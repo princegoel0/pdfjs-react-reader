@@ -1,0 +1,1261 @@
+/* pdfjs-react-reader — default theme (soft modern light) */
+
+.pjsr-viewer {
+  --pjsr-bg: #ffffff;
+  --pjsr-fg: #181d27;
+  --pjsr-muted-fg: #5c6470;
+  --pjsr-border: #e4e7ec;
+  --pjsr-toolbar-bg: #fcfcfd;
+  --pjsr-hover-bg: #f0f1f3;
+  --pjsr-accent: #4f46e5;
+  --pjsr-viewport-bg: #e8eaef;
+  --pjsr-page-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.08),
+    0 12px 32px rgba(16, 24, 40, 0.14);
+  --pjsr-menu-shadow:
+    0 4px 8px rgba(16, 24, 40, 0.08),
+    0 16px 40px rgba(16, 24, 40, 0.18);
+  --pjsr-danger-fg: #d92d20;
+  --pjsr-radius: 8px;
+  --pjsr-radius-lg: 12px;
+  --pjsr-control-h: 32px;
+  /* Row height for sidebar tabs / outline entries, gap inside control clusters,
+     and the ink colour dot plus its larger transparent tap box. The compact
+     blocks below raise these to touch sizes without touching desktop density. */
+  --pjsr-row-h: 30px;
+  /* Horizontal gap between toolbar controls. The overflow planner measures this
+     so its width arithmetic matches the row the browser actually lays out. */
+  --pjsr-cluster-gap: 6px;
+  --pjsr-caret-w: 20px;
+  --pjsr-swatch: 22px;
+  --pjsr-swatch-hit: 32px;
+  /* Glyph size tracks the control height so buttons do not read as big empty
+     boxes at touch size. */
+  --pjsr-icon: 16px;
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius-lg);
+  overflow: hidden;
+  /* `clip` also forbids programmatic scrolling: an `overflow: hidden` box can
+     still be shoved sideways when a focused form widget lies outside it, which
+     scrolled the whole viewer (and the page with it) off screen. Browsers
+     without `clip` keep the `hidden` declaration above. */
+  overflow: clip;
+  /* Lets the viewer adapt its own chrome to its width rather than the window's,
+     so a viewer squeezed into a narrow column gets the compact layout. */
+  container-type: inline-size;
+  container-name: pjsr;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---------- toolbar ---------- */
+
+/* Removes the ~300ms tap delay on touch without disabling pinch-zoom. The ink
+   layer overrides this with `touch-action: none` so drawing is not interrupted
+   by browser gestures. */
+.pjsr-viewer :is(button, input, select, a) {
+  touch-action: manipulation;
+}
+
+.pjsr-toolbar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /* Left-packed: the controls form one dense run and the document label takes
+     the slack at the right edge. `space-between` used to spread the run across
+     the whole row, which read as gaps in the middle of the controls. */
+  gap: 8px var(--pjsr-cluster-gap);
+  padding: 8px 10px;
+  background: var(--pjsr-toolbar-bg);
+  border-bottom: 1px solid var(--pjsr-border);
+  flex: none;
+}
+
+/* Off-screen copy of every control, used to measure natural widths before the
+   bar decides what folds. `visibility: hidden` keeps the subtree out of the
+   accessibility tree and out of the tab order, so the duplicated controls
+   cannot expose a second set of names or steal focus. `max-content` makes the
+   sizer report a resize whenever any control's width changes, and it is
+   right-anchored so the overflow runs leftwards — a left-anchored copy would
+   extend the toolbar's scrollable width by its full length. */
+.pjsr-toolbar-sizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--pjsr-cluster-gap);
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.pjsr-toolbar-sizer > * {
+  flex: none;
+}
+
+.pjsr-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: var(--pjsr-control-h);
+  height: var(--pjsr-control-h);
+  /* Icon-only buttons are the common case and must come out square: the
+     horizontal padding has to stay under (control-h - icon)/2, which is 8px at
+     the desktop tokens and 14px at touch size. Text buttons override this. */
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pjsr-fg);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.pjsr-button:hover:not(:disabled) {
+  background: var(--pjsr-hover-bg);
+}
+
+/* CSS beats the SVG width/height presentation attributes, so icon components
+   need no sizing props of their own. */
+.pjsr-button svg {
+  width: var(--pjsr-icon);
+  height: var(--pjsr-icon);
+}
+
+.pjsr-button:disabled {
+  color: var(--pjsr-muted-fg);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pjsr-page-input {
+  box-sizing: border-box;
+  width: 52px;
+  height: var(--pjsr-control-h);
+  padding: 0 6px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  text-align: center;
+  font: inherit;
+  /* After the `font` shorthand, which resets font-variant-numeric. */
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.pjsr-page-input::-webkit-outer-spin-button,
+.pjsr-page-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pjsr-page-input:focus,
+.pjsr-zoom-select:focus,
+.pjsr-button:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-page-count {
+  color: var(--pjsr-muted-fg);
+  white-space: nowrap;
+}
+
+/* Document name + effective zoom. Takes whatever slack the controls leave at
+   the right edge; the overflow planner drops it before any control, so it is
+   context rather than a control. */
+.pjsr-toolbar-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 0 1 auto;
+  margin-left: auto;
+  min-width: 0;
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+}
+
+.pjsr-meta-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pjsr-fg);
+  font-weight: 500;
+}
+
+.pjsr-meta-zoom {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.pjsr-zoom-select {
+  box-sizing: border-box;
+  height: var(--pjsr-control-h);
+  padding: 0 6px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ---------- overflow menu ---------- */
+
+/* Rendered by the Toolbar only when the planner has folded something away, so
+   no CSS toggle is needed and a wide bar never shows an empty ⋯. */
+.pjsr-overflow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pjsr-overflow-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* As wide as its widest row, then capped by the viewer so rows wrap instead of
+     being clipped by the viewer's `overflow: clip`. A `min-width` would beat the
+     cap and reintroduce a horizontal scrollbar on narrow phones. */
+  width: max-content;
+  /* The cap is a content-box measure without this, so the padding would spill
+     past the viewer edge it is meant to stay inside. */
+  box-sizing: border-box;
+  /* Anchored to the ⋯ at the right edge, so a row wider than the viewer would
+     be clipped by its `overflow: clip`. The vw form is the fallback for browsers
+     without container query units; cqw tracks the viewer when a wide window
+     holds a squeezed viewer. */
+  max-width: calc(100vw - 16px);
+  max-width: calc(100cqw - 16px);
+  padding: 8px;
+  background: var(--pjsr-bg);
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius-lg);
+  box-shadow: var(--pjsr-menu-shadow);
+}
+
+.pjsr-overflow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pjsr-cluster-gap);
+}
+
+/* The menu is a list of actions, so each row names what its icon-only control
+   does — an unlabeled grid of glyphs is only readable in a toolbar, where the
+   neighbours give it away. The label takes the slack and the control sits at
+   the trailing edge. */
+.pjsr-overflow-label {
+  flex: 1 1 96px;
+  min-width: 0;
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+}
+
+/* The label takes the slack; the control keeps its natural width. */
+.pjsr-overflow-row .pjsr-zoom-select {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* ---------- search ---------- */
+
+/* Both mode bars sit on a toolbar row of their own, at every width, and are
+   ordered last so they cannot split the control run from the ⋯ menu button.
+   Inline they need ~440px, which pushes the zoom/rotate controls onto a second
+   row at any desktop narrower than ~1500px — a 2-row toolbar either way, so the
+   stable layout wins: opening search never reflows the other controls, and a
+   match can never hide behind the bar. Left-aligned to match the control run. */
+.pjsr-search {
+  display: flex;
+  flex-wrap: wrap;
+  order: 1;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 440px;
+}
+
+.pjsr-search-input {
+  /* Basis 0, no floor: a positive `min-width` makes Chrome size-break flex
+     lines from the field's ~188px content box instead, which wrapped the last
+     button onto a second row even inside the full 440px bar. With `min-width: 0`
+     one row holds down to a ~430px viewer (field still ~117px); tier C puts the
+     floor back, where a phone bar genuinely cannot fit everything. */
+  flex: 1 1 0%;
+  min-width: 0;
+  height: var(--pjsr-control-h);
+  padding: 0 12px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: 999px;
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font: inherit;
+}
+
+.pjsr-search-input:focus {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-search-count {
+  min-width: 72px;
+  text-align: center;
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Before the first keystroke there is nothing to report; keep the element in
+   the DOM (an `aria-live` region that appears mid-flight is unreliable) but
+   stop it reserving 72px of dead space. */
+.pjsr-search-count:empty {
+  min-width: 0;
+}
+
+.pjsr-search-count[data-state='error'] {
+  color: var(--pjsr-danger-fg);
+}
+
+/* Zero matches stays neutral — only a failed search is red. */
+.pjsr-search-count[data-state='empty'] {
+  color: var(--pjsr-muted-fg);
+}
+
+/* Typographic toggles (match case / whole word). These stay as letters on
+   purpose — word-processor convention reads better than an invented glyph — but
+   the shared styling makes that look deliberate next to the SVG icons. */
+.pjsr-button--text {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+/* Toggles use aria-pressed; disclosures (sidebar, search, overflow menu) use
+   aria-expanded — both get the same active treatment. */
+.pjsr-button:is([aria-pressed='true'], [aria-expanded='true']) {
+  background: color-mix(in srgb, var(--pjsr-accent) 14%, transparent);
+  color: var(--pjsr-accent);
+}
+
+/* ---------- search highlights ---------- */
+
+.pjsr-text-layer mark.pjsr-mark {
+  color: transparent;
+  background: color-mix(in srgb, var(--pjsr-accent) 22%, transparent);
+  border-radius: 2px;
+}
+
+.pjsr-text-layer mark.pjsr-mark--active {
+  background: color-mix(in srgb, var(--pjsr-accent) 55%, transparent);
+}
+
+/* ---------- viewport & pages ---------- */
+
+.pjsr-body {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.pjsr-viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--pjsr-viewport-bg);
+}
+
+.pjsr-viewport:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -2px;
+}
+
+.pjsr-spacer {
+  position: relative;
+  margin: 0 auto;
+}
+
+.pjsr-page-slot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  background: #ffffff;
+  box-shadow: var(--pjsr-page-shadow);
+}
+
+.pjsr-page-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.pjsr-page {
+  position: relative;
+  /* Used by pdf.js setLayerDimensions when CSS round() is supported. */
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+
+.pjsr-page-canvas {
+  display: block;
+}
+
+/* ---------- annotation layer (links, markups, form widgets) ---------- */
+/* Adapted from pdf.js pdf_viewer.css (MIT, © Mozilla); the editor-layer rules
+   are omitted because we render annotations read/write through pdf.js directly. */
+
+.pjsr-annotation-layer {
+  --annotation-unfocused-field-background: url("data:image/svg+xml;charset=UTF-8,<svg width='1px' height='1px' xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%' style='fill:rgba(79, 70, 229, 0.12);'/></svg>");
+  --input-focus-border-color: var(--pjsr-accent);
+  --input-focus-outline: none;
+  --input-unfocused-border-color: transparent;
+  --input-disabled-border-color: transparent;
+  --input-hover-border-color: color-mix(in srgb, var(--pjsr-accent) 45%, transparent);
+
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+
+.pjsr-annotation-layer--inert,
+.pjsr-annotation-layer--inert section {
+  pointer-events: none !important;
+}
+
+/* The layer is transparent to the pointer, but each annotation box is not —
+   pdf.js relies on this exact pair so form widgets stay clickable while the
+   text layer below keeps its selection behaviour. */
+.pjsr-annotation-layer section {
+  position: absolute;
+  text-align: initial;
+  pointer-events: auto;
+  box-sizing: border-box;
+  transform-origin: 0 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pjsr-annotation-layer svg.quadrilateralsContainer {
+  contain: strict;
+  width: 0;
+  height: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+
+.pjsr-annotation-layer .annotationContent {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.pjsr-annotation-layer section:is(.highlightAnnotation, .underlinAnnotation, .strikeOutAnnotation, .squigglyAnnotation) {
+  mix-blend-mode: multiply;
+}
+
+.pjsr-annotation-layer :is(.linkAnnotation, .buttonWidgetAnnotation.pushButton) > a {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  font-size: 1em;
+}
+
+.pjsr-annotation-layer :is(.linkAnnotation, .buttonWidgetAnnotation.pushButton):not(.hasBorder) > a:hover {
+  background: color-mix(in srgb, var(--pjsr-accent) 12%, transparent);
+}
+
+.pjsr-annotation-layer .hasBorder {
+  background: transparent;
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea),
+.pjsr-annotation-layer .choiceWidgetAnnotation select,
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input {
+  background-image: var(--annotation-unfocused-field-background);
+  border: 2px solid var(--input-unfocused-border-color);
+  border-radius: 2px;
+  box-sizing: border-box;
+  font: calc(9px * var(--total-scale-factor, 1)) sans-serif;
+  height: 100%;
+  margin: 0;
+  vertical-align: top;
+  width: 100%;
+  color: var(--pjsr-fg);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea):hover,
+.pjsr-annotation-layer .choiceWidgetAnnotation select:hover,
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:hover {
+  border: 2px solid var(--input-hover-border-color);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea):focus,
+.pjsr-annotation-layer .choiceWidgetAnnotation select:focus {
+  background: none;
+  border: 2px solid var(--input-focus-border-color);
+  outline: var(--input-focus-outline);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea):required,
+.pjsr-annotation-layer .choiceWidgetAnnotation select:required,
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input:required {
+  outline: 1.5px solid var(--pjsr-danger-fg);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation [disabled]:is(input, textarea),
+.pjsr-annotation-layer .choiceWidgetAnnotation select[disabled],
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input[disabled] {
+  background: none;
+  border: 2px solid var(--input-disabled-border-color);
+  cursor: not-allowed;
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation textarea {
+  resize: none;
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation input.comb {
+  font-family: monospace;
+  padding-left: 2px;
+  padding-right: 0;
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input {
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) :focus {
+  background-color: Highlight;
+  border-color: var(--input-focus-border-color);
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::before,
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::after,
+.pjsr-annotation-layer .buttonWidgetAnnotation.radioButton input:checked::before {
+  background-color: var(--pjsr-fg);
+  content: "";
+  display: block;
+  position: absolute;
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::before,
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::after {
+  height: 80%;
+  left: 45%;
+  width: 1px;
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::before {
+  transform: rotate(45deg);
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::after {
+  transform: rotate(-45deg);
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.radioButton input:checked::before {
+  border-radius: 50%;
+  height: 50%;
+  left: 25%;
+  top: 25%;
+  width: 50%;
+}
+
+.pjsr-annotation-layer .popupAnnotation {
+  position: absolute;
+  font-size: calc(13px * var(--total-scale-factor, 1));
+  left: calc(10px * var(--total-scale-factor, 1));
+  top: calc(10px * var(--total-scale-factor, 1));
+  pointer-events: none;
+}
+
+.pjsr-annotation-layer .popup {
+  position: absolute;
+  z-index: 1;
+  max-width: 300px;
+  padding: 8px 12px;
+  background: var(--pjsr-bg);
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  box-shadow: var(--pjsr-menu-shadow);
+  color: var(--pjsr-fg);
+  line-height: 1.4;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pjsr-annotation-layer .popup * {
+  font-size: calc(13px * var(--total-scale-factor, 1));
+}
+
+.pjsr-annotation-layer .popup > .header {
+  display: inline-block;
+}
+
+.pjsr-annotation-layer .popup > .header > .title {
+  display: inline;
+  font-weight: 600;
+}
+
+/* ---------- ink layer (freehand drawing) ---------- */
+
+.pjsr-ink-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.pjsr-ink-layer[data-drawing] {
+  pointer-events: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* ---------- drawing toolbar ---------- */
+
+.pjsr-ink {
+  display: flex;
+  flex-wrap: wrap;
+  order: 1;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 100%;
+  min-width: 0;
+  /* 520, not the search bar's 440: label + 4 swatches + width select + Undo +
+     Clear + close measure ~436 at desktop and ~494 at 44px controls. */
+  max-width: 520px;
+}
+
+.pjsr-ink-label {
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.pjsr-ink-colors {
+  display: flex;
+  align-items: center;
+  gap: var(--pjsr-cluster-gap);
+}
+
+/* The button is the tap target and the span inside is the visible dot, so the
+   colour chip stays compact while the hit area grows to touch size. */
+.pjsr-ink-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--pjsr-swatch-hit);
+  height: var(--pjsr-swatch-hit);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pjsr-ink-swatch-dot {
+  display: block;
+  width: var(--pjsr-swatch);
+  height: var(--pjsr-swatch);
+  border: 2px solid var(--pjsr-border);
+  border-radius: 50%;
+}
+
+.pjsr-ink-swatch--active .pjsr-ink-swatch-dot {
+  border-color: var(--pjsr-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pjsr-accent) 30%, transparent);
+}
+
+.pjsr-ink .pjsr-button {
+  font-size: 13px;
+  padding: 0 8px;
+}
+
+.pjsr-ink-swatch:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: 1px;
+}
+
+/* ---------- sidebar (thumbnails / outline) ---------- */
+
+.pjsr-sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 248px;
+  min-height: 0;
+  background: var(--pjsr-bg);
+  border-right: 1px solid var(--pjsr-border);
+}
+
+.pjsr-sidebar-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--pjsr-cluster-gap);
+  padding: 4px 4px 0;
+  border-bottom: 1px solid var(--pjsr-border);
+  flex: none;
+}
+
+.pjsr-sidebar-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--pjsr-row-h);
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--pjsr-muted-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pjsr-sidebar-tab:hover {
+  color: var(--pjsr-fg);
+}
+
+.pjsr-sidebar-tab:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+.pjsr-sidebar-tab--active {
+  color: var(--pjsr-accent);
+  border-bottom-color: var(--pjsr-accent);
+}
+
+.pjsr-sidebar-close {
+  margin-left: auto;
+}
+
+.pjsr-sidebar-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ---------- thumbnails ---------- */
+
+.pjsr-thumbnail-list {
+  display: grid;
+  /* Two-up as soon as the sidebar can hold it; a fixed 132px frame wasted 48%
+     of every row as centring gutter. */
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 12px;
+  padding: 12px;
+}
+
+.pjsr-thumbnail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pjsr-thumbnail-frame {
+  display: block;
+  width: 100%;
+  /* Provisional until the page ratio is measured, then overridden inline;
+     aspect-ratio (not min-height) is what reserves the space. */
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.pjsr-thumbnail-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.pjsr-thumbnail-label {
+  color: var(--pjsr-muted-fg);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pjsr-thumbnail:hover .pjsr-thumbnail-frame {
+  border-color: color-mix(in srgb, var(--pjsr-accent) 45%, var(--pjsr-border));
+}
+
+.pjsr-thumbnail--active .pjsr-thumbnail-frame {
+  border-color: var(--pjsr-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pjsr-accent) 35%, transparent);
+}
+
+.pjsr-thumbnail--active .pjsr-thumbnail-label {
+  color: var(--pjsr-accent);
+}
+
+.pjsr-thumbnail:focus-visible .pjsr-thumbnail-frame {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: 1px;
+}
+
+/* ---------- outline ---------- */
+
+.pjsr-outline-tree,
+.pjsr-outline-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pjsr-outline-tree {
+  padding: 6px 4px;
+}
+
+.pjsr-outline-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pjsr-outline-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--pjsr-caret-w);
+  min-height: var(--pjsr-row-h);
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--pjsr-muted-fg);
+  cursor: pointer;
+}
+
+.pjsr-outline-caret:hover {
+  background: var(--pjsr-hover-bg);
+  color: var(--pjsr-fg);
+}
+
+.pjsr-outline-caret-spacer {
+  flex: none;
+  width: var(--pjsr-caret-w);
+}
+
+.pjsr-outline-link {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--pjsr-row-h);
+  /* Line-height (not flex) centres the label: a flex container turns its text
+     into an anonymous item, which silently kills the ellipsis below. */
+  line-height: calc(var(--pjsr-row-h) - 8px);
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pjsr-fg);
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.pjsr-outline-link:hover:not(:disabled) {
+  background: var(--pjsr-hover-bg);
+}
+
+.pjsr-outline-link:disabled {
+  color: var(--pjsr-muted-fg);
+  cursor: default;
+}
+
+.pjsr-outline-link:focus-visible,
+.pjsr-outline-caret:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-outline-empty {
+  padding: 16px;
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+}
+
+/* ---------- text layer ---------- */
+/* Adapted from pdf.js text_layer.css (MIT, © Mozilla). */
+
+.pjsr-text-layer {
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  --text-scale-factor: calc(var(--total-scale-factor, 1) * var(--min-font-size));
+
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 1;
+}
+
+.pjsr-text-layer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+
+.pjsr-text-layer > :not(.markedContent),
+.pjsr-text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.pjsr-text-layer .markedContent {
+  display: contents;
+}
+
+.pjsr-text-layer span[role='img'] {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+.pjsr-text-layer ::selection {
+  background: color-mix(in srgb, var(--pjsr-accent), transparent 75%);
+}
+
+.pjsr-text-layer br::selection {
+  background: transparent;
+}
+
+.pjsr-text-layer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pjsr-text-layer.selecting .endOfContent {
+  top: 0;
+}
+
+/* ---------- status ---------- */
+
+.pjsr-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  min-height: 120px;
+  padding: 16px;
+  text-align: center;
+  color: var(--pjsr-muted-fg);
+}
+
+.pjsr-status[role='alert'] {
+  color: var(--pjsr-danger-fg);
+}
+
+/* Outlined so the recovery action reads as a real button on the tinted
+   viewport backdrop, rather than another piece of status text. */
+.pjsr-status-action {
+  width: auto;
+  height: 36px;
+  border-color: var(--pjsr-border);
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.pjsr-status-action:hover:not(:disabled) {
+  background: var(--pjsr-hover-bg);
+}
+
+/* ---------- password prompt (FR-03) ---------- */
+
+/* Loading parks on the pending password request, so this fills the viewport
+   area rather than floating over an empty page list. */
+.pjsr-password {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  min-height: 180px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.pjsr-password-title {
+  margin: 0;
+  color: var(--pjsr-fg);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.pjsr-password-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pjsr-password-label {
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+}
+
+.pjsr-password-input {
+  width: min(240px, 100%);
+  height: var(--pjsr-control-h);
+  padding: 0 10px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font: inherit;
+}
+
+.pjsr-password-input:focus {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-password-error {
+  color: var(--pjsr-danger-fg);
+  font-size: 13px;
+}
+
+.pjsr-password-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Touch-sized alongside the field on the compact tiers. */
+.pjsr-password-actions .pjsr-button {
+  height: var(--pjsr-control-h);
+}
+
+/* ---------- printing (FR-19) ---------- */
+/* `usePdfPrint` appends this container to <body> rather than into the viewer:
+   the viewer clips with `overflow: clip`, and the rule below that isolates the
+   sheets would otherwise hide the thing being printed. On screen it is inert. */
+.pjsr-print {
+  display: none;
+}
+
+@media print {
+  /* Direct children of <body> only — the viewer is usually nested, and hiding
+     its wrapper takes the rest of the host chrome with it. Gated on the class
+     the pipeline adds for the duration of a job, so printing a host page that
+     merely *contains* the viewer is unaffected. */
+  body.pjsr-printing > :not(.pjsr-print) {
+    display: none !important;
+  }
+
+  body.pjsr-printing {
+    margin: 0;
+  }
+
+  .pjsr-print {
+    display: block;
+  }
+
+  .pjsr-print canvas {
+    display: block;
+    /* Filled to the printable width: the sheet's own margins shrink both
+       dimensions, so a page scaled this way still lands on a single sheet.
+       No `@page` rule — that would leak into the host app's own printing. */
+    width: 100%;
+    height: auto;
+  }
+
+  /* Break *before* every sheet but the first; `page-break-after` on all of them
+     would leave a blank page at the end. */
+  .pjsr-print canvas + canvas {
+    page-break-before: always;
+    break-before: page;
+  }
+}
+
+/* ---------- responsive ---------- */
+/* Two separate axes, deliberately not mixed:
+
+   * Control *size* follows the input device. WCAG 2.5.5 and the platform HIGs
+     want 44px targets for a finger, but a 500px-wide desktop window is still
+     driven by a mouse and keeps the dense 32px chrome. This one is a `@media`
+     query because pointer capability belongs to the device, not to the box.
+   * Which controls are *visible* is measured in JS — `planToolbarOverflow` works
+     off the sizer row — so no breakpoint can rot when a label is reworded or a
+     control added, which is exactly how the old fixed tiers went stale.
+
+   What remains keyed to width is about space rather than folding: the sidebar
+   overlays and the viewer drops its frame only where there is no room for them,
+   and the query field owns a row of its own on a phone bar. Each stays declared
+   twice — `@media` for phones and for browsers without container queries
+   (Safari 14 is a stated target), `@container` for a squeezed viewer inside a
+   wide window, which `@media` structurally cannot see. A container block cannot
+   style `.pjsr-viewer` itself, so tokens go on its children. */
+
+@media (pointer: coarse) {
+  .pjsr-viewer :is(.pjsr-toolbar, .pjsr-body) {
+    --pjsr-control-h: 44px;
+    --pjsr-row-h: 44px;
+    /* 8px is the published minimum gap between touch targets. */
+    --pjsr-cluster-gap: 8px;
+    --pjsr-caret-w: 32px;
+    --pjsr-swatch-hit: 44px;
+    --pjsr-icon: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .pjsr-viewer {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .pjsr-toolbar {
+    padding: 6px 8px;
+  }
+
+  /* Sidebar overlays the viewport instead of squeezing small screens. */
+  .pjsr-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 25;
+    width: min(78vw, 280px);
+    box-shadow: var(--pjsr-menu-shadow);
+  }
+
+  .pjsr-search-count {
+    min-width: 56px;
+  }
+}
+
+@container pjsr (max-width: 640px) {
+  .pjsr-toolbar {
+    padding: 6px 8px;
+  }
+
+  .pjsr-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 25;
+    width: min(78cqw, 280px);
+    box-shadow: var(--pjsr-menu-shadow);
+  }
+
+  .pjsr-search-count {
+    min-width: 56px;
+  }
+}
+
+@media (max-width: 440px) {
+  /* The bar is ~260-420px wide, so the query field takes the first row on its
+     own and the toggles + match buttons share the second: one row each, rather
+     than a 78px field with two buttons trailing off to nowhere. */
+  .pjsr-search-input {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+}
+
+@container pjsr (max-width: 440px) {
+  .pjsr-search-input {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+}
+
+/* ---------- reduced motion ---------- */
+
+/* 0.01ms rather than `none` so transitionend still fires for anything waiting
+   on it, while the change is imperceptible. */
+@media (prefers-reduced-motion: reduce) {
+  .pjsr-viewer :is(*, *::before, *::after) {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "pdfjs-react-reader": ["./src/index.ts"],
+      "pdfjs-react-reader/headless": ["./src/headless.ts"],
+      "pdfjs-react-reader/styles.css": ["./src/styles/viewer.css"]
+    }
+  },
+  "include": ["src", "playground/src", "playground/vite.config.ts", "docs/src", "docs/vite.config.ts"]
+}

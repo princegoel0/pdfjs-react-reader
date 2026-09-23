@@ -1,0 +1,361 @@
+/* Documentation site chrome. Deliberately a separate palette from the viewer's
+   `--pjsr-*` tokens: the docs must stay legible while showing the viewer
+   re-themed, so the two cannot share variables. */
+
+:root {
+  --doc-bg: #f7f8fa;
+  --doc-surface: #ffffff;
+  --doc-fg: #181d27;
+  --doc-muted: #5c6470;
+  --doc-border: #e4e7ec;
+  --doc-accent: #4f46e5;
+  --doc-accent-soft: #eef0fe;
+  --doc-code-bg: #1b1f2a;
+  --doc-code-fg: #e6e9f0;
+  --doc-radius: 10px;
+  --doc-measure: 74ch;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--doc-bg);
+  color: var(--doc-fg);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.doc-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--doc-border);
+}
+
+.doc-logo {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.doc-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-links {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.doc-links a {
+  color: var(--doc-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.doc-links a:hover {
+  color: var(--doc-accent);
+  text-decoration: underline;
+}
+
+.doc-layout {
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr);
+  gap: 32px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 20px 96px;
+}
+
+.doc-nav {
+  position: sticky;
+  top: 61px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 85px);
+  overflow: auto;
+}
+
+.doc-nav-group {
+  margin: 16px 0 4px;
+  color: var(--doc-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.doc-nav a {
+  padding: 6px 10px;
+  border-radius: 7px;
+  color: var(--doc-fg);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.doc-nav a:hover {
+  background: #eef0f3;
+}
+
+.doc-nav a[aria-current='page'] {
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent);
+  font-weight: 600;
+}
+
+.doc-main {
+  min-width: 0;
+}
+
+.doc-page {
+  max-width: var(--doc-measure);
+}
+
+.doc-page h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.doc-page h2 {
+  margin: 40px 0 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--doc-border);
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+.doc-page h3 {
+  margin: 28px 0 8px;
+  font-size: 16px;
+}
+
+.doc-lede {
+  margin: 0 0 24px;
+  color: var(--doc-muted);
+  font-size: 17px;
+}
+
+.doc-page p,
+.doc-page li {
+  color: #2c333f;
+}
+
+.doc-page ul {
+  padding-left: 22px;
+}
+
+.doc-page a {
+  color: var(--doc-accent);
+}
+
+code,
+pre {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+:not(pre) > code {
+  padding: 1px 5px;
+  border: 1px solid var(--doc-border);
+  border-radius: 5px;
+  background: var(--doc-surface);
+  font-size: 0.9em;
+}
+
+pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  border-radius: var(--doc-radius);
+  background: var(--doc-code-bg);
+  color: var(--doc-code-fg);
+  line-height: 1.6;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.doc-table th,
+.doc-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--doc-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc-table th {
+  color: var(--doc-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Hook signatures are long; `white-space: nowrap` on this column pushed the
+   whole table past the viewport and gave the page a horizontal scrollbar. */
+.doc-table code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.doc-callout {
+  margin: 20px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--doc-border);
+  border-left: 3px solid var(--doc-accent);
+  border-radius: 0 var(--doc-radius) var(--doc-radius) 0;
+  background: var(--doc-surface);
+  font-size: 14px;
+}
+
+/* ---------- live examples ---------- */
+
+.doc-example {
+  margin: 24px 0;
+  border: 1px solid var(--doc-border);
+  border-radius: 14px;
+  background: var(--doc-surface);
+  overflow: hidden;
+}
+
+.doc-example-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--doc-border);
+  background: #fbfbfc;
+}
+
+.doc-example-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.doc-example-live {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.doc-example-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.doc-example-actions button {
+  padding: 4px 10px;
+  border: 1px solid var(--doc-border);
+  border-radius: 7px;
+  background: var(--doc-surface);
+  color: var(--doc-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.doc-example-actions button:hover {
+  border-color: var(--doc-accent);
+  color: var(--doc-accent);
+}
+
+.doc-example-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+.doc-example-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 0 14px 14px;
+  border-top: 1px dashed var(--doc-border);
+  font-size: 13px;
+}
+
+.doc-example-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--doc-muted);
+}
+
+.doc-example-source {
+  border-top: 1px solid var(--doc-border);
+}
+
+.doc-frame {
+  height: 460px;
+  min-height: 0;
+}
+
+.doc-frame--short {
+  height: 320px;
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 900px) {
+  .doc-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 16px 14px 72px;
+  }
+
+  .doc-nav {
+    position: static;
+    flex-direction: row;
+    gap: 6px;
+    padding-bottom: 8px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--doc-border);
+  }
+
+  .doc-nav-group {
+    display: none;
+  }
+
+  .doc-nav a {
+    white-space: nowrap;
+    border: 1px solid var(--doc-border);
+  }
+
+  .doc-frame {
+    height: 380px;
+  }
+}
