@@ -7,6 +7,9 @@ It ships the parts that are tedious to get right — virtualized rendering, the 
 layer stack, worker lifecycle, whole-document search, AcroForm editing, printing — as hooks you can
 drive from your own interface, plus an optional drop-in component for when you just need a viewer.
 
+Every one of those has a runnable example on the
+[documentation site](https://princegoel0.github.io/pdfjs-react-reader/).
+
 ```bash
 npm install pdfjs-react-reader pdfjs-dist
 ```
@@ -103,7 +106,8 @@ export function CustomViewer({ src }: { src: string }) {
 }
 ```
 
-The `docs/` site has this running live, alongside the shell, theming and form examples.
+The [documentation site](https://princegoel0.github.io/pdfjs-react-reader/) runs this live, alongside
+the shell, theming and form examples.
 
 ## The worker
 
@@ -173,7 +177,8 @@ If Safari is critical to you, test that first.
 ## Links
 
 - [CHANGELOG.md](./CHANGELOG.md) — release entries, development log, versioning policy.
-- `docs/` — the documentation site with live examples (`npm run docs`).
+- [Documentation site](https://princegoel0.github.io/pdfjs-react-reader/) — live examples; source in
+  `docs/`, served on :5200 by `npm run docs`, published from `main` by `.github/workflows/docs.yml`.
 - `PRD.md` — the original requirements and phase plan.
 
 ## Development

@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/princegoel0/pdfjs-react-reader/issues"
   },
-  "homepage": "https://github.com/princegoel0/pdfjs-react-reader#readme",
+  "homepage": "https://princegoel0.github.io/pdfjs-react-reader/",
   "sideEffects": [
     "**/*.css"
   ],
