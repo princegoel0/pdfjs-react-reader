@@ -4,6 +4,14 @@
   "description": "MIT-licensed, headless-first PDF viewer for React built directly on pdfjs-dist. Virtualized rendering, text layer, search, forms, and an optional drop-in UI shell.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/princegoel0/pdfjs-react-reader.git"
+  },
+  "bugs": {
+    "url": "https://github.com/princegoel0/pdfjs-react-reader/issues"
+  },
+  "homepage": "https://github.com/princegoel0/pdfjs-react-reader#readme",
   "sideEffects": [
     "**/*.css"
   ],
