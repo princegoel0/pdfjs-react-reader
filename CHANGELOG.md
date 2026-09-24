@@ -5,6 +5,15 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- A `prepublishOnly` script that runs the full `verify` gate, so `npm publish` cannot ship a `dist/`
+  that fails typecheck or tests, has drifted from the source, or is over the size budget. It runs on
+  `npm publish --dry-run` as well, which is how the guard itself gets tested; `npm pack --dry-run`
+  checks nothing, so reading the tarball listing stays a separate manual step.
+
 ## [0.1.0] — 2026-09-23
 
 Initial release. Feature-complete against the project brief and browser-verified; not yet published

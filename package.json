@@ -42,7 +42,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "size": "node scripts/check-size.mjs",
-    "verify": "npm run typecheck && npm run test && npm run build && npm run size"
+    "verify": "npm run typecheck && npm run test && npm run build && npm run size",
+    "prepublishOnly": "npm run verify"
   },
   "engines": {
     "node": ">=20"

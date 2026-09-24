@@ -196,7 +196,7 @@ If Safari is critical to you, test that first.
 ```bash
 npm run dev          # playground on :5199 with the repo's fixture PDFs
 npm run docs         # documentation site on :5200
-npm run verify       # typecheck + tests + build + size budget
+npm run verify       # typecheck + tests + build + size budget (prepublishOnly runs this)
 node scripts/make-form-pdf.mjs   # regenerate fixtures
 ```
 
