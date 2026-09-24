@@ -1,6 +1,6 @@
 {
   "name": "pdfjs-react-reader",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MIT-licensed, headless-first PDF viewer for React built directly on pdfjs-dist. Virtualized rendering, text layer, search, forms, and an optional drop-in UI shell.",
   "type": "module",
   "license": "MIT",
@@ -53,7 +53,7 @@
   },
   "author": "Prince Goel",
   "peerDependencies": {
-    "pdfjs-dist": "^5.0.0",
+    "pdfjs-dist": "^5.0.0 || ^6.2.108",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
   },
@@ -62,7 +62,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "pdfjs-dist": "^5.0.0",
+    "pdfjs-dist": "^6.2.108",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsup": "^8.0.0",

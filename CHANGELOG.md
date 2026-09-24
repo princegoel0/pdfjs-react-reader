@@ -5,7 +5,32 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] — unreleased
+## [0.1.2] — 2026-09-24
+
+### Changed
+
+- **The `pdfjs-dist` peer range is now `^5.0.0 || ^6.2.108`.** This is a security-driven widening,
+  not a routine major bump. CVE-2026-16633 (`GHSA-hq66-cqwq-w95j`, high — arbitrary JavaScript
+  execution when opening a malicious PDF) covers `>= 5.6.83, < 6.2.108`, and **no 5.x release fixes
+  it**. The previous `^5.0.0` therefore did more than permit a vulnerable engine: it *excluded* every
+  patched one, so a consumer following our own docs could not install a fixed `pdfjs-dist` without a
+  peer-resolution error. The floor is deliberately `6.2.108` rather than `6.0.0`, because 6.0.x and
+  6.1.x are inside the vulnerable band too. `pdfjs-dist` v5 remains supported and nothing existing
+  breaks.
+
+### Fixed
+
+- **A cancelled document load threw on pdfjs-dist 6.x.** `usePdfDocument` released a load that had
+  been superseded by calling `PDFDocumentProxy.destroy()`, which 6.x removed. It now destroys the
+  loading task instead — present in both majors, and the more correct call for an aborted load
+  because it also abandons the in-flight request rather than only the resolved document.
+
+Tested against `pdfjs-dist` 6.3.289 in a browser: page and text-layer rendering, all nine AcroForm
+widget types, form editing through `annotationStorage`, search with match marking, thumbnail and
+outline sidebar including destination navigation, ink strokes through `convertToPdfPoint`, and the
+encrypted-document password prompt for both wrong and correct passwords. Console clean throughout.
+
+## [0.1.1] — 2026-09-24
 
 ### Fixed
 
@@ -176,7 +201,8 @@ of published versions.
 
 ## How to pick a version
 
-1. Install the same major of `pdfjs-dist` you already use — this package requires `^5.0.0`.
+1. Install the same major of `pdfjs-dist` you already use — this package requires `^5.0.0 || ^6.2.108`.
+   On v5 you are on a release with no fix for CVE-2026-16633, so move to 6.2.108 or later when you can.
 2. React 18 or 19 both work; nothing else is required at runtime.
 3. Pin an exact version in an application (`pdfjs-react-reader` `0.1.0`, not `^0.1.0`) until 1.0.0,
    because 0.x minor releases may include breaking changes.

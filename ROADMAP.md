@@ -245,10 +245,16 @@ downloads.
 
 ## Policy conflicts to resolve
 
-* **Peer floor.** `package.json` requires `pdfjs-dist: ^5.0.0`, but the editor classes live under
-  `display/editor/*` and `AnnotationEditorType.SIGNATURE` / `TextLayerImages` are recent additions.
-  `0.6` needs the floor raised to whatever version introduced them — a breaking peer change, which
-  the CHANGELOG policy says to announce loudly even at `0.x`.
+* **Peer floor.** Resolved for the engine major in `0.1.2`: the range is now `^5.0.0 || ^6.2.108`,
+  the floor being set by CVE-2026-16633 (`>= 5.6.83, < 6.2.108`, no 5.x patched) rather than by our
+  own API usage. **Still open for `0.6`:** the editor classes live under `display/editor/*` and
+  `AnnotationEditorType.SIGNATURE` / `TextLayerImages` are recent additions, so `0.6` needs the floor
+  raised to whatever version introduced them — a breaking peer change, which the CHANGELOG policy
+  says to announce loudly even at `0.x`. Note the security floor and the feature floor may end up
+  demanding different things, in which case dropping v5 entirely becomes the cleaner answer.
+* **v6 runtime coverage.** `0.1.2` verified 6.3.289 by hand in a browser and the CI `consumer` job now
+  builds the packed tarball against `^5` and `^6.2.108`. That coverage must be kept: every later
+  release should pass on both, and `0.7`'s writer work should be measured on 6.x, not 5.7.284.
 * **Breaking `0.4` props.** `enablePrint` / `enableDownload` / `renderForms` change meaning when they
   become features. Permitted pre-1.0, but it must be one deliberate release with a changelog entry,
   not an incidental fallout of a refactor.

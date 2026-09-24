@@ -43,7 +43,7 @@ export function Report() {
 
 | Package | Required | Tested with |
 | --- | --- | --- |
-| `pdfjs-dist` | `^5.0.0` | 5.7.284 |
+| `pdfjs-dist` | `^5.0.0 \|\| ^6.2.108` | 6.3.289 |
 | `react` | `^18.0.0 \|\| ^19.0.0` | 18.3.1, 19.3.0 |
 | `react-dom` | `^18.0.0 \|\| ^19.0.0` | 18.3.1, 19.3.0 |
 
@@ -52,6 +52,10 @@ Nothing else at runtime — no state library, no date library, no polyfills, no 
 `pdfjs-dist` v4 is **not** supported: it has no `canvas` render parameter (its `render()` reads
 `canvasContext.canvas`), so a v4 install would show blank pages rather than fail loudly. 4.2.67 also
 lacks the `TextLayer` export. See [CHANGELOG.md](./CHANGELOG.md) for the full reasoning.
+
+The 6.x floor is `6.2.108` rather than `6.0.0` on purpose: CVE-2026-16633 (high — arbitrary
+JavaScript execution when opening a malicious PDF) affects `>= 5.6.83, < 6.2.108`, and no 5.x release
+fixes it. v5 stays supported, but if you can move to `6.2.108` or later you should.
 
 Your bundler needs to handle ESM and `exports` maps — Vite 5+, webpack 5+, Rollup 4+, esbuild and
 Turbopack all work. There is no CommonJS build.

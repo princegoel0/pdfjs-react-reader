@@ -92,7 +92,7 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
 
         const loaded = await task.promise;
         if (cancelled) {
-          void loaded.destroy();
+          void task.destroy();
           return;
         }
         setDoc(loaded);

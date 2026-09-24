@@ -91,9 +91,19 @@ jobs:
           retention-days: 7
 
   consumer:
-    name: Consumer build (Vite)
+    name: Consumer build (Vite, pdfjs-dist ${{ matrix.engine }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both supported majors, because a peer range we cannot actually build
+        # against is the mistake that shipped 0.1.0. `^6.2.108` rather than
+        # `^6` so CI proves the CVE-2026-16633 floor we advertise, not an
+        # unpatched 6.0/6.1 that the range deliberately excludes.
+        engine: ['^5', '^6.2.108']
+    env:
+      PDFJS_ENGINE: ${{ matrix.engine }}
     steps:
       - uses: actions/checkout@v4
 
@@ -124,7 +134,7 @@ jobs:
           cd /tmp/consumer
           npm init -y > /dev/null
           npm i --no-audit --no-fund "$GITHUB_WORKSPACE"/pdfjs-react-reader-*.tgz \
-            pdfjs-dist@^5 react react-dom > /dev/null
+            "pdfjs-dist@$PDFJS_ENGINE" react react-dom > /dev/null
           npm i -D --no-audit --no-fund vite typescript @types/react @types/react-dom > /dev/null
 
       # Tripwire for the 0.1.0 defect. Vite rewrites a bare `new URL()` specifier

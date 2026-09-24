@@ -17,9 +17,9 @@ yarn add pdfjs-react-reader pdfjs-dist`}</code>
       </pre>
       <p>
         <code>pdfjs-dist</code> is a peer dependency on purpose: it stays your copy, at your
-        version, and the package requires <code>^5.0.0</code> — see{' '}
-        <a href="#/compatibility">Versions &amp; compatibility</a> for why v4 is excluded. React 18
-        or 19 is required. The build is ESM-only
+        version, and the package requires <code>^5.0.0 || ^6.2.108</code> — see{' '}
+        <a href="#/compatibility">Versions &amp; compatibility</a> for why v4 is excluded and why the
+        6.x floor is 6.2.108. React 18 or 19 is required. The build is ESM-only
         (<code>"type": "module"</code>) with generated TypeScript declarations.
       </p>
 

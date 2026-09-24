@@ -27,9 +27,9 @@ export function Compatibility() {
               <code>pdfjs-dist</code>
             </td>
             <td>
-              <code>^5.0.0</code>
+              <code>^5.0.0 || ^6.2.108</code>
             </td>
-            <td>5.7.284</td>
+            <td>6.3.289</td>
             <td>
               The engine. Rendering, text, annotations and printing all go straight to it.
             </td>
@@ -62,6 +62,26 @@ export function Compatibility() {
         <code>{`npm install pdfjs-react-reader pdfjs-dist
 # react and react-dom must already be in the app`}</code>
       </pre>
+
+      <h2>Why the 6.x floor is 6.2.108</h2>
+      <p>
+        Not <code>^6.0.0</code>. <strong>CVE-2026-16633</strong> (<code>GHSA-hq66-cqwq-w95j</code>,
+        high) is arbitrary JavaScript execution when a malicious PDF is opened, and it covers{' '}
+        <code>&gt;= 5.6.83, &lt; 6.2.108</code>. That range includes every 6.0.x and 6.1.x release, so
+        a permissive 6 floor would advertise vulnerable engines as supported.
+      </p>
+      <p>
+        More importantly, no 5.x release fixes it. The previous <code>^5.0.0</code> range therefore
+        did more than allow a vulnerable version — it <em>excluded</em> every patched one, so an app
+        following our own docs could not install a fixed <code>pdfjs-dist</code> without a
+        peer-resolution error. v5 remains supported because dropping it would break existing installs
+        for no security gain; if you can move to <code>6.2.108</code> or later, you should.
+      </p>
+      <p>
+        Note this is the engine's vulnerability, not ours, and we cannot patch it from here. Our own
+        default already declines the trigger the advisory names: the annotation layer is rendered with{' '}
+        <code>enableScripting: false</code> and the scripting sandbox is never loaded.
+      </p>
 
       <h2>Why v4 of pdfjs-dist is not supported</h2>
       <p>
