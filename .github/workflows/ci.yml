@@ -15,6 +15,9 @@ jobs:
   verify:
     name: Verify (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    # Without this a step that never exits holds its runner for the 360-minute
+    # default before GitHub cancels it.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -52,6 +55,7 @@ jobs:
   docs:
     name: Build docs
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -68,6 +72,8 @@ jobs:
       - name: Build library
         run: npm run build
 
+      # `build:docs` must be a pure build: an earlier version chained
+      # `vite preview`, which serves forever, so this step hung for six hours.
       - name: Build docs
         run: npm run build:docs
         env:

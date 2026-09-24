@@ -37,7 +37,7 @@
     "build": "tsup && node scripts/copy-assets.mjs",
     "dev": "vite playground",
     "docs": "vite docs",
-    "build:docs": "vite build docs && vite preview docs --port 4173",
+    "build:docs": "vite build docs",
     "preview:docs": "vite preview docs --port 4173",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
