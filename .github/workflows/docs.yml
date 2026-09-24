@@ -1,0 +1,68 @@
+name: Deploy docs
+
+# The published site mirrors `main`, the release branch, so a `dev` push or a
+# pull request only gets checked by ci.yml and never reaches readers.
+on:
+  push:
+    branches: [main]
+  # Republish without a code change, e.g. after flipping a Pages setting.
+  workflow_dispatch:
+
+# `cancel-in-progress` stays false on purpose: cancelling a run between the
+# artifact upload and the swap can leave the site half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# `id-token` is needed by deploy-pages to authenticate to the Pages API.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build library
+        run: npm run build
+
+      # A project page is served from /<repo>/, so every URL the bundle emits
+      # needs that prefix. Derived from the event payload instead of hardcoded
+      # so a repository rename does not silently 404 the site. The Vite config
+      # defaults to a relative base, which covers hashed assets but not the
+      # `publicDir` fixture PDFs those pages load.
+      - name: Build docs
+        run: npm run build:docs
+        env:
+          DOC_TARGET: dist
+          DOCS_BASE: /${{ github.event.repository.name }}/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4

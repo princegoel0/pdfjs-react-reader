@@ -52,8 +52,12 @@ jobs:
       - name: Pack
         run: npm pack --dry-run
 
+  # Check-only. A push to `main` also starts docs.yml, which builds this same
+  # site in order to publish it, so running the job there would duplicate work.
+  # PR events carry a refs/pull/* ref, so they still get the check.
   docs:
     name: Build docs
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
