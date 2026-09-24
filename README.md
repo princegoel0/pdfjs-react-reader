@@ -162,8 +162,16 @@ Gzipped, excluding `pdfjs-dist` (a peer dependency):
 | --- | --- |
 | Shell — `index.js` + shared chunk + CSS | 37.0 kB |
 | Headless — `headless.js` + shared chunk + CSS | 22.3 kB |
+| A single headless hook (`usePdfDocument`) tree-shaken | 1.7 kB |
 
 CI runs `npm run size` and fails above the 45 kB budget.
+
+Both figures above are ceilings: because the package is ESM with `"sideEffects": ["**/*.css"]`,
+importing only what you use costs less than the whole path. For scale, `pdfjs-dist` itself is ~532 kB
+gzipped, so it dominates any viewer bundle regardless of this package.
+
+Named imports are already tree-shakeable; the open work is making the *shell* opt-in per feature
+rather than all-or-nothing, which is `ROADMAP.md` §0.4.
 
 ## Browser support
 

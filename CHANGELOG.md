@@ -134,6 +134,14 @@ of published versions.
 - A new `pdfjs-dist` major is supported in a minor release when it needs no API change here, and is
   announced in this file. Dropping a major that is still under the React/pdfjs-dist support window
   is a breaking change and takes a major.
+- During `0.x` a **MINOR may break** the public API, and does so only as a deliberate, single-release
+  change announced at the top of its entry here. `0.4.0` is reserved for exactly that: `enablePrint`,
+  `enableDownload` and `renderForms` become opt-in features (`PRD.md` FR-21), because a prop cannot
+  remove code from a bundle while an import can.
+- Size budgets are **per tier**, not one global ceiling: core viewer ≤ 8 kB gzipped, any single
+  feature ≤ 4 kB, full viewer ≤ 45 kB, all excluding `pdfjs-dist`. CI also asserts the built core
+  artifact contains no feature code, so a regression in the tier boundary fails the build rather than
+  quietly shipping (`PRD.md` FR-23).
 - The `docs/` site documents the latest release; older API shapes are described by the matching git
   tag rather than maintained as separate sites.
 
