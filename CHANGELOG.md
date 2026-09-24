@@ -5,19 +5,39 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] — unreleased
+
+### Fixed
+
+- **The worker could not be found in a Vite dev server.** `configureWorker` built
+  `new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)` with a bare specifier. Vite
+  rewrites that at build time but not while serving modules, so consumers got
+  `…/pdfjs-react-reader/dist/pdfjs-dist/build/pdf.worker.min.mjs` and a 404, and pdf.js's own
+  fallback then fetched the same dead URL because we had assigned it. The lookup now probes a
+  bundler-relative specifier first, then the bare one (still needed where the package source is
+  bundled directly, as the docs site does), and assigns whichever answers. Nothing is assigned when
+  neither does, so pdf.js can fall back, and the load error names `workerSrc` as the remedy.
+  Verified against the installed tarball in Vite dev and in a production build.
+- **`import 'pdfjs-react-reader/styles.css'` failed to typecheck** under TypeScript 5.6+ (TS2882)
+  for any consumer without a `*.css` module declaration of its own. The `./styles.css` export now
+  carries a shipped declaration.
 
 ### Added
 
-- A `prepublishOnly` script that runs the full `verify` gate, so `npm publish` cannot ship a `dist/`
-  that fails typecheck or tests, has drifted from the source, or is over the size budget. It runs on
-  `npm publish --dry-run` as well, which is how the guard itself gets tested; `npm pack --dry-run`
-  checks nothing, so reading the tarball listing stays a separate manual step.
+- `ensureWorker` and `workerAutoDetectionFailed`, exported from both entry points.
+- A `consumer` CI job that installs the packed tarball into a throwaway Vite app and typechecks and
+  builds it. Every other job resolves `pdfjs-react-reader` to this repository's own source through
+  `tsconfig.json` `paths` and the docs alias, which is exactly why a broken published artifact passed
+  CI: the guard had never once looked at the tarball.
 
 ## [0.1.0] — 2026-09-23
 
-Initial release. Feature-complete against the project brief and browser-verified; not yet published
-to npm.
+Initial release. Feature-complete against the project brief and browser-verified; published to npm on
+2026-09-24 as `0.1.0`, tagged at `35261ce`.
+
+Two things in this release were later corrected: it needs `workerSrc` to be passed explicitly in a
+Vite dev server (fixed in `0.1.1`), and it ships no CSS type declaration (also `0.1.1`). Nothing else
+about the artifact is affected — an installed `0.1.0` builds and renders correctly in production.
 
 ### Added
 

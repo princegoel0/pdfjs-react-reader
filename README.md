@@ -111,15 +111,22 @@ the shell, theming and form examples.
 
 ## The worker
 
-pdf.js parses in a worker, and locating it is the usual integration headache. The package resolves
-`new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)` automatically, which works in
-Vite, webpack 5 and Next (client component). Pass `workerSrc` to pin a CDN or a copied asset, or
-let it fall back to pdf.js's main-thread fake worker when `import.meta.url` is unavailable.
+pdf.js parses in a worker, and locating it is the usual integration headache. Without `workerSrc`
+the package looks for the worker inside your own `node_modules`, probing a bundler-relative
+specifier first and a bare one second, and keeps the first URL that actually answers. That covers
+Vite (dev server and build), webpack 5 and Rollup without a line of configuration.
+
+Nothing is assigned when no candidate answers, so pdf.js can still fall back to its main-thread
+worker, and a failed load names `workerSrc` as the fix instead of surfacing a fetch error.
 
 ```tsx
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 <PdfViewer src={src} workerSrc={workerUrl} />
 ```
+
+Pin it when you serve the worker from a CDN or copy it into a fixed location. Note that `pdfjs-dist`
+itself needs DOM globals at import time, so this package is client-side only — in Next.js, import it
+from a `"use client"` component and load it dynamically rather than in a server component.
 
 ## Theming
 

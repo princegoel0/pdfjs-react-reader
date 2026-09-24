@@ -43,14 +43,17 @@ yarn add pdfjs-react-reader pdfjs-dist`}</code>
           <code>usePdfDocument</code> always wins — use this for a CDN or a copied asset.
         </li>
         <li>
-          Otherwise it resolves <code>new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)</code>,
-          which is the pattern bundlers understand, so nothing is needed in a normal Vite, Next
-          (client component) or webpack 5 app.
+          Otherwise it probes two specifiers for the worker and keeps the first URL that answers: a
+          bundler-relative one,{' '}
+          <code>new URL('../../pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)</code>, then a
+          bare one. The relative form is tried first because a bare specifier is only rewritten at
+          build time — under a Vite dev server it resolves next to this package and 404s. Nothing is
+          needed in a normal Vite, webpack 5 or Rollup app.
         </li>
         <li>
-          If <code>import.meta.url</code> is unavailable, it leaves the worker unset and pdf.js
-          transparently falls back to its main-thread "fake worker". Everything still works, just
-          without the worker's responsiveness.
+          If nothing answers, <code>workerSrc</code> is left unset so pdf.js can still fall back to
+          its main-thread "fake worker", and a failed load tells you to pass <code>workerSrc</code>
+          instead of surfacing a bare fetch error.
         </li>
       </ol>
       <pre>

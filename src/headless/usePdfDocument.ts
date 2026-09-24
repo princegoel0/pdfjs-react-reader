@@ -7,7 +7,7 @@ import {
   type PDFDocumentProxy,
 } from 'pdfjs-dist';
 import { normalizeSource, type PdfSource } from '../lib/source';
-import { configureWorker } from '../lib/worker';
+import { ensureWorker, workerAutoDetectionFailed } from '../lib/worker';
 
 export type PasswordReason = 'need-password' | 'incorrect-password';
 
@@ -71,7 +71,7 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
 
     (async () => {
       try {
-        configureWorker(workerSrc);
+        await ensureWorker(workerSrc);
         const normalized = await normalizeSource(srcRef.current);
         if (cancelled) return;
 
@@ -98,7 +98,13 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
         setDoc(loaded);
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err : new Error(String(err)));
+        const cause = err instanceof Error ? err : new Error(String(err));
+        if (workerAutoDetectionFailed() && /worker/i.test(cause.message)) {
+          cause.message +=
+            ' — the pdf.js worker was not found automatically. Pin it with `workerSrc` ' +
+            "(e.g. `import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'`).";
+        }
+        setError(cause);
       }
     })();
 

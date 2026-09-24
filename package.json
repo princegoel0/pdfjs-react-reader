@@ -1,6 +1,6 @@
 {
   "name": "pdfjs-react-reader",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MIT-licensed, headless-first PDF viewer for React built directly on pdfjs-dist. Virtualized rendering, text layer, search, forms, and an optional drop-in UI shell.",
   "type": "module",
   "license": "MIT",
@@ -27,7 +27,10 @@
       "types": "./dist/headless.d.ts",
       "import": "./dist/headless.js"
     },
-    "./styles.css": "./dist/styles.css",
+    "./styles.css": {
+      "types": "./dist/styles.d.ts",
+      "default": "./dist/styles.css"
+    },
     "./package.json": "./package.json"
   },
   "files": [

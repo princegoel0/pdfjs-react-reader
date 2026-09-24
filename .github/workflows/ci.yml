@@ -89,3 +89,72 @@ jobs:
           name: docs
           path: docs/dist/
           retention-days: 7
+
+  consumer:
+    name: Consumer build (Vite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build library
+        run: npm run build
+
+      - name: Pack
+        run: npm pack
+
+      # `tsconfig.json` maps `pdfjs-react-reader` onto its own source and the docs
+      # alias to `../src`, so every other job here resolves the package locally
+      # and a packaging defect can only surface against the installed tarball.
+      # That is how 0.1.0 shipped a worker URL no bundler could rewrite.
+      - name: Install the packed tarball into a throwaway app
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/consumer && mkdir -p /tmp/consumer
+          cp scripts/consumer-smoke/index.html scripts/consumer-smoke/tsconfig.json /tmp/consumer/
+          cp -r scripts/consumer-smoke/src /tmp/consumer/src
+          cd /tmp/consumer
+          npm init -y > /dev/null
+          npm i --no-audit --no-fund "$GITHUB_WORKSPACE"/pdfjs-react-reader-*.tgz \
+            pdfjs-dist@^5 react react-dom > /dev/null
+          npm i -D --no-audit --no-fund vite typescript @types/react @types/react-dom > /dev/null
+
+      # Tripwire for the 0.1.0 defect. Vite rewrites a bare `new URL()` specifier
+      # when building but not while serving modules in dev, so a bare-only lookup
+      # 404s on every consumer's dev server while still passing the build below.
+      # The relative form must stay present and tried first.
+      - name: Assert the worker specifier is bundler-safe
+        run: |
+          set -euo pipefail
+          grep -q 'new URL("../../pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url)' \
+            dist/*.js || { echo 'the relative worker specifier is missing from dist/'; exit 1; }
+
+      # Asserts the shipped .d.ts files work and that the CSS subpath is importable
+      # by a plain tsc build (`types: []`, no vite/client shim).
+      - name: Type check the consumer
+        run: cd /tmp/consumer && ./node_modules/.bin/tsc -p tsconfig.json
+
+      - name: Build the consumer
+        run: cd /tmp/consumer && ./node_modules/.bin/vite build
+
+      # Packaging health only: this passed against 0.1.0, whose breakage was
+      # dev-server-side. Runtime behaviour in dev and production is verified
+      # manually by mounting the installed package in a browser.
+      - name: Assert the worker was bundled rather than left unresolved
+        run: |
+          set -euo pipefail
+          cd /tmp/consumer
+          ls dist/assets/ | grep -q pdf.worker \
+            || { echo 'no pdf.worker asset was emitted'; exit 1; }
+          if grep -rq '\.\./\.\./pdfjs-dist/build/pdf.worker' dist/assets/; then
+            echo 'the worker specifier survived unbundled: new URL() was not rewritten'
+            exit 1
+          fi

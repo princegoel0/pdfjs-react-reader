@@ -125,7 +125,7 @@ export {
   printCanvasSize,
 } from './lib/print';
 export { downloadBytes, pdfFileName } from './lib/download';
-export { configureWorker } from './lib/worker';
+export { configureWorker, ensureWorker, workerAutoDetectionFailed } from './lib/worker';
 export { normalizeSource, type PdfSource, type NormalizedSource } from './lib/source';
 export {
   applyRotation,
