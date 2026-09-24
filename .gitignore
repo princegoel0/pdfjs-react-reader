@@ -4,3 +4,4 @@ playground/dist/
 *.log
 .DS_Store
 .screenshots/
+*.tgz
