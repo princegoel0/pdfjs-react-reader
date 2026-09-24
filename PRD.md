@@ -26,8 +26,11 @@ The goal of `pdfjs-react-reader` is to build an MIT-licensed, headless-first PDF
 
 ### Non-Goals (Out of Scope for v1.0)
 * Authoring new PDF documents from scratch (creation/assembly).
+  *Amended 2026-09-24:* **modifying** an existing document — page reorder, deletion, extraction, splitting and flattening — is now in scope, shipped through an optional `pdfjs-react-reader/edit` subpath so the core keeps its zero-dependency promise. Building a PDF from nothing is still out. See `ROADMAP.md` §0.6.
 * Complex cryptographic digital signature verification (PKI / X.509 certificate validation).
+  *Amended 2026-09-24:* drawing a signature and writing it into a `Sig` field's appearance stream is in scope; validating a certificate chain is not.
 * Full desktop vector editing capabilities (e.g., editing underlying paths or font kerning).
+* *Added 2026-09-24:* **persisting XFA form data.** pdf.js renders XFA (`enableXfa` / `XfaLayer`), and 1.0 will ship that rendering, but XFA submit/save is Adobe LiveCycle behaviour with no open implementation, so XFA stays read-only.
 
 ---
 

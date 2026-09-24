@@ -177,9 +177,11 @@ If Safari is critical to you, test that first.
 ## Links
 
 - [CHANGELOG.md](./CHANGELOG.md) — release entries, development log, versioning policy.
+- [ROADMAP.md](./ROADMAP.md) — which features ship in which `0.x` release on the way to `1.0.0`.
 - [Documentation site](https://princegoel0.github.io/pdfjs-react-reader/) — live examples; source in
   `docs/`, served on :5200 by `npm run docs`, published from `main` by `.github/workflows/docs.yml`.
-- `PRD.md` — the original requirements and phase plan.
+- [PRD.md](./PRD.md) — the original requirements (`FR-nn`) and architecture; §2 records what stays
+  out of `1.0`.
 
 ## Development
 
