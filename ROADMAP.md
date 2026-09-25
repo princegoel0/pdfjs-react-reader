@@ -16,7 +16,7 @@ release carries one theme so the version number means something beyond "several 
 
 `FR-01`–`FR-19` and `FR-21`–`FR-23` are implemented, tested and browser-verified. `FR-20` is **not**
 complete: download offers the original bytes or a pdf.js incremental save, and
-`src/headless/usePdfDownload.ts:13-19`
+`usePdfDownload`’s options in `src/headless/usePdfDownload.ts`
 states that this is "not a true flatten (flattening needs a PDF writer, which this library is not)".
 That sentence is what forces the writer subpath in `0.7`.
 
@@ -30,13 +30,13 @@ assumed. `pdfjs-dist@5.7.284` exports:
 
 | Export | Unblocks |
 | --- | --- |
-| `AnnotationEditorLayer`, `AnnotationEditorUIManager`, `AnnotationEditorType` (`FREETEXT`, `HIGHLIGHT`, `STAMP`, `INK`, `POPUP`, `SIGNATURE`, `COMMENT`) | Annotation authoring without third-party code — `PdfPage.tsx:246` currently passes `annotationEditorUIManager: null` |
+| `AnnotationEditorLayer`, `AnnotationEditorUIManager`, `AnnotationEditorType` (`FREETEXT`, `HIGHLIGHT`, `STAMP`, `INK`, `POPUP`, `SIGNATURE`, `COMMENT`) | Annotation authoring without third-party code — `PdfPage` currently passes `annotationEditorUIManager: null` to its `AnnotationLayer` |
 | `XfaLayer`, `enableXfa`, `getXfaPageViewport` | XFA **rendering** (persistence stays impossible, see PRD §2) |
 | `SignatureExtractor`, `SupportedImageMimeTypes`, `DrawLayer`, `TextLayerImages`, `renderRichText` | Signature and image/stamp annotations, rich-text free text |
 | `TouchManager` (`onPinchStart` / `onPinching` / `onPinchEnd`) | Pinch zoom instead of hand-written gesture math |
 | `OutputScale.capPixels(maxPixels, capAreaFactor)`, `FeatureTest` | Canvas-area capping. `FeatureTest` exposes **no** canvas-size probe, so the cap must be measured here and fed to `capPixels` |
 
-`saveDocument(): Promise<Uint8Array>` (`types/src/display/api.d.ts:1072`) and the `annotationStorage`
+`saveDocument(): Promise<Uint8Array>` on `PDFDocumentProxy` and the `annotationStorage`
 getter (`:860`) exist, but which editor types actually survive into those bytes is unmeasured — see
 Spike A.
 
@@ -145,13 +145,13 @@ Every requested feature, and the release that ships it.
 | Internationalization | `0.2` API done, `0.8` locales | ~90 strings behind one typed catalog |
 | Advanced JS API | `0.2`, `0.5`, `0.6` | handle + events done in `0.2` → find controller → popups |
 | Mobile optimization | `0.2`, `0.8` | gestures done → real-device matrix |
-| **Basic vs full bundle weight** | **`0.4` done** | opt-in features; core shell 20.61 kB gz bundled, each feature 0.86–2.02 kB over it |
+| **Basic vs full bundle weight** | **`0.4` done** | opt-in features; core shell 22.59 kB gz bundled (`0.5` build), each feature 0.78–2.50 kB over it |
 | High-resolution rendering | `0.3` done | `devicePixelRatio` forwarded from `PdfViewer`, capped by the canvas ceilings |
 | Performance | `0.3` done | canvas area/side ceilings in `lib/canvas.ts`; virtualization and canvas zeroing already done |
 | Security / CSP | `0.3` done | `assetUrl` roots cMaps + fonts + wasm; `allowedSources`; opt-in Trusted Types policy |
-| Customizable toolbar and UI | `0.5` | falls out of feature-as-data from `0.4` |
-| Rich sidebar | `0.5` | one tab by default since `0.4` (thumbnails); outline is a feature tab, and attachments/layers still missing. `executeSetOCGState()` is a no-op (`lib/link-service.ts:73`) |
-| Advanced search | `0.5` | case + whole-word + highlight-all exist; regex and multi-term do not |
+| Customizable toolbar and UI | `0.5` done | the parts are exported and read one controller; `controls` hides, re-ranks, re-orders and adds controls by id |
+| Rich sidebar | `0.5` done | thumbnails are core; outline, layers and attachments are feature tabs. `executeSetOCGState` is implemented — a document's own layer link and the layers panel drive one shared config. Left: an annotation that *opens* an attachment is still inert |
+| Advanced search | `0.5` done | case, whole-word, highlight-all, multi-word AND, regex, invalid-pattern reporting, per-page counts, and `find` to swap the strategy |
 | PDF annotation and editing | `0.6` create, `0.7` persist | |
 | Comprehensive form support (AcroForm + XFA) | `0.6` renders XFA | XFA persistence excluded permanently |
 | Page reordering | `0.7` | needs a PDF writer |
@@ -177,7 +177,7 @@ No new dependencies.
   before this and exposed no handle. `rotatePage` was not in the plan; it came with FR-09's per-page
   half. `toggleFullscreen` rather than `requestFullscreen`, because it exits when already in.
 * Events: `onPageChange`, `onScaleChange`, `onLayoutChange`, `onFullscreenChange`. `onExternalLink`
-  was defined at `lib/link-service.ts:28` and never wired by `PdfViewer`; it is now, intercepted on
+  was defined on `CreatePdfLinkServiceOptions` in `lib/link-service.ts` and never wired by `PdfViewer`; it is now, intercepted on
   click rather than at attribute time, which is where the pdf.js callback does not fire.
 * Drag-and-drop file loading, plus an `acceptDrop` escape hatch. Needed a shell-side `reload()` on
   source change — see the `src` fix in the changelog.
@@ -209,13 +209,13 @@ No new dependencies.
   An over-large canvas does not throw — the browser allocates nothing and pdf.js paints into a blank
   surface — so this is the whole defence, not a hint.
 * `assetUrl` for cMaps, standard fonts **and wasm** (`wasmUrl` was never passed at all, so JPEG 2000 and
-  JBIG2 documents had no decoder to find), replacing the unpkg defaults at `usePdfDocument.ts:41-42`,
+  JBIG2 documents had no decoder to find), replacing the unpkg defaults in `pdfAssetUrls`/`CDN_ASSET_ROOT` (`lib/assets.ts`),
   plus a CSP section in the docs. `'cdn' | URL`, not the planned
   `'cdn' | 'local' | URL`: `'local'` assumed a bundler can hand back a *directory*. It cannot —
   Vite rewrites both `new URL()` forms to the package's entry file, and emits only individually
   named files, while pdf.js looks these up by name at runtime. Probing for a directory is therefore
   impossible, so a root you serve is the only self-hosting option and is taken verbatim.
-* Document-source allowlist, and a fix for `lib/source.ts:6-29`, which treats any unrecognized string
+* Document-source allowlist, and a fix for `classifyString` in `lib/source.ts`, which treats any unrecognized string
   as a URL. A bare word now throws instead of being fetched against the page's own origin.
 * Trusted Types, opt-in and never implicit: `configureTrustedTypes(name)` builds the worker through the
   page's policy, because pdf.js accepts only a *string* `workerSrc` and a `require-trusted-types-for`
@@ -426,7 +426,7 @@ headless 25.47. 281 tests.
 
 **Compound components shipped in a different spelling.** This section asked for `PdfViewer.Root` /
 `.Toolbar` / `.Page`; what shipped is `ViewerRoot` / `ViewerToolbar` / `ViewerSidebar` / `ViewerPages`
-plus `ViewerProvider` and `useViewer` (`src/index.ts:7-17`). Same composition, no namespace to keep in
+plus `ViewerProvider` and `useViewer`, all exported from `src/index.ts`. Same composition, no namespace to keep in
 sync with the flat exports, and a host importing `PdfViewer.Root` would be reaching for the component
 they could have imported. Recorded as a decision, not an oversight.
 
@@ -442,10 +442,11 @@ half needs someone to open a window.
 No new dependencies. Gated on Spike A.
 
 * Wire `AnnotationEditorLayer` + `AnnotationEditorUIManager` into `PdfPage`, replacing the `null` it
-  passes today (`PdfPage.tsx:246`): highlight, underline, strikeout, squiggly, free text, ink, stamp,
+  passes today: highlight, underline, strikeout, squiggly, free text, ink, stamp,
   image stamp and drawn signature.
 * Create, select, move, resize and **delete** annotations, including pre-existing ones.
-* Interactive popups — `.popupAnnotation` is `pointer-events: none` today (`styles/viewer.css:568`).
+* Interactive popups — `.popupAnnotation` is `pointer-events: none` today in `src/styles/viewer.css`, which
+  is the rule that keeps the layer from swallowing page interaction.
 * `enableXfa: true` and `XfaLayer` so XFA documents display at all.
 * `onAnnotationChange` events, plus re-export of the editor classes from `/headless`.
 * Annotation keyboard accessibility.
@@ -476,9 +477,9 @@ explicit exclusion, and strict semver from then on.
 A three-way review of the finished release (CI, docs, API surface) produced these. None is a defect in
 what `0.4` shipped; each is recorded so the later releases inherit the list rather than rediscover it.
 
-* **The print control prints the whole document**, as `0.3`'s did — extraction kept the behaviour, and
-  changing it is not this release's job. A page-range choice, or `createPrintFeature({ range })`
-  defaulting to the visible rows, belongs with `0.5`'s toolbar work, where the control can host it.
+* **Closed in `0.5`: the print control printed the whole document.** A scope control now sits beside it
+  — All / Current / From–to — with the range resolved by `printRangeFor` and the button's title naming
+  what it will send.
 * **`findFeatureKey` returns the winning binding but not the feature it came from.** Harmless today;
   `0.6`'s editor layer will want both, to say which feature refused a chord. A return-shape change, so
   it has to happen before the API freeze.

@@ -97,6 +97,9 @@ readback returns stale buffers). The layer work is therefore verified structural
 which groups own which content, `getGroup(id).visible` shows what the document says, and canvas attribute
 mutations show that a redraw was asked for — and the visual half needs a window to look at.
 
+## [0.4.0] — 2026-09-25
+
+
 
 
 Tiers. Four of the viewer's capabilities — printing, saving, filling forms, the outline panel — are now
