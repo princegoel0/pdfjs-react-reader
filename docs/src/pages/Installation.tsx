@@ -25,11 +25,41 @@ yarn add pdfjs-react-reader pdfjs-dist`}</code>
 
       <h2>Import the theme</h2>
       <pre>
-        <code>{`import 'pdfjs-react-reader/styles.css';`}</code>
+        <code>{`import 'pdfjs-react-reader/styles.css';
+
+// and, for the features you mounted:
+import 'pdfjs-react-reader/print.css';
+import 'pdfjs-react-reader/forms.css';
+import 'pdfjs-react-reader/outline.css';`}</code>
       </pre>
       <p>
-        Once per app, near your other global CSS. Skip it if you are building your own UI from the
-        headless hooks and bringing your own styles.
+        <code>styles.css</code> once per app, near your other global CSS. Skip it if you are building
+        your own UI from the headless hooks and bringing your own styles. The three feature sheets are
+        separate files on purpose: a bundler drops CSS that no JavaScript module imports, so a
+        feature's rules cannot ride inside its own module, and one file per tier is what lets a
+        download-only viewer ship no print rules at all. <code>download</code> needs no sheet — its
+        control is an ordinary toolbar button.
+      </p>
+
+      <h2>Optional capabilities</h2>
+      <p>
+        <code>{'<PdfViewer src="/a.pdf" />'}</code> is a viewer that reads: pages, selectable text,
+        search, thumbnails, ink, zoom and rotation. Print, save, fillable form widgets and the
+        bookmarks tab are features you add, because they are imports and an import is the only thing
+        that decides what your bundle contains:
+      </p>
+      <pre>
+        <code>{`import { PdfViewer } from 'pdfjs-react-reader';
+import { printFeature } from 'pdfjs-react-reader/features/print';
+import { downloadFeature } from 'pdfjs-react-reader/features/download';
+import { formsFeature } from 'pdfjs-react-reader/features/forms';
+import { outlineFeature } from 'pdfjs-react-reader/features/outline';
+
+<PdfViewer src="/a.pdf" features={[printFeature, downloadFeature, formsFeature, outlineFeature]} />`}</code>
+      </pre>
+      <p>
+        See <a href="#/features">Features &amp; tiers</a> for what each one adds, what it costs, and
+        how to write your own.
       </p>
 
       <h2>The worker</h2>

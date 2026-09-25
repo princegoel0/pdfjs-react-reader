@@ -136,7 +136,20 @@ Each rendered page DOM node contains three coordinated layers stacked via CSS po
 
 _Acceptance note for FR-21:_ feature `Runner` elements are keyed by feature id, never by array
 position. Measured behaviour: dropping an unrelated feature from the list with an index key remounts
-the surviving feature and discards its internal state, with no error raised.
+the surviving feature and discards its internal state, with no error raised. Both halves have a
+regression test, because neither failure announces itself.
+
+_Acceptance note for FR-22:_ one stylesheet per tier is a published entry (`/print.css`, `/forms.css`,
+`/outline.css`), not a rule inside `styles.css`. Shipping them as separate JavaScript-side imports was
+tested and does not work: tsup resolves the CSS import at build time, strips it from the module, and
+emits a sibling file nothing loads — so the styles were missing with no error, which is the failure
+mode this requirement exists to prevent. `sideEffects: ["**/*.css"]` keeps the sheets alive.
+
+_Acceptance note for FR-23:_ the marker is the name of the headless hook a feature wraps
+(`usePdfPrint`, `usePdfDownload`, `usePdfFormValues`, `usePdfOutline`), grepped on the unminified
+`dist` so a rename cannot hide it, and asserted in both directions: absent from the core consumer
+bundle, present in its own. Gate proven in both directions — a reintroduced static import fails it,
+and a fabricated 5 kB of growth in the committed baseline fails it too.
 
 ---
 
@@ -145,30 +158,60 @@ the surviving feature and discards its internal state, with no error raised.
 The package exposes two consumption models: **Compound Components** (for rapid installation) and **Headless Hooks** (for 100% custom user interfaces). Both share a third axis, **feature tiers** (§5.3), which decides how much of the library an application actually ships.
 
 ### 5.1 Headless API Example
+
+_Shipped, with the names as they are today._ An earlier draft of this section used `results`,
+`virtualPages` and a `{ index, offsetTop, height }` slot; the hook returns `search`/`results` from
+`usePdfSearch`, and `virtualSlots` of `{ indices, pageNumber, offsetTop, width, height }` from
+`usePdfVirtualizer`.
+
 ```tsx
-import { usePdfDocument, usePdfSearch, usePdfVirtualizer } from 'pdfjs-react-reader';
+import {
+  PdfPage,
+  usePdfDocument,
+  usePdfSearch,
+  usePdfVirtualizer,
+} from 'pdfjs-react-reader/headless';
 
 export function CustomViewer({ fileUrl }: { fileUrl: string }) {
   const { doc, numPages, isReady } = usePdfDocument({ src: fileUrl });
   const { results, activeIndex, search, nextMatch } = usePdfSearch({ doc });
-  const { virtualPages, containerRef } = usePdfVirtualizer({ doc, numPages });
+  const { virtualSlots, containerRef, totalHeight, resolvedScale, reportPageDims } =
+    usePdfVirtualizer({ doc, numPages, scale: 'fit-width' });
 
   return (
     <div ref={containerRef} className="viewer-viewport">
-      {virtualPages.map(({ index, offsetTop, height }) => (
-        <CustomPageRenderer 
-          key={index} 
-          doc={doc} 
-          pageNumber={index + 1} 
-          style={{ transform: `translateY(${offsetTop}px)`, height }} 
-        />
-      ))}
+      <button onClick={() => search('indemnity')}>Find</button>
+      <div style={{ position: 'relative', height: totalHeight }}>
+        {virtualSlots.map((slot) => (
+          <div
+            key={slot.pageNumber}
+            style={{ position: 'absolute', transform: `translateY(${slot.offsetTop}px)` }}
+          >
+            {slot.indices.map((index) => (
+              <PdfPage
+                key={index}
+                doc={doc}
+                pageNumber={index + 1}
+                scale={resolvedScale}
+                onBaseDimensions={reportPageDims}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 ```
 
 ### 5.2 Compound Components Example
+
+_Not the shipped API._ This is the target shape, and `ROADMAP.md` §0.5 schedules it. Today's
+`PdfViewer` is uncontrolled and takes its parts as props plus a `features` list; the pieces it is
+assembled from (`Toolbar`, `Sidebar`, `ThumbnailList`, `PdfPage`, …) are exported and composable by
+hand, but the children-as-slots form below is not. Written against the original proposal, in which the
+stylesheet was `dist/style.css`; it is `pdfjs-react-reader/styles.css`.
+
 ```tsx
 import { 
   PdfViewer, 
@@ -177,7 +220,7 @@ import {
   PdfThumbnailList, 
   PdfPages 
 } from 'pdfjs-react-reader';
-import 'pdfjs-react-reader/dist/style.css';
+import 'pdfjs-react-reader/styles.css';
 
 export function StandardViewer({ fileUrl }: { fileUrl: string }) {
   return (
@@ -203,31 +246,36 @@ The same component serves a read-only viewer and a full editor; the difference i
 which is the only place a bundler can still see what an application uses.
 
 ```tsx
-// Basic: display only. Nothing beyond the core viewer is in the bundle.
+// Basic: display only. Nothing beyond the core viewer is in the bundle — measured at 20.61 kB gz,
+// and search, thumbnails and ink are in this tier, so "basic" is not "read-only".
 import { PdfViewer } from 'pdfjs-react-reader';
 import 'pdfjs-react-reader/styles.css';
 
 <PdfViewer src={url} />
 
-// Full: each feature is named, so each one is separately droppable.
+// Full: each feature is named, so each one is separately droppable. Search stayed core when the
+// tier split landed, because a reader who cannot search is missing the first thing a reader does.
 import { PdfViewer } from 'pdfjs-react-reader';
-import { search } from 'pdfjs-react-reader/search';
-import { print } from 'pdfjs-react-reader/print';
+import { printFeature } from 'pdfjs-react-reader/features/print';
+import { formsFeature } from 'pdfjs-react-reader/features/forms';
 import 'pdfjs-react-reader/styles.css';
-import 'pdfjs-react-reader/search.css';
+import 'pdfjs-react-reader/print.css';
+import 'pdfjs-react-reader/forms.css';
 
-<PdfViewer src={url} features={[search, print]} />
+<PdfViewer src={url} features={[printFeature, formsFeature]} />
 ```
 
-A convenience barrel (`pdfjs-react-reader/full`) exists for applications that want everything without
-listing it. It is an ordinary re-export module, not a second build.
+A convenience barrel for "everything without listing it" is the root entry itself: `index.js` re-exports
+the shell, its parts, the feature contract and every headless hook, and a bundler still shakes it down
+to what a file names. No separate `/full` entry was made, because it would be an ordinary re-export
+module with nothing to add.
 
 ---
 
 ## 6. Non-Functional Requirements (NFR)
 
 * **Performance & Memory Footprint:** Off-screen canvases must be unmounted and their pixel buffers explicitly cleared (`context.clearRect()`) to prevent mobile Safari crashes.
-* **Bundle Budgets:** Excluding `pdfjs-dist`, size is governed by a **ratchet**, not a ceiling: `scripts/check-size.mjs` measures every consumer path gzipped and fails the build when one grows more than 2 % above the baseline committed in `size-baseline.json` (256 B of slack absorbs minifier jitter). Accepting a growth means running `npm run size:update`, so the increase is a reviewed line in the same diff as the code that caused it. What the release still promises is per tier, not global: the core viewer without any optional feature under **8 kB gzipped**, no single feature above **4 kB gzipped**, both enforced once the FR-21 opt-in model in `0.4` ships. For context the engine itself costs ~532 kB gzipped, so these numbers govern our own layer only. *(Amended 2026-09-25: the 45 kB ceiling was raised to 48 kB when `0.3`'s Trust features took the shell path from 42.88 to 45.45 kB, and then replaced by the ratchet — a ceiling that has to be renegotiated by whichever feature release happens to cross it is a scheduling artifact, not a requirement. The 8 kB core and 4 kB per-feature targets are unchanged and are what `0.4` makes measurable per path.)*
+* **Bundle Budgets:** Excluding `pdfjs-dist`, size is governed by a **ratchet**, not a ceiling: `scripts/check-size.mjs` measures every consumer path gzipped and fails the build when one grows more than 2 % above the baseline committed in `size-baseline.json` (256 B of slack absorbs minifier jitter). Accepting a growth means running `npm run size:update`, so the increase is a reviewed line in the same diff as the code that caused it. Per tier, the gate that stayed fixed is **no single feature above 4 kB gzipped over core**, and `0.4` measures it: print 2.02, download 0.86, forms 1.99, outline 0.93 kB, all four 5.18 kB over a 20.61 kB core. The **8 kB core target was dropped rather than met** — it was written against a prototype, and the real core viewer (pages, text, search, ink, thumbnails, layout, toolbar, sidebar, virtualization, worker lifecycle) measured 20.61 kB on the first run, so the number became a baseline instead of a requirement. For context the engine itself costs ~532 kB gzipped, so these numbers govern our own layer only. *(Amended 2026-09-25: the 45 kB ceiling was raised to 48 kB when `0.3`'s Trust features took the shell path from 42.88 to 45.45 kB, and then replaced by the ratchet — a ceiling that has to be renegotiated by whichever feature release happens to cross it is a scheduling artifact, not a requirement. Restated again at the close of `0.4`, which is what measuring per path was for.)*
 * **Tree-Shakability:** Built with pure ES Modules (`"type": "module"` in `package.json`), separate entry points for UI themes (`/styles.css`) and headless hooks (`/headless`), and the opt-in feature model in FR-21 so that unused features are eliminated at build time. `"sideEffects": ["**/*.css"]` keeps stylesheets from being shaken away while leaving JavaScript shakable. Verified against both esbuild and Rollup: an unimported feature contributes zero bytes to the consumer bundle.
 * **Accessibility (a11y):** The generated Text Layer elements must preserve tab navigation orders and maintain semantic tagging corresponding to the document structure for screen reader compatibility.
 * **Browser Compatibility:** Support Chrome >= 90, Safari >= 14, Firefox >= 90, Edge >= 90, and modern mobile browsers.

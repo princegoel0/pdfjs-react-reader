@@ -18,7 +18,6 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
-  DownloadIcon,
   MaximizeIcon,
   MinimizeIcon,
   MinusIcon,
@@ -26,7 +25,6 @@ import {
   PanelLeftIcon,
   PenIcon,
   PlusIcon,
-  PrinterIcon,
   RotateCcwIcon,
   RotateCwIcon,
   SearchIcon,
@@ -70,16 +68,11 @@ export interface ToolbarProps {
   docLabel?: string;
   /** Effective zoom as a percentage, e.g. "124%". */
   zoomLabel?: string;
-  /** Opens the print pipeline. Omit to hide the control (e.g. where printing is unsupported). */
-  onPrint?: () => void;
-  /** Aborts a running print job; the control swaps to a cancel button while `printing`. */
-  onPrintCancel?: () => void;
-  printing?: boolean;
-  /** 0..1 while pages are rendered for print. */
-  printProgress?: number;
-  /** Saves the document. Omit to hide the control. */
-  onDownload?: () => void;
-  downloading?: boolean;
+  /**
+   * Controls contributed by mounted features, folded into the same overflow
+   * plan as these: their `priority` decides what survives a narrow bar.
+   */
+  featureItems?: readonly ToolbarItem[];
   /** Toggles fullscreen. Omit to hide the control where it is unsupported. */
   onFullscreenToggle?: () => void;
   fullscreenActive?: boolean;
@@ -94,7 +87,7 @@ export interface ToolbarProps {
  * label. Items sharing a priority fold as one cluster, so a pair like the
  * rotate buttons can never be split into a lone leftover button.
  */
-interface ToolbarItem {
+export interface ToolbarItem {
   id: string;
   priority: number;
   /** Visible text for this item's row in the overflow menu. */
@@ -146,12 +139,7 @@ export function Toolbar({
   inkCanUndo = false,
   docLabel,
   zoomLabel,
-  onPrint,
-  onPrintCancel,
-  printing = false,
-  printProgress = 0,
-  onDownload,
-  downloading = false,
+  featureItems,
   onFullscreenToggle,
   fullscreenActive = false,
   onRotatePage,
@@ -543,57 +531,9 @@ export function Toolbar({
     });
   }
 
-  if (onDownload) {
-    items.push({
-      id: 'download',
-      priority: 9,
-      label: labels.overflowDownload,
-      node: (
-        <button
-          type="button"
-          className="pjsr-button"
-          aria-label={labels.downloadDocument}
-          title={labels.downloadDocument}
-          disabled={downloading}
-          aria-busy={downloading || undefined}
-          onClick={onDownload}
-        >
-          <DownloadIcon />
-        </button>
-      ),
-    });
-  }
-
-  if (onPrint) {
-    items.push({
-      id: 'print',
-      priority: 8,
-      label: printing ? 'Cancel printing' : 'Print',
-      node: printing ? (
-        /* Rendering a long document takes tens of seconds, so the control
-           turns into its own abort rather than sitting disabled. */
-        <button
-          type="button"
-          className="pjsr-button"
-          aria-label={labels.cancelPrinting}
-          title={formatLabel(labels.cancelPrintingProgress, { percent: Math.round(printProgress * 100) })}
-          onClick={onPrintCancel}
-        >
-          <CloseIcon />
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="pjsr-button"
-          aria-label={labels.printDocument}
-          title={labels.printDocument}
-          onClick={onPrint}
-        >
-          <PrinterIcon />
-        </button>
-      ),
-    });
-  }
+  /* Feature controls join the same fold at the priorities the features ask for,
+     so an opted-in print button evicts exactly where the built-in one did. */
+  if (featureItems?.length) items.push(...featureItems);
 
   if (docLabel || zoomLabel) {
     items.push({
@@ -704,7 +644,11 @@ export function Toolbar({
   const menuRows: ToolbarItem[][] = [];
   for (const item of overflowItems) {
     const row = menuRows[menuRows.length - 1];
-    if (row && row[0]!.priority === item.priority) row.push(item);
+    /* Same priority *and* same label. The built-in pairs share both on purpose
+       (prev/next, the rotate arrows); a feature that happens to pick a priority
+       a built-in already uses must not be filed under the built-in's name, which
+       is how print ended up reading "Rotate current page". */
+    if (row && row[0]!.priority === item.priority && row[0]!.label === item.label) row.push(item);
     else menuRows.push([item]);
   }
 

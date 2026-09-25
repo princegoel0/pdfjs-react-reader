@@ -1,0 +1,47 @@
+/* pdfjs-react-reader — the print pipeline, shipped with features/print
+ * Import this alongside 'pdfjs-react-reader/styles.css'. The theme tokens live
+ * in the core sheet; everything here is rules this file needs and the core
+ * stylesheet must not carry, because a feature you did not ask for should not
+ * be styled for. */
+
+/* ---------- printing (FR-19) ---------- */
+/* `usePdfPrint` appends this container to <body> rather than into the viewer:
+   the viewer clips with `overflow: clip`, and the rule below that isolates the
+   sheets would otherwise hide the thing being printed. On screen it is inert. */
+.pjsr-print {
+  display: none;
+}
+
+@media print {
+  /* Direct children of <body> only — the viewer is usually nested, and hiding
+     its wrapper takes the rest of the host chrome with it. Gated on the class
+     the pipeline adds for the duration of a job, so printing a host page that
+     merely *contains* the viewer is unaffected. */
+  body.pjsr-printing > :not(.pjsr-print) {
+    display: none !important;
+  }
+
+  body.pjsr-printing {
+    margin: 0;
+  }
+
+  .pjsr-print {
+    display: block;
+  }
+
+  .pjsr-print canvas {
+    display: block;
+    /* Filled to the printable width: the sheet's own margins shrink both
+       dimensions, so a page scaled this way still lands on a single sheet.
+       No `@page` rule — that would leak into the host app's own printing. */
+    width: 100%;
+    height: auto;
+  }
+
+  /* Break *before* every sheet but the first; `page-break-after` on all of them
+     would leave a blank page at the end. */
+  .pjsr-print canvas + canvas {
+    page-break-before: always;
+    break-before: page;
+  }
+}

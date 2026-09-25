@@ -1,0 +1,109 @@
+/* pdfjs-react-reader — AcroForm widgets, shipped with features/forms
+ * Import this alongside 'pdfjs-react-reader/styles.css'. The theme tokens live
+ * in the core sheet; everything here is rules this file needs and the core
+ * stylesheet must not carry, because a feature you did not ask for should not
+ * be styled for. */
+
+.pjsr-annotation-layer {
+  --annotation-unfocused-field-background: url("data:image/svg+xml;charset=UTF-8,<svg width='1px' height='1px' xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%' style='fill:rgba(79, 70, 229, 0.12);'/></svg>");
+  --input-focus-border-color: var(--pjsr-accent);
+  --input-focus-outline: none;
+  --input-unfocused-border-color: transparent;
+  --input-disabled-border-color: transparent;
+  --input-hover-border-color: color-mix(in srgb, var(--pjsr-accent) 45%, transparent);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea),
+.pjsr-annotation-layer .choiceWidgetAnnotation select,
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input {
+  background-image: var(--annotation-unfocused-field-background);
+  border: 2px solid var(--input-unfocused-border-color);
+  border-radius: 2px;
+  box-sizing: border-box;
+  font: calc(9px * var(--total-scale-factor, 1)) sans-serif;
+  height: 100%;
+  margin: 0;
+  vertical-align: top;
+  width: 100%;
+  color: var(--pjsr-fg);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea):hover,
+.pjsr-annotation-layer .choiceWidgetAnnotation select:hover,
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:hover {
+  border: 2px solid var(--input-hover-border-color);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea):focus,
+.pjsr-annotation-layer .choiceWidgetAnnotation select:focus {
+  background: none;
+  border: 2px solid var(--input-focus-border-color);
+  outline: var(--input-focus-outline);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea):required,
+.pjsr-annotation-layer .choiceWidgetAnnotation select:required,
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input:required {
+  outline: 1.5px solid var(--pjsr-danger-fg);
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation [disabled]:is(input, textarea),
+.pjsr-annotation-layer .choiceWidgetAnnotation select[disabled],
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input[disabled] {
+  background: none;
+  border: 2px solid var(--input-disabled-border-color);
+  cursor: not-allowed;
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation textarea {
+  resize: none;
+}
+
+.pjsr-annotation-layer .textWidgetAnnotation input.comb {
+  font-family: monospace;
+  padding-left: 2px;
+  padding-right: 0;
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input {
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) :focus {
+  background-color: Highlight;
+  border-color: var(--input-focus-border-color);
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::before,
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::after,
+.pjsr-annotation-layer .buttonWidgetAnnotation.radioButton input:checked::before {
+  background-color: var(--pjsr-fg);
+  content: "";
+  display: block;
+  position: absolute;
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::before,
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::after {
+  height: 80%;
+  left: 45%;
+  width: 1px;
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::before {
+  transform: rotate(45deg);
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.checkBox input:checked::after {
+  transform: rotate(-45deg);
+}
+
+.pjsr-annotation-layer .buttonWidgetAnnotation.radioButton input:checked::before {
+  border-radius: 50%;
+  height: 50%;
+  left: 25%;
+  top: 25%;
+  width: 50%;
+}

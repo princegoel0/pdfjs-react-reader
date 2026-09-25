@@ -3,7 +3,9 @@ export function Recipes() {
     <>
       <h1>Recipes</h1>
       <p className="doc-lede">
-        The patterns that come up once you stop wanting the default toolbar.
+        The patterns that come up once you stop wanting the default toolbar. Everything below drives
+        the headless hooks directly; the <a href="#/features">built-in features</a> are the same
+        calls, wrapped in a control the shell can fold away for you.
       </p>
 
       <h2>Print from your own button</h2>
@@ -47,8 +49,11 @@ download.download({ withFormValues: true });`}</code>
       <p>
         <code>withFormValues</code> uses <code>saveDocument()</code>, which produces an editable
         form — the <code>/AcroForm</code> dictionary survives, values are written as{' '}
-        <code>/V</code> with regenerated appearances. It is not a flatten. The shell passes{' '}
-        <code>form.isDirty</code> so an untouched document downloads byte-identical to the original.
+        <code>/V</code> with regenerated appearances. It is not a flatten. The{' '}
+        <code>downloadFeature</code> passes <code>withFormValues</code> only when{' '}
+        <code>formsFeature</code> is mounted and <code>isDirty</code> is true, so an untouched
+        document — or one whose form feature you never imported — downloads byte-identical to the
+        original.
       </p>
 
       <h2>Read and write forms programmatically</h2>

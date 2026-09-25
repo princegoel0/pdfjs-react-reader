@@ -1,20 +1,24 @@
 import { useState } from 'react';
 import { PdfViewer, type FormValue } from 'pdfjs-react-reader';
+import { createFormsFeature } from 'pdfjs-react-reader/features/forms';
 import { Example } from '../components/Example';
 import { FORM_SAMPLE } from '../fixtures';
 import source from './FormsExample.tsx?raw';
 
 export function FormsExample() {
   const [values, setValues] = useState<Record<string, FormValue> | null>(null);
+  // Filling a form in is a feature you name, and the callback that reports it
+  // belongs to that feature rather than to the viewer.
+  const [forms] = useState(() => createFormsFeature({ onChange: setValues }));
 
   return (
     <Example title="AcroForm values, live" source={source}>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 260px', gap: 12 }}>
         <div className="doc-frame doc-frame--short">
-          <PdfViewer src={FORM_SAMPLE} defaultScale="fit-width" onFormValuesChange={setValues} />
+          <PdfViewer src={FORM_SAMPLE} defaultScale="fit-width" features={[forms]} />
         </div>
         <div>
-          <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>onFormValuesChange</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>onChange</h3>
           <pre style={{ maxHeight: 300, overflow: 'auto' }}>
             <code>{values ? JSON.stringify(values, null, 2) : 'Edit a field to see the payload.'}</code>
           </pre>

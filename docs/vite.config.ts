@@ -18,6 +18,13 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^pdfjs-react-reader\/styles\.css$/, replacement: target(fromDist ? 'styles.css' : 'styles/viewer.css') },
+      // Features are separate entries with a sheet each, in both source and dist
+      // layout, so the same two patterns cover either target.
+      { find: /^pdfjs-react-reader\/(\w+)\.css$/, replacement: target(`${fromDist ? '' : 'styles/'}$1.css`) },
+      {
+        find: /^pdfjs-react-reader\/features\/(\w+)$/,
+        replacement: target(`features/$1.${fromDist ? 'js' : 'tsx'}`),
+      },
       { find: /^pdfjs-react-reader\/headless$/, replacement: target('headless.ts') },
       { find: /^pdfjs-react-reader$/, replacement: target(fromDist ? 'index.js' : 'index.ts') },
     ],

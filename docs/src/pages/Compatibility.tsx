@@ -149,9 +149,11 @@ export function Compatibility() {
           <tr>
             <td>CSS</td>
             <td>
-              Import <code>pdfjs-react-reader/styles.css</code>, or supply your own rules for the{' '}
-              <code>.pjsr-*</code> classes. The text layer in particular needs its positioning CSS
-              or selectable text will overlay the page incorrectly.
+              Import <code>pdfjs-react-reader/styles.css</code>, plus{' '}
+              <code>print.css</code> / <code>forms.css</code> / <code>outline.css</code> for the
+              features you mounted, or supply your own rules for the <code>.pjsr-*</code> classes. The
+              text layer in particular needs its positioning CSS or selectable text will overlay the
+              page incorrectly.
             </td>
           </tr>
           <tr>
@@ -204,45 +206,90 @@ export function Compatibility() {
 
       <h2>Bundle size</h2>
       <p>
-        Gzipped, excluding <code>pdfjs-dist</code>, measured on 0.3.0. CI fails the build when a path
-        grows more than 2&nbsp;% above the numbers committed in <code>size-baseline.json</code>, so
-        these are enforced rather than estimated. The gate is a ratchet, not a promise about how
-        small the library stays: the budget was a fixed 45&nbsp;kB until <code>0.3</code>&apos;s
-        production-robustness features pushed the shell to 45.45&nbsp;kB, which is what replaced the
-        ceiling with a committed baseline. Importing a single headless hook instead of the path costs
-        far less than the figures below — 2.5&nbsp;kB for <code>usePdfDocument</code>, because the
-        package is ESM and tree-shakeable.
+        Gzipped, excluding <code>pdfjs-dist</code> and React, measured on 0.4.0. Each row is a real
+        consumer file bundled once with esbuild and once with Rollup, and the larger number is
+        reported, so a path only counts as small if two independent tree-shakers agree. CI fails the
+        build when a path grows more than 2&nbsp;% above the numbers committed in{' '}
+        <code>size-baseline.json</code>, and fails on its own when any single feature costs more than
+        4&nbsp;kB over core, so these are enforced rather than estimated.
       </p>
       <table className="doc-table">
         <thead>
           <tr>
-            <th>Path</th>
-            <th>Files</th>
+            <th>What you import</th>
             <th>Size</th>
+            <th>Over core</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Shell</td>
-            <td>
-              <code>index.js</code> + shared chunk + <code>styles.css</code>
-            </td>
-            <td>45.5 kB</td>
+            <td>Core (<code>PdfViewer</code> with no features)</td>
+            <td>20.61 kB</td>
+            <td>—</td>
           </tr>
           <tr>
-            <td>Headless</td>
-            <td>
-              <code>headless.js</code> + shared chunk + <code>styles.css</code>
-            </td>
-            <td>25.6 kB</td>
+            <td>Core + print</td>
+            <td>22.63 kB</td>
+            <td>+2.02 kB</td>
+          </tr>
+          <tr>
+            <td>Core + download</td>
+            <td>21.47 kB</td>
+            <td>+0.86 kB</td>
+          </tr>
+          <tr>
+            <td>Core + forms</td>
+            <td>22.60 kB</td>
+            <td>+1.99 kB</td>
+          </tr>
+          <tr>
+            <td>Core + outline</td>
+            <td>21.54 kB</td>
+            <td>+0.93 kB</td>
+          </tr>
+          <tr>
+            <td>All four features</td>
+            <td>25.79 kB</td>
+            <td>+5.18 kB</td>
+          </tr>
+          <tr>
+            <td>Root entry, every export</td>
+            <td>44.01 kB</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>Headless entry, every export</td>
+            <td>21.77 kB</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>One headless hook (<code>usePdfDocument</code>)</td>
+            <td>2.59 kB</td>
+            <td>—</td>
           </tr>
         </tbody>
       </table>
+      <p>
+        The last three rows are measured differently from the first six: they sum the shipped files
+        reachable from an entry rather than bundling one import, so they are what a bundler that
+        cannot tree-shake pays, and an upper bound for everyone else. Importing a single headless hook
+        costs far less than any entry-wide figure — 2.59&nbsp;kB for <code>usePdfDocument</code> —
+        because the package is ESM and tree-shakeable.
+      </p>
+      <p>
+        The gate is a ratchet, not a promise about how small the library stays. The budget was a fixed
+        45&nbsp;kB until <code>0.3</code>&apos;s production-robustness features pushed the shell to
+        45.45&nbsp;kB; raising the ceiling was the smaller fix, and a number every feature release has
+        to renegotiate is not a requirement. What replaced it is the committed baseline plus the
+        per-feature cap, which is the part that can stay fixed.
+      </p>
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.1.0</code>. While it is pre-1.0, minor versions may contain breaking
-        changes, so pin exactly in an application. The full release entry, the development log and
+        The package is <code>0.4.0</code>. While it is pre-1.0, minor versions may contain breaking
+        changes, so pin exactly in an application. <code>0.4</code> is one such minor: six{' '}
+        <code>PdfViewer</code> props became four feature imports, listed at{' '}
+        <a href="#/features">Features &amp; tiers</a>. The full release entry, the development log and
         the versioning policy live in <code>CHANGELOG.md</code> at the repository root, which GitHub
         renders on the project home page.
       </p>

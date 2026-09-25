@@ -45,6 +45,10 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^pdfjs-react-reader\/styles\.css$/, replacement: r('../src/styles/viewer.css') },
+      // Each feature ships its own sheet, so a tier is a JS import and a CSS
+      // import, and the playground runs from source rather than from dist.
+      { find: /^pdfjs-react-reader\/(\w+)\.css$/, replacement: r('../src/styles/$1.css') },
+      { find: /^pdfjs-react-reader\/features\/(\w+)$/, replacement: r('../src/features/$1.tsx') },
       { find: /^pdfjs-react-reader\/headless$/, replacement: r('../src/headless.ts') },
       { find: /^pdfjs-react-reader$/, replacement: r('../src/index.ts') },
     ],

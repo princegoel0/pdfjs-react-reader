@@ -22,6 +22,29 @@ export { OutlineView, type OutlineViewProps } from './components/OutlineView';
 export { InkLayer, type InkLayerProps } from './components/InkLayer';
 export { PasswordPrompt, type PasswordPromptProps } from './components/PasswordPrompt';
 export {
+  findFeatureKey,
+  mergeFeaturePageProps,
+  NO_FEATURES,
+  samePublication,
+  type AnyPdfFeature,
+  type FeaturePageProps,
+  type FeaturePublication,
+  type FeatureKeyEvent,
+  type PdfFeature,
+  type PdfFeatureControl,
+  type PdfFeatureKeyBinding,
+  type PdfFeaturePanel,
+  type PdfViewerShell,
+} from './lib/features';
+export {
+  usePdfFeatureOptions,
+  usePdfFeaturePeer,
+  usePdfFeaturePublish,
+  usePdfFeatureShell,
+  usePdfFeatureState,
+  type FeatureStore,
+} from './components/FeatureHost';
+export {
   usePdfDocument,
   type PdfCapabilities,
   type UsePdfDocumentOptions,

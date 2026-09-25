@@ -1,6 +1,6 @@
 {
   "name": "pdfjs-react-reader",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MIT-licensed, headless-first PDF viewer for React built directly on pdfjs-dist. Virtualized rendering, text layer, search, forms, and an optional drop-in UI shell.",
   "type": "module",
   "license": "MIT",
@@ -27,9 +27,37 @@
       "types": "./dist/headless.d.ts",
       "import": "./dist/headless.js"
     },
+    "./features/print": {
+      "types": "./dist/features/print.d.ts",
+      "import": "./dist/features/print.js"
+    },
+    "./features/download": {
+      "types": "./dist/features/download.d.ts",
+      "import": "./dist/features/download.js"
+    },
+    "./features/forms": {
+      "types": "./dist/features/forms.d.ts",
+      "import": "./dist/features/forms.js"
+    },
+    "./features/outline": {
+      "types": "./dist/features/outline.d.ts",
+      "import": "./dist/features/outline.js"
+    },
     "./styles.css": {
       "types": "./dist/styles.d.ts",
       "default": "./dist/styles.css"
+    },
+    "./print.css": {
+      "types": "./dist/styles.d.ts",
+      "default": "./dist/print.css"
+    },
+    "./forms.css": {
+      "types": "./dist/styles.d.ts",
+      "default": "./dist/forms.css"
+    },
+    "./outline.css": {
+      "types": "./dist/styles.d.ts",
+      "default": "./dist/outline.css"
     },
     "./package.json": "./package.json"
   },
@@ -59,10 +87,12 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^30.1.1",
     "pdfjs-dist": "^6.2.108",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

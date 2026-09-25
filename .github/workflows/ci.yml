@@ -11,6 +11,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Nothing here publishes or deploys, so nothing here needs a writable token.
+# The default is whatever the organization hands out, which for this repo is
+# more than a check-only workflow should hold.
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Verify (Node ${{ matrix.node }})

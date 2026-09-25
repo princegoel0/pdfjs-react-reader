@@ -2,6 +2,7 @@ import { FormsExample } from '../examples/FormsExample';
 
 const PROPS: [string, string, string][] = [
   ['src', 'PdfSource', 'Required. URL, path, data URI, base64, File/Blob, or PDF bytes. Changing it reloads in place — keep the value stable across renders.'],
+  ['features', 'readonly PdfFeature[]', 'What this viewer can do beyond reading: printFeature, downloadFeature, formsFeature, outlineFeature or one you wrote. Defaults to none — the code you do not import is code you do not ship.'],
   ['workerSrc', 'string', 'Pins the pdf.js worker location. Auto-detected when omitted.'],
   ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
   ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
@@ -12,13 +13,8 @@ const PROPS: [string, string, string][] = [
   ['defaultPageRotations', 'Record<number, number>', 'Per-page rotation in degrees, keyed by 0-based page index.'],
   ['defaultSidebarOpen', 'boolean', 'Show the thumbnails/outline sidebar on first render.'],
   ['gap', 'number', 'Vertical gap between pages in CSS pixels.'],
-  ['renderForms', 'boolean', 'Render interactive AcroForm widgets. Defaults to true.'],
-  ['enablePrint', 'boolean', 'Show the print control and bind Ctrl/Cmd+P. Defaults to true, never on iOS.'],
-  ['printScale', 'number', 'Print canvas scale. Auto-tuned against a memory budget by default.'],
   ['maxRenderPixels', 'number', 'Area ceiling per page canvas in device pixels. Defaults to pdf.js’s own limit, tightened for mobile — over it a browser paints a blank page rather than failing.'],
   ['devicePixelRatio', 'number', 'Device pixels per CSS pixel for page canvases. Defaults to window.devicePixelRatio.'],
-  ['enableDownload', 'boolean', 'Show the download control. Defaults to true.'],
-  ['downloadFileName', 'string', 'Name for the saved file; defaults to the document name.'],
   ['enableWheelZoom', 'boolean', 'Ctrl/Cmd + wheel, which is also how browsers report trackpad pinch. Defaults to true.'],
   ['enablePinchZoom', 'boolean', 'Two-finger pinch through the engine’s touch manager. Defaults to true.'],
   ['enableFullscreen', 'boolean', 'Show the fullscreen control, and only where the platform supports it. Defaults to true.'],
@@ -27,7 +23,6 @@ const PROPS: [string, string, string][] = [
   ['acceptDrop', '(file) => boolean', 'Gate which dropped files count. Defaults to any PDF.'],
   ['onDropFile', '(file) => void', 'Fires for every accepted drop, even when enableDrop is off.'],
   ['labels', 'PdfViewerLabelsOverride', 'Override any subset of the shell’s strings; everything else keeps its English default.'],
-  ['onFormValuesChange', '(values) => void', 'Fires whenever the user edits a form field.'],
   ['onCapabilities', '(capabilities) => void', 'What the opened document declares: form type, whether the pages came from XFA, whether it carries JavaScript.'],
   ['onPageChange', '(page) => void', 'The topmost visible page, after load.'],
   ['onScaleChange', '(scale) => void', 'The effective zoom, including what a fit mode resolves to.'],
@@ -47,7 +42,7 @@ const HANDLE: [string, string][] = [
   ['setLayout(layout)', 'continuous, single or spread.'],
   ['rotate(degrees)', 'Rotates the whole document.'],
   ['rotatePage(page, degrees)', 'Rotates one page in place.'],
-  ['openSidebar(open, tab?)', 'Opens the sidebar on thumbnails or outline.'],
+  ['openSidebar(open, tab?)', 'Opens the sidebar. The tab argument is a string, and the only tabs that exist are the ones mounted: thumbnails is core, outline needs outlineFeature.'],
   ['toggleFullscreen()', 'Needs a user gesture, like every fullscreen request.'],
   ['search(query, options?)', 'Runs a search and reveals the search bar.'],
 ];
@@ -58,19 +53,38 @@ export function Shell() {
     <>
       <h1>The viewer shell</h1>
       <p className="doc-lede">
-        <code>PdfViewer</code> is the whole product in one element: toolbar, sidebar, search, ink,
-        printing, download and virtualized pages. It is uncontrolled by design — it owns its own
-        state and tells you what changed through callbacks.
+        <code>PdfViewer</code> is the whole product in one element: toolbar, sidebar, search, ink and
+        virtualized pages. What it can do <em>to</em> a document — print it, save it, fill it in — is
+        a feature you import, so the viewer you ship is the viewer you named. It is uncontrolled by
+        design: it owns its own state and tells you what changed through callbacks.
       </p>
 
       <pre>
         <code>{`import { PdfViewer } from 'pdfjs-react-reader';
+import { printFeature } from 'pdfjs-react-reader/features/print';
+import { downloadFeature } from 'pdfjs-react-reader/features/download';
+import { formsFeature } from 'pdfjs-react-reader/features/forms';
 import 'pdfjs-react-reader/styles.css';
+import 'pdfjs-react-reader/print.css';
+import 'pdfjs-react-reader/forms.css';
 
 export function Viewer() {
-  return <PdfViewer src="/contract.pdf" defaultScale="fit-width" />;
+  return (
+    <PdfViewer
+      src="/contract.pdf"
+      defaultScale="fit-width"
+      features={[printFeature, downloadFeature, formsFeature]}
+    />
+  );
 }`}</code>
       </pre>
+
+      <p>
+        Reading only — pages, text, search, thumbnails, rotation, layout modes — needs nothing beyond{' '}
+        <code>&lt;PdfViewer src=&hellip; /&gt;</code>. Each feature is a separate entry and a separate
+        stylesheet, so leaving one out leaves its bytes and its rules out of your bundle.{' '}
+        <a href="#/features">Features</a> covers them, including writing your own.
+      </p>
 
       <h2>Props</h2>
       <table className="doc-table">
@@ -193,9 +207,12 @@ const de: PdfViewerLabelsOverride = {
 
       <h2>Forms</h2>
       <p>
-        Widget edits land in pdf.js annotation storage, so printing and{' '}
-        <code>saveDocument()</code> carry them. <code>onFormValuesChange</code> gives you the whole
-        field map whenever one changes.
+        Filling a form in is <a href="#/features">a feature</a>: mount <code>formsFeature</code> and the
+        annotation layer renders AcroForm widgets against pdf.js storage, so printing and{' '}
+        <code>saveDocument()</code> carry what the reader typed. Edits reach you through{' '}
+        <code>createFormsFeature({'{ onChange }'})</code>, which fires with the whole field map whenever
+        one changes; <code>downloadFeature</code> asks the same publication whether there is anything
+        worth saving.
       </p>
       <FormsExample />
 
@@ -243,7 +260,10 @@ const de: PdfViewerLabelsOverride = {
             <td>
               <code>Ctrl/Cmd + P</code>
             </td>
-            <td>Print the document, when enabled.</td>
+            <td>
+              Print the document — <code>printFeature</code>’s own binding, so a viewer without it leaves{' '}
+              <code>Ctrl/Cmd + P</code> to the browser.
+            </td>
           </tr>
           <tr>
             <td>
@@ -271,9 +291,11 @@ const de: PdfViewerLabelsOverride = {
         The bar is not built from fixed breakpoints. Every control carries a priority, the toolbar
         measures the natural width of each one, and it folds the least useful control into the{' '}
         <code>⋯</code> menu as space runs out — so the page field and zoom survive down to a 320 px
-        container while print, download and layout give way first. Nothing is ever hidden while
+        container while the feature controls and layout give way first. Nothing is ever hidden while
         there is room for it, and the menu lists what each control does rather than showing bare
-        glyphs.
+        glyphs. A feature joins the same planner as the built-ins: it contributes items with priorities
+        of its own and is folded by the same arithmetic, so adding three capabilities to a narrow
+        viewer costs three menu entries, not a wrapped toolbar.
       </p>
       <p>
         Control <em>size</em> follows the input device instead of the width: 44 px targets under{' '}
@@ -306,6 +328,15 @@ const de: PdfViewerLabelsOverride = {
         <code>PdfPage</code>, <code>InkLayer</code>, <code>PasswordPrompt</code> — so you can
         compose them differently without dropping to raw hooks. Read{' '}
         <code>src/components/PdfViewer.tsx</code> for the wiring.
+      </p>
+      <p>
+        One boundary to know before you start: <code>features</code> is a <code>PdfViewer</code>{' '}
+        prop, and the host that runs a feature&apos;s <code>Runner</code> is the shell. Assembled
+        chrome of your own goes straight to the hooks instead —{' '}
+        <code>usePdfPrint</code>, <code>usePdfDownload</code>, <code>usePdfFormValues</code>,{' '}
+        <code>usePdfOutline</code> are public and standalone, and are what those four features wrap.
+        The authoring hooks are exported too, so a feature you write can be mounted in any{' '}
+        <code>PdfViewer</code> without the consumer knowing its internals.
       </p>
     </>
   );

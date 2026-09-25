@@ -4,6 +4,12 @@ import { GlobalWorkerOptions } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { App } from './App';
 import 'pdfjs-react-reader/styles.css';
+// The examples mount print, forms and outline, so this page needs their sheets
+// too — an app imports exactly the CSS for the features it names, which is the
+// point of FR-22.
+import 'pdfjs-react-reader/print.css';
+import 'pdfjs-react-reader/forms.css';
+import 'pdfjs-react-reader/outline.css';
 import './docs.css';
 
 // The examples here run against a production build, where a bare

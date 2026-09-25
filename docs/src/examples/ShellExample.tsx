@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { PdfViewer, type PageLayout } from 'pdfjs-react-reader';
+import { PdfViewer, type AnyPdfFeature, type PageLayout } from 'pdfjs-react-reader';
+import { downloadFeature } from 'pdfjs-react-reader/features/download';
+import { formsFeature } from 'pdfjs-react-reader/features/forms';
+import { outlineFeature } from 'pdfjs-react-reader/features/outline';
+import { printFeature } from 'pdfjs-react-reader/features/print';
 import { CheckKnob, Example, SelectKnob } from '../components/Example';
 import { FORM_SAMPLE, SAMPLES } from '../fixtures';
 import source from './ShellExample.tsx?raw';
@@ -17,6 +21,16 @@ export function ShellExample() {
   const [forms, setForms] = useState(true);
   const [print, setPrint] = useState(true);
   const [download, setDownload] = useState(true);
+  const [outline, setOutline] = useState(true);
+
+  // Three of the viewer's capabilities are features you name here, so switching
+  // one off is switching its code off in your bundle, not hiding a button.
+  const features: AnyPdfFeature[] = [
+    ...(print ? [printFeature] : []),
+    ...(download ? [downloadFeature] : []),
+    ...(forms ? [formsFeature] : []),
+    ...(outline ? [outlineFeature] : []),
+  ];
 
   return (
     <Example
@@ -32,9 +46,10 @@ export function ShellExample() {
             onChange={(value) => setLayout(value)}
           />
           <CheckKnob label="Sidebar open" checked={sidebar} onChange={setSidebar} />
-          <CheckKnob label="Render forms" checked={forms} onChange={setForms} />
-          <CheckKnob label="Print" checked={print} onChange={setPrint} />
-          <CheckKnob label="Download" checked={download} onChange={setDownload} />
+          <CheckKnob label="Forms feature" checked={forms} onChange={setForms} />
+          <CheckKnob label="Print feature" checked={print} onChange={setPrint} />
+          <CheckKnob label="Download feature" checked={download} onChange={setDownload} />
+          <CheckKnob label="Outline feature" checked={outline} onChange={setOutline} />
         </>
       }
     >
@@ -46,9 +61,7 @@ export function ShellExample() {
           src={src}
           defaultLayout={layout as PageLayout}
           defaultSidebarOpen={sidebar}
-          renderForms={forms}
-          enablePrint={print}
-          enableDownload={download}
+          features={features}
         />
       </div>
     </Example>

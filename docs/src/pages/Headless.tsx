@@ -6,29 +6,32 @@ const HOOKS: [string, string][] = [
     'Loads the file. Returns { doc, numPages, isReady, error, capabilities, reload }.',
   ],
   [
-    'usePdfVirtualizer({ doc, numPages, scale, layout?, rotation?, gap? })',
-    'The scroll engine. Returns { containerRef, virtualSlots, totalHeight, currentPage, resolvedScale, scrollToPage, reportPageDims }.',
+    'usePdfVirtualizer({ doc, numPages, scale, gap?, rotation?, pageRotations?, overscan?, layout? })',
+    'The scroll engine. Returns { containerRef, virtualSlots, totalHeight, currentPage, pageEstimate, resolvedScale, viewportWidth, viewportHeight, scrollToPage, reportPageDims }.',
   ],
   [
-    'usePdfSearch({ doc })',
-    'Whole-document search with a 200 ms debounce and cancellation of stale runs. Returns matches, status, and next/prev.',
+    'usePdfSearch({ doc, onError? })',
+    'Whole-document search with a 200 ms debounce and cancellation of stale runs. Returns { status, progress, query, options, results, total, activeIndex, activeSeq, search, setActiveIndex, nextMatch, prevMatch, clear }.',
   ],
   [
     'usePdfOutline({ doc })',
-    'The bookmark tree, with destinations resolved to 1-based page numbers.',
+    'The bookmark tree, with destinations resolved to 0-based page indexes. Returns { entries, loading } — `entries` is null while loading.',
   ],
   [
-    'usePdfFormValues({ doc })',
-    'Fields, widgets, values, isDirty, plus storage/getFormData/setFormData/reset for programmatic form access.',
-  ],
-  ['usePdfInk({ resetKey })', 'Freehand strokes stored in PDF user space, so zoom and rotation both map correctly.'],
-  [
-    'usePdfPrint({ doc, rotation?, getInkStrokes? })',
-    'Headless print pipeline: { print, cancel, isPrinting, progress, error, supported }.',
+    'usePdfFormValues({ doc, onError? })',
+    'Returns { fields, widgets, values, isDirty, version, loading, refresh, storage, setValue, getFormData, setFormData, reset }.',
   ],
   [
-    'usePdfDownload({ doc, fileName? })',
-    'Saves the file, optionally with form values via saveDocument().',
+    'usePdfInk({ resetKey? })',
+    'Freehand strokes stored in PDF user space, so zoom and rotation both map correctly. Returns { strokes, settings, drawing, setDrawing, updateSettings, addStroke, undo, clear, strokesForPage, getDrawingData, setDrawingData }.',
+  ],
+  [
+    'usePdfPrint({ doc, rotation?, getInkStrokes?, onError? })',
+    'Headless print pipeline. Returns { print, cancel, isPrinting, progress, error, supported }; `print()` takes { range?, scale? } and defaults to the whole document.',
+  ],
+  [
+    'usePdfDownload({ doc, fileName?, onError? })',
+    'Saves the file. Returns { download, isBusy, error }; `download()` takes { withFormValues? }, which writes an incremental save instead of the original bytes.',
   ],
 ];
 
@@ -39,7 +42,8 @@ export function Headless() {
       <p className="doc-lede">
         Import from <code>pdfjs-react-reader/headless</code> and build the entire interface
         yourself. You get the document proxy, the virtualizer, and the layer components — you choose
-        where every button lives.
+        where every button lives. These are the same hooks the shell&apos;s built-in{' '}
+        <a href="#/features">features</a> wrap, so nothing a feature can do is closed to you.
       </p>
 
       <HeadlessExample />
@@ -93,6 +97,12 @@ export function Headless() {
       <p>
         <code>reportPageDims</code> feeds measured page sizes back into the virtualizer, so the
         scrollbar stops guessing after the first page renders.
+      </p>
+      <p>
+        <code>PdfPage</code> draws annotations read-only. A form you can type into needs{' '}
+        <code>renderForms</code> plus the <code>annotationStorage</code>, <code>formVersion</code> and{' '}
+        <code>onFormChange</code> that <code>usePdfFormValues</code> hands back — which is precisely
+        what <code>formsFeature</code> does through its <code>pageProps</code>.
       </p>
 
       <h2>Two rules that matter</h2>
@@ -155,10 +165,12 @@ if (capabilities?.form === 'xfa' && !capabilities.renderedFromXfa) {
       <pre>
         <code>{`const search = usePdfSearch({ doc });
 
-search.run('speculation', { caseSensitive: false, wholeWord: true });
-// search.matches   -> PageMatch[] with pageIndex and a rect per hit
-// search.status    -> 'idle' | 'searching' | 'results' | 'empty' | 'error'
-search.next();
+search.search('speculation', { caseSensitive: false, wholeWord: true });
+// search.results    -> PageMatch[] with pageIndex and a rect per hit
+// search.total      -> how many, which is how 'no matches' reads differently from 'still working'
+// search.status     -> 'idle' | 'indexing' | 'ready' | 'error' (indexing the text, not the query)
+// search.activeIndex, search.nextMatch(), search.prevMatch(), search.clear()
+search.nextMatch();
 
 // Pass each page its slice of matches to highlight in the text layer:
 <PdfPage doc={doc} pageNumber={i + 1} scale={scale} highlights={byPage.get(i)} />`}</code>

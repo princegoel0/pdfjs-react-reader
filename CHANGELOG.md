@@ -5,6 +5,137 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-09-25
+
+Tiers. Four of the viewer's capabilities — printing, saving, filling forms, the outline panel — are now
+values you import rather than props you switch off, which is the only arrangement that survives a
+bundler. **This release contains a breaking change to `PdfViewer`'s props**; the upgrade is three lines
+and is spelled out under "Changed" below.
+
+The reason it was worth breaking anything: measured against `0.3`'s build, `PdfViewer` with all three
+feature props switched off cost **24.09 kB** gzipped against **24.07 kB** with them all on — the same
+bytes, and the same print, download, form and search code in the bundle either way. A prop can turn a
+feature off in the UI. It cannot turn it off in your bundle.
+
+### Added
+
+- **The `features` prop** (`src/lib/features.ts`): `features={[printFeature, downloadFeature,
+  formsFeature, outlineFeature]}`, each a plain value imported from its own entry. The core shell
+  imports none of them — `dist/index.js` contains no reference to `features/print`, `features/forms`,
+  `features/download` or `features/outline` — and a consumer who names none gets pages, the text layer,
+  search, ink, thumbnails, rotation and layout modes and nothing else.
+- **The `PdfFeature` contract**: `{ id, Runner?, controls?, panel?, keys?, pageProps?, options? }`. A
+  feature's hooks live inside its `Runner`, which is mounted once per viewer and keyed by `feature.id`;
+  its toolbar controls, sidebar panel and key bindings are data the shell places, and whatever its
+  Runner publishes flows back to the pages (`pageProps`) and to its own controls. The authoring hooks —
+  `usePdfFeatureShell`, `usePdfFeatureState`, `usePdfFeaturePeer`, `usePdfFeatureOptions`,
+  `usePdfFeaturePublish` — are exported from the root entry, so an application can ship its own feature
+  (annotation editing in `0.6` will be one) through the same door.
+- **Four built-in features** at `pdfjs-react-reader/features/{print,download,forms,outline}`, each with
+  a `create*Feature(options)` form for its own knobs: `createPrintFeature({ scale })`,
+  `createDownloadFeature({ fileName })`, `createFormsFeature({ onChange })`. `download` asks `forms`
+  whether the document has unsaved edits through `usePdfFeaturePeer(FORMS_FEATURE_ID)` and falls back to
+  the pristine bytes when that feature is not mounted, so the peer edge is a lookup, not an import.
+- **One stylesheet per tier** (FR-22): `styles.css` keeps the core chrome and `print.css`, `forms.css`
+  and `outline.css` carry the rules for the features that need them, so the core sheet no longer ships
+  form-widget or print rules to an app that mounted neither. All four are minified at build time, which
+  matters because the source sheets are heavily commented: the core sheet went 28,645 B → 15,820 B.
+- **A second half to the size gate** (FR-23): `scripts/size-consumers/` holds one file per import an
+  application can make, `npm run size` bundles every one of them with both esbuild and Rollup, reports
+  the larger result per path, and asserts that each feature's marker string is **absent from the core
+  bundle and present in its own** — the second direction so a marker that matches nothing cannot pass
+  vacuously. The markers are the hook names (`usePdfPrint`, `usePdfDownload`, `usePdfFormValues`,
+  `usePdfOutline`), grepped on unminified output, because an earlier attempt used engine symbols too:
+  `AnnotationMode` shows up in a clean core bundle merely because our code imports that name from
+  `pdfjs-dist`, so it reported the print pipeline as present when the hook itself was gone.
+- **The gate was tested by breaking it.** Re-adding a live `usePdfPrint` reference to the shell and
+  rebuilding: core went 20.61 → 22.10 kB and both bundlers reported `FAIL usePdfPrint is in the core …
+  bundle: the shell imports print again`, exit 1. The leak also made print's *marginal* cost read as
+  0.55 kB instead of 2.02, which is the shape of the regression a totals-only gate cannot see. The
+  ratchet half was checked the same way, by lowering a baseline number 5 kB in a scratch copy — the
+  first attempt at that produced a false green, because the scratch file was written to `/tmp`, which
+  Git Bash and node resolve to different roots, so the run that "failed correctly" had failed to find a
+  baseline at all. Redone inside the repo.
+- **The PRD's 8 kB core target did not survive contact with the build**, and the honest record is that
+  it was written against a prototype shell with none of the things the real core carries. The measured
+  core is 20.61 kB, so `PRD.md` §6 now reports that number and keeps the per-feature 4 kB gate, which
+  is the half that can stay fixed and still say something. No absolute core ceiling was reinstated.
+- **A DOM test project** (`vitest.config.ts`), because the two rules that fail silently — a Runner
+  remounting and losing its state, a publication outliving its feature — cannot be reproduced without
+  one. `jsdom` and `@testing-library/react` are devDependencies; the package still ships zero runtime
+  dependencies of its own.
+
+### Changed
+
+**Breaking, on `PdfViewer` — the one breaking change `0.4` was reserved for:**
+
+| Removed in `0.4` | Replaced by |
+| --- | --- |
+| `enablePrint`, `printScale` | `features={[printFeature]}`, or `createPrintFeature({ scale })` |
+| `enableDownload`, `downloadFileName` | `features={[downloadFeature]}`, or `createDownloadFeature({ fileName })` |
+| `renderForms`, `onFormValuesChange` | `features={[formsFeature]}`, or `createFormsFeature({ onChange })` |
+| — (the outline tab was always there) | `features={[outlineFeature]}` |
+
+So `<PdfViewer src="/a.pdf" />` in `0.4` is a viewer that reads: no print button, no save, no fillable
+widgets, no outline tab. `<PdfViewer src="/a.pdf" features={[printFeature, downloadFeature, formsFeature,
+outlineFeature]} />` is the `0.3` default, and the import paths are `pdfjs-react-reader/features/*`. The
+reason `0.4` is where this lands instead of after `1.0` is in the paragraph above: leaving the props in
+place would mean leaving the code unshakable, and every later tier (`0.6` annotations, `0.7` editing)
+has to sit on the seam this creates.
+
+- **`PdfPage`'s `renderForms` now defaults to `false`.** The annotation layer still draws links and
+  markups — those are core — but widgets are rendered only when something hands the page the storage to
+  write into. Consumers using `PdfPage` directly were getting widgets they had not asked for.
+- **`SidebarTab` widened from `'thumbnails' | 'outline'` to `string`.** A closed union cannot name a tab
+  contributed by a feature, including one an application writes for itself. `'thumbnails'` and
+  `'outline'` are unchanged in behaviour; the sidebar now renders exactly the tabs its mounted features
+  contribute, with the roving-tabindex arrow keys wrapping over that list.
+- **Toolbar overflow rows group on priority *and* label**, not priority alone. Feature controls declare a
+  priority on the built-in scale, and print asking for 8 — where the built-in print button had always
+  sat — put it in the menu row labelled "Rotate current page". That mislabel predates this release; with
+  features being named by the application it becomes visible, so it is fixed here.
+- **`size-baseline.json` was rewritten** and its labels changed meaning. It now holds the two shipped-file
+  paths (`shell`, `headless`, computed over the files reachable from each entry rather than over every
+  chunk in `dist/`, which six entries made meaningless) plus seven bundled consumer paths.
+
+Measured, gzipped, worst of esbuild and Rollup, on this release's build:
+
+| Consumer import | `0.3` | `0.4` |
+| --- | --- | --- |
+| `PdfViewer`, features off / on | 24.09 / 24.07 kB | — |
+| `PdfViewer` alone | — | **20.61 kB** |
+| + one feature | — | print +2.02, forms +1.99, outline +0.93, download +0.86 kB |
+| `PdfViewer` + all four | — | 25.79 kB |
+| `usePdfDocument` from `/headless` | 2.69 kB | 2.59 kB |
+
+Verified in a browser, on the docs site and the playground:
+
+- **Core, with all four features unmounted**: no print or download control anywhere in the toolbar, zero
+  form widgets (against 9 on the same document with `formsFeature`), the sidebar reduced to the single
+  `Thumbnails` tab, and a `Ctrl/Cmd+P` keydown neither consumed nor printing
+  (`defaultPrevented: false, printCalls: 0`) — while the same page still rendered 2 canvases, 13 text
+  spans, and 5 annotation sections including both link annotations. With all four re-mounted, every
+  control came back without a reload, and the playground's 14-page document still painted 356 text
+  spans with nothing mounted at all.
+- **Print through the feature**: in flight, `body.pjsr-printing` set, one `.pjsr-print` container holding
+  3 canvases at 1224×1584, the control swapped to `Cancel printing`; afterwards `window.print` had been
+  called once and the container was detached with the body class removed. `Ctrl/Cmd+P` fired the same
+  path (`defaultPrevented: true, printCalls: 1`).
+- **Print still carries freehand ink**, which is the behaviour the shell→feature→`usePdfPrint` hop could
+  silently have lost: after one stroke on page 1, the print render sampled 2,455 red pixels on page 1
+  against 161 on each of pages 2 and 3 (that fixture's own red text).
+- **Download through the peer link**: 5,073 bytes pristine, 5,600 after typing `typed by verification`
+  into a text widget, both named `form-sample.pdf` from `shell.documentLabel` — i.e. the save switched
+  from `getData()` to `saveDocument()` because `forms` said the document was dirty.
+- **Outline as a panel feature**: tabs `["Thumbnails", "Outline"]`, 4 tree entries including the nested
+  `2.1 Deep dive`, and clicking `3. Conclusion` moved the page input to `3`.
+- **Folding with feature controls present**: at 380 px the bar kept navigation, search and zoom, and the
+  menu rows read `Rotate current page`, `Print document`, `Custom zoom percentage`, `Download`,
+  `Page layout`, `Enter fullscreen` — each feature control in its own labelled row, and the print button
+  in the menu drove the full pipeline.
+- Console clean on both dev servers apart from Vite's own HMR chatter; no React warnings, no pdf.js
+  worker failures.
+
 ## [0.3.0] — 2026-09-25
 
 Production robustness: the ways a viewer that works on a laptop fails in the field — a canvas too
@@ -372,16 +503,19 @@ of published versions.
   announced in this file. Dropping a major that is still under the React/pdfjs-dist support window
   is a breaking change and takes a major.
 - During `0.x` a **MINOR may break** the public API, and does so only as a deliberate, single-release
-  change announced at the top of its entry here. `0.4.0` is reserved for exactly that: `enablePrint`,
-  `enableDownload` and `renderForms` become opt-in features (`PRD.md` FR-21), because a prop cannot
-  remove code from a bundle while an import can.
+  change announced at the top of its entry here. `0.4.0` spent that allowance: `enablePrint`,
+  `enableDownload` and `renderForms` became opt-in features (`PRD.md` FR-21), because a prop cannot
+  remove code from a bundle while an import can. No further breaking release is planned before `1.0.0`.
 - Size is governed by a **ratchet, not a ceiling**: `scripts/check-size.mjs` measures every consumer
   path gzipped and fails the build on more than 2 % growth above the baseline committed in
   `size-baseline.json`; accepting a growth is `npm run size:update`, which puts the new number in the
-  same diff as the code that caused it. The design targets are **per tier**, not global: core viewer
-  ≤ 8 kB gzipped, any single feature ≤ 4 kB, excluding `pdfjs-dist`. CI also asserts the built core
-  artifact contains no feature code, so a regression in the tier boundary fails the build rather than
-  quietly shipping (`PRD.md` FR-23).
+  same diff as the code that caused it. What is asserted *besides* the ratchet is the tier boundary:
+  each built-in feature must cost **≤ 4 kB** gzipped over the core bundle, and each feature's marker
+  string must be absent from the core bundle and present in its own, measured through both esbuild and
+  Rollup, so a shell that re-imports a feature fails the build rather than quietly shipping
+  (`PRD.md` FR-23). There is **no absolute core ceiling**: the 8 kB figure carried in the PRD since
+  drafting described a prototype shell, and the real one measured 20.61 kB at `0.4.0`, which is a
+  number to ratchet against, not to renegotiate every release.
 - The `docs/` site documents the latest release; older API shapes are described by the matching git
   tag rather than maintained as separate sites.
 
@@ -390,5 +524,5 @@ of published versions.
 1. Install the same major of `pdfjs-dist` you already use — this package requires `^5.0.0 || ^6.2.108`.
    On v5 you are on a release with no fix for CVE-2026-16633, so move to 6.2.108 or later when you can.
 2. React 18 or 19 both work; nothing else is required at runtime.
-3. Pin an exact version in an application (`pdfjs-react-reader` `0.1.0`, not `^0.1.0`) until 1.0.0,
+3. Pin an exact version in an application (`pdfjs-react-reader` `0.4.0`, not `^0.4.0`) until 1.0.0,
    because 0.x minor releases may include breaking changes.

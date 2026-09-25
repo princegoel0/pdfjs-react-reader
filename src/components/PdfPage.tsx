@@ -43,7 +43,11 @@ export interface PdfPageProps {
    * pages mounting later for ordinary virtualization do not yank the scroll.
    */
   navigateToActiveAt?: number;
-  /** Renders interactive AcroForm widgets on the annotation layer. */
+  /**
+   * Renders interactive AcroForm widgets. Off by default: the annotation layer
+   * always draws links and markups, and turning widgets on means a feature
+   * handing this page the storage to write into.
+   */
   renderForms?: boolean;
   /** pdf.js annotation storage backing form field values. */
   annotationStorage?: AnnotationValueStore | null;
@@ -76,7 +80,7 @@ export function PdfPage({
   highlights,
   activeHighlight = -1,
   navigateToActiveAt = 0,
-  renderForms = true,
+  renderForms = false,
   annotationStorage = null,
   linkService = null,
   formVersion = 0,

@@ -2,10 +2,18 @@ import { useCallback, useRef, useState } from 'react';
 import {
   PdfViewer,
   type FormValue,
+  type AnyPdfFeature,
   type PdfViewerHandle,
   type PdfViewerLabelsOverride,
 } from 'pdfjs-react-reader';
+import { downloadFeature } from 'pdfjs-react-reader/features/download';
+import { createFormsFeature } from 'pdfjs-react-reader/features/forms';
+import { outlineFeature } from 'pdfjs-react-reader/features/outline';
+import { printFeature } from 'pdfjs-react-reader/features/print';
 import 'pdfjs-react-reader/styles.css';
+import 'pdfjs-react-reader/print.css';
+import 'pdfjs-react-reader/forms.css';
+import 'pdfjs-react-reader/outline.css';
 import './app.css';
 
 // The standard pdf.js test document (14 pages).
@@ -38,7 +46,22 @@ export default function App() {
   const [restrict, setRestrict] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, FormValue> | null>(null);
   const [log, setLog] = useState<string[]>([]);
+  // All four on, so the first thing a visitor sees is what the old default
+  // looked like — and unchecking one is how you watch a control leave the bar.
+  const [withPrint, setWithPrint] = useState(true);
+  const [withDownload, setWithDownload] = useState(true);
+  const [withForms, setWithForms] = useState(true);
+  const [withOutline, setWithOutline] = useState(true);
   const src = file ?? (appliedUrl || DEFAULT_PDF);
+
+  // Rebuilt inline on purpose: features keyed by id must survive a list that has
+  // no stable identity, which is the ordinary way a host app will write this.
+  const features: AnyPdfFeature[] = [
+    ...(withPrint ? [printFeature] : []),
+    ...(withDownload ? [downloadFeature] : []),
+    ...(withForms ? [createFormsFeature({ onChange: setFormValues })] : []),
+    ...(withOutline ? [outlineFeature] : []),
+  ];
 
   const note = useCallback((message: string) => {
     setLog((previous) => [message, ...previous].slice(0, 8));
@@ -106,6 +129,40 @@ export default function App() {
             <option value="/pdfjs-dist/">self-hosted</option>
           </select>
         </label>
+        <span className="app-features" aria-label="Mounted features">
+          <label>
+            <input
+              type="checkbox"
+              checked={withPrint}
+              onChange={(e) => setWithPrint(e.target.checked)}
+            />
+            &nbsp;print
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={withDownload}
+              onChange={(e) => setWithDownload(e.target.checked)}
+            />
+            &nbsp;download
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={withForms}
+              onChange={(e) => setWithForms(e.target.checked)}
+            />
+            &nbsp;forms
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={withOutline}
+              onChange={(e) => setWithOutline(e.target.checked)}
+            />
+            &nbsp;outline
+          </label>
+        </span>
       </header>
       <div className="app-main">
         <div className="app-viewer">
@@ -115,7 +172,7 @@ export default function App() {
             assetUrl={assetMode || undefined}
             allowedSources={restrict ? ['/fixtures/'] : undefined}
             labels={german ? GERMAN : undefined}
-            onFormValuesChange={setFormValues}
+            features={features}
             onError={(err) => console.error('[playground] viewer error', err)}
             onPageChange={(page) => note(`onPageChange ${page}`)}
             onScaleChange={(scale) => note(`onScaleChange ${scale.toFixed(2)}`)}

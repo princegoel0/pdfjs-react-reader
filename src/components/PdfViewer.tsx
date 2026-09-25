@@ -16,11 +16,7 @@ import {
   type PdfCapabilities,
 } from '../headless/usePdfDocument';
 import type { AssetUrl } from '../lib/assets';
-import { usePdfDownload } from '../headless/usePdfDownload';
-import { usePdfFormValues } from '../headless/usePdfFormValues';
 import { usePdfInk } from '../headless/usePdfInk';
-import { usePdfOutline } from '../headless/usePdfOutline';
-import { usePdfPrint } from '../headless/usePdfPrint';
 import { usePdfSearch } from '../headless/usePdfSearch';
 import { usePdfVirtualizer } from '../headless/usePdfVirtualizer';
 import { applyRotation, type PageLayout, type ScaleMode } from '../lib/layout';
@@ -32,6 +28,15 @@ import {
 } from '../lib/labels';
 import { LabelsContext } from './labels-context';
 import {
+  findFeatureKey,
+  mergeFeaturePageProps,
+  NO_FEATURES,
+  type AnyPdfFeature,
+  type PdfViewerShell,
+} from '../lib/features';
+import { FeaturePart, FeatureRunners, useFeatureStore } from './FeatureHost';
+import type { ReactElement } from 'react';
+import {
   enterFullscreen,
   exitFullscreen,
   fullscreenElement,
@@ -42,17 +47,15 @@ import { isEditableTarget, pageNavigationKey } from '../lib/keyboard';
 import { clampScale, pinchScale, wheelScale, zoomBy } from '../lib/zoom';
 import { resolveDestinationPageIndex } from '../lib/outline';
 import { createPdfLinkService } from '../lib/link-service';
-import type { FormValue } from '../lib/form';
 import type { PageMatch } from '../lib/search';
 import type { PdfSource } from '../lib/source';
 
-import { OutlineView } from './OutlineView';
 import { PasswordPrompt } from './PasswordPrompt';
 import { PdfPage } from './PdfPage';
 import { SearchBox } from './SearchBox';
-import { Sidebar, type SidebarTab } from './Sidebar';
+import { Sidebar, type SidebarTab, type SidebarTabSpec } from './Sidebar';
 import { ThumbnailList } from './ThumbnailList';
-import { Toolbar } from './Toolbar';
+import { Toolbar, type ToolbarItem } from './Toolbar';
 
 const clampPage = (page: number, total: number): number =>
   Math.min(Math.max(1, Math.round(page)), Math.max(1, total));
@@ -116,12 +119,15 @@ export interface PdfViewerProps {
   defaultLayout?: PageLayout;
   /** Show the navigation sidebar (thumbnails/outline) on first render. */
   defaultSidebarOpen?: boolean;
-  /** Render interactive AcroForm widgets. Defaults to true. */
-  renderForms?: boolean;
-  /** Show the print control and bind Ctrl/Cmd+P. Defaults to true (never on iOS). */
-  enablePrint?: boolean;
-  /** Canvas scale for printing; 1 = the 72 dpi PDF unit. Auto-tuned to fit memory by default. */
-  printScale?: number;
+  /**
+   * The features this viewer has: print, download, forms, an outline panel, or
+   * one you wrote. Each is a value you import, so a feature you leave out never
+   * enters the bundle — which is the whole reason these are not booleans.
+   *
+   * Defaults to none. `<PdfViewer src={src} />` shows pages, text, search, ink,
+   * thumbnails and rotation, and nothing that can print, save or edit.
+   */
+  features?: readonly AnyPdfFeature[];
   /** Device pixels per CSS pixel for page canvases. Defaults to `window.devicePixelRatio`. */
   devicePixelRatio?: number;
   /**
@@ -131,12 +137,6 @@ export interface PdfViewerProps {
    * on a large page on screen. `0` renders at CSS resolution.
    */
   maxRenderPixels?: number;
-  /** Show the download control. Defaults to true. */
-  enableDownload?: boolean;
-  /** Name for the saved file; defaults to the document's own name. */
-  downloadFileName?: string;
-  /** Notified with the current values whenever the user edits a form field. */
-  onFormValuesChange?: (values: Record<string, FormValue>) => void;
   className?: string;
   style?: CSSProperties;
   /**
@@ -226,14 +226,9 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
   defaultRotation = 0,
   defaultLayout = 'continuous',
   defaultSidebarOpen = false,
-  renderForms = true,
-  enablePrint = true,
-  printScale,
+  features = NO_FEATURES,
   devicePixelRatio,
   maxRenderPixels,
-  enableDownload = true,
-  downloadFileName,
-  onFormValuesChange,
   className,
   style,
   onPasswordRequired,
@@ -283,6 +278,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
   // wins the moment it changes, so an app navigating elsewhere is never stuck
   // showing a file the user dragged in earlier.
   const effectiveSrc = droppedFile ?? src;
+
   useEffect(() => {
     setDroppedFile(null);
     setDragOver(false);
@@ -333,15 +329,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
   }, []);
 
   const search = usePdfSearch({ doc, onError: handlePageError });
-  const { entries: outlineEntries, loading: outlineLoading } = usePdfOutline({ doc });
-  const form = usePdfFormValues({ doc, onError: handlePageError });
   const ink = usePdfInk({ resetKey: effectiveSrc });
-  const print = usePdfPrint({
-    doc,
-    rotation,
-    getInkStrokes: ink.strokesForPage,
-    onError: handlePageError,
-  });
 
   const {
     containerRef,
@@ -399,10 +387,107 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
     setNavigateToActiveAt(Date.now());
   }, [search.activeSeq, search.activeIndex, search.results]);
 
-  const canPrint = enablePrint && print.supported;
-  const handlePrint = useCallback(() => {
-    void print.print({ scale: printScale });
-  }, [print, printScale]);
+  // ---- features ------------------------------------------------------------
+  // Human-readable document name. `File` carries a name; a bare Blob or data URL
+  // does not, so those simply omit the label. Features see it too, which is how
+  // a save gets named after the file the reader is looking at.
+  const docLabel = useMemo(() => {
+    if (typeof effectiveSrc === 'string') {
+      try {
+        const url = new URL(effectiveSrc, window.location.href);
+        const last = url.pathname.split('/').filter(Boolean).pop();
+        return last ? decodeURIComponent(last).replace(/\.pdf$/i, '') : url.hostname;
+      } catch {
+        return undefined;
+      }
+    }
+    const name = (effectiveSrc as Blob & { name?: string }).name;
+    return name ? name.replace(/\.pdf$/i, '') : undefined;
+  }, [effectiveSrc]);
+
+  const shellApi = useMemo<PdfViewerShell>(
+    () => ({
+      doc,
+      numPages,
+      currentPage,
+      scale: resolvedScale,
+      scaleMode,
+      rotation,
+      documentLabel: docLabel,
+      labels: resolvedLabels,
+      labelsOverride: labels,
+      scrollToPage,
+      setScaleMode,
+      setLayout: setPageLayout,
+      reportError: handlePageError,
+      inkStrokesForPage: ink.strokesForPage,
+      openSidebar: (open, tab) => {
+        setSidebarOpen(open);
+        if (tab) setSidebarTab(tab);
+      },
+    }),
+    [
+      doc,
+      numPages,
+      currentPage,
+      resolvedScale,
+      scaleMode,
+      rotation,
+      docLabel,
+      resolvedLabels,
+      labels,
+      scrollToPage,
+      handlePageError,
+      ink.strokesForPage,
+    ],
+  );
+
+  // The single owner of feature state. Everything below reads through it, and
+  // the shell itself imports no feature to do any of it.
+  const store = useFeatureStore(shellApi);
+
+  const pageProps = useMemo(
+    () => mergeFeaturePageProps(features, store.get),
+    [features, store],
+  );
+
+  const featureItems = useMemo<ToolbarItem[]>(() => {
+    const items: ToolbarItem[] = [];
+    for (const feature of features) {
+      const state = store.get(feature.id);
+      for (const control of feature.controls ?? []) {
+        if (control.available && !control.available(state, shellApi)) continue;
+        items.push({
+          id: control.id,
+          priority: control.priority,
+          label: control.label(resolvedLabels, state),
+          node: (
+            <FeaturePart feature={feature} store={store}>
+              <control.render />
+            </FeaturePart>
+          ),
+        });
+      }
+    }
+    return items.sort((a, b) => a.priority - b.priority);
+  }, [features, store, shellApi, resolvedLabels]);
+
+  const featurePanels = useMemo<SidebarTabSpec[]>(
+    () =>
+      features
+        .filter((feature) => feature.panel)
+        .map((feature) => ({
+          id: feature.panel!.id,
+          label: feature.panel!.label(resolvedLabels, store.get(feature.id)),
+        })),
+    [features, store, resolvedLabels],
+  );
+
+  const activePanel = featurePanels.find((entry) => entry.id === sidebarTab);
+  const activePanelFeature = activePanel
+    ? features.find((feature) => feature.panel?.id === activePanel.id)
+    : undefined;
+  const ActivePanel = activePanelFeature?.panel?.render;
 
   // ---- change events -------------------------------------------------------
   useChangeSignal(currentPage, (page) => onPageChange?.(page));
@@ -447,14 +532,19 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
     // page — belongs to that field, never to the viewer.
     if (isEditableTarget(event.target)) return;
 
+    // A mounted feature gets the chord first: Ctrl/Cmd+P belongs to print, and
+    // print is only here because the application put it here.
+    const claimed = findFeatureKey(features, store.get, shellApi, event);
+    if (claimed) {
+      event.preventDefault();
+      claimed.binding.run(store.get(claimed.feature.id), shellApi, event);
+      return;
+    }
+
     if (event.ctrlKey || event.metaKey) {
-      const key = event.key.toLowerCase();
-      if (key === 'f') {
+      if (event.key.toLowerCase() === 'f') {
         event.preventDefault();
         setSearchOpen(true);
-      } else if (key === 'p' && canPrint) {
-        event.preventDefault();
-        handlePrint();
       }
       return;
     }
@@ -622,14 +712,6 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
     [doc, effectiveSrc],
   );
 
-  // Held in a ref so a consumer passing an inline arrow cannot re-trigger this
-  // effect on every render (which would loop whenever it sets state).
-  const onFormValuesChangeRef = useRef(onFormValuesChange);
-  onFormValuesChangeRef.current = onFormValuesChange;
-  useEffect(() => {
-    onFormValuesChangeRef.current?.(form.values);
-  }, [form.values]);
-
   const handleRotate = useCallback((delta: number) => {
     setRotation((r) => (((r + delta) % 360) + 360) % 360);
   }, []);
@@ -641,33 +723,6 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
     for (const slot of virtualSlots) max = Math.max(max, slot.width);
     return max;
   }, [virtualSlots, pageEstimate, rotation, resolvedScale]);
-
-  // Human-readable document name for the bar. `File` carries a name; a bare
-  // Blob or data URL does not, so those simply omit the label.
-  const docLabel = useMemo(() => {
-    if (typeof effectiveSrc === 'string') {
-      try {
-        const url = new URL(effectiveSrc, window.location.href);
-        const last = url.pathname.split('/').filter(Boolean).pop();
-        return last ? decodeURIComponent(last).replace(/\.pdf$/i, '') : url.hostname;
-      } catch {
-        return undefined;
-      }
-    }
-    const name = (effectiveSrc as Blob & { name?: string }).name;
-    return name ? name.replace(/\.pdf$/i, '') : undefined;
-  }, [effectiveSrc]);
-
-  const download = usePdfDownload({
-    doc,
-    fileName: downloadFileName ?? docLabel,
-    onError: handlePageError,
-  });
-  const handleDownload = useCallback(() => {
-    // Save what the user is looking at: with edits pending, the download embeds
-    // the current form values instead of the pristine file.
-    void download.download({ withFormValues: form.isDirty });
-  }, [download, form.isDirty]);
 
   // ---- imperative handle ---------------------------------------------------
   // Every member reads through a ref, so the object is created once and a
@@ -724,6 +779,9 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
             {resolvedLabels.dropToOpen}
           </div>
         )}
+        {/* One Runner per feature, keyed by id: this is where a feature's hooks
+            live, so the shell body never calls one whose count could change. */}
+        <FeatureRunners features={features} store={store} />
         <Toolbar
         currentPage={currentPage}
         numPages={numPages}
@@ -758,12 +816,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
         zoomLabel={formatLabel(resolvedLabels.zoomPercent, {
           percent: Math.round(resolvedScale * 100),
         })}
-        onPrint={canPrint ? handlePrint : undefined}
-        onPrintCancel={print.cancel}
-        printing={print.isPrinting}
-        printProgress={print.progress}
-        onDownload={enableDownload ? handleDownload : undefined}
-        downloading={download.isBusy}
+        featureItems={featureItems}
         onFullscreenToggle={fsAvailable ? toggleFullscreen : undefined}
         fullscreenActive={isFullscreen}
         onRotatePage={handleRotatePage}
@@ -775,6 +828,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
           tab={sidebarTab}
           onTabChange={setSidebarTab}
           onClose={() => setSidebarOpen(false)}
+          extraTabs={featurePanels}
         >
           {sidebarTab === 'thumbnails' ? (
             doc && (
@@ -787,13 +841,11 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
                 onSelectPage={(page) => scrollToPage(page)}
               />
             )
-          ) : (
-            <OutlineView
-              entries={outlineEntries}
-              loading={outlineLoading}
-              onSelectPage={(page) => scrollToPage(page)}
-            />
-          )}
+          ) : activePanelFeature && ActivePanel ? (
+            <FeaturePart feature={activePanelFeature} store={store}>
+              <ActivePanel />
+            </FeaturePart>
+          ) : null}
         </Sidebar>
 
         <div
@@ -857,11 +909,8 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
                           highlights={matchesByPage.get(index)}
                           activeHighlight={activeLocalByPage.get(index) ?? -1}
                           navigateToActiveAt={navigateToActiveAt}
-                          renderForms={renderForms}
-                          annotationStorage={form.storage}
                           linkService={linkService}
-                          formVersion={form.version}
-                          onFormChange={form.refresh}
+                          {...pageProps}
                           inkStrokes={ink.strokesForPage(index)}
                           inkDrawing={ink.drawing}
                           inkSettings={ink.settings}

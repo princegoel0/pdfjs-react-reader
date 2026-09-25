@@ -100,8 +100,18 @@ export function Theming() {
         <code>.pjsr-toolbar</code>, <code>.pjsr-page</code>, <code>.pjsr-text-layer</code>,{' '}
         <code>.pjsr-ink-layer</code>, <code>.pjsr-sidebar</code>, <code>.pjsr-thumbnail</code>,{' '}
         <code>.pjsr-overflow-menu</code>. The print container is <code>.pjsr-print</code> and its
-        rules live under <code>@media print</code>; there is deliberately no <code>@page</code>{' '}
-        rule, so the library cannot interfere with the host app's own printing.
+        rules live under <code>@media print</code> in <code>print.css</code>; there is deliberately no{' '}
+        <code>@page</code> rule, so the library cannot interfere with the host app&apos;s own
+        printing.
+      </p>
+      <p>
+        The rules are spread over four files — <code>styles.css</code> for the core chrome, then{' '}
+        <code>print.css</code>, <code>forms.css</code> and <code>outline.css</code> — so a viewer that
+        mounted none of those features downloads none of their CSS. The split changes which file a
+        rule is in, not how it is themed: every sheet reads the same tokens, and the feature markup
+        sits inside <code>.pjsr-viewer</code>, so your overrides reach it. The one exception is the
+        print container, which the pipeline appends to <code>&lt;body&gt;</code> because the viewer
+        clips — it is bare canvases and sets no colour, so there is nothing to theme.
       </p>
     </>
   );

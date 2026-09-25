@@ -1,0 +1,90 @@
+/* pdfjs-react-reader — the outline sidebar panel, shipped with features/outline
+ * Import this alongside 'pdfjs-react-reader/styles.css'. The theme tokens live
+ * in the core sheet; everything here is rules this file needs and the core
+ * stylesheet must not carry, because a feature you did not ask for should not
+ * be styled for. */
+
+/* ---------- outline ---------- */
+
+.pjsr-outline-tree,
+.pjsr-outline-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pjsr-outline-tree {
+  padding: 6px 4px;
+}
+
+.pjsr-outline-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pjsr-outline-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--pjsr-caret-w);
+  min-height: var(--pjsr-row-h);
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--pjsr-muted-fg);
+  cursor: pointer;
+}
+
+.pjsr-outline-caret:hover {
+  background: var(--pjsr-hover-bg);
+  color: var(--pjsr-fg);
+}
+
+.pjsr-outline-caret-spacer {
+  flex: none;
+  width: var(--pjsr-caret-w);
+}
+
+.pjsr-outline-link {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--pjsr-row-h);
+  /* Line-height (not flex) centres the label: a flex container turns its text
+     into an anonymous item, which silently kills the ellipsis below. */
+  line-height: calc(var(--pjsr-row-h) - 8px);
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pjsr-fg);
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.pjsr-outline-link:hover:not(:disabled) {
+  background: var(--pjsr-hover-bg);
+}
+
+.pjsr-outline-link:disabled {
+  color: var(--pjsr-muted-fg);
+  cursor: default;
+}
+
+.pjsr-outline-link:focus-visible,
+.pjsr-outline-caret:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-outline-empty {
+  padding: 16px;
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+}

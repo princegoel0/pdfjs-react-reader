@@ -1,0 +1,171 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import type { AnyPdfFeature, FeaturePublication, PdfViewerShell } from '../lib/features';
+import { samePublication } from '../lib/features';
+
+/**
+ * Where a feature's state lives while it is mounted (FR-21).
+ *
+ * A Runner owns the hooks and publishes their results here; the shell merges
+ * page contributions back out of it, and a feature's own controls and panels
+ * read them. That indirection is the point: the shell calling a hook per feature
+ * breaks as soon as the feature list changes length, and a control owning its own
+ * hook breaks too, because the toolbar renders every control three times — the
+ * off-screen sizer, the bar, and the overflow menu.
+ */
+export interface FeatureStore {
+  shell: PdfViewerShell;
+  /** Never undefined: an unmounted feature reads as an empty object. */
+  get: (id: string) => FeaturePublication;
+  publish: (id: string, value: FeaturePublication) => void;
+  retire: (id: string) => void;
+}
+
+const NO_PUBLICATION: FeaturePublication = Object.freeze({});
+
+interface ScopedStore extends FeatureStore {
+  feature: AnyPdfFeature;
+}
+
+const FeatureScope = createContext<ScopedStore | null>(null);
+
+function useScope(): ScopedStore {
+  const scope = useContext(FeatureScope);
+  if (!scope) {
+    throw new Error('pdfjs-react-reader: feature hooks only work inside a mounted feature.');
+  }
+  return scope;
+}
+
+/** Creates the publication store one viewer instance runs its features from. */
+export function useFeatureStore(shell: PdfViewerShell): FeatureStore {
+  const [states, setStates] = useState<Map<string, FeaturePublication>>(() => new Map());
+
+  const publish = useCallback((id: string, value: FeaturePublication) => {
+    setStates((prev) =>
+      samePublication(prev.get(id), value) ? prev : new Map(prev).set(id, value),
+    );
+  }, []);
+
+  // A feature that is gone must stop being readable: download decides whether to
+  // save form edits by asking the forms feature, and a stale answer would be a
+  // wrong answer rather than no answer.
+  const retire = useCallback((id: string) => {
+    setStates((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const get = useCallback(
+    (id: string) => states.get(id) ?? NO_PUBLICATION,
+    [states],
+  );
+
+  return useMemo(() => ({ shell, get, publish, retire }), [shell, get, publish, retire]);
+}
+
+function FeatureScopeProvider({
+  feature,
+  store,
+  children,
+}: {
+  feature: AnyPdfFeature;
+  store: FeatureStore;
+  children: ReactNode;
+}) {
+  const scoped = useMemo<ScopedStore>(() => ({ ...store, feature }), [store, feature]);
+  return <FeatureScope.Provider value={scoped}>{children}</FeatureScope.Provider>;
+}
+
+export interface FeaturePartProps {
+  feature: AnyPdfFeature;
+  store: FeatureStore;
+  children: ReactNode;
+}
+
+/** Re-scopes a control or panel so the feature hooks resolve inside the shell. */
+export function FeaturePart({ feature, store, children }: FeaturePartProps) {
+  return (
+    <FeatureScopeProvider feature={feature} store={store}>
+      {children}
+    </FeatureScopeProvider>
+  );
+}
+
+/**
+ * Mounts one Runner per feature, keyed by `feature.id`.
+ *
+ * Keying by position instead would remount the surviving feature whenever an
+ * earlier sibling is dropped, discarding its state with no error — `features` is
+ * expected to be rebuilt inline on every render.
+ */
+export function FeatureRunners({
+  features,
+  store,
+}: {
+  features: readonly AnyPdfFeature[];
+  store: FeatureStore;
+}) {
+  return (
+    <>
+      {features.map((feature) => (
+        <FeatureMount key={feature.id} feature={feature} store={store} />
+      ))}
+    </>
+  );
+}
+
+function FeatureMount({ feature, store }: { feature: AnyPdfFeature; store: FeatureStore }) {
+  const { Runner } = feature;
+  const { retire } = store;
+  useEffect(
+    () => () => {
+      retire(feature.id);
+    },
+    [feature.id, retire],
+  );
+  if (!Runner) return null;
+  return (
+    <FeatureScopeProvider feature={feature} store={store}>
+      <Runner />
+    </FeatureScopeProvider>
+  );
+}
+
+/** The shell services a feature may use. */
+export function usePdfFeatureShell(): PdfViewerShell {
+  return useScope().shell;
+}
+
+/** The feature's own published state — `{}` until its Runner has published. */
+export function usePdfFeatureState<S extends object = FeaturePublication>(): S {
+  const scope = useScope();
+  return scope.get(scope.feature.id) as S;
+}
+
+/** Another feature's state, e.g. download asking forms whether the doc is dirty. */
+export function usePdfFeaturePeer<S extends object = FeaturePublication>(id: string): S {
+  return useScope().get(id) as S;
+}
+
+/** The options given to the `create*Feature` factory that made this feature. */
+export function usePdfFeatureOptions<O>(): O {
+  return useScope().feature.options as O;
+}
+
+/**
+ * Publishes the Runner's state on every render; the store's shallow compare is
+ * what keeps that from re-rendering the shell forever, so published values must
+ * be primitives or stable references.
+ */
+export function usePdfFeaturePublish<S extends object>(value: S): void {
+  const { feature, publish } = useScope();
+  const latest = useRef(value);
+  latest.current = value;
+  useEffect(() => {
+    publish(feature.id, latest.current as FeaturePublication);
+  });
+}

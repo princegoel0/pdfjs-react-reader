@@ -4,6 +4,7 @@ import { Introduction } from './pages/Introduction';
 import { Installation } from './pages/Installation';
 import { Compatibility } from './pages/Compatibility';
 import { Shell } from './pages/Shell';
+import { Features } from './pages/Features';
 import { Headless } from './pages/Headless';
 import { Theming } from './pages/Theming';
 import { Recipes } from './pages/Recipes';
@@ -20,6 +21,7 @@ const PAGES: DocPage[] = [
   { id: 'installation', title: 'Installation & worker', group: 'Getting started', Component: Installation },
   { id: 'compatibility', title: 'Versions & compatibility', group: 'Getting started', Component: Compatibility },
   { id: 'shell', title: 'The viewer shell', group: 'Using it', Component: Shell },
+  { id: 'features', title: 'Features & tiers', group: 'Using it', Component: Features },
   { id: 'headless', title: 'Headless hooks', group: 'Using it', Component: Headless },
   { id: 'theming', title: 'Theming', group: 'Using it', Component: Theming },
   { id: 'recipes', title: 'Recipes', group: 'Using it', Component: Recipes },
@@ -58,10 +60,11 @@ export function App() {
     <>
       <header className="doc-header">
         <span className="doc-logo">pdfjs-react-reader</span>
-        <span className="doc-badge">v0.1.0</span>
+        <span className="doc-badge">v0.4.0</span>
         <nav className="doc-links" aria-label="Documentation sections">
           <a href="#/compatibility">Compatibility</a>
           <a href="#/shell">Shell</a>
+          <a href="#/features">Features</a>
           <a href="#/headless">Headless</a>
           <a href="#/theming">Theming</a>
           <a href="#/recipes">Recipes</a>

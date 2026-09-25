@@ -8,7 +8,8 @@ export function Introduction() {
         An MIT-licensed, headless-first PDF viewer for React, built directly on Mozilla's{' '}
         <code>pdfjs-dist</code>. It ships the plumbing that is tedious to get right — virtualized
         rendering, the canvas/text/annotation layer stack, worker lifecycle, search, forms, and
-        printing — as hooks you can drive from your own UI, plus an optional drop-in component.
+        printing — as hooks you can drive from your own UI, plus an optional drop-in component whose
+        extra capabilities are imports, so the bundle holds only the ones you mounted.
       </p>
 
       <ShellExample />
@@ -32,17 +33,17 @@ export function Introduction() {
           search matches highlighted in place.
         </li>
         <li>
-          <strong>Forms and annotations.</strong> Interactive AcroForm widgets (text, checkbox,
-          radio, choice, button) wired to pdf.js annotation storage, plus link annotations and
-          freehand ink.
+          <strong>Search, layout modes, and a sidebar.</strong> Continuous, single page and two-page
+          spread; thumbnails are core, and the bookmarks tab is a feature you import.
         </li>
         <li>
-          <strong>Search, outline, thumbnails, layout modes.</strong> Continuous, single page and
-          two-page spread.
+          <strong>Forms, printing and download as features.</strong> Interactive AcroForm widgets
+          (text, checkbox, radio, choice, button) wired to pdf.js annotation storage; a print
+          pipeline that renders every page at print intent; a save that can carry your form edits.
+          Each is an import, and each is measured in the Footprint table below.
         </li>
         <li>
-          <strong>Printing and download.</strong> A headless print pipeline that renders every page
-          at print intent, and a save that can carry your form edits.
+          <strong>Freehand ink.</strong> Core, and it goes to the printer with the page.
         </li>
         <li>
           <strong>Encrypted documents.</strong> A built-in password prompt, or take over the UI
@@ -56,7 +57,7 @@ export function Introduction() {
         </li>
       </ul>
 
-      <h2>Two entry points</h2>
+      <h2>Entry points</h2>
       <table className="doc-table">
         <thead>
           <tr>
@@ -70,7 +71,9 @@ export function Introduction() {
               <code>pdfjs-react-reader</code>
             </td>
             <td>
-              Everything: the <code>PdfViewer</code> shell, its parts, and every headless hook.
+              Everything: the <code>PdfViewer</code> shell, its parts, the feature contract and every
+              headless hook. Importing <code>PdfViewer</code> from here does not drag in the
+              features you did not mount.
             </td>
           </tr>
           <tr>
@@ -81,58 +84,119 @@ export function Introduction() {
           </tr>
           <tr>
             <td>
+              <code>pdfjs-react-reader/features/{'{print | download | forms | outline}'}</code>
+            </td>
+            <td>
+              One optional capability each: its <code>Runner</code>, toolbar control, keys and panel,
+              passed to <code>PdfViewer</code> as <code>features</code>.{' '}
+              <a href="#/features">Features &amp; tiers</a>.
+            </td>
+          </tr>
+          <tr>
+            <td>
               <code>pdfjs-react-reader/styles.css</code>
             </td>
-            <td>The default theme. Import it, or theme through the tokens.</td>
+            <td>
+              The default theme for the core chrome. Import it, or theme through the tokens.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/{'{print | forms | outline}'}.css</code>
+            </td>
+            <td>
+              The rules for those three features' markup, as separate files because a bundler drops
+              CSS that no JavaScript imports.
+            </td>
           </tr>
         </tbody>
       </table>
 
       <h2>Footprint</h2>
       <p>
-        Measured gzipped, excluding <code>pdfjs-dist</code> itself, which stays a peer dependency:
+        Measured gzipped, excluding <code>pdfjs-dist</code> and React themselves, both peer
+        dependencies. Each row is a real consumer file bundled once with esbuild and once with
+        Rollup, and the larger of the two reported:
       </p>
       <table className="doc-table">
         <thead>
           <tr>
-            <th>Consumer path</th>
+            <th>What you import</th>
             <th>Size</th>
+            <th>Over core</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>
-              Shell (<code>index.js</code> + shared chunk + CSS)
+              <code>PdfViewer</code> alone — pages, text, search, ink, thumbnails, chrome
             </td>
-            <td>45.5 kB</td>
+            <td>20.61 kB</td>
+            <td>—</td>
           </tr>
           <tr>
             <td>
-              Headless (<code>headless.js</code> + shared chunk + CSS)
+              <code>+ printFeature</code>
             </td>
-            <td>25.6 kB</td>
+            <td>22.63 kB</td>
+            <td>+2.02 kB</td>
           </tr>
           <tr>
             <td>
-              One headless hook tree-shaken (<code>usePdfDocument</code>)
+              <code>+ downloadFeature</code>
             </td>
-            <td>2.5 kB</td>
+            <td>21.47 kB</td>
+            <td>+0.86 kB</td>
+          </tr>
+          <tr>
+            <td>
+              <code>+ formsFeature</code>
+            </td>
+            <td>22.60 kB</td>
+            <td>+1.99 kB</td>
+          </tr>
+          <tr>
+            <td>
+              <code>+ outlineFeature</code>
+            </td>
+            <td>21.54 kB</td>
+            <td>+0.93 kB</td>
+          </tr>
+          <tr>
+            <td>All four</td>
+            <td>25.79 kB</td>
+            <td>+5.18 kB</td>
+          </tr>
+          <tr>
+            <td>
+              One headless hook (<code>usePdfDocument</code>)
+            </td>
+            <td>2.59 kB</td>
+            <td>—</td>
           </tr>
         </tbody>
       </table>
       <p>
-        Measured on 0.3.0. CI runs <code>npm run size</code>, which compares every path against the
+        All four together cost less than their sum, because each is measured against the same core
+        they attach to. The two shipped-file paths are what a bundler that cannot tree-shake pays for
+        the whole entry surface: <strong>44.01 kB</strong> for <code>index.js</code> and{' '}
+        <strong>21.77 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>.
+      </p>
+      <p>
+        Measured on 0.4.0. CI runs <code>npm run size</code>, which compares every path against the
         numbers committed in <code>size-baseline.json</code> and fails on growth beyond 2&nbsp;%
-        (+256&nbsp;B of slack for minifier jitter). It is a ratchet rather than a ceiling: a library
-        that grows with features cannot honestly promise a fixed size, so what the gate protects is
-        the process — accepting growth means running <code>npm run size:update</code>, which puts the
-        new number in the same diff as the code that caused it.
+        (+256&nbsp;B of slack for minifier jitter), and fails on its own if any single feature costs
+        more than 4&nbsp;kB over core. It is a ratchet rather than a ceiling: a library that grows
+        with features cannot honestly promise a fixed size, so what the gate protects is the process —
+        accepting growth means running <code>npm run size:update</code>, which puts the new number in
+        the same diff as the code that caused it.
       </p>
 
       <h2>Accessibility</h2>
       <p>
         The shell is built to be usable by keyboard and screen reader out of the box: the page
-        region is focusable so the search and print shortcuts are reachable, controls carry{' '}
+        region is focusable so the search shortcut — and print's, when that feature is mounted — are
+        reachable, controls carry{' '}
         <code>aria-label</code>, disclosures use <code>aria-expanded</code> and toggles{' '}
         <code>aria-pressed</code>, the match counter is an <code>aria-live</code> region, load
         failures are <code>role="alert"</code>, and every text token clears WCAG AA contrast. Touch
