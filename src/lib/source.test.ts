@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { normalizeSource } from './source';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { normalizeSource, resolveSourceUrl } from './source';
 
 const PDF_MAGIC_BASE64 = 'JVBERi0xLjQK'; // "%PDF-1.4\n"
 
@@ -54,5 +54,97 @@ describe('normalizeSource', () => {
 
   it('rejects unsupported types', async () => {
     await expect(normalizeSource(42 as unknown as string)).rejects.toThrow(TypeError);
+  });
+
+  // A string that is not recognisably a path used to be fetched as one, which
+  // sends whatever the app's origin happens to serve there to the parser.
+  it('refuses a bare word rather than fetching it', async () => {
+    await expect(normalizeSource('report')).rejects.toThrow(TypeError);
+    await expect(normalizeSource('the monthly report')).rejects.toThrow(/Unrecognized PDF source/);
+    await expect(normalizeSource('C:\\docs\\report.pdf')).rejects.toThrow(TypeError);
+  });
+
+  it('still accepts paths without an extension', async () => {
+    expect(await normalizeSource('./report')).toMatchObject({ kind: 'url' });
+    expect(await normalizeSource('/files/1234')).toMatchObject({ kind: 'url', url: '/files/1234' });
+    expect(await normalizeSource('//cdn.example.com/a.pdf')).toMatchObject({ kind: 'url' });
+    expect(await normalizeSource('my-app://documents/a.pdf')).toMatchObject({ kind: 'url' });
+  });
+});
+
+const BASE = 'https://app.example/reports/index.html';
+
+describe('allowedSources', () => {
+  beforeEach(() => {
+    Reflect.set(globalThis, 'document', { baseURI: BASE });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'document');
+  });
+
+  it('does not restrict anything when unset', async () => {
+    const result = await normalizeSource('https://anyone.example/doc.pdf');
+    expect(result).toMatchObject({ kind: 'url' });
+  });
+
+  it('accepts an origin or URL prefix', async () => {
+    expect(
+      await normalizeSource('https://cdn.example.com/a/b.pdf', {
+        allowedSources: ['https://cdn.example.com'],
+      }),
+    ).toMatchObject({ kind: 'url' });
+    expect(
+      await normalizeSource('https://cdn.example.com/x/y.pdf', {
+        allowedSources: ['https://cdn.example.com/x/'],
+      }),
+    ).toMatchObject({ kind: 'url' });
+  });
+
+  it('refuses a host that merely starts with an allowed one', async () => {
+    await expect(
+      normalizeSource('https://cdn.example.com.evil/a.pdf', {
+        allowedSources: ['https://cdn.example.com'],
+      }),
+    ).rejects.toThrow(/allowedSources/);
+  });
+
+  it('binds a path entry to the page origin', async () => {
+    expect(await normalizeSource('/files/a.pdf', { allowedSources: ['/files/'] })).toMatchObject({
+      kind: 'url',
+    });
+    await expect(
+      normalizeSource('https://evil.example/files/a.pdf', { allowedSources: ['/files/'] }),
+    ).rejects.toThrow(/allowedSources/);
+  });
+
+  it('matches a relative source against the page, not the worker', async () => {
+    expect(await normalizeSource('a.pdf', { allowedSources: ['/reports/'] })).toMatchObject({
+      kind: 'url',
+    });
+    await expect(
+      normalizeSource(resolveSourceUrl('a.pdf').replace('/reports/', '/other/'), {
+        allowedSources: ['/reports/'],
+      }),
+    ).rejects.toThrow(/allowedSources/);
+  });
+
+  it('allows blob URLs only when asked, and anything under "*"', async () => {
+    await expect(
+      normalizeSource('blob:https://app.example/uuid', { allowedSources: ['/x/'] }),
+    ).rejects.toThrow(/allowedSources/);
+    expect(
+      await normalizeSource('blob:https://app.example/uuid', { allowedSources: ['blob:'] }),
+    ).toMatchObject({ kind: 'url' });
+    expect(
+      await normalizeSource('https://anyone.example/a.pdf', { allowedSources: ['*'] }),
+    ).toMatchObject({ kind: 'url' });
+  });
+
+  it('leaves byte sources unrestricted', async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    expect(await normalizeSource(bytes, { allowedSources: [] })).toEqual({
+      kind: 'data',
+      data: bytes,
+    });
   });
 });

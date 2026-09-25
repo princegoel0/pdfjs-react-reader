@@ -1,5 +1,6 @@
 export {
   usePdfDocument,
+  type PdfCapabilities,
   type UsePdfDocumentOptions,
   type UsePdfDocumentResult,
   type PasswordReason,
@@ -106,8 +107,40 @@ export {
   printCanvasSize,
 } from './lib/print';
 export { downloadBytes, pdfFileName } from './lib/download';
-export { configureWorker, ensureWorker, workerAutoDetectionFailed } from './lib/worker';
-export { normalizeSource, type PdfSource, type NormalizedSource } from './lib/source';
+export {
+  configureTrustedTypes,
+  configureWorker,
+  ensureWorker,
+  isTrustedTypesConfigured,
+  workerAutoDetectionFailed,
+} from './lib/worker';
+export {
+  isAllowedSource,
+  normalizeSource,
+  resolveSourceUrl,
+  type PdfSource,
+  type NormalizedSource,
+} from './lib/source';
+export {
+  CDN_ASSET_ROOT,
+  pdfAssetUrls,
+  resolveAssetRoot,
+  type AssetUrl,
+  type PdfAssetUrls,
+} from './lib/assets';
+export {
+  CAP_AREA_FACTOR,
+  MAX_RENDER_PIXELS,
+  MAX_RENDER_PIXELS_MOBILE,
+  MAX_RENDER_SIDE,
+  isMobileCanvasEnvironment,
+  maxRenderPixelsFor,
+  readCanvasEnvironment,
+  resolveRenderScale,
+  type CanvasEnvironment,
+  type RenderScale,
+  type RenderScaleOptions,
+} from './lib/canvas';
 export {
   applyRotation,
   computeLayout,

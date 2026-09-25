@@ -38,6 +38,10 @@ export function Report() {
   resolution and a cancellable progress loop.
 - **Download** of the original bytes, or an incremental save carrying the edits.
 - **Encrypted documents** with a built-in password prompt you can replace.
+- **Production edges** — a canvas area ceiling (an over-large canvas paints blank rather than
+  throwing), an `allowedSources` allowlist for URLs you did not author, pdf.js support assets served
+  from your own origin, an opt-in Trusted Types policy, and a `capabilities` report of what the
+  opened document declares.
 - **Driven from code** — a `ref` handle (`goToPage`, `zoomTo`, `rotatePage`, `search`,
   `toggleFullscreen`, …) and change events that report what the user did rather than what mounted.
 - **Gestures** — Ctrl/Cmd + wheel (which is also how a trackpad pinch arrives), two-finger pinch on
@@ -170,6 +174,34 @@ Pin it when you serve the worker from a CDN or copy it into a fixed location. No
 itself needs DOM globals at import time, so this package is client-side only — in Next.js, import it
 from a `"use client"` component and load it dynamically rather than in a server component.
 
+## Beyond the worker
+
+pdf.js also fetches `cmaps/`, `standard_fonts/` and `wasm/` while parsing. They default to an unpkg
+root pinned to your `pdfjs-dist` version; `assetUrl="/pdfjs-assets/"` points them at a directory you
+serve instead — those three folder names, kept as-is, under that root. There is no automatic
+self-hosted discovery because pdf.js concatenates a *directory* with a filename at runtime and a
+bundler only emits files it was told about by name.
+
+A string `src` you did not author is bounded by `allowedSources`, and one that is not recognizably a
+URL or a path throws rather than being fetched:
+
+```tsx
+<PdfViewer src={userUrl} allowedSources={['/uploads/', 'https://cdn.example.com']} />
+```
+
+Once a document is open, `onCapabilities` says what it is, which is the only way to know a form will
+not fill in before the user types into it:
+
+```tsx
+<PdfViewer src={src} onCapabilities={(c) => c.form /* 'none' | 'acroform' | 'xfa' | 'mixed' */} />
+```
+
+On a page served with `require-trusted-types-for 'script'` pdf.js cannot start its worker at all — it
+accepts a string URL, and constructing a `Worker` from one throws there, which pdf.js swallows while
+parsing on the main thread. `configureTrustedTypes('your-policy-name')` opts in to building the
+worker through your own policy; the name must already appear in your `trusted-types` directive, which
+is why nothing here picks one.
+
 ## Theming
 
 Plain CSS custom properties, no CSS-in-JS. Every colour and size resolves from a `--pjsr-*` token
@@ -205,17 +237,23 @@ follows the input device instead: 44 px targets under `(pointer: coarse)`, 32 px
 
 ## Size
 
-Gzipped, excluding `pdfjs-dist` (a peer dependency):
+Gzipped, excluding `pdfjs-dist` (a peer dependency). Measured on `0.3.0`:
 
 | Path | Size |
 | --- | --- |
-| Shell — `index.js` + shared chunk + CSS | 42.9 kB |
-| Headless — `headless.js` + shared chunk + CSS | 23.4 kB |
-| A single headless hook (`usePdfDocument`) tree-shaken | 2.2 kB |
+| Shell — `index.js` + shared chunk + CSS | 45.5 kB |
+| Headless — `headless.js` + shared chunk + CSS | 25.6 kB |
+| A single headless hook (`usePdfDocument`) tree-shaken | 2.5 kB |
 
-CI runs `npm run size` and fails above the 45 kB budget.
+CI runs `npm run size`, which compares each path against the numbers committed in
+`size-baseline.json` and fails when one grows more than 2 % above them (plus 256 bytes of slack, so
+minifier jitter is not a failure). It is a ratchet rather than a ceiling: a library that grows with
+features cannot honestly promise a fixed size, and `pdfjs-dist` decides a bundle's weight long before
+this layer does. What the gate guarantees is that bytes never arrive quietly — accepting growth means
+running `npm run size:update`, so the increase lands in the same diff as the code that caused it.
+Shrinking is always allowed and reported.
 
-Both figures above are ceilings: because the package is ESM with `"sideEffects": ["**/*.css"]`,
+All three figures are upper bounds: because the package is ESM with `"sideEffects": ["**/*.css"]`,
 importing only what you use costs less than the whole path. For scale, `pdfjs-dist` itself is ~532 kB
 gzipped, so it dominates any viewer bundle regardless of this package.
 
@@ -245,7 +283,8 @@ If Safari is critical to you, test that first.
 ```bash
 npm run dev          # playground on :5199 with the repo's fixture PDFs
 npm run docs         # documentation site on :5200
-npm run verify       # typecheck + tests + build + size budget (prepublishOnly runs this)
+npm run verify       # typecheck + tests + build + size gate (prepublishOnly runs this)
+npm run size:update  # accept new baseline numbers after a deliberate growth
 node scripts/make-form-pdf.mjs   # regenerate fixtures
 ```
 
@@ -255,8 +294,10 @@ development, against the built `dist` in CI.
 
 ## Status
 
-Version 0.1.0 — feature-complete against the brief, with documentation, CI and a size budget in
-place. Not yet published to npm; the repository URL is still to be added to `package.json`.
+Version `0.3.0`, built on `dev`. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.8` releases are committed
+locally and publish together with `1.0.0`, which is the shipping rule in
+[`ROADMAP.md`](./ROADMAP.md) §Releases. While the package is pre-1.0 a minor may break the API, so pin
+exactly.
 
 ## Licence
 

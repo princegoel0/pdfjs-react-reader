@@ -34,6 +34,8 @@ export default function App() {
   const [appliedUrl, setAppliedUrl] = useState('');
   const [german, setGerman] = useState(false);
   const [dropEnabled, setDropEnabled] = useState(true);
+  const [assetMode, setAssetMode] = useState<'' | 'cdn' | '/pdfjs-dist/'>('');
+  const [restrict, setRestrict] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, FormValue> | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const src = file ?? (appliedUrl || DEFAULT_PDF);
@@ -85,18 +87,42 @@ export default function App() {
           />
           &nbsp;Swap on drop
         </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={restrict}
+            onChange={(e) => setRestrict(e.target.checked)}
+          />
+          &nbsp;Allow only /fixtures/
+        </label>
+        <label>
+          &nbsp;Support assets:&nbsp;
+          <select
+            value={assetMode}
+            onChange={(e) => setAssetMode(e.target.value as '' | 'cdn' | '/pdfjs-dist/')}
+          >
+            <option value="">default (cdn)</option>
+            <option value="cdn">cdn</option>
+            <option value="/pdfjs-dist/">self-hosted</option>
+          </select>
+        </label>
       </header>
       <div className="app-main">
         <div className="app-viewer">
           <PdfViewer
             ref={viewer}
             src={src}
+            assetUrl={assetMode || undefined}
+            allowedSources={restrict ? ['/fixtures/'] : undefined}
             labels={german ? GERMAN : undefined}
             onFormValuesChange={setFormValues}
             onError={(err) => console.error('[playground] viewer error', err)}
             onPageChange={(page) => note(`onPageChange ${page}`)}
             onScaleChange={(scale) => note(`onScaleChange ${scale.toFixed(2)}`)}
             onLayoutChange={(layout) => note(`onLayoutChange ${layout}`)}
+            onCapabilities={(c) =>
+              note(`capabilities form=${c.form} xfa=${c.renderedFromXfa} js=${c.hasJSActions}`)
+            }
             onFullscreenChange={(active) => note(`onFullscreenChange ${active}`)}
             onExternalLink={(link) => note(`onExternalLink ${link}`)}
             enableDrop={dropEnabled}

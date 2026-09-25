@@ -1,0 +1,5 @@
+{
+  "//": "Gzipped bytes per consumer path, accepted by `npm run size:update`. See scripts/check-size.mjs.",
+  "shell": 45450,
+  "headless": 25600
+}

@@ -1,8 +1,11 @@
 import { FormsExample } from '../examples/FormsExample';
 
 const PROPS: [string, string, string][] = [
-  ['src', 'PdfSource', 'Required. URL, File, Blob, Uint8Array, or a ranged source object. Changing it reloads in place — keep the value stable across renders.'],
+  ['src', 'PdfSource', 'Required. URL, path, data URI, base64, File/Blob, or PDF bytes. Changing it reloads in place — keep the value stable across renders.'],
   ['workerSrc', 'string', 'Pins the pdf.js worker location. Auto-detected when omitted.'],
+  ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
+  ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
+  ['enableXfa', 'boolean', 'Render XFA forms. Defaults to true, which is what a dynamic XFA needs to have any content at all.'],
   ['defaultScale', 'number | "fit-width" | "fit-page"', 'Initial zoom. 1 = 100%. Any percentage is accepted, not just the presets.'],
   ['defaultLayout', '"continuous" | "single" | "spread"', 'Row grouping.'],
   ['defaultRotation', 'number', 'Initial rotation in degrees; the toolbar rotates from here.'],
@@ -12,6 +15,8 @@ const PROPS: [string, string, string][] = [
   ['renderForms', 'boolean', 'Render interactive AcroForm widgets. Defaults to true.'],
   ['enablePrint', 'boolean', 'Show the print control and bind Ctrl/Cmd+P. Defaults to true, never on iOS.'],
   ['printScale', 'number', 'Print canvas scale. Auto-tuned against a memory budget by default.'],
+  ['maxRenderPixels', 'number', 'Area ceiling per page canvas in device pixels. Defaults to pdf.js’s own limit, tightened for mobile — over it a browser paints a blank page rather than failing.'],
+  ['devicePixelRatio', 'number', 'Device pixels per CSS pixel for page canvases. Defaults to window.devicePixelRatio.'],
   ['enableDownload', 'boolean', 'Show the download control. Defaults to true.'],
   ['downloadFileName', 'string', 'Name for the saved file; defaults to the document name.'],
   ['enableWheelZoom', 'boolean', 'Ctrl/Cmd + wheel, which is also how browsers report trackpad pinch. Defaults to true.'],
@@ -23,6 +28,7 @@ const PROPS: [string, string, string][] = [
   ['onDropFile', '(file) => void', 'Fires for every accepted drop, even when enableDrop is off.'],
   ['labels', 'PdfViewerLabelsOverride', 'Override any subset of the shell’s strings; everything else keeps its English default.'],
   ['onFormValuesChange', '(values) => void', 'Fires whenever the user edits a form field.'],
+  ['onCapabilities', '(capabilities) => void', 'What the opened document declares: form type, whether the pages came from XFA, whether it carries JavaScript.'],
   ['onPageChange', '(page) => void', 'The topmost visible page, after load.'],
   ['onScaleChange', '(scale) => void', 'The effective zoom, including what a fit mode resolves to.'],
   ['onLayoutChange', '(layout) => void', 'The layout mode.'],

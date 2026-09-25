@@ -2,8 +2,8 @@ import { HeadlessExample } from '../examples/HeadlessExample';
 
 const HOOKS: [string, string][] = [
   [
-    'usePdfDocument({ src, workerSrc?, onPasswordRequired? })',
-    'Loads the file. Returns { doc, numPages, isReady, error, reload }.',
+    'usePdfDocument({ src, workerSrc?, assetUrl?, cMapUrl?, standardFontUrl?, allowedSources?, enableXfa?, onPasswordRequired? })',
+    'Loads the file. Returns { doc, numPages, isReady, error, capabilities, reload }.',
   ],
   [
     'usePdfVirtualizer({ doc, numPages, scale, layout?, rotation?, gap? })',
@@ -108,6 +108,49 @@ export function Headless() {
         and render nothing but the first row.
       </div>
 
+      <h2>The four production knobs</h2>
+      <p>
+        Headless consumers get the same protections the shell uses, as plain options.
+      </p>
+      <pre>
+        <code>{`import {
+  configureTrustedTypes,
+  usePdfDocument,
+  type PdfCapabilities,
+} from 'pdfjs-react-reader/headless';
+
+const { doc, numPages, isReady, error, capabilities, reload } = usePdfDocument({
+  src,
+  // Where the file may come from. Byte sources are always allowed.
+  allowedSources: ['/uploads/', 'https://cdn.example.com'],
+  // cmaps/, standard_fonts/ and wasm/ — 'cdn' or a directory you serve.
+  assetUrl: '/pdfjs-assets/',
+  // Defaults to true; false leaves a dynamic XFA with no content to show.
+  enableXfa: true,
+});
+
+// capabilities: { form: 'none' | 'acroform' | 'xfa' | 'mixed',
+//                 renderedFromXfa: boolean, hasJSActions: boolean }
+// Null until the document is open. It is the answer to "can this be filled in
+// here", which a rendered page cannot tell you.
+if (capabilities?.form === 'xfa' && !capabilities.renderedFromXfa) {
+  // offer it for download instead of showing a form that will not accept input
+}`}</code>
+      </pre>
+      <p>
+        <code>configureTrustedTypes(name)</code> is a module-level call, not a hook option, and only
+        belongs on a page whose CSP has <code>require-trusted-types-for 'script'</code>: pdf.js takes
+        a <em>string</em> worker URL and cannot use one there, so without this it parses on the main
+        thread without telling you. The name has to be one your directive already lists.
+      </p>
+      <p>
+        Page canvases are capped too — pass <code>maxRenderPixels</code> and{' '}
+        <code>devicePixelRatio</code> to <code>PdfPage</code>, or leave them unset and let{' '}
+        <code>maxRenderPixelsFor(readCanvasEnvironment())</code> pick the limit the engine uses. An
+        uncapped page at deep zoom asks for more pixels than a browser will allocate, and the failure
+        is a blank rectangle, not an exception.
+      </p>
+
       <h2>Search without the shell</h2>
       <pre>
         <code>{`const search = usePdfSearch({ doc });
@@ -127,7 +170,9 @@ search.next();
         against it: <code>computeSlots</code>, <code>findVisibleRange</code>,{' '}
         <code>buildPageText</code>, <code>planPrintPages</code>, <code>planPrintScale</code>,{' '}
         <code>strokePathD</code>, <code>drawInkStrokes</code>, <code>parseDestination</code>,{' '}
-        <code>collectWidgets</code>, <code>readFormValues</code>.
+        <code>collectWidgets</code>, <code>readFormValues</code>, <code>resolveRenderScale</code>,{' '}
+        <code>maxRenderPixelsFor</code>, <code>pdfAssetUrls</code>, <code>isAllowedSource</code>,{' '}
+        <code>normalizeSource</code>.
       </p>
     </>
   );

@@ -9,6 +9,7 @@ import {
 } from 'pdfjs-dist';
 import type { CSSProperties } from 'react';
 import { formatLabel } from '../lib/labels';
+import { resolveRenderScale } from '../lib/canvas';
 import { useLabels } from './labels-context';
 import { InkLayer } from './InkLayer';
 import { applyHighlights, unwrapMarks } from '../lib/highlight';
@@ -27,6 +28,10 @@ export interface PdfPageProps {
   rotation?: number;
   /** Overrides window.devicePixelRatio for canvas resolution. */
   devicePixelRatio?: number;
+  /** Device-pixel area ceiling for this page's canvas. Defaults to the pdf.js desktop limit. */
+  maxRenderPixels?: number;
+  /** Ceiling for either canvas side, in device pixels. */
+  maxRenderSide?: number;
   className?: string;
   /** Search matches located on this page (pageIndex must equal pageNumber - 1). */
   highlights?: PageMatch[];
@@ -65,6 +70,8 @@ export function PdfPage({
   scale,
   rotation = 0,
   devicePixelRatio,
+  maxRenderPixels,
+  maxRenderSide,
   className,
   highlights,
   activeHighlight = -1,
@@ -138,7 +145,15 @@ export function PdfPage({
     const canvas = canvasRef.current;
     if (!page || !canvas || !viewport) return;
 
-    const dpr = devicePixelRatio ?? window.devicePixelRatio ?? 1;
+    // An over-large canvas does not throw: the browser allocates nothing and
+    // pdf.js paints into a blank surface, so the ceiling has to be applied here.
+    const { scale: dpr } = resolveRenderScale({
+      width: viewport.width,
+      height: viewport.height,
+      devicePixelRatio: devicePixelRatio ?? window.devicePixelRatio ?? 1,
+      maxPixels: maxRenderPixels,
+      maxSide: maxRenderSide,
+    });
 
     canvas.width = Math.max(1, Math.floor(viewport.width * dpr));
     canvas.height = Math.max(1, Math.floor(viewport.height * dpr));
@@ -167,7 +182,7 @@ export function PdfPage({
       canvas.width = 0;
       canvas.height = 0;
     };
-  }, [page, viewport, devicePixelRatio, reportError]);
+  }, [page, viewport, devicePixelRatio, maxRenderPixels, maxRenderSide, reportError]);
 
   // The layer is built only for page/scale/rotation changes; highlight updates
   // are layered on top by the effect below without a full rebuild.

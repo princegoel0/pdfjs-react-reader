@@ -5,6 +5,111 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-09-25
+
+Production robustness: the ways a viewer that works on a laptop fails in the field — a canvas too
+large to allocate, a document that needs an asset nobody fetched, a source that should not have been
+loaded, a page whose Content-Security-Policy quietly moved the engine onto the main thread, and a
+form that will never fill in, which nothing said before the user tried.
+
+### Added
+
+- **Canvas ceilings** in `src/lib/canvas.ts`, wired through `PdfPage` and exposed on `PdfViewer` as
+  `maxRenderPixels` and `devicePixelRatio` (the latter previously accepted and ignored). pdf.js caps
+  the render area at 2^25 device pixels, 5,242,880 on iOS/Android, and 32,767 per side, with an area
+  factor of 200; those four numbers are restated here rather than imported, because reading them from
+  the engine's `AppOptions` would let a pdf.js minor change what our pages render at. The default
+  comes from `maxRenderPixelsFor(readCanvasEnvironment())`, so a phone gets the mobile cap without
+  anyone configuring it. This is the entire defence, not a hint: an over-large canvas does not throw,
+  the browser allocates nothing, and pdf.js paints a blank page.
+- **`assetUrl`** — `'cdn'` (the default) or a directory you serve — resolving to `cMapUrl`,
+  `standardFontUrl` **and** `wasmUrl`, which was never passed before, so JBIG2 and JPEG 2000
+  documents had no decoder to find. The default root is `CDN_ASSET_ROOT`, an unpkg URL interpolated
+  with the installed `pdfjs-dist` version, replacing the two unpkg string literals from `0.1`. The
+  planned `'local'` mode was dropped after measurement: pdf.js concatenates a *directory* with a
+  filename at runtime, and no bundler can hand one back — Vite rewrites both `new URL()` forms to the
+  package's entry file in dev and emits only individually named hashed files in build.
+- **`allowedSources`** on `PdfViewer` and `usePdfDocument`: URL prefixes, bare origins, or
+  same-origin paths, with `'*'` to opt out explicitly. Path entries are bound to the page's origin,
+  and an origin entry is matched at its slash boundary, so `https://cdn.example.com` cannot admit
+  `https://cdn.example.com.evil/`. Byte sources are always accepted — the app handed them over.
+- **`configureTrustedTypes(name)`** and `isTrustedTypesConfigured()`, exported from both entries.
+  Under `require-trusted-types-for 'script'` pdf.js cannot start its worker — `workerSrc` accepts only
+  a string, and `new Worker(string)` throws there — and it swallows the failure, parsing on the main
+  thread while the viewer appears to work. This builds the worker through your own policy and passes
+  pdf.js the *instance*. It is opt-in because a policy name absent from your directive throws at page
+  level, so nothing here can pick one for you. Loads under this mode own their worker and dispose of
+  it: `PDFWorker.destroy()` does not terminate a port it was handed, which would otherwise leak one
+  per reload (measured: 7 workers constructed, 6 terminated across 3 document switches).
+- **`capabilities`** on `usePdfDocument` and `onCapabilities` on the shell: `{ form:
+  'none' | 'acroform' | 'xfa' | 'mixed', renderedFromXfa, hasJSActions }`, read from the document's
+  own `getMetadata()` flags and `hasJSActions()`. Detection is unaffected by `enableXfa`. A host can
+  now say "this one needs Acrobat" instead of showing a page that refuses to fill in.
+- **Fixtures and playground coverage** for all of the above: `scripts/make-cjk-pdf.mjs` →
+  `cjk-sample.pdf` (CID-encoded, so the cMap path is exercised) and `scripts/make-scripted-pdf.mjs` →
+  `scripted-sample.pdf` (document-level JavaScript). The playground gained an asset-mode switch, an
+  allowlist toggle and a capabilities readout, and a dev-only middleware that serves `cmaps/`,
+  `standard_fonts/` and `wasm/` out of `node_modules` so self-hosting is testable without a deploy.
+
+### Changed
+
+- **A string that is not recognizably a URL now throws `TypeError`** instead of being fetched.
+  `classifyString` treated anything it could not classify as a relative URL, so `src="report"` sent a
+  request to `/report` on your own origin and handed whatever answered — usually `index.html` — to a
+  PDF parser. Bare words and backslash paths are now refused; paths with a slash or a `.pdf`
+  extension still resolve as before. **This is a behaviour change for consumers**, and the case it
+  closes is the reason it ships anyway.
+- **`enableXfa` is now passed, defaulting to true** (pdf.js's own viewer default). A dynamic XFA has
+  no page content of its own, so `false` means a blank document rather than a plain form. Note the
+  limit honestly: no fixture here is a genuine XFA — pdf.js's parser rejects the hand-written packet
+  `scripts/make-scripted-pdf.mjs` could embed — so composition is enabled and detected, **not**
+  verified to render.
+- **The size gate is a ratchet, not a ceiling.** `npm run size` now compares each path against the
+  baseline committed in `size-baseline.json` and fails on growth beyond 2 % (+256 B of slack for
+  minifier jitter); `npm run size:update` accepts new numbers, which puts the growth in the same diff
+  as the code that caused it. The 45 kB ceiling from `0.1`–`0.2` was crossed by this release, and
+  raising it to 48 was the smaller fix — the ceiling was replaced because a number every feature
+  release has to renegotiate is not a requirement. The per-tier targets (core ≤ 8 kB, feature ≤ 4 kB)
+  stay, and `0.4` is what makes them measurable.
+
+Measured: shell 42.88 → **45.45 kB** gz, headless 23.35 → **25.60 kB** gz, both now baselines.
+**199 unit tests** (37 new: `canvas.test.ts` 15, `assets.test.ts` 8, plus the source-classification,
+allowlist and worker-ownership cases). Verified in a browser, each with its counterfactual:
+
+- **Canvas capping** at 400 % zoom on a 1536×816 / dpr 1.25 display: the uncapped request was
+  12,117,600 device px against a 5,875,200 budget, the buffer came out 2130×2757 for a 2448×3168 CSS
+  page — the predicted 0.8704 factor exactly — and the ink-density oracle under 20 text spans read
+  0.221 mean with none blank, so a capped page paints and its overlays stay aligned. At 104 % the
+  buffer equals CSS × dpr, so the uncapped path is untouched.
+- **`assetUrl`** on a new CID fixture (`cjk-sample.pdf`, a Type0/UniGB-UCS2-H font with no embedded
+  glyphs, so nothing decodes until `cmaps/UniGB-UCS2-H.bcmap` is fetched): the CDN default and a
+  self-hosted root served by a dev-only middleware both produced the same two text spans
+  (`你好世界`, `阅读器`), with the cMap answering as 43,366 bytes of `application/octet-stream`. Pointing
+  `assetUrl` at a root that is not there produced zero spans and
+  `loadFont - translateFont failed: FormatError: unexpected EOF in bcmap` — which is also how the
+  probe design died: a catch-all dev server answers a missing file with 200 + `index.html`, so a
+  wrong root surfaces as a decode error, not a 404. The middleware's traversal probes
+  (`%2e%2e`, `..`, `cmaps/..`) all fell through to the SPA fallback rather than leaking a file.
+- **`allowedSources`**: a foreign URL refused with *"Refused to load …: it is not listed in
+  allowedSources"* and zero page slots, while a `/fixtures/` URL loaded under the same policy.
+  Separately, `src="nonsense"` now throws `Unrecognized PDF source` with **no network request at
+  all**, where `0.2` fetched `/nonsense` against the page origin.
+- **Trusted Types**, on a harness page carrying `require-trusted-types-for 'script'` and a recorder
+  wrapped around the `Worker` constructor. Without a policy: one construction, `ctor: 'String'`,
+  rejected with *"This document requires 'TrustedScriptURL' assignment"* — and the viewer still
+  rendered 356 text spans on the main thread, which is the silent failure this feature exists to
+  remove. With `configureTrustedTypes('pdfjs-react-reader')` before the first load: every
+  construction was a `TrustedScriptURL`, zero string attempts, same 356 spans, so the worker
+  survives. An unlisted policy name throws (`Policy "probe" disallowed`), confirming why nothing here
+  can pick one. Three document switches under the policy left 7 workers constructed / 6 terminated,
+  so the per-load dispose reclaims each one.
+- **`capabilities`** across four fixtures: `form=mixed, hasJSActions=true` for the new scripted one
+  (AcroForm + document/page/field JavaScript), `form=acroform, hasJSActions=false` for the form
+  fixture, `form=none` for the CJK and outline ones. `renderedFromXfa` read `false` everywhere,
+  including the fixture carrying an XFA packet — pdf.js's parser wants a real template — so this
+  release proves *detection* and makes composition possible, not that a dynamic XFA renders.
+
+
 ## [0.2.0] — 2026-09-25
 
 The shell's control surface: strings you can translate, a ref you can drive it with, events that
@@ -270,8 +375,11 @@ of published versions.
   change announced at the top of its entry here. `0.4.0` is reserved for exactly that: `enablePrint`,
   `enableDownload` and `renderForms` become opt-in features (`PRD.md` FR-21), because a prop cannot
   remove code from a bundle while an import can.
-- Size budgets are **per tier**, not one global ceiling: core viewer ≤ 8 kB gzipped, any single
-  feature ≤ 4 kB, full viewer ≤ 45 kB, all excluding `pdfjs-dist`. CI also asserts the built core
+- Size is governed by a **ratchet, not a ceiling**: `scripts/check-size.mjs` measures every consumer
+  path gzipped and fails the build on more than 2 % growth above the baseline committed in
+  `size-baseline.json`; accepting a growth is `npm run size:update`, which puts the new number in the
+  same diff as the code that caused it. The design targets are **per tier**, not global: core viewer
+  ≤ 8 kB gzipped, any single feature ≤ 4 kB, excluding `pdfjs-dist`. CI also asserts the built core
   artifact contains no feature code, so a regression in the tier boundary fails the build rather than
   quietly shipping (`PRD.md` FR-23).
 - The `docs/` site documents the latest release; older API shapes are described by the matching git

@@ -73,17 +73,100 @@ export function Report() {
         but the worker resolution and canvas rendering are browser-only by nature.
       </div>
 
+      <h2>Support assets</h2>
+      <p>
+        Apart from the worker, pdf.js fetches three more folders while parsing:{' '}
+        <code>cmaps/</code> for CID-encoded CJK text, <code>standard_fonts/</code> for the 14
+        built-in fonts, and <code>wasm/</code> for the JBIG2 and JPEG 2000 decoders. A missing one is
+        never a load error — a Chinese document just paints blank glyphs where the text should be,
+        and a JBIG2 image fails to decode with nothing pointing at the cause.
+      </p>
+      <p>
+        By default they are read from <code>CDN_ASSET_ROOT</code>: an unpkg URL pinned to the{' '}
+        <code>pdfjs-dist</code> version you have installed. To keep the documents on your own
+        network, copy the three folders out of <code>node_modules/pdfjs-dist/</code> and point{' '}
+        <code>assetUrl</code> at the directory that holds them:
+      </p>
+      <pre>
+        <code>{`// 'cdn' (the default), or any directory you serve — a path or an absolute URL.
+// Copy the three folders in beside it, keeping their names:
+//   public/pdfjs-assets/cmaps/…
+//   public/pdfjs-assets/standard_fonts/…
+//   public/pdfjs-assets/wasm/…
+<PdfViewer src="/a.pdf" assetUrl="/pdfjs-assets/" />`}</code>
+      </pre>
+      <p>
+        The root gets a trailing <code>/</code> if you leave it off, and a relative one is resolved
+        against the page rather than the worker — the cMaps are fetched inside the worker, whose base
+        URL is a module file, not your site. What you cannot do is have the package find them in{' '}
+        <code>node_modules</code> for you: pdf.js builds these paths by concatenating a directory with
+        a filename at runtime, while a bundler only copies files named by literal specifiers and
+        renames them with hashes. That is why <code>assetUrl</code> takes a directory and there is no
+        automatic mode. <code>usePdfDocument</code> also accepts{' '}
+        <code>cMapUrl</code> and <code>standardFontUrl</code> to override one folder at a time.
+      </p>
+
+      <h2>Content Security Policy</h2>
+      <p>
+        Nothing here injects a script tag or evaluates a string, so the default setup needs your CSP
+        to allow two things: the worker file, and the asset root. Self-hosting both with{' '}
+        <code>workerSrc</code> and <code>assetUrl</code> keeps the policy on your own origin; leaving
+        the default adds <code>https://unpkg.com</code> to <code>connect-src</code>.
+      </p>
+      <p>
+        <code>require-trusted-types-for 'script'</code> is the one policy that changes how the worker
+        is started, because pdf.js has no Trusted Types support at all:{' '}
+        <code>GlobalWorkerOptions.workerSrc</code> only accepts a plain string, and constructing a{' '}
+        <code>Worker</code> from one throws on such a page. pdf.js catches that and parses on the main
+        thread — so the viewer works, and nobody tells you the worker is gone. Opt in to fix it:
+      </p>
+      <pre>
+        <code>{`import { configureTrustedTypes } from 'pdfjs-react-reader';
+
+// CSP: require-trusted-types-for 'script'; trusted-types pdfjs-react-reader#worker;
+// The name must already be allowed by your directive, so it is never chosen for you.
+configureTrustedTypes();
+
+// Now every load builds its own worker through your policy and hands pdf.js
+// the instance instead of a URL, which is what keeps it off the main thread.`}</code>
+      </pre>
+      <p>
+        This is opt-in for two reasons: a policy name your directive does not list throws when the
+        page's scripts run, and a library should not pick names in your CSP. Once configured, loads
+        own their worker and dispose of it — <code>PDFWorker.destroy()</code> does not terminate a
+        port it was handed, so the package does it.
+      </p>
+
       <h2>Sources</h2>
       <p>
-        <code>src</code> accepts a URL string, a <code>File</code> or <code>Blob</code>, a{' '}
-        <code>Uint8Array</code>, or an object with range/length metadata for HTTP partial loading.
-        A <code>File</code> also lends its name to the toolbar label and the download filename.
+        <code>src</code> accepts a URL string, a <code>data:</code> URI, a base64 string, a{' '}
+        <code>File</code> or <code>Blob</code>, or an <code>ArrayBuffer</code> /{' '}
+        <code>Uint8Array</code> of PDF bytes. A <code>File</code> also lends its name to the toolbar
+        label and the download filename. A string that is none of those — a bare word, a Windows path
+        with backslashes — throws <code>TypeError</code> instead of fetching whatever your origin
+        happens to serve at that location and handing it to a PDF parser.
       </p>
       <pre>
         <code>{`<PdfViewer src="/a.pdf" />
+<PdfViewer src="https://host/a.pdf" />
 <PdfViewer src={selectedFile} />
-<PdfViewer src={bytes} />
-<PdfViewer src={{ url: 'https://host/a.pdf', httpHeaders: { Authorization: 'Bearer …' } }} />`}</code>
+<PdfViewer src={bytes} />`}</code>
+      </pre>
+      <p>
+        When the URL is not one you wrote — a field from a CMS, a link a user pasted — bound it with{' '}
+        <code>allowedSources</code>. Entries are URL prefixes or bare origins, plus paths, which are
+        pinned to the page's own origin so that <code>'/files/'</code> cannot also admit{' '}
+        <code>https://elsewhere.example/files/</code>. Byte sources are always accepted; the app
+        handed those over itself.
+      </p>
+      <pre>
+        <code>{`<PdfViewer
+  src={userSuppliedUrl}
+  allowedSources={['/uploads/', 'https://cdn.example.com']}
+/>
+
+// Opt out explicitly, if that is ever what you mean:
+<PdfViewer src={userSuppliedUrl} allowedSources={['*']} />`}</code>
       </pre>
 
       <h2>Remounting</h2>
@@ -124,7 +207,16 @@ export function Report() {
             <td>
               <code>npm run verify</code>
             </td>
-            <td>Typecheck, tests, build and the size budget in one go.</td>
+            <td>Typecheck, tests, build and the size gate in one go.</td>
+          </tr>
+          <tr>
+            <td>
+              <code>npm run size:update</code>
+            </td>
+            <td>
+              Accept the current bundle sizes into <code>size-baseline.json</code> after deciding a
+              growth is worth it.
+            </td>
           </tr>
         </tbody>
       </table>

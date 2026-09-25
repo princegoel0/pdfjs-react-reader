@@ -1,11 +1,47 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { createReadStream, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const r = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
+const PDFJS_PKG = r('../node_modules/pdfjs-dist');
+
+/**
+ * Serves `/pdfjs-dist/<folder>/<file>` out of the installed package, so the
+ * playground can demonstrate a self-hosted `assetUrl` without adding 2.4 MB of
+ * binaries to the repo. Only the three folders pdf.js looks in are exposed, and
+ * only under a flat file name, so `..` cannot reach outside them.
+ */
+function servePdfjsAssets(): Plugin {
+  return {
+    name: 'serve-pdfjs-assets',
+    configureServer(server) {
+      server.middlewares.use('/pdfjs-dist', (req, res, next) => {
+        const match = /^\/(cmaps|standard_fonts|wasm)\/([A-Za-z0-9._-]+)$/.exec(req.url ?? '');
+        const [, folder, name] = match ?? [];
+        if (!folder || !name) return next();
+        const file = join(PDFJS_PKG, folder, name);
+        let size: number;
+        try {
+          const stats = statSync(file);
+          if (!stats.isFile()) return next();
+          size = stats.size;
+        } catch {
+          return next();
+        }
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Length', String(size));
+        if (req.method === 'HEAD') return void res.end();
+        createReadStream(file).pipe(res);
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), servePdfjsAssets()],
   resolve: {
     alias: [
       { find: /^pdfjs-react-reader\/styles\.css$/, replacement: r('../src/styles/viewer.css') },

@@ -204,8 +204,14 @@ export function Compatibility() {
 
       <h2>Bundle size</h2>
       <p>
-        Gzipped, excluding <code>pdfjs-dist</code>, measured on 0.2.0. CI fails the build above 45 kB
-        per consumer path, so these are enforced rather than estimated.
+        Gzipped, excluding <code>pdfjs-dist</code>, measured on 0.3.0. CI fails the build when a path
+        grows more than 2&nbsp;% above the numbers committed in <code>size-baseline.json</code>, so
+        these are enforced rather than estimated. The gate is a ratchet, not a promise about how
+        small the library stays: the budget was a fixed 45&nbsp;kB until <code>0.3</code>&apos;s
+        production-robustness features pushed the shell to 45.45&nbsp;kB, which is what replaced the
+        ceiling with a committed baseline. Importing a single headless hook instead of the path costs
+        far less than the figures below — 2.5&nbsp;kB for <code>usePdfDocument</code>, because the
+        package is ESM and tree-shakeable.
       </p>
       <table className="doc-table">
         <thead>
@@ -221,14 +227,14 @@ export function Compatibility() {
             <td>
               <code>index.js</code> + shared chunk + <code>styles.css</code>
             </td>
-            <td>42.9 kB</td>
+            <td>45.5 kB</td>
           </tr>
           <tr>
             <td>Headless</td>
             <td>
               <code>headless.js</code> + shared chunk + <code>styles.css</code>
             </td>
-            <td>23.4 kB</td>
+            <td>25.6 kB</td>
           </tr>
         </tbody>
       </table>

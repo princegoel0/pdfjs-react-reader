@@ -48,6 +48,12 @@ export function Introduction() {
           <strong>Encrypted documents.</strong> A built-in password prompt, or take over the UI
           entirely.
         </li>
+        <li>
+          <strong>The production edges.</strong> Canvas ceilings, so deep zoom paints instead of
+          blanking; a document-source allowlist for URLs you did not author; pdf.js support assets
+          from your own origin; an opt-in Trusted Types policy; and a capabilities report that says
+          what the opened document actually is.
+        </li>
       </ul>
 
       <h2>Two entry points</h2>
@@ -98,19 +104,29 @@ export function Introduction() {
             <td>
               Shell (<code>index.js</code> + shared chunk + CSS)
             </td>
-            <td>37.0 kB</td>
+            <td>45.5 kB</td>
           </tr>
           <tr>
             <td>
               Headless (<code>headless.js</code> + shared chunk + CSS)
             </td>
-            <td>22.3 kB</td>
+            <td>25.6 kB</td>
+          </tr>
+          <tr>
+            <td>
+              One headless hook tree-shaken (<code>usePdfDocument</code>)
+            </td>
+            <td>2.5 kB</td>
           </tr>
         </tbody>
       </table>
       <p>
-        CI runs <code>npm run size</code> and fails the build over the 45 kB budget, so these
-        numbers cannot drift quietly.
+        Measured on 0.3.0. CI runs <code>npm run size</code>, which compares every path against the
+        numbers committed in <code>size-baseline.json</code> and fails on growth beyond 2&nbsp;%
+        (+256&nbsp;B of slack for minifier jitter). It is a ratchet rather than a ceiling: a library
+        that grows with features cannot honestly promise a fixed size, so what the gate protects is
+        the process — accepting growth means running <code>npm run size:update</code>, which puts the
+        new number in the same diff as the code that caused it.
       </p>
 
       <h2>Accessibility</h2>

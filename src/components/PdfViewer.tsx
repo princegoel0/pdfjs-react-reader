@@ -9,7 +9,13 @@ import {
 } from 'react';
 import type { CSSProperties, DragEvent, KeyboardEvent } from 'react';
 import { TouchManager } from 'pdfjs-dist';
-import { usePdfDocument, type PasswordReason, type PasswordSubmit } from '../headless/usePdfDocument';
+import {
+  usePdfDocument,
+  type PasswordReason,
+  type PasswordSubmit,
+  type PdfCapabilities,
+} from '../headless/usePdfDocument';
+import type { AssetUrl } from '../lib/assets';
 import { usePdfDownload } from '../headless/usePdfDownload';
 import { usePdfFormValues } from '../headless/usePdfFormValues';
 import { usePdfInk } from '../headless/usePdfInk';
@@ -18,6 +24,7 @@ import { usePdfPrint } from '../headless/usePdfPrint';
 import { usePdfSearch } from '../headless/usePdfSearch';
 import { usePdfVirtualizer } from '../headless/usePdfVirtualizer';
 import { applyRotation, type PageLayout, type ScaleMode } from '../lib/layout';
+import { maxRenderPixelsFor, readCanvasEnvironment } from '../lib/canvas';
 import {
   DEFAULT_LABELS,
   formatLabel,
@@ -83,6 +90,23 @@ export interface PdfViewerProps {
    */
   src: PdfSource;
   workerSrc?: string;
+  /**
+   * Root for pdf.js's cMaps, standard fonts and wasm: `'cdn'` (the default,
+   * unpkg pinned to the engine version) or your own path such as
+   * `'/pdfjs-dist/'`. Set this before a CJK or JPEG 2000 document reaches the
+   * viewer, since a wrong root only surfaces as a blank page.
+   */
+  assetUrl?: AssetUrl;
+  /**
+   * Restrict where a URL `src` may point: URL prefixes, bare origins, or
+   * same-origin paths, e.g. `['/files/', 'https://cdn.example.com']`. Documents
+   * passed as bytes are always accepted. Omit to allow any URL — which is right
+   * for an app that only ever opens paths it chose, and wrong for one that
+   * opens an address a visitor typed.
+   */
+  allowedSources?: readonly string[];
+  /** Render XFA forms. Defaults to true; without it a dynamic XFA is a blank page. */
+  enableXfa?: boolean;
   defaultScale?: ScaleMode;
   /** Vertical gap between pages in CSS pixels. */
   gap?: number;
@@ -98,6 +122,15 @@ export interface PdfViewerProps {
   enablePrint?: boolean;
   /** Canvas scale for printing; 1 = the 72 dpi PDF unit. Auto-tuned to fit memory by default. */
   printScale?: number;
+  /** Device pixels per CSS pixel for page canvases. Defaults to `window.devicePixelRatio`. */
+  devicePixelRatio?: number;
+  /**
+   * Area ceiling per page canvas, in device pixels. Defaults to the limit pdf.js's
+   * own viewer uses, tightened for mobile and small screens. A canvas over the
+   * ceiling renders blank rather than throwing, so this is what keeps a 500% zoom
+   * on a large page on screen. `0` renders at CSS resolution.
+   */
+  maxRenderPixels?: number;
   /** Show the download control. Defaults to true. */
   enableDownload?: boolean;
   /** Name for the saved file; defaults to the document's own name. */
@@ -123,6 +156,12 @@ export interface PdfViewerProps {
   onScaleChange?: (scale: number) => void;
   /** Fired when the layout mode changes. */
   onLayoutChange?: (layout: PageLayout) => void;
+  /**
+   * Fired once a document is open and its shape is known. `hasJSActions` means
+   * the form's calculated fields and validation scripts will not run here, which
+   * is worth knowing before you offer "fill this in and send it back".
+   */
+  onCapabilities?: (capabilities: PdfCapabilities) => void;
   /** Fired when the viewer enters or leaves fullscreen. */
   onFullscreenChange?: (active: boolean) => void;
   /**
@@ -179,6 +218,9 @@ export interface PdfViewerHandle {
 export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer({
   src,
   workerSrc,
+  assetUrl,
+  allowedSources,
+  enableXfa,
   defaultScale = 'fit-width',
   gap = 16,
   defaultRotation = 0,
@@ -187,6 +229,8 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
   renderForms = true,
   enablePrint = true,
   printScale,
+  devicePixelRatio,
+  maxRenderPixels,
   enableDownload = true,
   downloadFileName,
   onFormValuesChange,
@@ -198,6 +242,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
   onPageChange,
   onScaleChange,
   onLayoutChange,
+  onCapabilities,
   onFullscreenChange,
   onExternalLink,
   enableWheelZoom = true,
@@ -213,6 +258,11 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
   // consumer would otherwise give the context a new value every render and
   // re-render every consumer of it, including each page.
   const resolvedLabels = useMemo(() => ({ ...DEFAULT_LABELS, ...labels }), [labels]);
+  // Read once: the ceiling is a property of the device, and re-reading `screen`
+  // per page would change canvas resolution mid-session when a monitor is
+  // hot-plugged, re-rendering every visible page.
+  const autoRenderPixels = useMemo(() => maxRenderPixelsFor(readCanvasEnvironment()), []);
+  const renderPixels = maxRenderPixels ?? autoRenderPixels;
   const [scaleMode, setScaleMode] = useState<ScaleMode>(defaultScale);
   const [searchOpen, setSearchOpen] = useState(false);
   const [rotation, setRotation] = useState(defaultRotation);
@@ -252,9 +302,12 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
     [onPasswordRequired],
   );
 
-  const { doc, numPages, isReady, error, reload } = usePdfDocument({
+  const { doc, numPages, isReady, error, capabilities, reload } = usePdfDocument({
     src: effectiveSrc,
     workerSrc,
+    assetUrl,
+    allowedSources,
+    enableXfa,
     onPasswordRequired: handlePasswordRequired,
   });
 
@@ -355,6 +408,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
   useChangeSignal(currentPage, (page) => onPageChange?.(page));
   useChangeSignal(resolvedScale, (scale) => onScaleChange?.(scale));
   useChangeSignal(pageLayout, (layout) => onLayoutChange?.(layout));
+  useChangeSignal(capabilities, (next) => next && onCapabilities?.(next));
 
   // ---- fullscreen ----------------------------------------------------------
   // Computed in an effect, not during render, so a server render never touches
@@ -797,6 +851,8 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function Pd
                           pageNumber={index + 1}
                           scale={resolvedScale}
                           rotation={rotation + (pageRotations[index] ?? 0)}
+                          devicePixelRatio={devicePixelRatio}
+                          maxRenderPixels={renderPixels}
                           className="pjsr-page-canvas"
                           highlights={matchesByPage.get(index)}
                           activeHighlight={activeLocalByPage.get(index) ?? -1}
