@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import {
+  countPerPage,
   extractAllText,
-  findQueryMatches,
+  findPageMatches,
+  planFind,
+  type FindPlan,
   type PageMatch,
   type ResolvedSearchOptions,
   type SearchOptions,
@@ -25,6 +28,15 @@ export interface UsePdfSearchResult {
   /** All matches in document order. */
   results: PageMatch[];
   total: number;
+  /**
+   * Matches per page, index 0 being page 1, zeros included. A results list groups by
+   * this instead of recounting, and a page with no match still occupies a slot.
+   */
+  counts: number[];
+  /** Pages holding at least one match — the honest answer to "found on how many pages". */
+  pagesWithMatches: number;
+  /** Why a regex query could not be compiled, which is the one case worth naming. */
+  patternError: string | null;
   /** Index into results of the current match, -1 when there are none. */
   activeIndex: number;
   /**
@@ -40,7 +52,23 @@ export interface UsePdfSearchResult {
   clear: () => void;
 }
 
-const DEFAULT_OPTIONS: ResolvedSearchOptions = { caseSensitive: false, wholeWord: false };
+const DEFAULT_OPTIONS: ResolvedSearchOptions = {
+  caseSensitive: false,
+  wholeWord: false,
+  regex: false,
+};
+
+/**
+ * The contract the viewer's find UI is built on.
+ *
+ * `usePdfSearch` returns exactly this, and `PdfViewer`'s `find` prop accepts any
+ * object that does — so a host with its own matching strategy (a server-side index,
+ * a stemmed or fuzzy search, a synonym list) supplies the behaviour and keeps the
+ * built-in find bar, marks and page counts instead of forking the shell. It is
+ * structural on purpose: there is no interface to implement, only these members to
+ * provide.
+ */
+export type PdfFindController = UsePdfSearchResult;
 
 export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
   const { doc, onError } = options;
@@ -49,6 +77,8 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
   const [query, setQuery] = useState('');
   const [resolvedOptions, setResolvedOptions] = useState<ResolvedSearchOptions>(DEFAULT_OPTIONS);
   const [results, setResults] = useState<PageMatch[]>([]);
+  const [counts, setCounts] = useState<number[]>([]);
+  const [patternError, setPatternError] = useState<string | null>(null);
   const [activeIndex, setActiveIndexState] = useState(-1);
   const [activeSeq, setActiveSeq] = useState(0);
 
@@ -68,6 +98,8 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
     setProgress(0);
     setQuery('');
     setResults([]);
+    setCounts([]);
+    setPatternError(null);
     setActiveIndexState(-1);
   }, [doc]);
 
@@ -77,10 +109,12 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
       const resolved: ResolvedSearchOptions = {
         caseSensitive: searchOptions?.caseSensitive ?? false,
         wholeWord: searchOptions?.wholeWord ?? false,
+        regex: searchOptions?.regex ?? false,
       };
       setQuery(nextQuery);
       setResolvedOptions(resolved);
       setActiveIndexState(-1);
+      setPatternError(null);
 
       if (!doc || nextQuery.length === 0) {
         setStatus(doc ? 'ready' : 'idle');
@@ -94,6 +128,19 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
 
       (async () => {
         try {
+          // Planned before the expensive part, so a malformed expression is reported
+          // immediately instead of after every page has been read for nothing.
+          const plan: FindPlan = planFind(nextQuery, resolved);
+          if (plan.error) {
+            if (runIdRef.current !== runId) return;
+            setPatternError(plan.error);
+            setStatus('error');
+            setProgress(0);
+            setResults([]);
+            setCounts([]);
+            return;
+          }
+
           const pages = await extractAllText(doc, (fraction) => {
             if (runIdRef.current === runId) setProgress(fraction);
           });
@@ -101,19 +148,21 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
 
           const flat: PageMatch[] = [];
           for (let i = 0; i < pages.length; i++) {
-            for (const match of findQueryMatches(pages[i]!, nextQuery, resolved)) {
+            for (const match of findPageMatches(pages[i]!, plan)) {
               match.pageIndex = i;
               flat.push(match);
             }
           }
           setStatus('ready');
           setResults(flat);
+          setCounts(countPerPage(flat, pages.length));
           setActiveIndexState(flat.length > 0 ? 0 : -1);
           setActiveSeq((s) => s + 1);
         } catch (err) {
           if (runIdRef.current !== runId) return;
           setStatus('error');
           setResults([]);
+          setCounts([]);
           onErrorRef.current?.(err instanceof Error ? err : new Error(String(err)));
         }
       })();
@@ -150,6 +199,8 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
     setProgress(0);
     setQuery('');
     setResults([]);
+    setCounts([]);
+    setPatternError(null);
     setActiveIndexState(-1);
   }, [doc]);
 
@@ -160,6 +211,9 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
     options: resolvedOptions,
     results,
     total: results.length,
+    counts,
+    pagesWithMatches: counts.reduce((done, count) => (count > 0 ? done + 1 : done), 0),
+    patternError,
     activeIndex,
     activeSeq,
     search,

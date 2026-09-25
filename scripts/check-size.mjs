@@ -100,6 +100,8 @@ const FEATURES = [
   { name: 'download', marker: 'usePdfDownload' },
   { name: 'forms', marker: 'usePdfFormValues' },
   { name: 'outline', marker: 'usePdfOutline' },
+  { name: 'layers', marker: 'usePdfOptionalContent' },
+  { name: 'attachments', marker: 'usePdfAttachments' },
 ];
 
 const consumerPaths = [

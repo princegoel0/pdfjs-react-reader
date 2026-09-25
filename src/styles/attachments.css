@@ -1,0 +1,74 @@
+/* pdfjs-react-reader — the attachments sidebar panel, shipped with
+ * features/attachments. Import this alongside 'pdfjs-react-reader/styles.css'. */
+
+.pjsr-attachments {
+  list-style: none;
+  margin: 0;
+  padding: 6px 4px;
+}
+
+.pjsr-attachments-item {
+  padding: 4px 6px 8px;
+}
+
+.pjsr-attachments-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--pjsr-row-h);
+}
+
+.pjsr-attachments-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pjsr-fg);
+}
+
+.pjsr-attachments-save {
+  flex: none;
+  min-height: var(--pjsr-control-h);
+  padding: 4px 8px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: 6px;
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pjsr-attachments-save:hover:not(:disabled) {
+  background: var(--pjsr-hover-bg);
+}
+
+/* The label names the file, so a disabled button still says what it was for. */
+.pjsr-attachments-save:disabled {
+  color: var(--pjsr-muted-fg);
+  cursor: progress;
+}
+
+.pjsr-attachments-save:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: 1px;
+}
+
+.pjsr-attachments-note {
+  margin-top: 2px;
+  color: var(--pjsr-muted-fg);
+  font-size: 12px;
+}
+
+.pjsr-attachments-error {
+  margin-top: 4px;
+  color: var(--pjsr-danger-fg);
+  font-size: 12px;
+}
+
+.pjsr-attachments-empty {
+  padding: 16px;
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+}

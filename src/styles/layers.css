@@ -1,0 +1,69 @@
+/* pdfjs-react-reader — the layers sidebar panel, shipped with features/layers
+ * Import this alongside 'pdfjs-react-reader/styles.css'. The theme tokens live in
+ * the core sheet; everything here is rules this file needs and the core stylesheet
+ * must not carry, because a feature you did not ask for should not be styled for. */
+
+.pjsr-layers {
+  list-style: none;
+  margin: 0;
+  padding: 6px 4px;
+}
+
+.pjsr-layers-section {
+  padding: 8px 6px 2px;
+  color: var(--pjsr-muted-fg);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pjsr-layers-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--pjsr-row-h);
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--pjsr-fg);
+  cursor: pointer;
+}
+
+.pjsr-layers-row:hover {
+  background: var(--pjsr-hover-bg);
+}
+
+/* The checkbox is the control, so it gets the full row as its hit area rather
+   than its own 16 px; the label text stays selectable for copy. */
+.pjsr-layers-row input[type='checkbox'] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--pjsr-accent);
+  cursor: pointer;
+}
+
+.pjsr-layers-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pjsr-layers-row:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-layers-empty {
+  padding: 16px;
+  color: var(--pjsr-muted-fg);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pjsr-layers-row {
+    transition: none;
+  }
+}

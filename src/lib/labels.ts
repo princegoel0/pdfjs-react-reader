@@ -66,6 +66,15 @@ export interface PdfViewerLabels {
   goToPage: string;
   outlineLoading: string;
   outlineEmpty: string;
+  layersTab: string;
+  layersLoading: string;
+  layersEmpty: string;
+  layersFailed: string;
+  attachmentsTab: string;
+  attachmentsLoading: string;
+  attachmentsEmpty: string;
+  attachmentsFailed: string;
+  downloadAttachment: string;
   expandSection: string;
   collapseSection: string;
   untitledEntry: string;
@@ -75,11 +84,13 @@ export interface PdfViewerLabels {
   searchPlaceholder: string;
   matchCase: string;
   wholeWordsOnly: string;
+  regexMode: string;
   previousMatch: string;
   nextMatch: string;
   closeSearch: string;
   searchIndexing: string;
   searchFailed: string;
+  searchInvalidPattern: string;
   searchNoResults: string;
   searchMatchSummary: string;
   searchMatchOnPage: string;
@@ -180,6 +191,15 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   goToPage: 'Go to page {page}',
   outlineLoading: 'Loading outline…',
   outlineEmpty: 'This document has no outline.',
+  layersTab: 'Layers',
+  layersLoading: 'Loading layers…',
+  layersEmpty: 'This document has no layers.',
+  layersFailed: 'Could not read the layers: {message}',
+  attachmentsTab: 'Attachments',
+  attachmentsLoading: 'Loading attachments…',
+  attachmentsEmpty: 'This document has no attached files.',
+  attachmentsFailed: 'Could not read the attached files: {message}',
+  downloadAttachment: 'Save “{name}”',
   expandSection: 'Expand {title}',
   collapseSection: 'Collapse {title}',
   untitledEntry: '(untitled)',
@@ -188,11 +208,13 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   searchPlaceholder: 'Find in document…',
   matchCase: 'Match case',
   wholeWordsOnly: 'Whole words only',
+  regexMode: 'Regular expression',
   previousMatch: 'Previous match',
   nextMatch: 'Next match',
   closeSearch: 'Close search',
   searchIndexing: 'Indexing {percent}%',
   searchFailed: 'Search failed',
+  searchInvalidPattern: 'Invalid pattern',
   searchNoResults: 'No results',
   searchMatchSummary: '{current} of {total}',
   searchMatchOnPage: '{current} of {total} · p{page}',

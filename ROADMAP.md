@@ -293,7 +293,7 @@ No new dependencies. This is the architecture seam; see "The tier decision" abov
   hook on purpose. The number that changed is the one a consumer's bundler reports, and it is the one
   the gate now leads with.
 
-### 0.5.0 — Compose: make the shell configurable
+### 0.5.0 — Compose: make the shell configurable ✅ built 2026-09-26 (local `dev`; pushed and published with 1.0.0)
 No new dependencies.
 
 **Measured first (2026-09-25, playground, 14-page document at fit-width, ~590 px viewer, 2 rows
@@ -388,11 +388,55 @@ React fiber):**
   canvases at 1224×1584 (Letter at scale 2) with progress at 100 %, and `current` produced one.
   Cost **+0.47 kB** on print (2.02 → 2.49, still under the 4 kB gate) and +0.09 on core, where
   `printRangeFor` lives beside the other print planners.
-* Sidebar attachments tab (`getAttachments`) and layers/OCG tab, implementing the `setOCGState` no-op.
-  Needs a fixture first — no generator here emits attachments or optional content groups.
-* Search depth: regex (the query is escaped to a literal at `lib/search.ts:107` today), multiple
-  terms, an all-match count, exposed per-page counts, a replaceable find controller. Independent of
-  everything above, so it can move later in the cycle without blocking it.
+* **Landed: the layers and attachments tabs.** `layersFeature` and `attachmentsFeature`
+  (`features/layers`, `features/attachments`, one stylesheet each) over
+  `usePdfOptionalContent` / `usePdfAttachments`, at **1.16 kB** and **1.29 kB** over core — panel only,
+  no toolbar control, because both describe the document rather than an action on it. The fixture the
+  bullet asked for is `scripts/make-attachments-ocg-pdf.mjs`.
+  **The bug this found is the reason the seam exists.** pdf.js rebuilds `OptionalContentConfig` on every
+  `getOptionalContentConfig()` call, and a `render()` that is not handed one fetches its own — so
+  toggling a layer on any object a caller holds repaints the page from *fresh defaults* and nothing
+  changes. Hence the shell owning one instance, `repaint()`/`contentVersion` in core, and
+  `executeSetOCGState` (was a no-op) mutating the same object. Verified in the browser in both
+  directions: a checkbox repaints the mounted canvases and moves the document's own link state, and
+  clicking the fixture's `SetOCGState` link moves the checkbox. `--stamp-on` emits a twin whose only
+  difference is the group default, which is what proves the flag drives visibility.
+  Not done, recorded: an annotation whose action *opens an attachment* is still inert, because pdf.js
+  reaches for `linkService.getAttachmentContent` and a `downloadManager`, neither of which we supply.
+* **Landed: search depth.** Multi-word queries require **all** words on a page (pdf.js's own rule),
+  `regex: true` compiles the query as an expression, an uncompilable pattern says `Invalid pattern`
+  instead of "no results", and `counts` / `pagesWithMatches` give per-page totals. Measured on the
+  14-page test document: `trace` → 416 matches, `trace monkey` → 401 (pages with one word and not the
+  other drop out), `^Trace-based` in regex mode → exactly 1 on page 1.
+  **One planned item was already true.** "An all-match count" existed: `search()` extracts every page
+  before publishing results, so `total` was always document-wide. The premise was wrong, not the code.
+* **Landed: the find controller is replaceable.** `PdfFindController` is `usePdfSearch`'s result type,
+  and `PdfViewer`'s `find` prop accepts anything that satisfies it; the bar, the marks and Enter
+  navigation read the host's answers. Demonstrated in the playground (`HostFind.tsx`, "host find
+  results"), which reports 3 where the engine reports 416 — the only version of that proof that
+  cannot pass by accident. Cost of all of the above: **core 22.14 → 22.59 kB**.
+
+### 0.5.0 — closed 2026-09-26
+
+Cumulative measured cost of the release, gzipped, worst of esbuild and Rollup: core
+**20.61 → 22.59 kB** (+1.98 — memo 0.08, controller 0.51, context and parts 0.15, controls 0.32,
+shared layer config and repaint 0.45, search depth 0.45). Over core: print 2.50, download 0.78,
+forms 1.96, outline 0.92, layers 1.16, attachments 1.29; all six 7.56. Entry sums: shell 47.19,
+headless 25.47. 281 tests.
+
+**Compound components shipped in a different spelling.** This section asked for `PdfViewer.Root` /
+`.Toolbar` / `.Page`; what shipped is `ViewerRoot` / `ViewerToolbar` / `ViewerSidebar` / `ViewerPages`
+plus `ViewerProvider` and `useViewer` (`src/index.ts:7-17`). Same composition, no namespace to keep in
+sync with the flat exports, and a host importing `PdfViewer.Root` would be reaching for the component
+they could have imported. Recorded as a decision, not an oversight.
+
+**Verification limit for this release, stated rather than glossed.** The layers work is verified
+structurally — DOM state, the operator list, and canvas attribute mutations proving a repaint was
+requested — because the automation browser used for the pass has `visibilityState: 'hidden'`: no
+animation frames, no compositor surface for screenshots, and canvas readback that returns stale buffers
+(a claim that "the stamp band stays blank" was measured, found unsound, and withdrawn). The visual
+half needs someone to open a window.
+
 
 ### 0.6.0 — Mark: annotation authoring
 No new dependencies. Gated on Spike A.

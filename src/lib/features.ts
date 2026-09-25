@@ -14,6 +14,7 @@ import type { AnnotationValueStore } from './form';
 import type { InkStroke } from './ink';
 import type { PdfViewerLabels, PdfViewerLabelsOverride } from './labels';
 import type { PageLayout, ScaleMode } from './layout';
+import type { OptionalContentConfigHandle } from './optional-content';
 
 /** What a feature's Runner publishes for its own controls and the shell to read. */
 export type FeaturePublication = Record<string, unknown>;
@@ -49,6 +50,25 @@ export interface PdfViewerShell {
   setLayout: (layout: PageLayout) => void;
   /** Routes a failure into the viewer's own `onError`. */
   reportError: (error: Error) => void;
+  /**
+   * Asks every mounted page to redraw without changing any of its inputs.
+   *
+   * A layer switched through `OptionalContentConfig` changes what the engine paints
+   * while leaving the document, the viewport and the scale untouched, so nothing in
+   * the props would otherwise re-run the render. Stable identity: it is safe to put
+   * in an effect's dependency list.
+   */
+  repaint: () => void;
+  /** The counter `repaint` bumps. Read it to notice a change you did not make. */
+  contentVersion: number;
+  /**
+   * The document's single `OptionalContentConfig`, or null before it resolves.
+   *
+   * Mutate this one and nothing else: pdf.js builds a new config on every
+   * `getOptionalContentConfig()` call and every render that is not handed one, so a
+   * layer switched on any other instance paints as if it never moved.
+   */
+  optionalContentConfig: OptionalContentConfigHandle | null;
   /** Freehand strokes on a 0-based page. Ink is core chrome, and print needs it. */
   inkStrokesForPage: (index: number) => InkStroke[];
   openSidebar: (open: boolean, tab?: string) => void;

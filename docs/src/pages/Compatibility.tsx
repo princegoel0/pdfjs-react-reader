@@ -206,7 +206,7 @@ export function Compatibility() {
 
       <h2>Bundle size</h2>
       <p>
-        Gzipped, excluding <code>pdfjs-dist</code> and React, measured on 0.4.0. Each row is a real
+        Gzipped, excluding <code>pdfjs-dist</code> and React, measured on 0.5.0. Each row is a real
         consumer file bundled once with esbuild and once with Rollup, and the larger number is
         reported, so a path only counts as small if two independent tree-shakers agree. CI fails the
         build when a path grows more than 2&nbsp;% above the numbers committed in{' '}
@@ -224,42 +224,52 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>20.61 kB</td>
+            <td>22.59 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>22.63 kB</td>
-            <td>+2.02 kB</td>
+            <td>25.09 kB</td>
+            <td>+2.50 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>21.47 kB</td>
-            <td>+0.86 kB</td>
+            <td>23.37 kB</td>
+            <td>+0.78 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>22.60 kB</td>
-            <td>+1.99 kB</td>
+            <td>24.55 kB</td>
+            <td>+1.96 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>21.54 kB</td>
-            <td>+0.93 kB</td>
+            <td>23.50 kB</td>
+            <td>+0.92 kB</td>
           </tr>
           <tr>
-            <td>All four features</td>
-            <td>25.79 kB</td>
-            <td>+5.18 kB</td>
+            <td>Core + layers</td>
+            <td>23.74 kB</td>
+            <td>+1.16 kB</td>
+          </tr>
+          <tr>
+            <td>Core + attachments</td>
+            <td>23.87 kB</td>
+            <td>+1.29 kB</td>
+          </tr>
+          <tr>
+            <td>All six features</td>
+            <td>30.15 kB</td>
+            <td>+7.56 kB</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>44.01 kB</td>
+            <td>47.19 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>21.77 kB</td>
+            <td>25.47 kB</td>
             <td>—</td>
           </tr>
           <tr>
@@ -270,7 +280,7 @@ export function Compatibility() {
         </tbody>
       </table>
       <p>
-        The last three rows are measured differently from the first six: they sum the shipped files
+        The last three rows are measured differently from the feature rows above: they sum the shipped files
         reachable from an entry rather than bundling one import, so they are what a bundler that
         cannot tree-shake pays, and an upper bound for everyone else. Importing a single headless hook
         costs far less than any entry-wide figure — 2.59&nbsp;kB for <code>usePdfDocument</code> —
@@ -286,7 +296,7 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.4.0</code>. While it is pre-1.0, minor versions may contain breaking
+        The package is <code>0.5.0</code>. While it is pre-1.0, minor versions may contain breaking
         changes, so pin exactly in an application. <code>0.4</code> is one such minor: six{' '}
         <code>PdfViewer</code> props became four feature imports, listed at{' '}
         <a href="#/features">Features &amp; tiers</a>. The full release entry, the development log and

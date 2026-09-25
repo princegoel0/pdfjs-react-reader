@@ -17,6 +17,7 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
   const [input, setInput] = useState(state.query);
   const [caseSensitive, setCaseSensitive] = useState(state.options.caseSensitive);
   const [wholeWord, setWholeWord] = useState(state.options.wholeWord);
+  const [regex, setRegex] = useState(state.options.regex);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<number | null>(null);
 
@@ -28,22 +29,22 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
   useEffect(() => {
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
-      state.search(input, { caseSensitive, wholeWord });
+      state.search(input, { caseSensitive, wholeWord, regex });
     }, SEARCH_DEBOUNCE_MS);
     return () => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     };
-  }, [state.search, input, caseSensitive, wholeWord]);
+  }, [state.search, input, caseSensitive, wholeWord, regex]);
 
   // Enter must not wait out the debounce: run the pending query now.
   const flushPendingSearch = () => {
     if (timerRef.current === null) return;
     window.clearTimeout(timerRef.current);
     timerRef.current = null;
-    state.search(input, { caseSensitive, wholeWord });
+    state.search(input, { caseSensitive, wholeWord, regex });
   };
 
-  const { status, progress, total, activeIndex, results } = state;
+  const { status, progress, total, activeIndex, results, patternError } = state;
   const activePage = activeIndex >= 0 ? results[activeIndex]?.pageIndex : undefined;
   // Derived once as a state name rather than inline in three places: the
   // counter's colour used to be chosen by comparing the rendered text against
@@ -53,31 +54,41 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
     ? 'idle'
     : status === 'indexing'
       ? 'indexing'
-      : status === 'error'
-        ? 'error'
-        : total === 0
-          ? 'empty'
-          : 'matches';
+      : patternError
+        ? 'invalid'
+        : status === 'error'
+          ? 'error'
+          : total === 0
+            ? 'empty'
+            : 'matches';
   const counter =
     counterKind === 'idle'
       ? ''
       : counterKind === 'indexing'
         ? formatLabel(labels.searchIndexing, { percent: Math.round(progress * 100) })
-        : counterKind === 'error'
-          ? labels.searchFailed
-          : counterKind === 'empty'
-            ? labels.searchNoResults
-            : activePage === undefined
-              ? formatLabel(labels.searchMatchSummary, { current: activeIndex + 1, total })
-              : formatLabel(labels.searchMatchOnPage, {
-                  current: activeIndex + 1,
-                  total,
-                  page: activePage + 1,
-                });
+        : counterKind === 'invalid'
+          ? labels.searchInvalidPattern
+          : counterKind === 'error'
+            ? labels.searchFailed
+            : counterKind === 'empty'
+              ? labels.searchNoResults
+              : activePage === undefined
+                ? formatLabel(labels.searchMatchSummary, { current: activeIndex + 1, total })
+                : formatLabel(labels.searchMatchOnPage, {
+                    current: activeIndex + 1,
+                    total,
+                    page: activePage + 1,
+                  });
   // Zero matches is an empty state, not a failure: only a real error gets the
-  // danger colour.
+  // danger colour. A pattern that will not compile is a mistake in the box, so it
+  // is reported as one rather than as "no results", which would be a lie about
+  // having looked.
   const counterState =
-    counterKind === 'error' ? 'error' : counterKind === 'empty' ? 'empty' : undefined;
+    counterKind === 'error' || counterKind === 'invalid'
+      ? 'error'
+      : counterKind === 'empty'
+        ? 'empty'
+        : undefined;
 
   const hint = (label: string, shortcut: string) =>
     formatLabel(labels.withShortcut, { label, shortcut });
@@ -132,6 +143,15 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
       >
         ab
       </button>
+      <button
+        type="button"
+        className="pjsr-button pjsr-button--text"
+        aria-label={labels.regexMode}
+        aria-pressed={regex}
+        title={labels.regexMode}
+        onClick={() => setRegex((v) => !v)}
+      >
+        .*</button>
       <button
         type="button"
         className="pjsr-button"

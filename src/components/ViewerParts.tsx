@@ -196,6 +196,8 @@ export function ViewerPages() {
     gap,
     devicePixelRatio,
     renderPixels,
+    contentVersion,
+    optionalContentConfig,
     maxRowWidth,
     reportPageDims,
     linkService,
@@ -262,6 +264,8 @@ export function ViewerPages() {
                       rotation={rotation + (pageRotations[index] ?? 0)}
                       devicePixelRatio={devicePixelRatio}
                       maxRenderPixels={renderPixels}
+                      contentVersion={contentVersion}
+                      optionalContentConfig={optionalContentConfig}
                       className="pjsr-page-canvas"
                       highlights={matchesByPage.get(index)}
                       activeHighlight={activeLocalByPage.get(index) ?? -1}

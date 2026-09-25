@@ -75,6 +75,7 @@ export {
 } from './headless/usePdfVirtualizer';
 export {
   usePdfSearch,
+  type PdfFindController,
   type SearchStatus,
   type UsePdfSearchOptions,
   type UsePdfSearchResult,

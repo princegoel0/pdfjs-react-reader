@@ -10,7 +10,7 @@ export function Features() {
         decides what your bundle contains.
       </p>
 
-      <h2>The four built-ins</h2>
+      <h2>The six built-ins</h2>
       <table className="doc-table">
         <thead>
           <tr>
@@ -33,7 +33,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/print.css</code>
             </td>
-            <td>2.02 kB</td>
+            <td>2.50 kB</td>
           </tr>
           <tr>
             <td>
@@ -44,7 +44,7 @@ export function Features() {
               edited — an incremental <code>saveDocument()</code> that keeps the fields interactive.
             </td>
             <td>none needed</td>
-            <td>0.86 kB</td>
+            <td>0.78 kB</td>
           </tr>
           <tr>
             <td>
@@ -57,8 +57,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/forms.css</code>
             </td>
-            <td>1.99 kB
-          </td>
+            <td>1.96 kB</td>
           </tr>
           <tr>
             <td>
@@ -70,19 +69,49 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/outline.css</code>
             </td>
-            <td>0.93 kB</td>
+            <td>0.92 kB</td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/features/layers</code>
+            </td>
+            <td>
+              The optional-content sidebar tab: every layer the document declares, with what the
+              document currently says about it, and a page redraw when the reader changes it. A layer
+              switched from the sidebar and a layer switched by a document&apos;s own
+              <code>SetOCGState</code> link are the same one object, so neither can leave the other
+              showing a stale tick.
+            </td>
+            <td>
+              <code>pdfjs-react-reader/layers.css</code>
+            </td>
+            <td>1.16 kB</td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/features/attachments</code>
+            </td>
+            <td>
+              The embedded-files sidebar tab: name, description and a save per file, with the bytes
+              read only when asked for. pdf.js 5 ships the content inside the attachment list and 6
+              behind <code>getAttachmentContent()</code>; this feature reads either.
+            </td>
+            <td>
+              <code>pdfjs-react-reader/attachments.css</code>
+            </td>
+            <td>1.29 kB</td>
           </tr>
         </tbody>
       </table>
 
       <p>
-        Cost is measured, not estimated, and the figures below are the <code>0.4</code> release build
-        (re-measure at each release close): <code>npm run size</code> bundles one file per consumer
-        import with both esbuild and Rollup and reports the larger of the two, so a feature is only
-        &ldquo;small&rdquo; if two independent tree-shakers agree. All four together cost 5.18 kB over
-        the <code>20.61 kB</code> core — less than their sum, because they share the shell they attach
+        Cost is measured, not estimated, and the figures below are the <code>0.5</code> release
+        build (re-measured at each release close): <code>npm run size</code> bundles one file per
+        consumer import with both esbuild and Rollup and reports the larger of the two, so a feature is
+        only &ldquo;small&rdquo; if two independent tree-shakers agree. All six together cost 7.56 kB
+        over the <code>22.59 kB</code> core — less than their sum, because they share the shell they attach
         to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
-        bundle pays. Summing the shipped files of the whole root entry instead gives 44.01 kB, because
+        bundle pays. Summing the shipped files of the whole root entry instead gives 47.19 kB, because
         that entry re-exports every headless hook whether or not you name one — so quote the import,
         not the entry.
       </p>
@@ -279,8 +308,9 @@ export const progressFeature: PdfFeature = {
         </li>
         <li>
           <a href="#/headless">Headless hooks</a> are what a feature wraps — <code>usePdfPrint</code>,{' '}
-          <code>usePdfDownload</code>, <code>usePdfFormValues</code>, <code>usePdfOutline</code> are public
-          on their own, with or without this shell.
+          <code>usePdfDownload</code>, <code>usePdfFormValues</code>, <code>usePdfOutline</code>,{' '}
+          <code>usePdfOptionalContent</code> and <code>usePdfAttachments</code> are public on their own,
+          with or without this shell.
         </li>
         <li>
           <a href="#/compatibility">Versions &amp; compatibility</a> carries the measured per-tier numbers.

@@ -5,7 +5,99 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] — 2026-09-25
+## [0.5.0] — 2026-09-26
+
+Composition. The viewer's state moved behind one object, the parts became importable, and the toolbar's
+contents became something the application decides. Two sidebar panels and a deeper find came with it.
+Nothing in here breaks an existing call site: every prop is additive, and the parts keep the explicit
+props the built-in layout passes today.
+
+The measurement that started it: opening the search bar re-rendered **six** page components and closing it
+four, because the shell handed every page a fresh inline arrow each render, which also made
+`React.memo(PdfPage)` inert. Both fixed, a chrome interaction now re-renders none.
+
+### Added
+
+- **`useViewerController(props)`** owns every piece of state, effect and handler the shell had;
+  `ViewerLayout` places the parts; `PdfViewer` is those two plus a ref and went from 933 lines to about
+  165. Cost **+0.51 kB** on the core path, and it is not subtle code — it is the ~60-field object the
+  controller returns, which is the API.
+- **`ViewerProvider` and `useViewer()`**, and the four parts the default layout is built from:
+  `ViewerRoot` (the frame: tokens, keyboard, drop, the feature Runners), `ViewerToolbar`, `ViewerSidebar`,
+  `ViewerPages`. A host writes its own arrangement instead of forking the shell —
+  `playground/src/CustomLayout.tsx` is the worked example, sharing one props object and one ref with
+  `<PdfViewer>`. `useViewer` outside a provider throws, deliberately: the alternative is an empty toolbar
+  with no explanation. Cost **+0.15 kB**.
+- **The `controls` prop** — `{ hide, priorities, order, add }`, keyed on each control's `id`, the seventeen
+  built-ins plus whatever a mounted feature declares. `hide` removes from bar and menu, `priorities`
+  changes what folds first, `order` changes where controls sit while they are in the bar, `add` contributes
+  host controls and replaces by id in place so swapping a button does not move it. `ToolbarItem` and
+  `ToolbarControls` are exported — `ToolbarItem` was already the type of `featureItems`, which no consumer
+  could name. Cost **+0.32 kB**. Named slots were planned and not built: `order` covers
+  placement without a second vocabulary for the same list, and injecting markup *between* controls is the
+  point where a host should write their own `Toolbar`, which this release supports.
+- **Print page ranges.** `printFeature` now contributes two controls — `print` at priority 8 (the action,
+  so it stays in the bar) and `print-pages` at 11 (All / Current / From–to, so it gives its place up first)
+  — and the print button says what it will send (`Print pages 2–3`). `Ctrl/Cmd + P` prints the same
+  selection. Scope state lives in the Runner, because a control can be rendered three times.
+  **+0.47 kB** on print (2.03 → 2.50 of its 4 kB gate).
+- **`layersFeature`** (`pdfjs-react-reader/features/layers`) lists a document's optional-content groups as
+  a sidebar tab and switches them; **`attachmentsFeature`** lists embedded files and saves them. Each ships
+  its own stylesheet, and neither is in the core bundle: measured over core, **layers +1.16 kB**,
+  **attachments +1.29 kB**.
+- **`usePdfOptionalContent`** and **`usePdfAttachments`** as headless hooks, and the pure halves beside
+  them (`planFind`, `findPageMatches`, `countPerPage`, `flattenOptionalContent`, `normalizeAttachments`).
+- **Search depth.** A query's words must **all appear on the page** (the rule pdf.js's own viewer uses),
+  `regex: true` treats the query as a JavaScript expression, an uncompilable pattern is reported as
+  `Invalid pattern` rather than as "no results", and `counts` / `pagesWithMatches` give per-page totals a
+  results list can group by.
+- **The `find` prop**: supply any object shaped like `usePdfSearch`'s result — the `PdfFindController`
+  contract — and the find bar, the marks and the navigation run on your answers. That is the seam for a
+  server-side index or a stemmed matcher without rebuilding the chrome.
+- **`attachments-ocg-sample.pdf`** and `scripts/make-attachments-ocg-pdf.mjs`: three pages carrying embedded
+  files and three optional-content groups, one off by default, plus a `SetOCGState` link. `--stamp-on` and
+  `--out` emit a twin document differing only in that flag, which is how the default was shown to be what
+  drives it.
+
+### Changed
+
+- **`PdfPage` is memoised** and the shell hands each page a stable ink-commit handler instead of a fresh
+  inline arrow. A chrome interaction (open search, toggle the sidebar, fold the bar) re-renders no pages;
+  toggling draw mode still re-renders two, legitimately, because `inkDrawing` is a page prop.
+- **A multi-word query means something different.** Before, `"trace license"` searched for that exact
+  string; it now finds pages holding both words, which is what every other PDF viewer's search box does
+  and what readers read the space as. Measure of the difference: on the 14-page test document `trace`
+  finds 416 matches and `trace monkey` finds 401, because pages with one word and not the other drop out.
+- `downloadBytes` takes a MIME type, so a saved attachment is not labelled `application/pdf`.
+- `PdfViewerHandle.search` now takes the same options the find bar exposes, including `regex`.
+- The core viewer resolves the document's `OptionalContentConfig` once per load and passes it to every
+  render, which is what `contentVersion`/`repaint` exist for: **+0.45 kB** on core.
+
+### Fixed
+
+- **Rotating a page's layer state now reaches the page.** pdf.js builds a *new*
+  `OptionalContentConfig` on every `getOptionalContentConfig()` call, and a `render()` that is not handed
+  one fetches its own — so switching a layer on any instance the caller holds changes nothing on screen.
+  Both the panel and the `SetOCGState` annotation handler now mutate the single instance the pages render
+  with, and the pages redraw. Proved in the browser in both directions: clicking a layer's checkbox and
+  clicking a document's own layer link each repaint the mounted pages and move the other's state.
+- **`executeSetOCGState` is implemented** instead of a no-op, so a link or bookmark that switches layers
+  does what it says rather than highlighting and changing nothing.
+- The new fixture initially emitted `q /MC0 BDC`, but `BDC` takes **two** operands and pdf.js resolves a
+  layer only when the tag is literally `/OC` (`q /OC /MC0 BDC`). One operand is skipped outright —
+  `Skipping command BDC: expected 2 args` — which leaves the content painted while belonging to no group:
+  the document looks fine and a layers tab has nothing to toggle. Zero such warnings is now the first
+  assertion made about it.
+
+### Notes on verification
+
+Page tracking, canvas ink and printing to a real dialog cannot be checked in the automated browser used for
+this release (its tab is `visibilityState: 'hidden'`: no animation frames, no compositor surface, and canvas
+readback returns stale buffers). The layer work is therefore verified structurally — the operator list shows
+which groups own which content, `getGroup(id).visible` shows what the document says, and canvas attribute
+mutations show that a redraw was asked for — and the visual half needs a window to look at.
+
+
 
 Tiers. Four of the viewer's capabilities — printing, saving, filling forms, the outline panel — are now
 values you import rather than props you switch off, which is the only arrangement that survives a

@@ -15,10 +15,14 @@ export function pdfFileName(label: string | undefined | null, fallback = 'docume
  * object URL is revoked on a later task — revoking synchronously can cancel the
  * download before the browser has read the blob.
  */
-export function downloadBytes(bytes: Uint8Array | ArrayBuffer, fileName: string): void {
+export function downloadBytes(
+  bytes: Uint8Array | ArrayBuffer,
+  fileName: string,
+  mimeType = 'application/pdf',
+): void {
   // `Uint8Array<ArrayBufferLike>` is not a `BlobPart` as far as TypeScript is
   // concerned (the buffer might be shared), while Blob only ever copies bytes.
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mimeType }));
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = fileName;

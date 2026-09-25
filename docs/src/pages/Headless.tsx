@@ -11,7 +11,15 @@ const HOOKS: [string, string][] = [
   ],
   [
     'usePdfSearch({ doc, onError? })',
-    'Whole-document search with a 200 ms debounce and cancellation of stale runs. Returns { status, progress, query, options, results, total, activeIndex, activeSeq, search, setActiveIndex, nextMatch, prevMatch, clear }.',
+    'Whole-document search with a 200 ms debounce and cancellation of stale runs. `search(query, { caseSensitive?, wholeWord?, regex? })` — several words mean a page holding all of them, `regex` treats the query as an expression. Returns { status, progress, query, options, results, total, counts, pagesWithMatches, patternError, activeIndex, activeSeq, search, setActiveIndex, nextMatch, prevMatch, clear }.',
+  ],
+  [
+    'usePdfOptionalContent({ doc, config?, revision?, onChanged?, onError? })',
+    'The document’s optional-content groups (layers). Returns { rows, loading, error, supported, config, setVisibility, applyState }. Pass the `config` you get back to `page.render({ optionalContentConfigPromise })`: pdf.js builds a fresh config per call, so a mutation on any other instance is invisible to the page.',
+  ],
+  [
+    'usePdfAttachments({ doc, onError? })',
+    'The files embedded in the document. Returns { files, loading, error, supported, busyId, saveError, download }; contents are read per file, never all at once.',
   ],
   [
     'usePdfOutline({ doc })',

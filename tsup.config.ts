@@ -10,6 +10,8 @@ export default defineConfig({
     'features/download': 'src/features/download.tsx',
     'features/forms': 'src/features/forms.tsx',
     'features/outline': 'src/features/outline.tsx',
+    'features/layers': 'src/features/layers.tsx',
+    'features/attachments': 'src/features/attachments.tsx',
   },
   format: ['esm'],
   target: 'es2022',

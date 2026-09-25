@@ -34,6 +34,7 @@ import {
 import { isEditableTarget, pageNavigationKey } from '../lib/keyboard';
 import { clampScale, pinchScale, wheelScale, zoomBy } from '../lib/zoom';
 import { resolveDestinationPageIndex } from '../lib/outline';
+import type { OptionalContentConfigHandle } from '../lib/optional-content';
 import { createPdfLinkService } from '../lib/link-service';
 
 const clampPage = (page: number, total: number): number =>
@@ -117,6 +118,11 @@ export interface ViewerController {
   setSidebarOpen: (open: boolean) => void;
   sidebarTab: SidebarTab;
   setSidebarTab: (tab: SidebarTab) => void;
+  /** Bumped to redraw pages whose input did not change — see `repaint`. */
+  contentVersion: number;
+  repaint: () => void;
+  /** The one layer config this viewer renders and mutates, or null before it resolves. */
+  optionalContentConfig: OptionalContentConfigHandle | null;
   isFullscreen: boolean;
   fsAvailable: boolean;
   toggleFullscreen: () => void;
@@ -194,6 +200,7 @@ export function useViewerController({
   onDropFile,
   defaultPageRotations,
   controls,
+  find,
 }: PdfViewerProps): ViewerController {
   // Memoised on identity of the override object: an inline literal from the
   // consumer would otherwise give the context a new value every render and
@@ -210,6 +217,19 @@ export function useViewerController({
   const [pageLayout, setPageLayout] = useState<PageLayout>(defaultLayout);
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('thumbnails');
+  // Bumped to redraw every page without changing any input that would otherwise
+  // rebuild it. Two things need it: a layer switched in the sidebar, and a
+  // `SetOCGState` action fired by an annotation — both change what the engine
+  // paints while leaving the viewport, the scale and the document identical.
+  const [contentVersion, setContentVersion] = useState(0);
+  const repaint = useCallback(() => setContentVersion((version) => version + 1), []);
+  // One `OptionalContentConfig` per document, shared by the layers panel, the
+  // `SetOCGState` annotation handler and every page render. It has to be one object:
+  // pdf.js rebuilds a fresh config from cached worker data on each
+  // `getOptionalContentConfig()` call, and `render()` does the same when it is not
+  // given one, so a mutation anywhere else is invisible to the page it was meant for.
+  const [optionalContentConfig, setOptionalContentConfig] =
+    useState<OptionalContentConfigHandle | null>(null);
   const [passwordPrompt, setPasswordPrompt] = useState<PasswordReason | null>(null);
   const submitPasswordRef = useRef<PasswordSubmit | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -274,7 +294,10 @@ export function useViewerController({
     onErrorRef.current?.(err);
   }, []);
 
-  const search = usePdfSearch({ doc, onError: handlePageError });
+  // Always called, even when a host supplies its own: hooks cannot be conditional,
+  // and an unused built-in stays idle because nothing here calls its `search`.
+  const builtInSearch = usePdfSearch({ doc, onError: handlePageError });
+  const search = find ?? builtInSearch;
   const ink = usePdfInk({ resetKey: effectiveSrc });
 
   // One commit handler per page, kept for the life of the viewer. PdfPage is
@@ -384,6 +407,9 @@ export function useViewerController({
       setLayout: setPageLayout,
       reportError: handlePageError,
       inkStrokesForPage: ink.strokesForPage,
+      repaint,
+      contentVersion,
+      optionalContentConfig,
       openSidebar: (open, tab) => {
         setSidebarOpen(open);
         if (tab) setSidebarTab(tab);
@@ -402,6 +428,9 @@ export function useViewerController({
       scrollToPage,
       handlePageError,
       ink.strokesForPage,
+      repaint,
+      contentVersion,
+      optionalContentConfig,
     ],
   );
 
@@ -646,6 +675,33 @@ export function useViewerController({
   const docRef = useRef(doc);
   docRef.current = doc;
 
+  // Resolve the document's one shared layer config. Fetched per document, kept in
+  // state so pages re-render with it, and mirrored into a ref so the link service —
+  // which is stable across renders — can mutate the same object the pages read.
+  const optionalContentRef = useRef<OptionalContentConfigHandle | null>(null);
+  useEffect(() => {
+    optionalContentRef.current = null;
+    setOptionalContentConfig(null);
+    if (!doc) return;
+    let cancelled = false;
+    doc
+      .getOptionalContentConfig()
+      .then((config) => {
+        if (cancelled) return;
+        const handle = config as unknown as OptionalContentConfigHandle;
+        optionalContentRef.current = handle;
+        setOptionalContentConfig(handle);
+      })
+      .catch(() => {
+        // No layers is the ordinary case. A document whose OCProperties cannot be
+        // parsed renders with pdf.js's own defaults, which is what a reader expects
+        // from a viewer that never mentions layers.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [doc]);
+
   // Stable per document: a new identity would re-render every page's
   // annotation layer, so navigation goes through refs.
   //
@@ -672,8 +728,23 @@ export function useViewerController({
           const index = await resolveDestinationPageIndex(current, target);
           if (index !== null) scrollToPageRef.current(index + 1);
         },
+        onSetOCGState: (action) => {
+          // Mutate the shared config, then ask for a redraw. Fetching a config here
+          // would be the bug: pdf.js builds a new object per call, so the action
+          // would land on an instance no page ever renders with, and the link would
+          // highlight, repaint from something else, and change nothing.
+          const config = optionalContentRef.current;
+          if (!config) return;
+          try {
+            config.setOCGState({ state: [...action.state], preserveRB: action.preserveRB });
+          } catch (reason) {
+            handlePageError(reason instanceof Error ? reason : new Error(String(reason)));
+            return;
+          }
+          repaint();
+        },
       }),
-    [doc, effectiveSrc],
+    [doc, effectiveSrc, repaint, handlePageError],
   );
 
   const rotate = useCallback((delta: number) => {
@@ -763,6 +834,9 @@ export function useViewerController({
     setSidebarOpen,
     sidebarTab,
     setSidebarTab,
+    contentVersion,
+    repaint,
+    optionalContentConfig,
     isFullscreen,
     fsAvailable,
     toggleFullscreen,

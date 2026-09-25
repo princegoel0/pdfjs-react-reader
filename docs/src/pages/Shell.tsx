@@ -2,8 +2,9 @@ import { FormsExample } from '../examples/FormsExample';
 
 const PROPS: [string, string, string][] = [
   ['src', 'PdfSource', 'Required. URL, path, data URI, base64, File/Blob, or PDF bytes. Changing it reloads in place — keep the value stable across renders.'],
-  ['features', 'readonly PdfFeature[]', 'What this viewer can do beyond reading: printFeature, downloadFeature, formsFeature, outlineFeature or one you wrote. Defaults to none — the code you do not import is code you do not ship.'],
+  ['features', 'readonly PdfFeature[]', 'What this viewer can do beyond reading: printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature or one you wrote. Defaults to none — the code you do not import is code you do not ship.'],
   ['controls', 'ToolbarControls', 'The bar’s own contents: `hide` by id, `priorities` to change what folds first, `order` to place controls, `add` for ones you wrote. Feature control ids work here too.'],
+  ['find', 'PdfFindController', 'Replace the finding strategy, keep the find bar. Any object shaped like `usePdfSearch`’s result works — a server-side index, a stemmed or fuzzy matcher. The marks, the counter and Enter/Shift+Enter all read your answers.'],
   ['workerSrc', 'string', 'Pins the pdf.js worker location. Auto-detected when omitted.'],
   ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
   ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
@@ -12,7 +13,7 @@ const PROPS: [string, string, string][] = [
   ['defaultLayout', '"continuous" | "single" | "spread"', 'Row grouping.'],
   ['defaultRotation', 'number', 'Initial rotation in degrees; the toolbar rotates from here.'],
   ['defaultPageRotations', 'Record<number, number>', 'Per-page rotation in degrees, keyed by 0-based page index.'],
-  ['defaultSidebarOpen', 'boolean', 'Show the thumbnails/outline sidebar on first render.'],
+  ['defaultSidebarOpen', 'boolean', 'Show the sidebar on first render, on its first tab.'],
   ['gap', 'number', 'Vertical gap between pages in CSS pixels.'],
   ['maxRenderPixels', 'number', 'Area ceiling per page canvas in device pixels. Defaults to pdf.js’s own limit, tightened for mobile — over it a browser paints a blank page rather than failing.'],
   ['devicePixelRatio', 'number', 'Device pixels per CSS pixel for page canvases. Defaults to window.devicePixelRatio.'],
@@ -43,7 +44,7 @@ const HANDLE: [string, string][] = [
   ['setLayout(layout)', 'continuous, single or spread.'],
   ['rotate(degrees)', 'Rotates the whole document.'],
   ['rotatePage(page, degrees)', 'Rotates one page in place.'],
-  ['openSidebar(open, tab?)', 'Opens the sidebar. The tab argument is a string, and the only tabs that exist are the ones mounted: thumbnails is core, outline needs outlineFeature.'],
+  ['openSidebar(open, tab?)', 'Opens the sidebar. The tab argument is a string, and the only tabs that exist are the ones mounted: `thumbnails` is core, while `outline`, `layers` and `attachments` need their feature.'],
   ['toggleFullscreen()', 'Needs a user gesture, like every fullscreen request.'],
   ['search(query, options?)', 'Runs a search and reveals the search bar.'],
 ];
@@ -349,6 +350,27 @@ const fullscreenToggle: ToolbarItem = {
         One limit worth stating: hiding <code>print</code> takes the control out of the bar, not out of
         your bundle. The feature is still mounted because you imported it; to stop it shipping, remove
         the import.
+      </p>
+
+      <h2>Finding things</h2>
+      <p>
+        The find bar searches the whole document, debounced, with stale runs cancelled. What a query
+        <em> means</em> is worth stating because it is not the obvious thing: spaces split it into
+        words and a page counts only when <strong>every</strong> word appears on it, which is the rule
+        every other PDF viewer’s search box follows — <code>trace monkey</code> on the test document
+        narrows 416 matches to 401 because the pages holding one word and not the other drop out.
+        <code>Match case</code> and <code>Whole words only</code> do what they say.{' '}
+        <code>Regular expression</code> (<code>.*</code>) switches off both the splitting and the
+        escaping, so <code>^Trace-based</code> is an anchored pattern rather than nine characters with a
+        caret in them.
+      </p>
+      <p>
+        An expression that will not compile is reported as <strong>Invalid pattern</strong> in the
+        error styling, not as “no results”, which would be a claim that the document was searched. And
+        when the built-in strategy is not yours — a server index, a stemmed matcher, a synonym list —
+        pass <code>find</code>: anything shaped like <code>usePdfSearch</code>’s result drives the bar,
+        the marks and the page counter. The playground’s <em>host find results</em> checkbox does exactly
+        that with a fixed three-match table, which is why it reports 3 where the engine finds 416.
       </p>
 
       <h2>Encrypted documents</h2>

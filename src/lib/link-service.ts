@@ -19,6 +19,12 @@ export interface PdfLinkService {
   };
 }
 
+export interface SetOCGStateAction {
+  /** pdf.js's own operator list: `ON`, `OFF`, `Toggle` interleaved with group ids. */
+  state: readonly unknown[];
+  preserveRB?: boolean;
+}
+
 export interface CreatePdfLinkServiceOptions {
   /** Base used to resolve relative link targets; usually the document URL. */
   baseUrl?: string;
@@ -26,12 +32,18 @@ export interface CreatePdfLinkServiceOptions {
   onDestination?: (dest: unknown) => void;
   /** Called when a link resolves to a safe external URL. */
   onExternalLink?: (url: string) => void;
+  /**
+   * Called when a link or bookmark carries a `SetOCGState` action, i.e. one that
+   * switches document layers. Without a handler the click does nothing, which is
+   * the failure a reader cannot diagnose: the link is there and it is inert.
+   */
+  onSetOCGState?: (action: SetOCGStateAction) => void;
 }
 
 const URL_OPTIONS = { addDefaultProtocol: true, tryConvertEncoding: true } as const;
 
 export function createPdfLinkService(options: CreatePdfLinkServiceOptions = {}): PdfLinkService {
-  const { baseUrl = null, onDestination, onExternalLink } = options;
+  const { baseUrl = null, onDestination, onExternalLink, onSetOCGState } = options;
 
   const resolve = (url: string | null): URL | null => {
     if (!url) return null;
@@ -70,8 +82,14 @@ export function createPdfLinkService(options: CreatePdfLinkServiceOptions = {}):
     executeNamedAction() {
       // Named actions (PrintPage, NextPage, …) are a no-op without scripting.
     },
-    executeSetOCGState() {
-      // Optional-content-group toggling is out of scope for v1.
+    executeSetOCGState(action) {
+      // pdf.js hands over exactly `{ state, preserveRB }`, the shape
+      // `OptionalContentConfig.setOCGState` takes, so this is a relay: the caller
+      // owns the config and the repaint that follows.
+      if (!onSetOCGState) return;
+      const state = (action as SetOCGStateAction | null)?.state;
+      if (!Array.isArray(state)) return;
+      onSetOCGState({ state, preserveRB: (action as SetOCGStateAction)?.preserveRB !== false });
     },
     eventBus: {
       dispatch() {},

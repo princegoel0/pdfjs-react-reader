@@ -54,11 +54,23 @@ objects.set(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
 // is the only route pdf.js reads: a /BDC tag whose name is absent from
 // /Properties is content that belongs to no layer at all.
 const resources =
-  '<< /Font << /F1 3 0 R >> /Properties << /MC0 8 0 R /MC1 9 0 R /MC2 10 0 R >> >>';const pageDict = (contents) =>
-  `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources ${resources} /Contents ${contents} 0 R >>`;
-objects.set(5, pageDict(11));
+  '<< /Font << /F1 3 0 R >> /Properties << /MC0 8 0 R /MC1 9 0 R /MC2 10 0 R >> >>';
+const pageDict = (contents, annots) =>
+  `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources ${resources} /Contents ${contents} 0 R${
+    annots ? ` /Annots ${annots}` : ''
+  } >>`;
+objects.set(5, pageDict(11, '[21 0 R]'));
 objects.set(6, pageDict(12));
 objects.set(7, pageDict(13));
+
+// A SetOCGState link, so the layer a reader can only reach through the sidebar can
+// also be switched by the document itself. It sits on page 1 because that is the page
+// a viewer is always looking at, and because the group it turns on is painted there.
+objects.set(
+  21,
+  '<< /Type /Annot /Subtype /Link /Rect [72 466 340 486] /Border [0 0 1] /P 5 0 R\n' +
+    '  /A << /Type /Action /S /SetOCGState /PreserveRB false /State [/ON 10 0 R] >> >>',
+);
 
 // /Name is what a layers tab shows. /Intent as an array covers the three
 // contexts pdf.js filters on, so a group is never hidden from a view that
@@ -94,6 +106,9 @@ objects.set(11, {
       `${text(16, 600, 'STAMP LAYER - off by default')}\n0.85 0 0 RG 4 w 72 576 m 330 576 l S`,
     ),
     text(10, 520, 'Three files are attached: notes.txt, data.csv, report.pdf'),
+    // Caption drawn inside the annotation rectangle, so the box has something to be
+    // a link about rather than being an empty outline over blank paper.
+    text(12, 472, 'Click this box to show the Stamp layer.'),
   ].join('\n'),
 });
 

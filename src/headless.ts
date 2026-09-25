@@ -15,6 +15,7 @@ export {
 } from './headless/usePdfVirtualizer';
 export {
   usePdfSearch,
+  type PdfFindController,
   type SearchStatus,
   type UsePdfSearchOptions,
   type UsePdfSearchResult,
@@ -44,6 +45,17 @@ export {
   type UsePdfDownloadResult,
   type PdfDownloadOptions,
 } from './headless/usePdfDownload';
+export {
+  usePdfOptionalContent,
+  type OcStateAction,
+  type UsePdfOptionalContentOptions,
+  type UsePdfOptionalContentResult,
+} from './headless/usePdfOptionalContent';
+export {
+  usePdfAttachments,
+  type UsePdfAttachmentsOptions,
+  type UsePdfAttachmentsResult,
+} from './headless/usePdfAttachments';
 export {
   clearFormValues,
   collectWidgets,
@@ -79,10 +91,15 @@ export {
 } from './lib/link-service';
 export {
   buildPageText,
+  convertMatchRanges,
   convertMatches,
+  countPerPage,
   escapeRegExp,
   extractAllText,
   extractPageText,
+  findPageMatches,
+  planFind,
+  type FindPlan,
   type PageMatch,
   type PageTextIndex,
   type ResolvedSearchOptions,
@@ -95,6 +112,19 @@ export {
   type DestinationRef,
   type OutlineEntry,
 } from './lib/outline';
+export {
+  flattenOptionalContent,
+  optionalContentGroupIds,
+  type OptionalContentBundle,
+  type OptionalContentGroupState,
+  type OptionalContentOrderEntry,
+  type OptionalContentRow,
+} from './lib/optional-content';
+export {
+  attachmentMimeType,
+  normalizeAttachments,
+  type AttachmentInfo,
+} from './lib/attachments';
 export {
   BYTES_PER_PIXEL,
   PRINT_MEMORY_BUDGET,

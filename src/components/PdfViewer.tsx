@@ -4,6 +4,8 @@ import type { AssetUrl } from '../lib/assets';
 import type { PdfViewerLabelsOverride } from '../lib/labels';
 import type { PageLayout, ScaleMode } from '../lib/layout';
 import type { PdfCapabilities, PasswordReason, PasswordSubmit } from '../headless/usePdfDocument';
+import type { PdfFindController } from '../headless/usePdfSearch';
+import type { SearchOptions } from '../lib/search';
 import type { AnyPdfFeature } from '../lib/features';
 import type { PdfSource } from '../lib/source';
 import type { SidebarTab } from './Sidebar';
@@ -124,6 +126,14 @@ export interface PdfViewerProps {
    * See {@link ToolbarControls}.
    */
   controls?: ToolbarControls;
+  /**
+   * Replace the finding strategy while keeping the find bar, the marks and the
+   * page counts. The built-in `usePdfSearch` result is the contract
+   * ({@link PdfFindController}), so anything shaped like it works: a stemmed or
+   * fuzzy matcher, a server-side index, a synonym expansion. When supplied, the
+   * viewer calls into it instead of searching the text layer itself.
+   */
+  find?: PdfFindController;
 }
 
 /** Imperative control surface, obtained with a ref on `PdfViewer`. */
@@ -145,7 +155,7 @@ export interface PdfViewerHandle {
   /** Enters fullscreen, or exits when already active. Needs a user gesture. */
   toggleFullscreen: () => void;
   /** Runs a document search and shows the search bar. */
-  search: (query: string, options?: { caseSensitive?: boolean; wholeWord?: boolean }) => void;
+  search: (query: string, options?: SearchOptions) => void;
 }
 
 /**

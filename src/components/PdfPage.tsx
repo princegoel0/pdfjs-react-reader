@@ -14,10 +14,14 @@ import { useLabels } from './labels-context';
 import { InkLayer } from './InkLayer';
 import { applyHighlights, unwrapMarks } from '../lib/highlight';
 import type { AnnotationValueStore } from '../lib/form';
+import type { OptionalContentConfigHandle } from '../lib/optional-content';
 import type { InkSettings, InkStroke, PdfPoint } from '../lib/ink';
 import type { PageDims } from '../lib/layout';
 import type { PdfLinkService } from '../lib/link-service';
 import type { PageMatch } from '../lib/search';
+
+/** `RenderParameters` is not exported, and the OC promise's type is only named there. */
+type RenderParams = Parameters<PDFPageProxy['render']>[0];
 
 export interface PdfPageProps {
   doc: PDFDocumentProxy;
@@ -55,6 +59,19 @@ export interface PdfPageProps {
   linkService?: PdfLinkService | null;
   /** Bumped by programmatic form changes to force an annotation re-render. */
   formVersion?: number;
+  /**
+   * Bumped when the *page* content itself changes without any input changing —
+   * a switched optional-content group is the case that needs it, because pdf.js
+   * decides layer visibility at paint time from a mutable config object.
+   */
+  contentVersion?: number;
+  /**
+   * The viewer's one shared `OptionalContentConfig`. Passing it is what makes a
+   * layer toggle paint: left out, pdf.js fetches a fresh config per render and
+   * resets every group to the document's defaults, so the pages would ignore
+   * whatever the sidebar just did.
+   */
+  optionalContentConfig?: OptionalContentConfigHandle | null;
   /** Notified after the user edits a form field. */
   onFormChange?: () => void;
   /** Freehand strokes for this page. */
@@ -94,6 +111,8 @@ export const PdfPage = memo(function PdfPage({
   annotationStorage = null,
   linkService = null,
   formVersion = 0,
+  contentVersion = 0,
+  optionalContentConfig = null,
   onFormChange,
   inkStrokes,
   inkDrawing = false,
@@ -180,6 +199,12 @@ export const PdfPage = memo(function PdfPage({
       viewport,
       transform,
       background: '#ffffff',
+      // A new promise each render on purpose: pdf.js only reads it once, and the
+      // value inside is the stable shared config. Putting this in the effect's
+      // deps instead would re-render every page on every parent render.
+      optionalContentConfigPromise: optionalContentConfig
+        ? (Promise.resolve(optionalContentConfig) as unknown as RenderParams['optionalContentConfigPromise'])
+        : undefined,
     });
     taskRef.current = task;
 
@@ -196,7 +221,7 @@ export const PdfPage = memo(function PdfPage({
       canvas.width = 0;
       canvas.height = 0;
     };
-  }, [page, viewport, devicePixelRatio, maxRenderPixels, maxRenderSide, reportError]);
+  }, [page, viewport, devicePixelRatio, maxRenderPixels, maxRenderSide, contentVersion, optionalContentConfig, reportError]);
 
   // The layer is built only for page/scale/rotation changes; highlight updates
   // are layered on top by the effect below without a full rebuild.

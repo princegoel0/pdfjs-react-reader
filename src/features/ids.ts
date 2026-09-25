@@ -8,3 +8,5 @@ export const PRINT_FEATURE_ID = 'print';
 export const DOWNLOAD_FEATURE_ID = 'download';
 export const FORMS_FEATURE_ID = 'forms';
 export const OUTLINE_FEATURE_ID = 'outline';
+export const LAYERS_FEATURE_ID = 'layers';
+export const ATTACHMENTS_FEATURE_ID = 'attachments';

@@ -8,14 +8,19 @@ import {
   type PdfViewerProps,
 } from 'pdfjs-react-reader';
 import { CustomLayoutViewer, progressControl } from './CustomLayout';
+import { useHostIndexFind } from './HostFind';
 import { downloadFeature } from 'pdfjs-react-reader/features/download';
 import { createFormsFeature } from 'pdfjs-react-reader/features/forms';
 import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { printFeature } from 'pdfjs-react-reader/features/print';
+import { layersFeature } from 'pdfjs-react-reader/features/layers';
+import { attachmentsFeature } from 'pdfjs-react-reader/features/attachments';
 import 'pdfjs-react-reader/styles.css';
 import 'pdfjs-react-reader/print.css';
 import 'pdfjs-react-reader/forms.css';
 import 'pdfjs-react-reader/outline.css';
+import 'pdfjs-react-reader/layers.css';
+import 'pdfjs-react-reader/attachments.css';
 import './app.css';
 
 // The standard pdf.js test document (14 pages).
@@ -54,8 +59,15 @@ export default function App() {
   const [withDownload, setWithDownload] = useState(true);
   const [withForms, setWithForms] = useState(true);
   const [withOutline, setWithOutline] = useState(true);
+  // Off by default: these two only say anything about the fixture that carries
+  // layers and attached files, and an empty tab on the usual document is noise.
+  const [withLayers, setWithLayers] = useState(false);
+  const [withAttachments, setWithAttachments] = useState(false);
   // The same props, rendered through a layout written in playground/src/CustomLayout.tsx.
   const [compound, setCompound] = useState(false);
+  // Find results come from playground/src/HostFind.tsx instead of the engine's text.
+  const [hostFind, setHostFind] = useState(false);
+  const hostFindController = useHostIndexFind();
   // Drop two controls, move one, add a host control — the bar's own configuration.
   const [trim, setTrim] = useState(false);
   const src = file ?? (appliedUrl || DEFAULT_PDF);
@@ -67,6 +79,8 @@ export default function App() {
     ...(withDownload ? [downloadFeature] : []),
     ...(withForms ? [createFormsFeature({ onChange: setFormValues })] : []),
     ...(withOutline ? [outlineFeature] : []),
+    ...(withLayers ? [layersFeature] : []),
+    ...(withAttachments ? [attachmentsFeature] : []),
   ];
 
   const note = useCallback((message: string) => {
@@ -81,6 +95,7 @@ export default function App() {
     allowedSources: restrict ? ['/fixtures/'] : undefined,
     labels: german ? GERMAN : undefined,
     features,
+    find: hostFind ? hostFindController : undefined,
     onError: (err) => console.error('[playground] viewer error', err),
     onPageChange: (page) => note(`onPageChange ${page}`),
     onScaleChange: (scale) => note(`onScaleChange ${scale.toFixed(2)}`),
@@ -196,10 +211,30 @@ export default function App() {
             />
             &nbsp;outline
           </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={withLayers}
+              onChange={(e) => setWithLayers(e.target.checked)}
+            />
+            &nbsp;layers
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={withAttachments}
+              onChange={(e) => setWithAttachments(e.target.checked)}
+            />
+            &nbsp;attachments
+          </label>
         </span>
         <label>
           <input type="checkbox" checked={compound} onChange={(e) => setCompound(e.target.checked)} />
           &nbsp;host-written layout
+        </label>
+        <label>
+          <input type="checkbox" checked={hostFind} onChange={(e) => setHostFind(e.target.checked)} />
+          &nbsp;host find results
         </label>
         <label>
           <input type="checkbox" checked={trim} onChange={(e) => setTrim(e.target.checked)} />
