@@ -102,13 +102,13 @@ Every requested feature, and the release that ships it.
 | --- | --- | --- |
 | Multiple viewing modes | `0.1` done | continuous / single / spread (`lib/layout.ts`) |
 | Direct pdf.js API access, TypeScript | `0.1` done | re-exports extended in `0.6` |
-| Zoom control, pinch zoom | `0.2` | wraps engine `TouchManager`; `ZOOM_LEVELS` is 0.25–5 today |
-| Drag-and-drop loading | `0.2` | `lib/source.ts` already accepts `File`/`Blob`/`Uint8Array` |
-| Fullscreen | `0.2` | zero `requestFullscreen` in the repo today |
-| Accessibility | `0.2`, `0.6`, `0.8` | keyboard → annotation access → audit |
-| Internationalization | `0.2` API, `0.8` locales | ~75 hardcoded strings, 43 in `Toolbar.tsx` |
-| Advanced JS API | `0.2`, `0.5`, `0.6` | handle + events → find controller → popups |
-| Mobile optimization | `0.2`, `0.8` | gestures, then the real-device matrix |
+| Zoom control, pinch zoom | `0.2` done | wheel + engine `TouchManager` pinch; `ZOOM_LEVELS` 0.25–5, any percentage accepted |
+| Drag-and-drop loading | `0.2` done | off by default; `acceptDrop` gates it, `onDropFile` always fires |
+| Fullscreen | `0.2` done | webkit spellings covered, control hidden where unsupported |
+| Accessibility | `0.2`, `0.6`, `0.8` | keyboard done in `0.2` → annotation access → audit |
+| Internationalization | `0.2` API done, `0.8` locales | ~90 strings behind one typed catalog |
+| Advanced JS API | `0.2`, `0.5`, `0.6` | handle + events done in `0.2` → find controller → popups |
+| Mobile optimization | `0.2`, `0.8` | gestures done → real-device matrix |
 | **Basic vs full bundle weight** | **`0.4`** | opt-in features; core shell 5.6 kB gz measured |
 | High-resolution rendering | `0.3` | capability detection; `PdfViewer` never forwards `devicePixelRatio` today |
 | Performance | `0.3` | canvas caps; virtualization and canvas zeroing already done |
@@ -122,28 +122,44 @@ Every requested feature, and the release that ships it.
 
 ## Releases
 
+**How these ship (decided 2026-09-25).** `0.2`–`0.9` are committed on `dev` and kept **local**; nothing
+is pushed, merged to `main` or published along the way. When the sequence is done we push `dev`, tag
+`1.0.0`, merge to `main`, and publish that one version. `0.1.2` is therefore never published — it is
+tagged on GitHub but npm goes `0.1.1` → `1.0.0`. The accepted cost: Actions do not run on `0.2`–`0.9`
+work, so `npm run verify` locally is the only gate, and the Pages docs site stays on 0.1.x content
+until the final merge.
+
 ### 0.1.0 — baseline publish
 Publish what exists. Housekeeping first: `npm login` then `npm publish`, a `main` branch ruleset
 requiring the two `Verify` checks, and repository topics.
 
-### 0.2.0 — Reach: control the viewer from outside
+### 0.2.0 — Reach: control the viewer from outside ✅ built 2026-09-25 (local `dev`; pushed and published with 1.0.0)
 No new dependencies.
 
 * `forwardRef` + imperative handle: `goToPage`, `zoomTo`, `zoomBy`, `fitTo`, `setLayout`, `rotate`,
-  `openSidebar`, `requestFullscreen`, `search`. The component is not `forwardRef` today and exposes
-  no handle.
+  `rotatePage`, `openSidebar`, `toggleFullscreen`, `search`. The component was not `forwardRef`
+  before this and exposed no handle. `rotatePage` was not in the plan; it came with FR-09's per-page
+  half. `toggleFullscreen` rather than `requestFullscreen`, because it exits when already in.
 * Events: `onPageChange`, `onScaleChange`, `onLayoutChange`, `onFullscreenChange`. `onExternalLink`
-  is defined at `lib/link-service.ts:28` and never wired by `PdfViewer`.
-* Drag-and-drop file loading, plus an `acceptDrop` escape hatch.
+  was defined at `lib/link-service.ts:28` and never wired by `PdfViewer`; it is now, intercepted on
+  click rather than at attribute time, which is where the pdf.js callback does not fire.
+* Drag-and-drop file loading, plus an `acceptDrop` escape hatch. Needed a shell-side `reload()` on
+  source change — see the `src` fix in the changelog.
 * Fullscreen via the Fullscreen API, with a toolbar control and an `F` shortcut.
-* Keyboard page navigation — arrows, PageUp/PageDown, Home/End. `handleViewerKeyDown` currently
-  maps only Ctrl/Cmd+F and Ctrl/Cmd+P.
+* Keyboard page navigation — arrows, PageUp/PageDown, Home/End. `handleViewerKeyDown` mapped only
+  Ctrl/Cmd+F and Ctrl/Cmd+P. Horizontal arrows are excluded on purpose; see the keyboard notes.
 * Wheel zoom and pinch zoom wrapping `TouchManager` behind our own interface — its published
-  parameter types are largely `any`, so an unguarded dependency breaks on a pdf.js minor.
-* `labels` prop with a typed English default. Must precede `0.5`, or every new toolbar and sidebar
-  string gets extracted twice.
-* Arbitrary zoom entry, closing the literal FR-06 wording, and per-page rotation, closing FR-09's
-  ("per-page or globally" — only global exists).
+  parameter types are bare `Function`, so the call site was read rather than the `.d.ts`, and the
+  whole construction sits in a `try` so an incompatible engine loses pinch zoom and nothing else.
+* `labels` prop with a typed English default. Precedes `0.5`, so no toolbar or sidebar string gets
+  extracted twice.
+* Arbitrary zoom entry, and per-page rotation, closing FR-09's ("per-page or globally" — only global
+  existed). Against FR-06's wording, 25–500 % arbitrary entry, `Fit-to-Width` and `Fit-to-Page` are
+  all in; a fourth `Automatic` mode is not, because fit-width already recomputes against the container
+  on every resize, which is what Acrobat's automatic resolves to for a portrait document.
+* Not planned, found while verifying per-page rotation: rotated pages left their text and annotation
+  layers in unrotated page space. Affects global rotation too, so it is a 0.1.0 defect. Fixed with
+  the three `data-main-rotation` rules the engine's own viewer CSS expects.
 
 ### 0.3.0 — Trust: stop it failing in production
 No new dependencies.

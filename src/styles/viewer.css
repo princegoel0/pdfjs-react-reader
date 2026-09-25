@@ -35,6 +35,9 @@
 
   display: flex;
   flex-direction: column;
+  /* Containing block for the drop overlay and the badge on the page-rotate
+     button. */
+  position: relative;
   height: 100%;
   min-height: 0;
   background: var(--pjsr-bg);
@@ -220,8 +223,71 @@
   cursor: pointer;
 }
 
-/* ---------- overflow menu ---------- */
+/* Free-text zoom, so any percentage is reachable rather than only the 16
+   presets in the select. Narrow on purpose: it sits beside that select. */
+.pjsr-zoom-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 
+.pjsr-zoom-input {
+  box-sizing: border-box;
+  width: 4.5ch;
+  height: var(--pjsr-control-h);
+  padding: 0 4px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font: inherit;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pjsr-zoom-input:focus {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-zoom-custom-suffix {
+  color: var(--pjsr-muted-fg);
+}
+
+/* Global rotate plus this badge reads as "rotate this page only". */
+.pjsr-button--page-rotate {
+  position: relative;
+}
+
+.pjsr-button-badge {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--pjsr-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.pjsr-viewer--dragover {
+  outline: 2px dashed var(--pjsr-accent);
+  outline-offset: -2px;
+}
+
+.pjsr-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--pjsr-accent) 12%, transparent);
+  color: var(--pjsr-accent);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* ---------- overflow menu ---------- */
 /* Rendered by the Toolbar only when the planner has folded something away, so
    no CSS toggle is needed and a wide bar never shows an empty ⋯. */
 .pjsr-overflow {
@@ -934,6 +1000,30 @@
   padding: 16px;
   color: var(--pjsr-muted-fg);
   font-size: 13px;
+}
+
+/* ---------- rotated page layers ---------- */
+/*
+ * pdf.js renders the canvas through a *rotated* viewport but lays the text and
+ * annotation out in unrotated page space, recording the angle only in
+ * `data-main-rotation` (its own viewer CSS rotates the layers the same way).
+ * Without these rules a turned page looks right while its selectable text,
+ * form fields and links stay where they were at 0°.
+ */
+
+.pjsr-text-layer[data-main-rotation='90'],
+.pjsr-annotation-layer[data-main-rotation='90'] {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.pjsr-text-layer[data-main-rotation='180'],
+.pjsr-annotation-layer[data-main-rotation='180'] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+.pjsr-text-layer[data-main-rotation='270'],
+.pjsr-annotation-layer[data-main-rotation='270'] {
+  transform: rotate(270deg) translateX(-100%);
 }
 
 /* ---------- text layer ---------- */

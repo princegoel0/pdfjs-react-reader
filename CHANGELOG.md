@@ -5,6 +5,84 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-09-25
+
+The shell's control surface: strings you can translate, a ref you can drive it with, events that
+report what the user did, and the gestures a reader expects from a PDF viewer.
+
+### Added
+
+- **`labels` prop.** Every user-visible string in the shell — roughly ninety across the toolbar,
+  search box, sidebar, outline, thumbnails, page canvases, drop overlay and password prompt — now
+  resolves through a typed catalog (`PdfViewerLabels`, `DEFAULT_LABELS`, `formatLabel`, all
+  exported). Overrides are partial and merged per key, so a catalog that translates eleven strings
+  leaves the other seventy-nine at their English default. Strings with values use `{name}` slots
+  rather than functions, so a locale catalog shipped in `0.8` can be plain JSON with nothing executed
+  to read it. An unfilled slot stays visible as `{page}` rather than collapsing to an empty label,
+  which makes a mistranslated catalog obvious instead of silently blanking a control. Subcomponents
+  read the catalog from context, so `Toolbar`, `SearchBox`, `Sidebar`, `OutlineView`, `PdfPage`,
+  `PdfThumbnail` and `PasswordPrompt` each stay usable standalone.
+- **`PdfViewerHandle`, via `ref`.** `PdfViewer` is now a `forwardRef` component exposing `goToPage`,
+  `zoomTo`, `zoomBy`, `fitTo`, `setLayout`, `rotate`, `rotatePage`, `openSidebar`, `toggleFullscreen`
+  and `search`. Every member reads through a ref, so a handle captured on mount never closes over a
+  stale page number or zoom.
+- **Change events.** `onPageChange`, `onScaleChange`, `onLayoutChange`, `onFullscreenChange` and
+  `onExternalLink`. They describe user actions: none of them fires during load, so a fit mode
+  resolving to 87 % on first paint does not announce itself as a change. With `onExternalLink` set,
+  the viewer prevents the navigation and hands the URL over rather than deciding for the host.
+- **Gestures.** Ctrl/Cmd + wheel zoom — which is also how a browser reports a trackpad pinch — and
+  two-finger pinch through the engine's `TouchManager`. Keyboard paging on `↓ ↑ PageUp PageDown
+  Home End`, `F` for fullscreen, `Ctrl/Cmd+F` for search; `←`/`→` are deliberately left alone so a
+  zoomed-wide row stays scrollable, and every one of them steps aside for a focused field, including
+  the real `<input>` elements an AcroForm text box renders as.
+- **Fullscreen** on the viewer root, with the webkit spellings covered and the control hidden where
+  the platform has no element fullscreen (iPhone, iPad Safari). State follows
+  `fullscreenchange`, not our own request, so Escape leaves the toolbar honest.
+- **Any zoom percentage**, not just the fourteen presets: a percentage box beside the zoom select
+  accepts `150`, `150%` or ` 150 % `, clamps to 25–500 %, and returns the box to the value on screen
+  when the edit is unparseable rather than snapping the zoom somewhere.
+- **Per-page rotation.** `rotatePage(page, degrees)` and `defaultPageRotations`, keyed by 0-based
+  index, alongside the existing document rotation. The virtualizer, thumbnails and each page's
+  viewport compose the two, so a single landscape scan in a portrait document no longer forces the
+  whole document to turn.
+- **Drag and drop**, off by default: `enableDrop` opens the dropped file in place of `src`,
+  `acceptDrop` gates it, `onDropFile` fires either way, and a later change to `src` wins back.
+
+### Fixed
+
+- **Rotating a page left its text layer and annotation layer behind.** Present since rotation first
+  shipped in 0.1.0 and visible with any rotation, global or per page: pdf.js renders the canvas
+  through a rotated viewport but lays both overlay layers out in *unrotated* page space, recording
+  the angle only in a `data-main-rotation` attribute that its own viewer CSS consumes. We ship no
+  such rule, so after a 90° turn the layer kept its portrait box inside a landscape page and every
+  selectable span, form widget and link sat on blank paper. Measured by sampling canvas ink density
+  under each span's rect: 0 % on a rotated page before, 18–22 % after — the same range as an
+  unrotated page. The layers now carry the three rotation rules their engine expects.
+- **Changing `src` did nothing.** `usePdfDocument` tracks the source through a ref and reloads only
+  on `reload()`, which keeps an inline `{ data }` object from restarting the load on every parent
+  render — but it also meant the shell ignored a new document, so the drop-to-open feature could not
+  work. The shell now asks for the reload itself when the source identity changes.
+- **Every change event fired once on mount under React StrictMode**, which runs effects twice and
+  left a "primed" flag set on the first pass. The suppression now compares against the value seen at
+  first render, which survives the double invocation.
+- **A successful webkit fullscreen rejected its own promise.** `webkitRequestFullscreen` returns
+  nothing, and the old code read that as "unsupported" after already firing the request. Existence of
+  the method is now the test. `clampScale(Infinity)` also returns 500 % rather than 25 %.
+- **The search counter's colour depended on an English string.** `SearchBox` chose its
+  empty-versus-error styling by comparing the rendered text against `'No results'`, so translating
+  that string would have quietly mis-styled the empty state. It now derives a state name once.
+
+Measured: shell 38.63 → 42.88 kB gz against the 45 kB budget, headless 22.75 → 23.35 kB gz — the
+labels catalog, the new controls and the gesture code are all shell-side, and the headless entry pays
+for none of them. 162 unit tests (48 new, over `zoom`, `keyboard` and `fullscreen`). Verified in a
+browser: the ten handle methods, each change event with no mount-time noise, a partial German catalog
+with no raw placeholder or `undefined` reaching the DOM, text-layer alignment at 90/180/270 global
+and per page, Ctrl+wheel zoom with plain wheel left scrolling, a two-finger pinch, `End`/`Home`/
+arrows with modified chords and AcroForm fields ignored, drop-to-open with a non-PDF rejected, and
+external-link interception. Fullscreen requests the right element from a trusted gesture but does not
+complete in the automated browser, so its visual state is unverified here.
+
+
 ## [0.1.2] — 2026-09-24
 
 ### Changed

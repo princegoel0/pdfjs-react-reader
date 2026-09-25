@@ -204,8 +204,8 @@ export function Compatibility() {
 
       <h2>Bundle size</h2>
       <p>
-        Gzipped, excluding <code>pdfjs-dist</code>. CI fails the build above 45 kB per consumer
-        path, so these are enforced rather than estimated.
+        Gzipped, excluding <code>pdfjs-dist</code>, measured on 0.2.0. CI fails the build above 45 kB
+        per consumer path, so these are enforced rather than estimated.
       </p>
       <table className="doc-table">
         <thead>
@@ -221,14 +221,14 @@ export function Compatibility() {
             <td>
               <code>index.js</code> + shared chunk + <code>styles.css</code>
             </td>
-            <td>37.0 kB</td>
+            <td>42.9 kB</td>
           </tr>
           <tr>
             <td>Headless</td>
             <td>
               <code>headless.js</code> + shared chunk + <code>styles.css</code>
             </td>
-            <td>22.3 kB</td>
+            <td>23.4 kB</td>
           </tr>
         </tbody>
       </table>

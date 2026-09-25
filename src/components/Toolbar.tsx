@@ -4,10 +4,23 @@ import type { PageLayout, ScaleMode } from '../lib/layout';
 import type { InkSettings } from '../lib/ink';
 import { planToolbarOverflow } from '../lib/toolbar';
 import {
+  formatZoomPercent,
+  MAX_SCALE,
+  MIN_SCALE,
+  nextZoomDown,
+  nextZoomUp,
+  parseZoomPercent,
+  ZOOM_LEVELS,
+} from '../lib/zoom';
+import { formatLabel } from '../lib/labels';
+import { useLabels } from './labels-context';
+import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
   DownloadIcon,
+  MaximizeIcon,
+  MinimizeIcon,
   MinusIcon,
   MoreIcon,
   PanelLeftIcon,
@@ -21,8 +34,7 @@ import {
 
 export type { PageLayout, ScaleMode };
 
-export const ZOOM_LEVELS = [0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
-
+export { ZOOM_LEVELS } from '../lib/zoom';
 export const INK_COLORS = ['#d92d20', '#4f46e5', '#067647', '#181d27'];
 
 export const INK_WIDTHS = [
@@ -68,6 +80,11 @@ export interface ToolbarProps {
   /** Saves the document. Omit to hide the control. */
   onDownload?: () => void;
   downloading?: boolean;
+  /** Toggles fullscreen. Omit to hide the control where it is unsupported. */
+  onFullscreenToggle?: () => void;
+  fullscreenActive?: boolean;
+  /** Rotates one page in place. Omit to keep rotation global only. */
+  onRotatePage?: (pageNumber: number, delta: number) => void;
 }
 
 /**
@@ -92,14 +109,6 @@ interface Metrics {
   avail: number;
   gap: number;
   widths: Record<string, number>;
-}
-
-function nextZoomUp(scale: number): number {
-  return ZOOM_LEVELS.find((z) => z > scale + 0.001) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1]!;
-}
-
-function nextZoomDown(scale: number): number {
-  return [...ZOOM_LEVELS].reverse().find((z) => z < scale - 0.001) ?? ZOOM_LEVELS[0]!;
 }
 
 function pxLength(value: string): number {
@@ -143,7 +152,11 @@ export function Toolbar({
   printProgress = 0,
   onDownload,
   downloading = false,
+  onFullscreenToggle,
+  fullscreenActive = false,
+  onRotatePage,
 }: ToolbarProps) {
+  const labels = useLabels();
   const [pageInput, setPageInput] = useState(String(currentPage));
   const [menuOpen, setMenuOpen] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -155,6 +168,23 @@ export function Toolbar({
   useEffect(() => {
     setPageInput(String(currentPage));
   }, [currentPage]);
+
+  // Mirrors pageInput: kept in sync with the scale actually on screen, so a fit
+  // mode or a pinch gesture updates the box rather than leaving a stale number.
+  const [zoomInput, setZoomInput] = useState(() => formatZoomPercent(resolvedScale));
+  useEffect(() => {
+    setZoomInput(formatZoomPercent(resolvedScale));
+  }, [resolvedScale]);
+  const applyZoomInput = () => {
+    const scale = parseZoomPercent(zoomInput);
+    // Reject rather than snap: an unparsable edit should return the box to what
+    // is on screen instead of silently jumping the zoom somewhere.
+    if (scale === null || Number.isNaN(scale)) {
+      setZoomInput(formatZoomPercent(resolvedScale));
+      return;
+    }
+    onScaleModeChange(scale);
+  };
 
   // Close the overflow menu on outside interaction or Escape.
   useEffect(() => {
@@ -191,13 +221,13 @@ export function Toolbar({
     items.push({
       id: 'sidebar',
       priority: 3,
-      label: 'Sidebar',
+      label: labels.overflowSidebar,
       node: (
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Toggle sidebar"
-          title="Toggle sidebar"
+          aria-label={labels.toggleSidebar}
+          title={labels.toggleSidebar}
           aria-expanded={sidebarOpen}
           onClick={onSidebarToggle}
         >
@@ -211,13 +241,13 @@ export function Toolbar({
     {
       id: 'prev',
       priority: 1,
-      label: 'Go to page',
+      label: labels.overflowGoToPage,
       node: (
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Previous page"
-          title="Previous page"
+          aria-label={labels.previousPage}
+          title={labels.previousPage}
           disabled={currentPage <= 1}
           onClick={() => onPageChange(currentPage - 1)}
         >
@@ -228,12 +258,12 @@ export function Toolbar({
     {
       id: 'page',
       priority: 1,
-      label: 'Go to page',
+      label: labels.overflowGoToPage,
       node: (
         <input
           type="number"
           className="pjsr-page-input"
-          aria-label="Page number"
+          aria-label={labels.pageNumber}
           min={1}
           max={numPages || 1}
           value={pageInput}
@@ -248,20 +278,20 @@ export function Toolbar({
     {
       id: 'count',
       priority: 11,
-      label: 'Page count',
+      label: labels.overflowPageCount,
       hideOnly: true,
       node: <span className="pjsr-page-count">of {numPages || '—'}</span>,
     },
     {
       id: 'next',
       priority: 1,
-      label: 'Go to page',
+      label: labels.overflowGoToPage,
       node: (
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Next page"
-          title="Next page"
+          aria-label={labels.nextPage}
+          title={labels.nextPage}
           disabled={numPages === 0 || currentPage >= numPages}
           onClick={() => onPageChange(currentPage + 1)}
         >
@@ -275,13 +305,13 @@ export function Toolbar({
     items.push({
       id: 'search',
       priority: 4,
-      label: 'Search',
+      label: labels.overflowSearch,
       node: (
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Search document"
-          title="Search document"
+          aria-label={labels.searchDocument}
+          title={labels.searchDocument}
           aria-expanded={searchOpen}
           onClick={onSearchToggle}
         >
@@ -295,14 +325,14 @@ export function Toolbar({
     items.push({
       id: 'draw',
       priority: 6,
-      label: 'Draw',
+      label: labels.drawLabel,
       node: (
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Draw on document"
+          aria-label={labels.drawOnDocument}
           aria-pressed={drawMode}
-          title="Draw on document"
+          title={labels.drawOnDocument}
           onClick={onDrawToggle}
         >
           <PenIcon />
@@ -315,14 +345,14 @@ export function Toolbar({
     {
       id: 'zoomOut',
       priority: 2,
-      label: 'Zoom in / out',
+      label: labels.overflowZoomRange,
       node: (
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Zoom out"
-          title="Zoom out"
-          disabled={resolvedScale <= ZOOM_LEVELS[0]!}
+          aria-label={labels.zoomOut}
+          title={labels.zoomOut}
+          disabled={resolvedScale <= MIN_SCALE}
           onClick={() => onScaleModeChange(nextZoomDown(resolvedScale))}
         >
           <MinusIcon />
@@ -332,12 +362,12 @@ export function Toolbar({
     {
       id: 'fit',
       priority: 5,
-      label: 'Zoom level',
+      label: labels.zoomLevel,
       node: (
         <select
           className="pjsr-zoom-select"
-          aria-label="Zoom level"
-          title="Zoom level"
+          aria-label={labels.zoomLevel}
+          title={labels.zoomLevel}
           value={selectValue}
           onChange={(e) => {
             const value = e.target.value;
@@ -346,8 +376,13 @@ export function Toolbar({
             );
           }}
         >
-          <option value="fit-width">Fit width</option>
-          <option value="fit-page">Fit page</option>
+          <option value="fit-width">{labels.fitWidth}</option>
+          <option value="fit-page">{labels.fitPage}</option>
+          {/* A custom scale has no matching option, which would leave the select
+              rendering blank while zoom is in fact applied. */}
+          {typeof scaleMode === 'number' && !ZOOM_LEVELS.includes(scaleMode) && (
+            <option value={String(scaleMode)}>{formatZoomPercent(scaleMode)}%</option>
+          )}
           {ZOOM_LEVELS.map((level) => (
             <option key={level} value={String(level)}>
               {Math.round(level * 100)}%
@@ -359,14 +394,14 @@ export function Toolbar({
     {
       id: 'zoomIn',
       priority: 2,
-      label: 'Zoom in / out',
+      label: labels.overflowZoomRange,
       node: (
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Zoom in"
-          title="Zoom in"
-          disabled={resolvedScale >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]!}
+          aria-label={labels.zoomIn}
+          title={labels.zoomIn}
+          disabled={resolvedScale >= MAX_SCALE}
           onClick={() => onScaleModeChange(nextZoomUp(resolvedScale))}
         >
           <PlusIcon />
@@ -375,18 +410,51 @@ export function Toolbar({
     },
   );
 
+  items.push({
+    id: 'zoomCustom',
+    priority: 9,
+    label: labels.zoomCustom,
+    node: (
+      <span className="pjsr-zoom-custom">
+        <input
+          className="pjsr-zoom-input"
+          type="text"
+          inputMode="decimal"
+          aria-label={labels.zoomCustom}
+          title={labels.zoomCustom}
+          value={zoomInput}
+          onChange={(e) => setZoomInput(e.target.value)}
+          onBlur={applyZoomInput}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              applyZoomInput();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              setZoomInput(formatZoomPercent(resolvedScale));
+              e.currentTarget.blur();
+            }
+          }}
+        />
+        <span className="pjsr-zoom-custom-suffix" aria-hidden="true">
+          %
+        </span>
+      </span>
+    ),
+  });
+
   if (onRotate) {
     items.push(
       {
         id: 'rotateCcw',
         priority: 7,
-        label: 'Rotate',
+        label: labels.overflowRotate,
         node: (
           <button
             type="button"
             className="pjsr-button"
-            aria-label="Rotate counterclockwise"
-            title="Rotate counterclockwise"
+            aria-label={labels.rotateCounterclockwise}
+            title={labels.rotateCounterclockwise}
             onClick={() => onRotate(-90)}
           >
             <RotateCcwIcon />
@@ -396,13 +464,13 @@ export function Toolbar({
       {
         id: 'rotateCw',
         priority: 7,
-        label: 'Rotate',
+        label: labels.overflowRotate,
         node: (
           <button
             type="button"
             className="pjsr-button"
-            aria-label="Rotate clockwise"
-            title="Rotate clockwise"
+            aria-label={labels.rotateClockwise}
+            title={labels.rotateClockwise}
             onClick={() => onRotate(90)}
           >
             <RotateCwIcon />
@@ -412,22 +480,64 @@ export function Toolbar({
     );
   }
 
+  if (onRotatePage) {
+    items.push({
+      id: 'rotatePage',
+      priority: 8,
+      label: labels.rotateCurrentPage,
+      node: (
+        <button
+          type="button"
+          className="pjsr-button pjsr-button--page-rotate"
+          aria-label={formatLabel(labels.rotatePageLabel, { page: currentPage })}
+          title={labels.rotateCurrentPage}
+          onClick={() => onRotatePage(currentPage, 90)}
+        >
+          <RotateCwIcon />
+          <span className="pjsr-button-badge" aria-hidden="true">
+            {currentPage}
+          </span>
+        </button>
+      ),
+    });
+  }
+
+  if (onFullscreenToggle) {
+    items.push({
+      id: 'fullscreen',
+      priority: 11,
+      label: fullscreenActive ? labels.exitFullscreen : labels.enterFullscreen,
+      node: (
+        <button
+          type="button"
+          className="pjsr-button"
+          aria-label={fullscreenActive ? labels.exitFullscreen : labels.enterFullscreen}
+          title={fullscreenActive ? labels.exitFullscreen : labels.enterFullscreen}
+          aria-pressed={fullscreenActive}
+          onClick={() => onFullscreenToggle()}
+        >
+          {fullscreenActive ? <MinimizeIcon /> : <MaximizeIcon />}
+        </button>
+      ),
+    });
+  }
+
   if (onPageLayoutChange) {
     items.push({
       id: 'layout',
       priority: 10,
-      label: 'Page layout',
+      label: labels.pageLayout,
       node: (
         <select
           className="pjsr-zoom-select"
-          aria-label="Page layout"
-          title="Page layout"
+          aria-label={labels.pageLayout}
+          title={labels.pageLayout}
           value={pageLayout}
           onChange={(e) => onPageLayoutChange(e.target.value as PageLayout)}
         >
-          <option value="continuous">Continuous</option>
-          <option value="single">Single</option>
-          <option value="spread">Spread</option>
+          <option value="continuous">{labels.layoutContinuous}</option>
+          <option value="single">{labels.layoutSingle}</option>
+          <option value="spread">{labels.layoutSpread}</option>
         </select>
       ),
     });
@@ -437,13 +547,13 @@ export function Toolbar({
     items.push({
       id: 'download',
       priority: 9,
-      label: 'Download',
+      label: labels.overflowDownload,
       node: (
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Download document"
-          title="Download document"
+          aria-label={labels.downloadDocument}
+          title={labels.downloadDocument}
           disabled={downloading}
           aria-busy={downloading || undefined}
           onClick={onDownload}
@@ -465,8 +575,8 @@ export function Toolbar({
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Cancel printing"
-          title={`Cancel printing (${Math.round(printProgress * 100)}% rendered)`}
+          aria-label={labels.cancelPrinting}
+          title={formatLabel(labels.cancelPrintingProgress, { percent: Math.round(printProgress * 100) })}
           onClick={onPrintCancel}
         >
           <CloseIcon />
@@ -475,8 +585,8 @@ export function Toolbar({
         <button
           type="button"
           className="pjsr-button"
-          aria-label="Print document"
-          title="Print document"
+          aria-label={labels.printDocument}
+          title={labels.printDocument}
           onClick={onPrint}
         >
           <PrinterIcon />
@@ -489,7 +599,7 @@ export function Toolbar({
     items.push({
       id: 'meta',
       priority: 12,
-      label: 'Document',
+      label: labels.overflowDocument,
       hideOnly: true,
       node: (
         <div className="pjsr-toolbar-meta">
@@ -599,7 +709,7 @@ export function Toolbar({
   }
 
   return (
-    <div className="pjsr-toolbar" ref={toolbarRef} role="toolbar" aria-label="PDF viewer controls">
+    <div className="pjsr-toolbar" ref={toolbarRef} role="toolbar" aria-label={labels.viewerControls}>
       {items
         .filter((item) => inlineSet.has(item.id))
         .map((item) => (
@@ -612,8 +722,8 @@ export function Toolbar({
             type="button"
             className="pjsr-button"
             ref={menuButtonRef}
-            aria-label="More controls"
-            title="More controls"
+            aria-label={labels.moreControls}
+            title={labels.moreControls}
             aria-haspopup="true"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
@@ -638,15 +748,15 @@ export function Toolbar({
       {searchOpen && searchContent && <div className="pjsr-search">{searchContent}</div>}
 
       {drawMode && inkSettings && onInkSettingsChange && (
-        <div className="pjsr-ink" role="group" aria-label="Drawing tools">
-          <span className="pjsr-ink-label">Draw</span>
+        <div className="pjsr-ink" role="group" aria-label={labels.drawingTools}>
+          <span className="pjsr-ink-label">{labels.drawLabel}</span>
           <div className="pjsr-ink-colors">
             {INK_COLORS.map((color) => (
               <button
                 key={color}
                 type="button"
                 className={`pjsr-ink-swatch${inkSettings.color === color ? ' pjsr-ink-swatch--active' : ''}`}
-                aria-label={`Draw with ${color}`}
+                aria-label={formatLabel(labels.drawWithColor, { color })}
                 aria-pressed={inkSettings.color === color}
                 onClick={() => onInkSettingsChange({ color })}
               >
@@ -656,29 +766,29 @@ export function Toolbar({
           </div>
           <select
             className="pjsr-zoom-select"
-            aria-label="Pen width"
+            aria-label={labels.penWidth}
             value={String(inkSettings.width)}
             onChange={(e) => onInkSettingsChange({ width: Number(e.target.value) })}
           >
-            {INK_WIDTHS.map((option) => (
+            {INK_WIDTHS.map((option, i) => (
               <option key={option.value} value={String(option.value)}>
-                {option.label}
+                {[labels.penThin, labels.penMedium, labels.penThick][i] ?? option.label}
               </option>
             ))}
           </select>
           <button
             type="button"
             className="pjsr-button pjsr-button--text"
-            aria-label="Undo stroke"
+            aria-label={labels.undoStroke}
             disabled={!inkCanUndo}
             onClick={() => onInkUndo?.()}
           >
-            Undo
+            {labels.undoLabel}
           </button>
           <button
             type="button"
             className="pjsr-button pjsr-button--text"
-            aria-label="Clear all drawings"
+            aria-label={labels.clearAllDrawings}
             onClick={() => onInkClear?.()}
           >
             Clear
@@ -686,8 +796,8 @@ export function Toolbar({
           <button
             type="button"
             className="pjsr-button"
-            aria-label="Exit drawing mode"
-            title="Exit drawing mode"
+            aria-label={labels.exitDrawingMode}
+            title={labels.exitDrawingMode}
             onClick={onDrawToggle}
           >
             <CloseIcon />

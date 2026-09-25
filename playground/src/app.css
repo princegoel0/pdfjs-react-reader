@@ -79,3 +79,19 @@ body {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+.app-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.app-actions button {
+  font: inherit;
+  padding: 4px 8px;
+}
+
+.app-log {
+  margin: 8px 0 0;
+  padding-left: 22px;
+}

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UsePdfSearchResult } from '../headless/usePdfSearch';
+import { formatLabel } from '../lib/labels';
+import { useLabels } from './labels-context';
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from './icons';
 
 export interface SearchBoxProps {
@@ -11,6 +13,7 @@ export interface SearchBoxProps {
 const SEARCH_DEBOUNCE_MS = 200;
 
 export function SearchBox({ state, onClose }: SearchBoxProps) {
+  const labels = useLabels();
   const [input, setInput] = useState(state.query);
   const [caseSensitive, setCaseSensitive] = useState(state.options.caseSensitive);
   const [wholeWord, setWholeWord] = useState(state.options.wholeWord);
@@ -42,19 +45,42 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
 
   const { status, progress, total, activeIndex, results } = state;
   const activePage = activeIndex >= 0 ? results[activeIndex]?.pageIndex : undefined;
-  const counter = !input
-    ? ''
+  // Derived once as a state name rather than inline in three places: the
+  // counter's colour used to be chosen by comparing the rendered text against
+  // 'No results', which silently mis-styled the empty state under any
+  // translation of that string.
+  const counterKind = !input
+    ? 'idle'
     : status === 'indexing'
-      ? `Indexing ${Math.round(progress * 100)}%`
+      ? 'indexing'
       : status === 'error'
-        ? 'Search failed'
+        ? 'error'
         : total === 0
-          ? 'No results'
-          : `${activeIndex + 1} of ${total}${activePage === undefined ? '' : ` · p${activePage + 1}`}`;
+          ? 'empty'
+          : 'matches';
+  const counter =
+    counterKind === 'idle'
+      ? ''
+      : counterKind === 'indexing'
+        ? formatLabel(labels.searchIndexing, { percent: Math.round(progress * 100) })
+        : counterKind === 'error'
+          ? labels.searchFailed
+          : counterKind === 'empty'
+            ? labels.searchNoResults
+            : activePage === undefined
+              ? formatLabel(labels.searchMatchSummary, { current: activeIndex + 1, total })
+              : formatLabel(labels.searchMatchOnPage, {
+                  current: activeIndex + 1,
+                  total,
+                  page: activePage + 1,
+                });
   // Zero matches is an empty state, not a failure: only a real error gets the
   // danger colour.
   const counterState =
-    status === 'error' ? 'error' : counter === 'No results' ? 'empty' : undefined;
+    counterKind === 'error' ? 'error' : counterKind === 'empty' ? 'empty' : undefined;
+
+  const hint = (label: string, shortcut: string) =>
+    formatLabel(labels.withShortcut, { label, shortcut });
 
   return (
     <>
@@ -63,8 +89,8 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
         type="text"
         className="pjsr-search-input"
         role="searchbox"
-        aria-label="Find in document"
-        placeholder="Find in document…"
+        aria-label={labels.findInDocument}
+        placeholder={labels.searchPlaceholder}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
@@ -89,9 +115,9 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
       <button
         type="button"
         className="pjsr-button pjsr-button--text"
-        aria-label="Match case"
+        aria-label={labels.matchCase}
         aria-pressed={caseSensitive}
-        title="Match case"
+        title={labels.matchCase}
         onClick={() => setCaseSensitive((v) => !v)}
       >
         Aa
@@ -99,9 +125,9 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
       <button
         type="button"
         className="pjsr-button pjsr-button--text"
-        aria-label="Whole words only"
+        aria-label={labels.wholeWordsOnly}
         aria-pressed={wholeWord}
-        title="Whole words only"
+        title={labels.wholeWordsOnly}
         onClick={() => setWholeWord((v) => !v)}
       >
         ab
@@ -109,8 +135,8 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
       <button
         type="button"
         className="pjsr-button"
-        aria-label="Previous match"
-        title="Previous match (Shift+Enter)"
+        aria-label={labels.previousMatch}
+        title={hint(labels.previousMatch, 'Shift+Enter')}
         disabled={total === 0}
         onClick={() => state.prevMatch()}
       >
@@ -119,8 +145,8 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
       <button
         type="button"
         className="pjsr-button"
-        aria-label="Next match"
-        title="Next match (Enter)"
+        aria-label={labels.nextMatch}
+        title={hint(labels.nextMatch, 'Enter')}
         disabled={total === 0}
         onClick={() => state.nextMatch()}
       >
@@ -129,8 +155,8 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
       <button
         type="button"
         className="pjsr-button"
-        aria-label="Close search"
-        title="Close search (Esc)"
+        aria-label={labels.closeSearch}
+        title={hint(labels.closeSearch, 'Esc')}
         onClick={() => onClose?.()}
       >
         <CloseIcon />

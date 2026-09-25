@@ -32,11 +32,18 @@ export function Report() {
   storage, with `onFormValuesChange` and programmatic get/set/reset.
 - **Search** across the whole document, debounced, with stale runs cancelled.
 - **Outline, thumbnails, rotation, layout modes** (continuous, single page, two-page spread).
+  Rotation works per page as well as globally, and the text and annotation layers turn with it.
 - **Freehand ink** stored in PDF user space, so zoom and rotation both map correctly — and it prints.
 - **Printing** at print intent, honouring stored form values and ink, with a memory-budgeted
   resolution and a cancellable progress loop.
 - **Download** of the original bytes, or an incremental save carrying the edits.
 - **Encrypted documents** with a built-in password prompt you can replace.
+- **Driven from code** — a `ref` handle (`goToPage`, `zoomTo`, `rotatePage`, `search`,
+  `toggleFullscreen`, …) and change events that report what the user did rather than what mounted.
+- **Gestures** — Ctrl/Cmd + wheel (which is also how a trackpad pinch arrives), two-finger pinch on
+  touch, keyboard paging, optional drag-and-drop to open a file, and any percentage zoom.
+- **Localisable** — every string in the shell lives in one typed catalog; override the subset you
+  need and the rest keeps its English default.
 - **Accessible** — see [Accessibility](#accessibility).
 
 ## Requirements
@@ -113,6 +120,37 @@ export function CustomViewer({ src }: { src: string }) {
 The [documentation site](https://princegoel0.github.io/pdfjs-react-reader/) runs this live, alongside
 the shell, theming and form examples.
 
+## The shell, controlled
+
+`PdfViewer` owns its own state, so it takes a ref instead of a pile of controlled props:
+
+```tsx
+import { useRef } from 'react';
+import { PdfViewer, type PdfViewerHandle } from 'pdfjs-react-reader';
+
+const viewer = useRef<PdfViewerHandle>(null);
+
+<PdfViewer ref={viewer} src="/contract.pdf" onPageChange={setPage} onScaleChange={setZoom} />;
+
+viewer.current?.goToPage(12);
+viewer.current?.zoomTo(1.5);        // any percentage, not just the presets
+viewer.current?.rotatePage(3, 90);  // one page, not the document
+viewer.current?.search('indemnity');
+```
+
+`goToPage · zoomTo · zoomBy · fitTo · setLayout · rotate · rotatePage · openSidebar ·
+toggleFullscreen · search` are the whole surface. The change events fire for what the user did, not
+for what mounted: a fit mode resolving to 87 % during load does not announce itself as a change.
+
+Strings are one typed catalog, so a partial override is always valid:
+
+```tsx
+import type { PdfViewerLabelsOverride } from 'pdfjs-react-reader';
+
+const de: PdfViewerLabelsOverride = { nextPage: 'Nächste Seite', pageOf: 'Seite {page} von {total}' };
+<PdfViewer src="/vertrag.pdf" labels={de} />
+```
+
 ## The worker
 
 pdf.js parses in a worker, and locating it is the usual integration headache. Without `workerSrc`
@@ -171,9 +209,9 @@ Gzipped, excluding `pdfjs-dist` (a peer dependency):
 
 | Path | Size |
 | --- | --- |
-| Shell — `index.js` + shared chunk + CSS | 37.0 kB |
-| Headless — `headless.js` + shared chunk + CSS | 22.3 kB |
-| A single headless hook (`usePdfDocument`) tree-shaken | 1.7 kB |
+| Shell — `index.js` + shared chunk + CSS | 42.9 kB |
+| Headless — `headless.js` + shared chunk + CSS | 23.4 kB |
+| A single headless hook (`usePdfDocument`) tree-shaken | 2.2 kB |
 
 CI runs `npm run size` and fails above the 45 kB budget.
 

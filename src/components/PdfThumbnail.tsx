@@ -4,6 +4,8 @@ import {
   type PDFDocumentProxy,
   type RenderTask,
 } from 'pdfjs-dist';
+import { formatLabel } from '../lib/labels';
+import { useLabels } from './labels-context';
 
 export interface PdfThumbnailProps {
   doc: PDFDocumentProxy;
@@ -25,6 +27,7 @@ export function PdfThumbnail({
   active = false,
   onSelect,
 }: PdfThumbnailProps) {
+  const labels = useLabels();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [visible, setVisible] = useState(false);
@@ -88,7 +91,7 @@ export function PdfThumbnail({
       type="button"
       className={`pjsr-thumbnail${active ? ' pjsr-thumbnail--active' : ''}`}
       data-page={pageNumber}
-      aria-label={`Go to page ${pageNumber}`}
+      aria-label={formatLabel(labels.goToPage, { page: pageNumber })}
       aria-current={active ? 'true' : undefined}
       onClick={() => onSelect?.(pageNumber)}
     >

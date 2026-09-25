@@ -2,6 +2,7 @@ import { useId, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { ReactNode } from 'react';
 import { CloseIcon } from './icons';
+import { useLabels } from './labels-context';
 
 export type SidebarTab = 'thumbnails' | 'outline';
 
@@ -15,6 +16,7 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ open, tab, onTabChange, onClose, children }: SidebarProps) {
+  const labels = useLabels();
   // Instance-scoped so two viewers on one page never share element ids, which
   // would make aria-controls/aria-labelledby resolve to the other viewer.
   const uid = useId();
@@ -38,8 +40,8 @@ export function Sidebar({ open, tab, onTabChange, onClose, children }: SidebarPr
   };
 
   return (
-    <aside className="pjsr-sidebar" aria-label="Document navigation" onKeyDown={onKeyDown}>
-      <div className="pjsr-sidebar-tabs" role="tablist" aria-label="Sidebar views">
+    <aside className="pjsr-sidebar" aria-label={labels.sidebarRegion} onKeyDown={onKeyDown}>
+      <div className="pjsr-sidebar-tabs" role="tablist" aria-label={labels.sidebarViews}>
         {(['thumbnails', 'outline'] as const).map((name) => (
           <button
             key={name}
@@ -63,14 +65,14 @@ export function Sidebar({ open, tab, onTabChange, onClose, children }: SidebarPr
               tabRefs.current[next]?.focus();
             }}
           >
-            {name === 'thumbnails' ? 'Thumbnails' : 'Outline'}
+            {name === 'thumbnails' ? labels.thumbnailsTab : labels.outlineTab}
           </button>
         ))}
         {onClose && (
           <button
             type="button"
             className="pjsr-button pjsr-sidebar-close"
-            aria-label="Close sidebar"
+            aria-label={labels.closeSidebar}
             onClick={onClose}
           >
             <CloseIcon />

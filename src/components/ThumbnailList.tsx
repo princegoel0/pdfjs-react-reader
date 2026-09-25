@@ -8,6 +8,8 @@ export interface ThumbnailListProps {
   /** 1-based page highlighted as current. */
   currentPage: number;
   rotation?: number;
+  /** Extra rotation for individual pages, keyed by 0-based index. */
+  pageRotations?: Record<number, number>;
   /** Fallback thumbnail width in CSS pixels before the list has measured. */
   width?: number;
   onSelectPage: (pageNumber: number) => void;
@@ -23,6 +25,7 @@ export function ThumbnailList({
   numPages,
   currentPage,
   rotation = 0,
+  pageRotations,
   width = 132,
   onSelectPage,
 }: ThumbnailListProps) {
@@ -60,7 +63,7 @@ export function ThumbnailList({
           doc={doc}
           pageNumber={i + 1}
           width={measured ?? width}
-          rotation={rotation}
+          rotation={rotation + (pageRotations?.[i] ?? 0)}
           active={currentPage === i + 1}
           onSelect={onSelectPage}
         />

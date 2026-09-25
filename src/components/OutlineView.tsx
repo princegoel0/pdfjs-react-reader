@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { OutlineEntry } from '../lib/outline';
+import { formatLabel } from '../lib/labels';
+import { useLabels } from './labels-context';
 
 export interface OutlineViewProps {
   entries: OutlineEntry[] | null;
@@ -16,8 +18,10 @@ function OutlineNode({
   depth: number;
   onSelectPage: (pageNumber: number) => void;
 }) {
+  const labels = useLabels();
   const [open, setOpen] = useState(!entry.collapsed);
   const hasChildren = entry.children.length > 0;
+  const title = entry.title || labels.untitledEntry;
 
   return (
     <li className="pjsr-outline-item">
@@ -26,7 +30,7 @@ function OutlineNode({
           <button
             type="button"
             className="pjsr-outline-caret"
-            aria-label={`${open ? 'Collapse' : 'Expand'} ${entry.title || '(untitled)'}`}
+            aria-label={formatLabel(open ? labels.collapseSection : labels.expandSection, { title })}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
           >
@@ -60,7 +64,7 @@ function OutlineNode({
             if (entry.pageIndex !== null) onSelectPage(entry.pageIndex + 1);
           }}
         >
-          {entry.title || '(untitled)'}
+          {title}
         </button>
       </div>
       {hasChildren && open && (
@@ -75,15 +79,16 @@ function OutlineNode({
 }
 
 export function OutlineView({ entries, loading = false, onSelectPage }: OutlineViewProps) {
+  const labels = useLabels();
   if (loading) {
     return (
       <div className="pjsr-outline-empty" role="status">
-        Loading outline…
+        {labels.outlineLoading}
       </div>
     );
   }
   if (!entries || entries.length === 0) {
-    return <div className="pjsr-outline-empty">This document has no outline.</div>;
+    return <div className="pjsr-outline-empty">{labels.outlineEmpty}</div>;
   }
   return (
     // Plain nested lists: `role="tree"` would demand treeitem/group roles and a

@@ -23,6 +23,11 @@ export interface UsePdfVirtualizerOptions {
   gap?: number;
   /** User-applied rotation in degrees (added to each page's intrinsic rotation). */
   rotation?: number;
+  /**
+   * Extra rotation for individual pages, keyed by 0-based index, added on top
+   * of `rotation`. Pages absent from the map keep the global value.
+   */
+  pageRotations?: Record<number, number>;
   /** Extra rows rendered above/below the viewport. Ignored in 'single' layout. */
   overscan?: number;
   /** Row grouping: continuous scroll, one page at a time, or two-page spreads. */
@@ -81,9 +86,18 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
     scale,
     gap = 16,
     rotation = 0,
+    pageRotations,
     overscan = 1,
     layout: pageLayout = 'continuous',
   } = options;
+
+  // Effective rotation for one page. A plain function rather than a memoised
+  // map: it is called inside existing layout loops, and rebuilding a map per
+  // page would allocate on every scroll frame for no gain.
+  const rotationFor = useCallback(
+    (index: number): number => rotation + (pageRotations?.[index] ?? 0),
+    [rotation, pageRotations],
+  );
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dims, setDims] = useState<ReadonlyMap<number, PageDims>>(new Map());
@@ -184,7 +198,7 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
   const resolvedScale = useMemo(() => {
     if (typeof scale === 'number') return scale;
     if (viewport.width <= 0 || viewport.height <= 0) return lastFitScale.current;
-    const base = applyRotation(pageEstimate, rotation);
+    const base = applyRotation(pageEstimate, rotationFor(0));
     // A spread row is two pages wide plus the gap between them; the fit width
     // must reserve that inner gap so the row doesn't overflow the viewport.
     const pagesAcross = pageLayout === 'spread' ? 2 : 1;
@@ -200,21 +214,21 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
         : Math.max(0.1, Math.min(fitWidthScale, (viewport.height - gap) / fitHeight));
     lastFitScale.current = resolved;
     return resolved;
-  }, [scale, pageEstimate, rotation, viewport.width, viewport.height, gap, pageLayout]);
+  }, [scale, pageEstimate, rotationFor, viewport.width, viewport.height, gap, pageLayout]);
 
   const layout: LayoutResult = useMemo(() => {
     const sizes = slots.map((group) => {
       let width = (group.length - 1) * gap;
       let height = 0;
       for (const i of group) {
-        const s = scaledPageSize(dims.get(i), estimate, resolvedScale, rotation);
+        const s = scaledPageSize(dims.get(i), estimate, resolvedScale, rotationFor(i));
         width += s.width;
         height = Math.max(height, s.height);
       }
       return { width, height };
     });
     return computeLayout(sizes, gap);
-  }, [slots, dims, estimate, resolvedScale, rotation, gap]);
+  }, [slots, dims, estimate, resolvedScale, rotationFor, gap]);
 
   // Keep the topmost visible row anchored when layout shifts underneath it
   // (dimension corrections, zoom changes) so the viewport doesn't jump.
@@ -266,12 +280,12 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
       if (!indices || offsetTop === undefined || height === undefined) continue;
       let width = (indices.length - 1) * gap;
       for (const i of indices) {
-        width += scaledPageSize(dims.get(i), estimate, resolvedScale, rotation).width;
+        width += scaledPageSize(dims.get(i), estimate, resolvedScale, rotationFor(i)).width;
       }
       out.push({ indices, pageNumber: indices[0]! + 1, offsetTop, width, height });
     }
     return out;
-  }, [visible, slots, layout, dims, estimate, resolvedScale, rotation, gap]);
+  }, [visible, slots, layout, dims, estimate, resolvedScale, rotationFor, gap]);
 
   const scrollToPage = useCallback(
     (pageNumber: number, behavior: ScrollBehavior = 'auto') => {

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import type { PasswordReason } from '../headless/usePdfDocument';
+import { useLabels } from './labels-context';
 
 export interface PasswordPromptProps {
   /** `incorrect-password` re-prompts after a rejected attempt. */
@@ -14,6 +15,7 @@ export interface PasswordPromptProps {
  * this replaces the page area rather than floating over it.
  */
 export function PasswordPrompt({ reason, onSubmit, onCancel }: PasswordPromptProps) {
+  const labels = useLabels();
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const id = useId();
@@ -40,11 +42,11 @@ export function PasswordPrompt({ reason, onSubmit, onCancel }: PasswordPromptPro
   return (
     <form className="pjsr-password" onSubmit={submit} onKeyDown={handleKeyDown}>
       <p className="pjsr-password-title">
-        {rejected ? 'That password did not open this document.' : 'This document is password protected.'}
+        {rejected ? labels.passwordRejected : labels.passwordProtected}
       </p>
       <div className="pjsr-password-row">
         <label className="pjsr-password-label" htmlFor={`${id}-input`}>
-          Password
+          {labels.passwordField}
         </label>
         <input
           ref={inputRef}
@@ -59,19 +61,19 @@ export function PasswordPrompt({ reason, onSubmit, onCancel }: PasswordPromptPro
       </div>
       {rejected && (
         <span className="pjsr-password-error" role="alert">
-          Incorrect password. Try again.
+          {labels.passwordIncorrect}
         </span>
       )}
       <div className="pjsr-password-actions">
         <button type="button" className="pjsr-button pjsr-status-action" onClick={onCancel}>
-          Cancel
+          {labels.passwordCancel}
         </button>
         <button
           type="submit"
           className="pjsr-button pjsr-status-action"
           disabled={value.length === 0}
         >
-          Unlock
+          {labels.passwordUnlock}
         </button>
       </div>
     </form>

@@ -1,4 +1,8 @@
-export { PdfViewer, type PdfViewerProps } from './components/PdfViewer';
+export {
+  PdfViewer,
+  type PdfViewerHandle,
+  type PdfViewerProps,
+} from './components/PdfViewer';
 export { PdfPage, type PdfPageProps } from './components/PdfPage';
 export {
   Toolbar,
@@ -125,6 +129,13 @@ export {
   printCanvasSize,
 } from './lib/print';
 export { downloadBytes, pdfFileName } from './lib/download';
+export {
+  DEFAULT_LABELS,
+  formatLabel,
+  type PdfViewerLabels,
+  type PdfViewerLabelsOverride,
+} from './lib/labels';
+export { LabelsContext, useLabels } from './components/labels-context';
 export { configureWorker, ensureWorker, workerAutoDetectionFailed } from './lib/worker';
 export { normalizeSource, type PdfSource, type NormalizedSource } from './lib/source';
 export {

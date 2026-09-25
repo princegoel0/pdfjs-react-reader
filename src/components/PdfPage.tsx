@@ -8,6 +8,8 @@ import {
   type RenderTask,
 } from 'pdfjs-dist';
 import type { CSSProperties } from 'react';
+import { formatLabel } from '../lib/labels';
+import { useLabels } from './labels-context';
 import { InkLayer } from './InkLayer';
 import { applyHighlights, unwrapMarks } from '../lib/highlight';
 import type { AnnotationValueStore } from '../lib/form';
@@ -79,6 +81,7 @@ export function PdfPage({
   onBaseDimensions,
   onError,
 }: PdfPageProps) {
+  const labels = useLabels();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
   const annotationRef = useRef<HTMLDivElement | null>(null);
@@ -293,7 +296,12 @@ export function PdfPage({
 
   return (
     <>
-      <canvas ref={canvasRef} className={className} role="img" aria-label={`Page ${pageNumber}`} />
+      <canvas
+        ref={canvasRef}
+        className={className}
+        role="img"
+        aria-label={formatLabel(labels.pageLabel, { page: pageNumber })}
+      />
       <div ref={textLayerRef} className="pjsr-text-layer" style={layerStyle} />
       <div
         ref={annotationRef}
