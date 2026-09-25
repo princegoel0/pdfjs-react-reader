@@ -105,6 +105,8 @@ export {
   planPrintPages,
   planPrintScale,
   printCanvasSize,
+  printRangeFor,
+  type PrintScope,
 } from './lib/print';
 export { downloadBytes, pdfFileName } from './lib/download';
 export {

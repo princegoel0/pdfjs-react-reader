@@ -5,7 +5,9 @@ import {
   type AnyPdfFeature,
   type PdfViewerHandle,
   type PdfViewerLabelsOverride,
+  type PdfViewerProps,
 } from 'pdfjs-react-reader';
+import { CustomLayoutViewer, progressControl } from './CustomLayout';
 import { downloadFeature } from 'pdfjs-react-reader/features/download';
 import { createFormsFeature } from 'pdfjs-react-reader/features/forms';
 import { outlineFeature } from 'pdfjs-react-reader/features/outline';
@@ -52,6 +54,10 @@ export default function App() {
   const [withDownload, setWithDownload] = useState(true);
   const [withForms, setWithForms] = useState(true);
   const [withOutline, setWithOutline] = useState(true);
+  // The same props, rendered through a layout written in playground/src/CustomLayout.tsx.
+  const [compound, setCompound] = useState(false);
+  // Drop two controls, move one, add a host control — the bar's own configuration.
+  const [trim, setTrim] = useState(false);
   const src = file ?? (appliedUrl || DEFAULT_PDF);
 
   // Rebuilt inline on purpose: features keyed by id must survive a list that has
@@ -66,6 +72,34 @@ export default function App() {
   const note = useCallback((message: string) => {
     setLog((previous) => [message, ...previous].slice(0, 8));
   }, []);
+
+  // One props object, two layouts: the stock `PdfViewer` and the host-written
+  // one in CustomLayout.tsx take exactly the same thing.
+  const viewerProps: PdfViewerProps = {
+    src,
+    assetUrl: assetMode || undefined,
+    allowedSources: restrict ? ['/fixtures/'] : undefined,
+    labels: german ? GERMAN : undefined,
+    features,
+    onError: (err) => console.error('[playground] viewer error', err),
+    onPageChange: (page) => note(`onPageChange ${page}`),
+    onScaleChange: (scale) => note(`onScaleChange ${scale.toFixed(2)}`),
+    onLayoutChange: (layout) => note(`onLayoutChange ${layout}`),
+    onCapabilities: (c) =>
+      note(`capabilities form=${c.form} xfa=${c.renderedFromXfa} js=${c.hasJSActions}`),
+    onFullscreenChange: (active) => note(`onFullscreenChange ${active}`),
+    onExternalLink: (link) => note(`onExternalLink ${link}`),
+    enableDrop: dropEnabled,
+    onDropFile: (dropped) => note(`onDropFile ${dropped.name}`),
+    controls: trim
+      ? {
+          hide: ['draw', 'meta'],
+          priorities: { layout: 2 },
+          order: ['search', 'page', 'prev', 'next', 'layout'],
+          add: [progressControl],
+        }
+      : undefined,
+  };
 
   return (
     <div className="app">
@@ -163,28 +197,22 @@ export default function App() {
             &nbsp;outline
           </label>
         </span>
+        <label>
+          <input type="checkbox" checked={compound} onChange={(e) => setCompound(e.target.checked)} />
+          &nbsp;host-written layout
+        </label>
+        <label>
+          <input type="checkbox" checked={trim} onChange={(e) => setTrim(e.target.checked)} />
+          &nbsp;trim the bar
+        </label>
       </header>
       <div className="app-main">
         <div className="app-viewer">
-          <PdfViewer
-            ref={viewer}
-            src={src}
-            assetUrl={assetMode || undefined}
-            allowedSources={restrict ? ['/fixtures/'] : undefined}
-            labels={german ? GERMAN : undefined}
-            features={features}
-            onError={(err) => console.error('[playground] viewer error', err)}
-            onPageChange={(page) => note(`onPageChange ${page}`)}
-            onScaleChange={(scale) => note(`onScaleChange ${scale.toFixed(2)}`)}
-            onLayoutChange={(layout) => note(`onLayoutChange ${layout}`)}
-            onCapabilities={(c) =>
-              note(`capabilities form=${c.form} xfa=${c.renderedFromXfa} js=${c.hasJSActions}`)
-            }
-            onFullscreenChange={(active) => note(`onFullscreenChange ${active}`)}
-            onExternalLink={(link) => note(`onExternalLink ${link}`)}
-            enableDrop={dropEnabled}
-            onDropFile={(dropped) => note(`onDropFile ${dropped.name}`)}
-          />
+          {compound ? (
+            <CustomLayoutViewer ref={viewer} {...viewerProps} />
+          ) : (
+            <PdfViewer ref={viewer} {...viewerProps} />
+          )}
         </div>
         <aside className="app-panel">
           <h3>Imperative handle</h3>

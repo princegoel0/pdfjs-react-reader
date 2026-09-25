@@ -107,10 +107,13 @@ export function Headless() {
 
       <h2>Two rules that matter</h2>
       <div className="doc-callout">
-        <strong>Do not pass inline callbacks that appear in a layer's dependency list.</strong>{' '}
-        <code>PdfPage</code> rebuilds the pdf.js text and annotation layers when its props change
-        identity, which clears the container, drops text selection and flashes the page. The shell
-        reads its callbacks through refs for exactly this reason; do the same in your own code.
+        <strong>Give <code>PdfPage</code> stable props.</strong> It is memoised, because it is the most
+        expensive subtree here and the shell re-renders for reasons that cannot reach it — opening the
+        search bar changes no page prop. A fresh inline arrow or a new object each render defeats that
+        and re-renders every visible page. Separately, the callbacks that appear in a layer's
+        dependency list (<code>onError</code>, <code>onBaseDimensions</code>,{' '}
+        <code>onFormChange</code>) are read through refs, because a layer rebuild clears its container,
+        drops text selection and flashes the page; the shell does the same.
       </div>
       <div className="doc-callout">
         <strong>Give the viewport element a height and let it scroll.</strong> The virtualizer

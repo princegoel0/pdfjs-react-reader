@@ -4,6 +4,72 @@
  * stylesheet must not carry, because a feature you did not ask for should not
  * be styled for. */
 
+/* ---------- the page-range selector ---------- */
+/* Mirrors the zoom select's box so the two read as one family. It lives here and
+   not in styles.css because an application that mounted no print feature has no
+   element to style — which is the same argument that split the sheets in 0.4. */
+.pjsr-print-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pjsr-print-scope-select {
+  box-sizing: border-box;
+  height: var(--pjsr-control-h);
+  padding: 0 6px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pjsr-print-scope-input {
+  box-sizing: border-box;
+  width: 4.5ch;
+  height: var(--pjsr-control-h);
+  padding: 0 4px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.pjsr-print-scope-input::-webkit-outer-spin-button,
+.pjsr-print-scope-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pjsr-print-scope-select:focus,
+.pjsr-print-scope-input:focus {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-print-scope-dash {
+  color: var(--pjsr-muted-fg);
+}
+
+/* In the menu the row label takes the slack and the selector keeps its natural
+   width, so "From–to" does not stretch a select across the panel. */
+.pjsr-overflow-row .pjsr-print-scope {
+  flex: 0 0 auto;
+}
+
+.pjsr-overflow-row .pjsr-print-scope-select {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 /* ---------- printing (FR-19) ---------- */
 /* `usePdfPrint` appends this container to <body> rather than into the viewer:
    the viewer clips with `overflow: clip`, and the rule below that isolates the

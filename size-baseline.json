@@ -1,12 +1,12 @@
 {
   "//": "Gzipped bytes per measured path, accepted by `npm run size:update`. See scripts/check-size.mjs.",
-  "shell": 43992,
-  "headless": 21769,
-  "core": 20600,
-  "core+print": 22628,
-  "core+download": 21462,
-  "core+forms": 22596,
-  "core+outline": 21534,
-  "all": 25782,
+  "shell": 45423,
+  "headless": 21883,
+  "core": 21757,
+  "core+print": 24249,
+  "core+download": 22512,
+  "core+forms": 23662,
+  "core+outline": 22614,
+  "all": 27323,
   "headless-only": 2592
 }

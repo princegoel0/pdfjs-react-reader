@@ -296,14 +296,103 @@ No new dependencies. This is the architecture seam; see "The tier decision" abov
 ### 0.5.0 — Compose: make the shell configurable
 No new dependencies.
 
-* Toolbar layout API: ordered controls, per-control opt-out, consumer-set priorities, named slots.
-  `0.4` already turned controls into data, so this replaces the hardcoded priorities in
-  `Toolbar.tsx`'s item list (`211`–`384` as this was written) rather than introducing them.
+**Measured first (2026-09-25, playground, 14-page document at fit-width, ~590 px viewer, 2 rows
+mounted; render counters instrumented in `PdfPage`, `PDFPageProxy.prototype.render` spied through the
+React fiber):**
+
+| Interaction | renders/page before | renders/page now | canvas repaints |
+| --- | --- | --- | --- |
+| Open the ⋯ menu (control: `Toolbar`-local state) | 0 | 0 | 0 |
+| Open the search bar | 6 | **0** | 0 |
+| Close it again | 4 | **0** | 0 |
+| Toggle draw mode | — | 2 | 0 (legitimate: `inkDrawing` is a page prop) |
+| Toggle the sidebar | 10 | 6 | yes (legitimate: fit-width re-resolves) |
+| Load the document | 16 | 8 | once per page (legitimate) |
+
+* **Landed, before any restructuring:** `PdfPage` is memoised and the shell hands each page a stable
+  ink-commit handler instead of a fresh inline arrow. Two changes, **+0.08 kB** on the core path
+  (20.61 → 20.69 kB gz), and a chrome-only interaction went from re-rendering every visible page to
+  re-rendering none. The inline arrow was load-bearing: memoising `PdfPage` alone changed *nothing*
+  (still 6/4/10), because the shell was passing a new callback identity to every page on every render
+  — which is the same rule the library's own docs give hosts about layer deps, now with the shell
+  obeying it first.
+* **Landed: the controller split.** `useViewerController` owns every piece of state, effect and
+  handler the shell had; `ViewerLayout` places the parts and reads nothing else; `PdfViewer` is now
+  those two plus a ref. It is a pure move — no behaviour change, and the browser pass over the
+  extracted shell found nothing new (zoom to 150 % → 918 px canvas, rotate → 1188 px with 356 text
+  spans still aligned, search "trace" → 416 matches and 56 marks, sidebar with 14 thumbnails and the
+  Outline tab, form widget typed → `getFormData`, ink stroke committed → 3 paths, console clean).
+  **The cost is +0.51 kB** (20.69 → 21.20 kB core), and it is not subtle code: it is the ~60-field
+  object literal the controller returns, which is the API. `size-baseline.json` was updated in the
+  same change, as the ratchet requires. If a later release finds the seam is not worth half a
+  kilobyte, that is the number to argue about.
+* **One claim from the first pass is retracted.** A close-search did appear to repaint both canvases
+  at an unchanged size, which would have meant an unstable effect dep. It did not reproduce: with the
+  spy in place the same interaction produced 0 renders and 0 repaints, and the geometry never moved.
+  The earlier hit was a transient resize in a different window state, not a defect. Recorded so it is
+  not chased twice.
+* **What that bought:** a host can now arrange the viewer without forking it — `playground/src/CustomLayout.tsx`
+  is 70 lines and owns no state. What remains of the theme is the *contents* of the bar: the parts
+  compose, but their controls are still a fixed list with hardcoded priorities, which is the next
+  bullet.
+
+* **Landed: the controller is published, and the parts read it.** `ViewerProvider` + `useViewer()`,
+  and the default layout is now four composed parts — `ViewerRoot` (the frame: tokens, keyboard, drop,
+  the feature Runners), `ViewerToolbar`, `ViewerSidebar`, `ViewerPages` — all exported, along with
+  `useViewerController` and `ViewerLayout`. The existing parts keep their explicit props, so nothing
+  from `0.1`–`0.4` breaks: a host either reads the controller or wires the props, per component.
+  Cost **+0.15 kB** (21.20 → 21.35), and `playground/src/CustomLayout.tsx` is the worked example —
+  host page controls on top, pages in the middle, the stock toolbar along the bottom, driven by the
+  same props object as `<PdfViewer>` and taking the same ref.
+  Verified in the browser with that toggle: DOM order `[host-bar, pjsr-body, pjsr-toolbar]` against
+  stock's `[pjsr-toolbar, pjsr-body]`, zoom 104 % → 129 % through a host button, sidebar with 14
+  thumbnails and the Outline tab, search "trace" → 416 matches and 56 marks, the print feature control
+  present in the host's toolbar, and the side panel's `zoomTo(2)` reaching the same canvas (1224 px).
+  `useViewer` outside a provider throws, and both halves have a test.
+* **A verification limit, learned the hard way here: page tracking cannot be checked in this
+  automation tab at all.** `usePdfVirtualizer` throttles its scroll handler through
+  `requestAnimationFrame`, and a hidden document produces no frames — measured
+  `visibilityState: 'hidden'` with a rAF callback that never ran. So scrolling updates `scrollTop`
+  and fires the listener, but `currentPage` never moves, in *either* layout. Two "regressions"
+  chased during this step were that artifact; the toolbar page field is not observable here, and
+  anything that needs it has to be checked in a visible window.
+* **Landed: the bar is configurable.** `controls={{ hide, priorities, order, add }}` on
+  `PdfViewer` (and on `Toolbar` directly), keyed on each control's `id` — the seventeen built-ins plus
+  whatever a mounted feature declares. `hide` removes from bar and menu, `priorities` changes what
+  folds first, `order` changes where controls sit while they are in it, `add` contributes host controls
+  and *replaces by id in place* so swapping a button does not move it. `ToolbarItem` and
+  `ToolbarControls` are now exported — `ToolbarItem` was already the type of `featureItems`, which no
+  consumer could name. Cost **+0.32 kB** (21.35 → 21.67), 12 new tests over the two pure helpers
+  (`applyControlConfig`, `mergeToolbarItems`), including the two orders that matter: removal runs
+  before priorities and order, so a hidden id cannot be coaxed back, and an unknown id is ignored
+  rather than rejected, because fullscreen is genuinely absent on some browsers.
+* **Not built: named slots.** The plan asked for slots; what shipped instead is `order`, which covers
+  placement without inventing a second vocabulary for the same list. A slot system would only earn
+  its keep if a host needed to inject markup *between* controls rather than order them — and at that
+  point they are writing their own `Toolbar`, which `0.5` now supports. Recorded so the gap is a
+  decision rather than an oversight.
 * Compound components (`PdfViewer.Root` / `.Toolbar` / `.Page` / layers), which PRD §2 already lists
-  as a goal.
+  as a goal — reading the controller, not receiving 25 props.
+* **Landed: print takes a page range.** `printFeature` now contributes **two** controls — `print` at
+  priority 8 (the action, so it stays in the bar) and `print-pages` at 11 (an All / Current / From–to
+  selector that gives its place up first) — and the print button's hover text says what it will send
+  (`Print pages 2–3`). `createPrintFeature({ scope, range })` sets where the selector starts; from
+  then on the reader owns it, which was the point. `Ctrl/Cmd + P` prints the same selection, because
+  a binding that ignored it would be a second, quieter print dialog.
+  The scope resolves in one pure function, `printRangeFor`, whose two interesting decisions are
+  tested: a backwards range is swapped rather than refused (someone who types “5 to 2” means the pages
+  between them), and bounds are *not* clamped to the document there — `planPrintPages` does that
+  against the real page count, which is the only place the count is known, since a range can be set
+  while a slow document is still loading.
+  Browser-proved against the engine, not assumed: a 2–3 selection produced **exactly two** print
+  canvases at 1224×1584 (Letter at scale 2) with progress at 100 %, and `current` produced one.
+  Cost **+0.47 kB** on print (2.02 → 2.49, still under the 4 kB gate) and +0.09 on core, where
+  `printRangeFor` lives beside the other print planners.
 * Sidebar attachments tab (`getAttachments`) and layers/OCG tab, implementing the `setOCGState` no-op.
+  Needs a fixture first — no generator here emits attachments or optional content groups.
 * Search depth: regex (the query is escaped to a literal at `lib/search.ts:107` today), multiple
-  terms, an all-match count, exposed per-page counts, a replaceable find controller.
+  terms, an all-match count, exposed per-page counts, a replaceable find controller. Independent of
+  everything above, so it can move later in the cycle without blocking it.
 
 ### 0.6.0 — Mark: annotation authoring
 No new dependencies. Gated on Spike A.
@@ -381,11 +470,12 @@ what `0.4` shipped; each is recorded so the later releases inherit the list rath
 
 ## Fixtures we do not have
 
-`playground/fixtures/` holds form, outline and encrypted PDFs. Later releases additionally need: an
-XFA document, a pre-annotated PDF (to exercise editing and deleting existing annotations), a document
-with attachments and optional content groups, a signature-bearing form, and a 20-page PDF for
-reorder. These should come from generator scripts like the existing `scripts/make-*-pdf.mjs`, not
-downloads.
+`playground/fixtures/` holds generated PDFs for forms, outlines, RC4 encryption, CID cMaps,
+document-level JavaScript, and — added for `0.5` — embedded files plus three optional-content groups
+(`attachments-ocg-sample.pdf`, one group off by default). Later releases additionally need: an XFA
+document, a pre-annotated PDF (to exercise editing and deleting existing annotations), a
+signature-bearing form, and a 20-page PDF for reorder. These should come from generator scripts like
+the existing `scripts/make-*-pdf.mjs`, not downloads.
 
 ## Policy conflicts to resolve
 

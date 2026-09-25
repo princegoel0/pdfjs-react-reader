@@ -38,6 +38,35 @@ function clampPage(value: number, fallback: number, min: number, max: number): n
   return Math.min(Math.max(int < 1 ? min : int, min), max);
 }
 
+/** What the print control's page selector offers. */
+export type PrintScope = 'all' | 'current' | 'range';
+
+/**
+ * The 1-based inclusive range a scope means right now.
+ *
+ * `from > to` is swapped rather than refused: someone who types "5 to 2" means
+ * the pages between them, and a control that rejects the keystroke is worse than
+ * one that prints what they pointed at. Bounds are not clamped to the document
+ * here — `planPrintPages` does that against the real page count, which is the
+ * only place the count is known, since a reader can set a range while a slow
+ * document is still loading.
+ */
+export function printRangeFor(
+  scope: PrintScope,
+  state: { from: number; to: number; currentPage: number; numPages: number },
+): [number, number] {
+  if (scope === 'current') {
+    const page = Math.trunc(state.currentPage) || 1;
+    return [page, page];
+  }
+  if (scope === 'range') {
+    const from = Math.max(1, Math.trunc(state.from) || 1);
+    const to = Math.max(1, Math.trunc(state.to) || from);
+    return from <= to ? [from, to] : [to, from];
+  }
+  return [1, Math.max(1, Math.trunc(state.numPages) || 1)];
+}
+
 /** Device pixels a page needs at `scale`, matching `PdfPage`'s floor rounding. */
 export function printCanvasSize(base: PageDims, scale: number): { width: number; height: number } {
   return {

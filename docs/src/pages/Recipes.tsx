@@ -131,7 +131,10 @@ const PdfViewer = dynamic(
       <pre>
         <code>{`node scripts/make-form-pdf.mjs       # AcroForm: text, checkbox, radio, choice, button
 node scripts/make-outline-pdf.mjs    # 3 pages, bookmarks, named destinations
-node scripts/make-encrypted-pdf.mjs  # RC4-40 encrypted, password "secret"`}</code>
+node scripts/make-encrypted-pdf.mjs  # RC4-40 encrypted, password "secret"
+node scripts/make-cjk-pdf.mjs        # CID-encoded, so the cMap path is exercised
+node scripts/make-scripted-pdf.mjs   # document-level JavaScript
+node scripts/make-attachments-ocg-pdf.mjs  # 3 attached files + 3 layers, one off by default`}</code>
       </pre>
     </>
   );

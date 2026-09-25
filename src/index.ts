@@ -3,12 +3,26 @@ export {
   type PdfViewerHandle,
   type PdfViewerProps,
 } from './components/PdfViewer';
+export {
+  useViewerController,
+  type ViewerController,
+} from './components/ViewerController';
+export { ViewerProvider, useViewer } from './components/ViewerContext';
+export { ViewerLayout } from './components/ViewerLayout';
+export {
+  ViewerPages,
+  ViewerRoot,
+  ViewerSidebar,
+  ViewerToolbar,
+} from './components/ViewerParts';
 export { PdfPage, type PdfPageProps } from './components/PdfPage';
 export {
   Toolbar,
   ZOOM_LEVELS,
   INK_COLORS,
   INK_WIDTHS,
+  type ToolbarControls,
+  type ToolbarItem,
   type ToolbarProps,
 } from './components/Toolbar';
 export { SearchBox, type SearchBoxProps } from './components/SearchBox';
@@ -151,6 +165,8 @@ export {
   planPrintPages,
   planPrintScale,
   printCanvasSize,
+  printRangeFor,
+  type PrintScope,
 } from './lib/print';
 export { downloadBytes, pdfFileName } from './lib/download';
 export {

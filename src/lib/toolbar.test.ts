@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planToolbarOverflow } from './toolbar';
+import { applyControlConfig, mergeToolbarItems, planToolbarOverflow } from './toolbar';
 import type { ToolbarItemMeasure } from './toolbar';
 
 /** The real control set, in visual order, at the desktop token sizes. */
@@ -131,3 +131,97 @@ const PRIORITY: Record<string, number> = {
   count: 11,
   meta: 12,
 };
+
+describe('applyControlConfig', () => {
+  const list = [
+    { id: 'page', priority: 1 },
+    { id: 'search', priority: 4 },
+    { id: 'layout', priority: 10 },
+  ];
+
+  it('leaves the list alone with no configuration', () => {
+    const out = applyControlConfig(list, undefined);
+    expect(out.map((item) => item.id)).toEqual(['page', 'search', 'layout']);
+    expect(out).not.toBe(list);
+  });
+
+  it('removes by id', () => {
+    expect(applyControlConfig(list, { hide: ['search'] }).map((item) => item.id)).toEqual([
+      'page',
+      'layout',
+    ]);
+  });
+
+  it('re-orders by id', () => {
+    const out = applyControlConfig(list, { priorities: { layout: 1 } });
+    expect(out.find((item) => item.id === 'layout')?.priority).toBe(1);
+  });
+
+  it('cannot be coaxed back with a priority for a hidden id', () => {
+    // Removal runs first, which is what makes `hide` mean what it says.
+    const out = applyControlConfig(list, { hide: ['search'], priorities: { search: 0 } });
+    expect(out.some((item) => item.id === 'search')).toBe(false);
+  });
+
+  it('ignores ids that are not in the bar', () => {
+    // Fullscreen is absent on a browser without it, and a host hiding it by
+    // policy should get the same result either way.
+    expect(applyControlConfig(list, { hide: ['fullscreen'], priorities: { nope: 2 } })).toHaveLength(
+      3,
+    );
+  });
+
+  it('keeps the same object when nothing about it changed', () => {
+    // `PdfPage` is not the only memoised consumer: a fresh item object on every
+    // render would re-render the bar's whole subtree.
+    const out = applyControlConfig(list, { priorities: { search: 4 } });
+    expect(out[1]).toBe(list[1]);
+  });
+
+  it('places the listed controls first and leaves the rest in order', () => {
+    const out = applyControlConfig(list, { order: ['layout', 'page'] });
+    expect(out.map((item) => item.id)).toEqual(['layout', 'page', 'search']);
+  });
+
+  it('orders what is there, not what was asked for', () => {
+    // `fullscreen` is absent on a browser without the API, and a host that
+    // listed it should see the same bar either way.
+    const out = applyControlConfig(list, { order: ['fullscreen', 'layout'] });
+    expect(out.map((item) => item.id)).toEqual(['layout', 'page', 'search']);
+  });
+
+  it('cannot be brought back by ordering a hidden id', () => {
+    const out = applyControlConfig(list, { hide: ['search'], order: ['search', 'layout'] });
+    expect(out.map((item) => item.id)).toEqual(['layout', 'page']);
+  });
+});
+
+describe('mergeToolbarItems', () => {
+  interface Item {
+    id: string;
+    label?: string;
+  }
+  const base: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+
+  it('replaces in place, so a swapped control keeps its position', () => {
+    const replacement: Item = { id: 'b', label: 'mine' };
+    const out = mergeToolbarItems(base, [replacement]);
+    expect(out.map((item) => item.id)).toEqual(['a', 'b', 'c']);
+    expect(out[1]).toBe(replacement);
+  });
+
+  it('appends a control that names nothing existing', () => {
+    expect(mergeToolbarItems(base, [{ id: 'z', label: 'new' }]).map((item) => item.id)).toEqual([
+      'a',
+      'b',
+      'c',
+      'z',
+    ]);
+  });
+
+  it('returns a copy of the base list when there is nothing to add', () => {
+    const out = mergeToolbarItems(base, []);
+    expect(out).not.toBe(base);
+    expect(out).toEqual(base);
+  });
+});

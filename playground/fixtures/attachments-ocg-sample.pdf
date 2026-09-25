@@ -1,0 +1,137 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R
+  /Names << /EmbeddedFiles << /Names [(notes.txt) 15 0 R (data.csv) 17 0 R (report.pdf) 19 0 R] >> >>
+  /OCProperties <<
+    /OCGs [8 0 R 9 0 R 10 0 R]
+    /D << /BaseState /ON /ON [8 0 R 9 0 R] /OFF [10 0 R] /Order [8 0 R 9 0 R 10 0 R] /RBMode /NotChecked >>
+  >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 6 0 R 7 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> /Properties << /MC0 8 0 R /MC1 9 0 R /MC2 10 0 R >> >> /Contents 11 0 R >>
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> /Properties << /MC0 8 0 R /MC1 9 0 R /MC2 10 0 R >> >> /Contents 12 0 R >>
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> /Properties << /MC0 8 0 R /MC1 9 0 R /MC2 10 0 R >> >> /Contents 13 0 R >>
+endobj
+8 0 obj
+<< /Type /OCG /Name (Heading layer) /Intent [/View /Design /Print] /Usage << /Print << /PrintState /ON >> >> >>
+endobj
+9 0 obj
+<< /Type /OCG /Name (Body layer) /Intent [/View /Design /Print] /Usage << /Print << /PrintState /ON >> >> >>
+endobj
+10 0 obj
+<< /Type /OCG /Name (Stamp layer) /Intent [/View /Design /Print] /Usage << /Print << /PrintState /OFF >> >> >>
+endobj
+11 0 obj
+<< /Length 438 >>
+stream
+BT /F1 20 Tf 72 740 Td (Attachments and optional content groups) Tj ET
+q /OC /MC0 BDC
+BT /F1 16 Tf 72 700 Td (HEADING LAYER - on by default) Tj ET
+EMC Q
+q /OC /MC1 BDC
+BT /F1 12 Tf 72 660 Td (BODY LAYER - on by default) Tj ET
+EMC Q
+q /OC /MC2 BDC
+BT /F1 16 Tf 72 600 Td (STAMP LAYER - off by default) Tj ET
+0.85 0 0 RG 4 w 72 576 m 330 576 l S
+EMC Q
+BT /F1 10 Tf 72 520 Td (Three files are attached: notes.txt, data.csv, report.pdf) Tj ET
+endstream
+endobj
+12 0 obj
+<< /Length 188 >>
+stream
+BT /F1 14 Tf 72 740 Td (Page 2) Tj ET
+q /OC /MC1 BDC
+BT /F1 12 Tf 72 700 Td (BODY LAYER on page 2) Tj ET
+EMC Q
+BT /F1 12 Tf 72 660 Td (Ungrouped text, visible whatever the layers do) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Length 84 >>
+stream
+BT /F1 14 Tf 72 740 Td (Page 3) Tj ET
+BT /F1 12 Tf 72 700 Td (No layers here.) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /Filespec /F (notes.txt) /UF (notes.txt) /Desc (A note about the report) /EF << /F 16 0 R >> >>
+endobj
+16 0 obj
+<< /Type /EmbeddedFile /Subtype /text#2Fplain /Params << /Size 55 >>
+/Length 55 >>
+stream
+Attached plain-text note for the fixture.
+Second line.
+
+endstream
+endobj
+17 0 obj
+<< /Type /Filespec /F (data.csv) /UF (data.csv) /Desc (Two rows of numbers) /EF << /F 18 0 R >> >>
+endobj
+18 0 obj
+<< /Type /EmbeddedFile /Subtype /text#2Fcsv /Params << /Size 30 >>
+/Length 30 >>
+stream
+quarter,revenue
+Q1,120
+Q2,145
+
+endstream
+endobj
+19 0 obj
+<< /Type /Filespec /F (report.pdf) /UF (report.pdf) /Desc (A PDF embedded in a PDF) /EF << /F 20 0 R >> >>
+endobj
+20 0 obj
+<< /Type /EmbeddedFile /Subtype /application#2Fpdf /Params << /Size 237 >>
+/Length 237 >>
+stream
+%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >> endobj
+trailer << /Size 4 /Root 1 0 R >>
+startxref
+0
+%%EOF
+endstream
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000000009 00000 n 
+0000000323 00000 n 
+0000000392 00000 n 
+0000000000 65535 f 
+0000000462 00000 n 
+0000000641 00000 n 
+0000000820 00000 n 
+0000000999 00000 n 
+0000001126 00000 n 
+0000001250 00000 n 
+0000001377 00000 n 
+0000001867 00000 n 
+0000002107 00000 n 
+0000000000 65535 f 
+0000002242 00000 n 
+0000002363 00000 n 
+0000002535 00000 n 
+0000002650 00000 n 
+0000002795 00000 n 
+0000002918 00000 n 
+trailer
+<< /Size 21 /Root 1 0 R >>
+startxref
+3279
+%%EOF

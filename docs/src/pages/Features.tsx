@@ -26,8 +26,9 @@ export function Features() {
               <code>pdfjs-react-reader/features/print</code>
             </td>
             <td>
-              The toolbar control, the <code>Ctrl/Cmd + P</code> binding, and the render-every-page
-              pipeline. Never offered on iOS, where there is no print dialog to open.
+              The toolbar control, the page-range selector, the <code>Ctrl/Cmd + P</code> binding, and
+              the render-at-print-intent pipeline — all pages, the page on screen, or a range the
+              reader types. Never offered on iOS, where there is no print dialog to open.
             </td>
             <td>
               <code>pdfjs-react-reader/print.css</code>
@@ -75,14 +76,15 @@ export function Features() {
       </table>
 
       <p>
-        Cost is measured, not estimated: <code>npm run size</code> bundles one file per consumer import
-        with both esbuild and Rollup and reports the larger of the two, so a feature is only
-        &ldquo;small&rdquo; if two independent tree-shakers agree. All four together cost 5.18 kB over the{' '}
-        <code>20.61 kB</code> core — less than their sum, because they share the shell they attach to.
-        Every figure on this page is the cost of <em>one consumer import</em>, which is what your bundle
-        pays. Summing the shipped files of the whole root entry instead gives 44.01 kB, because that
-        entry re-exports every headless hook whether or not you name one — so quote the import, not the
-        entry.
+        Cost is measured, not estimated, and the figures below are the <code>0.4</code> release build
+        (re-measure at each release close): <code>npm run size</code> bundles one file per consumer
+        import with both esbuild and Rollup and reports the larger of the two, so a feature is only
+        &ldquo;small&rdquo; if two independent tree-shakers agree. All four together cost 5.18 kB over
+        the <code>20.61 kB</code> core — less than their sum, because they share the shell they attach
+        to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
+        bundle pays. Summing the shipped files of the whole root entry instead gives 44.01 kB, because
+        that entry re-exports every headless hook whether or not you name one — so quote the import,
+        not the entry.
       </p>
 
       <pre>
@@ -103,6 +105,14 @@ const forms = createFormsFeature({ onChange: (values) => save(values) });
         <code>{'scale'}</code> for print, <code>{'fileName'}</code> for download, <code>{'onChange'}</code>{' '}
         for forms. Options are plain data on the feature value, so the component the shell mounts stays
         the same component between renders.
+      </p>
+      <p>
+        Two things a mounted feature is subject to, both by its control&apos;s <code>id</code>.{' '}
+        <a href="#/shell">The bar’s <code>controls</code> prop</a> can hide it, re-prioritise it or move
+        it, exactly as it does for a built-in — and because the <code>Runner</code>s are mounted by{' '}
+        <code>ViewerRoot</code> rather than by <code>PdfViewer</code> itself, a feature works unchanged
+        in a layout you wrote. Hiding <code>print</code> is not the same as not importing it: the
+        control leaves the bar, the bytes stay.
       </p>
 
       <h2>What a feature is</h2>

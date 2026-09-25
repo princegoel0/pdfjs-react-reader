@@ -31,6 +31,15 @@ export interface PdfViewerLabels {
   printDocument: string;
   cancelPrinting: string;
   cancelPrintingProgress: string;
+  /** Label for the page-range selector the print feature contributes. */
+  printPagesLabel: string;
+  printScopeAll: string;
+  printScopeCurrent: string;
+  printScopeRange: string;
+  printFromPage: string;
+  printToPage: string;
+  /** Hover text on the print button: what it would send right now. */
+  printRangeSummary: string;
   moreControls: string;
   pageLayout: string;
   fitWidth: string;
@@ -140,6 +149,13 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   printDocument: 'Print document',
   cancelPrinting: 'Cancel printing',
   cancelPrintingProgress: 'Cancel printing ({percent}% rendered)',
+  printPagesLabel: 'Print pages',
+  printScopeAll: 'All pages',
+  printScopeCurrent: 'Current page',
+  printScopeRange: 'From–to',
+  printFromPage: 'First page to print',
+  printToPage: 'Last page to print',
+  printRangeSummary: 'Print pages {from}–{to}',
   moreControls: 'More controls',
   pageLayout: 'Page layout',
   fitWidth: 'Fit width',

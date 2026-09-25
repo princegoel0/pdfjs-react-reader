@@ -3,6 +3,7 @@ import { FormsExample } from '../examples/FormsExample';
 const PROPS: [string, string, string][] = [
   ['src', 'PdfSource', 'Required. URL, path, data URI, base64, File/Blob, or PDF bytes. Changing it reloads in place — keep the value stable across renders.'],
   ['features', 'readonly PdfFeature[]', 'What this viewer can do beyond reading: printFeature, downloadFeature, formsFeature, outlineFeature or one you wrote. Defaults to none — the code you do not import is code you do not ship.'],
+  ['controls', 'ToolbarControls', 'The bar’s own contents: `hide` by id, `priorities` to change what folds first, `order` to place controls, `add` for ones you wrote. Feature control ids work here too.'],
   ['workerSrc', 'string', 'Pins the pdf.js worker location. Auto-detected when omitted.'],
   ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
   ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
@@ -261,8 +262,9 @@ const de: PdfViewerLabelsOverride = {
               <code>Ctrl/Cmd + P</code>
             </td>
             <td>
-              Print the document — <code>printFeature</code>’s own binding, so a viewer without it leaves{' '}
-              <code>Ctrl/Cmd + P</code> to the browser.
+              Print the document — <code>printFeature</code>&apos;s own binding, at whatever range its
+              page selector is showing, so a reader who set “2–3” and reaches for the keyboard gets 2–3.
+              A viewer without the feature leaves <code>Ctrl/Cmd + P</code> to the browser.
             </td>
           </tr>
           <tr>
@@ -303,6 +305,52 @@ const de: PdfViewerLabelsOverride = {
         the dense layout, and a landscape tablet gets finger-sized targets.
       </p>
 
+      <h2>Shaping the bar</h2>
+      <p>
+        Every control has an id, and <code>controls</code> speaks to the bar in those ids:{' '}
+        <code>sidebar</code>, <code>prev</code>, <code>page</code>, <code>next</code>,{' '}
+        <code>search</code>, <code>draw</code>, <code>zoomOut</code>, <code>zoomCustom</code>,{' '}
+        <code>zoomIn</code>, <code>fit</code>, <code>rotateCcw</code>, <code>rotateCw</code>,{' '}
+        <code>rotatePage</code>, <code>fullscreen</code>, <code>layout</code>, <code>count</code>,{' '}
+        <code>meta</code> — plus whatever id a mounted feature’s control declared, such as{' '}
+        <code>print</code>, <code>print-pages</code> or <code>download</code>. An id that is not there
+        is ignored, so a config written once behaves the same on a browser without fullscreen.
+      </p>
+      <pre>
+        <code>{`import { PdfViewer } from 'pdfjs-react-reader';
+import type { ToolbarItem } from 'pdfjs-react-reader';
+
+const fullscreenToggle: ToolbarItem = {
+  id: 'reading',
+  priority: 9,
+  label: 'Reading mode',
+  node: <button type="button" onClick={toggleMode}>Mode</button>,
+};
+
+<PdfViewer
+  src="/contract.pdf"
+  features={[printFeature]}
+  controls={{
+    hide: ['draw', 'meta'],          // gone from the bar and the menu
+    priorities: { layout: 2 },       // now it folds with the zoom cluster
+    order: ['search', 'page'],       // these two lead; the rest keep their places
+    add: [fullscreenToggle],         // an id that exists replaces it in place
+  }}
+/>`}</code>
+      </pre>
+      <p>
+        <code>priorities</code> and <code>order</code> are separate on purpose: priority decides what
+        survives a narrow bar, order decides where a control sits while it is in it. An{' '}
+        <code>add</code> that names an existing id replaces that control where it stands — so swapping
+        one button does not move it to the end — and the overflow menu still groups by priority, which
+        is what keeps the rotate arrows on one row.
+      </p>
+      <p>
+        One limit worth stating: hiding <code>print</code> takes the control out of the bar, not out of
+        your bundle. The feature is still mounted because you imported it; to stop it shipping, remove
+        the import.
+      </p>
+
       <h2>Encrypted documents</h2>
       <p>
         Without a handler, the viewer renders its own password prompt and re-prompts when the
@@ -323,20 +371,57 @@ const de: PdfViewerLabelsOverride = {
 
       <h2>Building your own chrome</h2>
       <p>
-        The shell is assembled from exported parts — <code>Toolbar</code>, <code>SearchBox</code>,{' '}
-        <code>Sidebar</code>, <code>ThumbnailList</code>, <code>OutlineView</code>,{' '}
-        <code>PdfPage</code>, <code>InkLayer</code>, <code>PasswordPrompt</code> — so you can
-        compose them differently without dropping to raw hooks. Read{' '}
-        <code>src/components/PdfViewer.tsx</code> for the wiring.
+        The shell is two things: a controller that owns every piece of state, and a layout that places
+        the parts. Both are exported, so an arrangement that is not toolbar-on-top is a few lines of
+        JSX rather than a fork:
+      </p>
+      <pre>
+        <code>{`import {
+  useViewerController,
+  ViewerProvider,
+  ViewerRoot,
+  ViewerSidebar,
+  ViewerToolbar,
+  ViewerPages,
+  useViewer,
+  type PdfViewerHandle,
+  type PdfViewerProps,
+} from 'pdfjs-react-reader';
+import { forwardRef, useImperativeHandle } from 'react';
+
+export const ReadingView = forwardRef<PdfViewerHandle, PdfViewerProps>(function ReadingView(
+  props,
+  ref,
+) {
+  const controller = useViewerController(props);
+  useImperativeHandle(ref, () => controller.handle, [controller.handle]);
+
+  return (
+    <ViewerProvider controller={controller}>
+      <ViewerRoot>
+        <div className="pjsr-body">
+          <ViewerSidebar />
+          <ViewerPages />
+        </div>
+        <ViewerToolbar />
+      </ViewerRoot>
+    </ViewerProvider>
+  );
+});`}</code>
+      </pre>
+      <p>
+        <code>ViewerRoot</code> is the frame: the element that carries the theme tokens, the keyboard
+        and drop handlers, and the mounted features’ <code>Runner</code>s — so print, download, forms
+        and the outline panel work exactly as they do in the default layout. Your own components inside
+        it read the same state with <code>useViewer()</code>, which is how a host-written page counter
+        or a set of buttons needs no props passed to it.
       </p>
       <p>
-        One boundary to know before you start: <code>features</code> is a <code>PdfViewer</code>{' '}
-        prop, and the host that runs a feature&apos;s <code>Runner</code> is the shell. Assembled
-        chrome of your own goes straight to the hooks instead —{' '}
-        <code>usePdfPrint</code>, <code>usePdfDownload</code>, <code>usePdfFormValues</code>,{' '}
-        <code>usePdfOutline</code> are public and standalone, and are what those four features wrap.
-        The authoring hooks are exported too, so a feature you write can be mounted in any{' '}
-        <code>PdfViewer</code> without the consumer knowing its internals.
+        Two routes, deliberately. The parts above read the viewer around them;{' '}
+        <code>Toolbar</code>, <code>Sidebar</code>, <code>SearchBox</code>, <code>PdfPage</code> and
+        friends still take their props explicitly, which is what you want when you are driving the
+        hooks yourself and owning the state. And the authoring hooks are exported too, so a feature you
+        write can be mounted in any <code>PdfViewer</code> without its consumer knowing how it works.
       </p>
     </>
   );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AnnotationLayer,
   RenderingCancelledException,
@@ -68,7 +68,17 @@ export interface PdfPageProps {
   onError?: (error: Error) => void;
 }
 
-export function PdfPage({
+/**
+ * One page: canvas, text layer, annotation layer, ink overlay.
+ *
+ * Memoised, because a page is the most expensive subtree in the library and the
+ * shell re-renders for reasons that cannot reach it — opening the search bar
+ * changed no page prop at all, and still re-rendered every visible page. That
+ * makes prop identity load-bearing for hosts too: an inline arrow or a fresh
+ * object here defeats the memo, which is the same rule the layers already
+ * follow, now with a cost attached.
+ */
+export const PdfPage = memo(function PdfPage({
   doc,
   pageNumber,
   scale,
@@ -339,4 +349,4 @@ export function PdfPage({
       )}
     </>
   );
-}
+});

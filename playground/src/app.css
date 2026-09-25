@@ -95,3 +95,54 @@ body {
   margin: 8px 0 0;
   padding-left: 22px;
 }
+
+/* The host-written layout's own chrome. It sits inside `.pjsr-viewer`, so it
+   reads the viewer's tokens rather than inventing a second palette. */
+.host-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--pjsr-border);
+  background: var(--pjsr-toolbar-bg);
+  color: var(--pjsr-fg);
+  font-size: 13px;
+}
+
+.host-bar button {
+  font: inherit;
+  padding: 3px 8px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  background: var(--pjsr-bg);
+  color: inherit;
+  cursor: pointer;
+}
+
+.host-bar button:hover:not(:disabled) {
+  background: var(--pjsr-hover-bg);
+}
+
+.host-bar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.host-bar-count,
+.host-bar-zoom {
+  font-variant-numeric: tabular-nums;
+  color: var(--pjsr-muted-fg);
+}
+
+.host-bar-zoom {
+  margin-left: auto;
+}
+
+/* A control the application added to the bar, so it wears the bar's type. */
+.host-progress {
+  padding: 0 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pjsr-muted-fg);
+}

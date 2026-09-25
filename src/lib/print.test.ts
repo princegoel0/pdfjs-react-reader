@@ -7,6 +7,7 @@ import {
   planPrintPages,
   planPrintScale,
   printCanvasSize,
+  printRangeFor,
 } from './print';
 
 /** A4 portrait in PDF units (72 dpi). */
@@ -101,5 +102,49 @@ describe('formatBytes', () => {
     expect(formatBytes(512 * 1024)).toBe('0.5 MB');
     expect(formatBytes(2 * 1024 * 1024)).toBe('2 MB');
     expect(formatBytes(PRINT_MEMORY_BUDGET)).toBe('256 MB');
+  });
+});
+
+describe('printRangeFor', () => {
+  const state = { from: 3, to: 5, currentPage: 8, numPages: 14 };
+
+  it('takes the whole document for all', () => {
+    expect(printRangeFor('all', state)).toEqual([1, 14]);
+  });
+
+  it('takes the page on screen for current', () => {
+    expect(printRangeFor('current', state)).toEqual([8, 8]);
+  });
+
+  it('takes what was typed for range', () => {
+    expect(printRangeFor('range', state)).toEqual([3, 5]);
+  });
+
+  it('swaps a backwards range instead of refusing it', () => {
+    // Someone who enters "5 to 2" means the pages between them.
+    expect(printRangeFor('range', { ...state, from: 5, to: 2 })).toEqual([2, 5]);
+  });
+
+  it('falls back to a single page when the far end is empty', () => {
+    // An input cleared mid-edit yields NaN; the reader meant page 4, not "0".
+    expect(printRangeFor('range', { ...state, from: 4, to: Number.NaN })).toEqual([4, 4]);
+  });
+
+  it('reads a zero or negative bound as the first page', () => {
+    // There is no page 0 and no page -3, and a range that displayed either would
+    // read as a bug in the control rather than as a half-typed number.
+    expect(printRangeFor('range', { ...state, from: 0, to: -3 })).toEqual([1, 1]);
+  });
+
+  it('does not clamp to the document, which planPrintPages does', () => {
+    // The selector can be set while a slow document is still loading, so this is
+    // the range the reader asked for; the page list is resolved against reality.
+    expect(printRangeFor('range', { ...state, from: 20, to: 999 })).toEqual([20, 999]);
+    expect(planPrintPages(14, printRangeFor('range', { ...state, from: 20, to: 999 }))).toEqual([14]);
+  });
+
+  it('survives a document that has not reported its page count', () => {
+    expect(printRangeFor('all', { ...state, numPages: 0 })).toEqual([1, 1]);
+    expect(printRangeFor('current', { ...state, currentPage: Number.NaN })).toEqual([1, 1]);
   });
 });

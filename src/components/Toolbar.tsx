@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import type { PageLayout, ScaleMode } from '../lib/layout';
 import type { InkSettings } from '../lib/ink';
 import { planToolbarOverflow } from '../lib/toolbar';
+import type { ToolbarControlConfig } from '../lib/toolbar';
+import { applyControlConfig, mergeToolbarItems } from '../lib/toolbar';
 import {
   formatZoomPercent,
   MAX_SCALE,
@@ -73,6 +75,8 @@ export interface ToolbarProps {
    * plan as these: their `priority` decides what survives a narrow bar.
    */
   featureItems?: readonly ToolbarItem[];
+  /** Remove, re-order or add controls. See {@link ToolbarControls}. */
+  controls?: ToolbarControls;
   /** Toggles fullscreen. Omit to hide the control where it is unsupported. */
   onFullscreenToggle?: () => void;
   fullscreenActive?: boolean;
@@ -95,6 +99,30 @@ export interface ToolbarItem {
   /** Information, not an action: dropped rather than menuised when it will not fit. */
   hideOnly?: boolean;
   node: ReactNode;
+}
+
+/**
+ * What the application says about the bar's contents.
+ *
+ * Everything keys on a control's `id`. The built-ins are `sidebar`, `prev`,
+ * `page`, `next`, `search`, `draw`, `zoomOut`, `zoomCustom`, `zoomIn`, `fit`,
+ * `rotateCcw`, `rotateCw`, `rotatePage`, `fullscreen`, `layout`, `count` and
+ * `meta`; a mounted feature adds its own control id, which is whatever its
+ * `controls[].id` says (`print`, `download`, …). An id that is not present —
+ * `fullscreen` on a browser without it, or one whose feature you did not mount —
+ * is simply ignored.
+ *
+ * `priorities` decides what survives a narrow bar; `order` decides where a
+ * control sits while it is in it. They are separate because folding is about
+ * importance and placement is about habit.
+ */
+export interface ToolbarControls extends ToolbarControlConfig {
+  /**
+   * Host-written controls. One that names an existing id replaces it *where it
+   * stands*; one that names nothing new is placed by its own priority, and folds
+   * into the overflow by the same arithmetic as everything else.
+   */
+  add?: readonly ToolbarItem[];
 }
 
 interface Metrics {
@@ -140,6 +168,7 @@ export function Toolbar({
   docLabel,
   zoomLabel,
   featureItems,
+  controls,
   onFullscreenToggle,
   fullscreenActive = false,
   onRotatePage,
@@ -554,6 +583,11 @@ export function Toolbar({
     });
   }
 
+  /* The application's own controls first — `add` may replace a built-in by id or
+     contribute a new one — and only then its configuration, so `hide` applies to
+     the list the host actually ended up with rather than to the built-ins. */
+  const configured = applyControlConfig(mergeToolbarItems(items, controls?.add ?? []), controls);
+
   /* The bar folds on measured widths rather than hand-tuned breakpoints, which
      rot the moment a label changes. Every item is measured once from this
      off-screen copy: `visibility: hidden` keeps it out of the accessibility
@@ -561,7 +595,7 @@ export function Toolbar({
      second set of names or steal focus. */
   const sizer = (
     <div className="pjsr-toolbar-sizer" ref={sizerRef} aria-hidden="true">
-      {items.map((item) => (
+      {configured.map((item) => (
         <span key={item.id} data-pjsr-item={item.id}>
           {item.node}
         </span>
@@ -615,7 +649,7 @@ export function Toolbar({
 
   const plan = metrics
     ? planToolbarOverflow(
-        items.map((item) => ({
+        configured.map((item) => ({
           id: item.id,
           priority: item.priority,
           width: metrics.widths[item.id] ?? 0,
@@ -626,7 +660,7 @@ export function Toolbar({
         metrics.widths['menu'] ?? 0,
       )
     : {
-        inline: items.map((item) => item.id),
+        inline: configured.map((item) => item.id),
         overflow: [] as string[],
         hidden: [] as string[],
         showMenu: false,
@@ -637,7 +671,7 @@ export function Toolbar({
      action first, and equal priorities are then guaranteed to be adjacent, so
      the rotate pair collapses into a single "Rotate [↺][↻]" row instead of two
      rows that both say Rotate. */
-  const byId = new Map(items.map((item) => [item.id, item]));
+  const byId = new Map(configured.map((item) => [item.id, item]));
   const overflowItems = plan.overflow
     .map((id) => byId.get(id))
     .filter((item): item is ToolbarItem => item !== undefined);
@@ -654,7 +688,7 @@ export function Toolbar({
 
   return (
     <div className="pjsr-toolbar" ref={toolbarRef} role="toolbar" aria-label={labels.viewerControls}>
-      {items
+      {configured
         .filter((item) => inlineSet.has(item.id))
         .map((item) => (
           <Fragment key={item.id}>{item.node}</Fragment>

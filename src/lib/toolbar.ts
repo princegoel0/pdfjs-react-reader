@@ -26,6 +26,85 @@ export interface ToolbarOverflowPlan {
   showMenu: boolean;
 }
 
+/** Anything the bar can hold: identified by `id`, ordered by `priority`. */
+export interface ToolbarConfigurable {
+  id: string;
+  priority: number;
+}
+
+/**
+ * What the application says about the bar's contents. Both halves key on a
+ * control's `id` — `sidebar`, `page`, `zoomIn`, `layout`, or a feature's own id
+ * — so changing one entry never means restating the list.
+ */
+export interface ToolbarControlConfig {
+  /** Drop these entirely. A control that is not there cannot be clicked. */
+  hide?: readonly string[];
+  /** Re-order. Lower stays in the bar longer; 1 is page navigation. */
+  priorities?: Readonly<Record<string, number>>;
+  /**
+   * Placement, not eviction: the named controls come first in this order and
+   * everything else follows in the order it was built in. One id is enough to
+   * pull a control to the front; list them all to dictate the bar exactly.
+   */
+  order?: readonly string[];
+}
+
+/**
+ * Apply the application's configuration to a list of controls.
+ *
+ * Removal runs first, which is what makes `hide` mean what it says: a hidden
+ * control cannot be brought back by a priority or an order entry for the same
+ * id. Unknown ids are ignored rather than rejected, because the bar is built
+ * from optional props — ordering by `fullscreen` should read the same whether or
+ * not the platform offered it.
+ */
+export function applyControlConfig<T extends ToolbarConfigurable>(
+  items: readonly T[],
+  config: ToolbarControlConfig | undefined,
+): T[] {
+  if (!config) return [...items];
+  const hidden = config.hide ? new Set(config.hide) : undefined;
+  const kept = items
+    .filter((item) => !hidden?.has(item.id))
+    .map((item) => {
+      const priority = config.priorities?.[item.id];
+      return priority === undefined || priority === item.priority ? item : { ...item, priority };
+    });
+  if (!config.order?.length) return kept;
+  const rank = new Map(config.order.map((id, index) => [id, index]));
+  const listed = kept.filter((item) => rank.has(item.id));
+  const rest = kept.filter((item) => !rank.has(item.id));
+  listed.sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+  return [...listed, ...rest];
+}
+
+/**
+ * Overlay `additions` on `base`, by id.
+ *
+ * An addition that names an existing control replaces it *where it stands*, so a
+ * host swapping out one button does not move it to the end of the bar; one that
+ * names nothing is appended and lands wherever its priority puts it.
+ */
+export function mergeToolbarItems<T extends { id: string }>(
+  base: readonly T[],
+  additions: readonly T[],
+): T[] {
+  if (additions.length === 0) return [...base];
+  const byId = new Map(additions.map((addition) => [addition.id, addition]));
+  const seen = new Set<string>();
+  const out = base.map((item) => {
+    const replacement = byId.get(item.id);
+    if (!replacement) return item;
+    seen.add(item.id);
+    return replacement;
+  });
+  for (const addition of additions) {
+    if (!seen.has(addition.id)) out.push(addition);
+  }
+  return out;
+}
+
 function totalWidth(items: ToolbarItemMeasure[], gap: number): number {
   if (items.length === 0) return 0;
   let total = 0;

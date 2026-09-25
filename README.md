@@ -66,13 +66,14 @@ Opt-in, one import each:
 
 | Feature | Adds | Cost over core |
 | --- | --- | --- |
-| `features/print` | Print at print intent, honouring stored form values and ink, with a memory-budgeted resolution, a cancellable progress loop and `Ctrl/Cmd + P`. | 2.02 kB |
+| `features/print` | Print at print intent — all pages, the current one, or a range the reader picks — honouring stored form values and ink, with a memory-budgeted resolution, a cancellable progress loop and `Ctrl/Cmd + P`. | 2.02 kB |
 | `features/download` | Download of the original bytes, or an incremental save carrying the edits. | 0.86 kB |
 | `features/forms` | AcroForm widgets — text, checkbox, radio, choice, button — wired to pdf.js annotation storage, with `createFormsFeature({ onChange })` and programmatic get/set/reset. | 1.99 kB |
 | `features/outline` | The bookmarks sidebar tab. | 0.93 kB |
 
 All four together cost 5.18 kB, less than their sum, because they share the shell they attach to.
 They are also the reference for writing your own: the contract and the authoring hooks are public.
+(Those costs are the `0.4.0` release build; see [Size](#size) for what the current release measures.)
 
 ## Requirements
 
@@ -181,6 +182,51 @@ import type { PdfViewerLabelsOverride } from 'pdfjs-react-reader';
 const de: PdfViewerLabelsOverride = { nextPage: 'Nächste Seite', pageOf: 'Seite {page} von {total}' };
 <PdfViewer src="/vertrag.pdf" labels={de} />
 ```
+
+The bar's contents are configurable by control id — the built-ins (`sidebar`, `page`, `search`,
+`zoomIn`, `layout`, `meta`, …) and each mounted feature's own id:
+
+```tsx
+<PdfViewer
+  src="/contract.pdf"
+  features={[printFeature]}
+  controls={{
+    hide: ['draw', 'meta'],
+    priorities: { layout: 2 },   // what survives a narrow bar
+    order: ['search', 'page'],   // where controls sit while it is in it
+    add: [myControl],            // an existing id replaces it in place
+  }}
+/>
+```
+
+And the shell is a controller plus a layout, both exported, so a different arrangement is a few lines
+of JSX rather than a fork:
+
+```tsx
+import {
+  useViewerController,
+  ViewerProvider,
+  ViewerRoot,
+  ViewerToolbar,
+  ViewerPages,
+} from 'pdfjs-react-reader';
+
+function ReadingView(props) {
+  const controller = useViewerController(props);
+  return (
+    <ViewerProvider controller={controller}>
+      <ViewerRoot>
+        <ViewerPages />
+        <ViewerToolbar />
+      </ViewerRoot>
+    </ViewerProvider>
+  );
+}
+```
+
+`ViewerRoot` carries the theme tokens, the keyboard and drop handlers and the mounted features'
+runners, so print, save, forms and the outline panel work there exactly as they do in the default
+layout; your own components inside it read the same state through `useViewer()`.
 
 ## Writing a feature
 
@@ -368,11 +414,13 @@ node scripts/make-outline-pdf.mjs    # 3 pages, bookmarks, named destinations
 node scripts/make-encrypted-pdf.mjs  # RC4-40 encrypted, password "secret"
 node scripts/make-cjk-pdf.mjs        # CID-encoded, so the cMap path is exercised
 node scripts/make-scripted-pdf.mjs   # document-level JavaScript
+node scripts/make-attachments-ocg-pdf.mjs  # 3 attached files + 3 layers, one off by default
 ```
 
 `playground/` exercises the whole surface against generated fixtures (AcroForm, outline with named
-destinations, RC4-encrypted, CID-encoded CJK, document-level JavaScript). `docs/` is a Vite app that
-renders the library — against `src` in development, against the built `dist` in CI.
+destinations, RC4-encrypted, CID-encoded CJK, document-level JavaScript, embedded files with
+optional-content layers). `docs/` is a Vite app that renders the library — against `src` in
+development, against the built `dist` in CI.
 
 ## Status
 
