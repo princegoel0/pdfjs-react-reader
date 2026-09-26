@@ -36,9 +36,9 @@ wrong in both directions: it silently omitted `FR-24`–`FR-28`, which `0.5` shi
 | `FR-13` | In-memory indexing | `0.1` | done in substance — `page.getTextContent()` parses in the pdf.js worker; the index is assembled on the main thread, yielding every five pages (`search.ts:272`) |
 | `FR-14` | Match highlighting | `0.1`, counts `0.5` | done |
 | `FR-15` | Search controls | `0.1`, `0.5` | done — case, whole-word, next/previous, `Indexing {percent}%` |
-| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6` | **partial** — every widget type except a signature is browser-verified; `form.ts:120` classifies `/Sig`, but no fixture carries one, so its rendering is unproven |
+| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6` | **partial** — every widget type except a signature is browser-verified; `form.ts:120` classifies `/Sig`, but no fixture carries one, so its rendering is unproven. XFA now renders through `XfaLayer` (`xfa-sample.pdf`, see *0.6.0 — Mark*), and a document whose template pdf.js cannot lay out **fails to load** rather than showing a blank page, so `enableXfa` on by default carries that risk |
 | `FR-17` | Form data sync | `0.1` | done |
-| `FR-18` | Annotations view and draw | `0.1` view, ink `0.5`; authoring `0.6` | **partial** — links and markup render, freehand ink draws and prints; *drawing signatures* and creating highlights/annotations are `0.6` scope (see *0.6.0 — Mark*) |
+| `FR-18` | Annotations view and draw | `0.1` view, ink `0.5`; authoring `0.6` | **partial** — links and markup render, freehand ink draws and prints; authoring shipped in `0.6` as `annotateFeature` and, as measured, that means highlight, free text and ink — the engine cannot create or edit underline/strikeout/squiggly, and stamp and signature break the save (see *0.6.0 — Mark*) |
 | `FR-19` | High-fidelity printing | `0.1`, ranges `0.5` | done — iOS Safari is excluded by design, which `PRD` does not mention |
 | `FR-20` | Document download | `0.7` | **not complete** — `doc.saveDocument()` is an incremental save, not a flatten; flattening needs a PDF writer, which is what `0.7` adds |
 | `FR-21` | Opt-in feature registration | `0.4` | done |
@@ -72,15 +72,17 @@ assumed. `pdfjs-dist@5.7.284` exports:
 
 | Export | Unblocks |
 | --- | --- |
-| `AnnotationEditorLayer`, `AnnotationEditorUIManager`, `AnnotationEditorType` (`FREETEXT`, `HIGHLIGHT`, `STAMP`, `INK`, `POPUP`, `SIGNATURE`, `COMMENT`) | Annotation authoring without third-party code — `PdfPage` currently passes `annotationEditorUIManager: null` to its `AnnotationLayer` |
-| `XfaLayer`, `enableXfa`, `getXfaPageViewport` | XFA **rendering** (persistence stays impossible, see PRD §2) |
+| `AnnotationEditorLayer`, `AnnotationEditorUIManager`, `AnnotationEditorType` (`FREETEXT`, `HIGHLIGHT`, `STAMP`, `INK`, `POPUP`, `SIGNATURE`, `COMMENT`) | Annotation authoring without third-party code — `PdfPage` took `annotationEditorUIManager: null` until `0.6` mounted `annotateFeature`, which publishes the manager and `annotationEditorEditing` through `pageProps` |
+| `XfaLayer`, `enableXfa`, `page.getXfa()` | XFA **rendering**, wired in `0.6`. Saving an edited XFA document is unmeasured (`#127`) and a packet pdf.js cannot lay out rejects the load — see *0.6.0 — Mark* |
 | `SignatureExtractor`, `SupportedImageMimeTypes`, `DrawLayer`, `TextLayerImages`, `renderRichText` | Signature and image/stamp annotations, rich-text free text |
 | `TouchManager` (`onPinchStart` / `onPinching` / `onPinchEnd`) | Pinch zoom instead of hand-written gesture math |
 | `OutputScale.capPixels(maxPixels, capAreaFactor)`, `FeatureTest` | Canvas-area capping. `FeatureTest` exposes **no** canvas-size probe, so the cap must be measured here and fed to `capPixels` |
 
 `saveDocument(): Promise<Uint8Array>` on `PDFDocumentProxy` and the `annotationStorage`
-getter (`:860`) exist, but which editor types actually survive into those bytes is unmeasured — see
-Spike A.
+getter (`:860`) exist, and `0.6`'s Spike A measured what actually reaches those bytes: new
+`/Highlight`, `/Ink` and `/FreeText` annotations do, a stamp and a signature do not — they throw during
+the save — and an existing `/Underline`, `/StrikeOut`, `/Squiggly`, `/Text` or `/Popup` is not editable at
+all. See *Spike A, second pass*.
 
 **Engine bytes are fixed.** Every class above already sits inside the single `pdf.min.mjs`
 (168 kB gz) plus `pdf.worker.min.mjs` (364 kB gz). Enabling annotation editing adds no engine
@@ -195,7 +197,7 @@ Every requested feature, and the release that ships it.
 | Customizable toolbar and UI | `0.5` done | the parts are exported and read one controller; `controls` hides, re-ranks, re-orders and adds controls by id |
 | Rich sidebar | `0.5` done | thumbnails are core; outline, layers and attachments are feature tabs. `executeSetOCGState` is implemented — a document's own layer link and the layers panel drive one shared config, and a paperclip annotation saves the file it carries |
 | Advanced search | `0.5` done | case, whole-word, every match marked at once (not a toggle — it is unconditional), multi-word AND, regex, invalid-pattern reporting, per-page counts, and `find` to swap the strategy |
-| PDF annotation and editing | `0.6` create, `0.7` persist | |
+| PDF annotation and editing | `0.6` create and save | marks go into the file through `saveDocument()`; `0.7` is about flattening, not persistence |
 | Comprehensive form support (AcroForm + XFA) | `0.6` renders XFA | XFA persistence excluded permanently |
 | Page reordering | `0.7` | needs a PDF writer |
 
@@ -273,6 +275,8 @@ No new dependencies.
   Detection reads `IsXFAPresent`/`IsAcroFormPresent`, which are true regardless of that flag; whether a
   real XFA actually composes is **not** exercised by any fixture here (pdf.js's parser rejects our
   hand-written packet), so no claim is made that it renders until one is measured.
+  _Superseded by `0.6`: the packet was the problem, not the parser — `xfa-sample.pdf` composes, and what
+  the rejection really looked like is written up under `0.6` (`#114`, `#119`)._
 * **The size gate became a ratchet instead of a ceiling.** These five items cost **+2.57 kB** on the
   shell path — 42.88 → **45.45 kB** — and took headless from 23.35 → **25.60 kB**, which is over the
   45 kB ceiling that stood from `0.1` through `0.2`. Golfing the new code back under 45 was measured
@@ -519,19 +523,468 @@ animation frames, no compositor surface for screenshots, and canvas readback tha
 half needs someone to open a window.
 
 
-### 0.6.0 — Mark: annotation authoring
+### 0.6.0 — Mark: annotation authoring ✅ built 2026-09-26 (local `dev`; pushed and published with 1.0.0)
 No new dependencies. Gated on Spike A.
 
+**Spike A, first pass (2026-09-26) — what is settled and what is not.** Driven from a scratch harness
+(`playground/spike-editors.html` + `src/spikeEditors.tsx`, temporary) against `form-sample.pdf` on
+6.3.289:
+
+* `getDocument`, `getPage`, `AnnotationEditorLayer.render()` and `AnnotationEditorUIManager.updateMode()`
+  all succeed with our own worker resolution, so the plumbing we already have is sufficient to reach the
+  editor stack. `STAMP` reached the created-editor step with null collaborators.
+* `AnnotationEditorLayer` registers itself with the manager in its constructor (`uiManager.addLayer`) —
+  a harness or feature that also calls `addLayer` would double-register. The layer's `#editorTypes` map
+  holds five classes — FreeText, Ink, Stamp, Highlight, Signature. **The inference drawn from that, that
+  underline, strikeout and squiggly must therefore be HighlightEditor subtypes, was wrong** — see the
+  second pass.
+* **`textLayer` is not the container node.** `AnnotationEditorLayer.disable()` reaches for
+  `this.#textLayer.div.addEventListener`, so the option is a layer-shaped object — passing the div throws
+  in the constructor's `uiManager.addLayer` → `layer.disable()` path before any editor exists. `DrawLayer`
+  wants the opposite (`#textLayer.isConnected`), i.e. the node. Passing `{ div: textDiv }` got the whole
+  stack constructing and rendering.
+* With the stack constructed, each type then failed on a collaborator the official viewer owns: highlight,
+  ink and signature all die on `null.updateProperties` — the `DrawingOptions` live on the **draw layer**,
+  so no tool that paints can work without one — and free text dies on a separate `undefined.toggle`.
+  **STAMP alone got as far as a real editor**: `storage keys = 1`, then `saveDocument()` threw
+  `Cannot destructure property 'imageRef' of 'n.image'`, because a stamp created with no image has nothing
+  to serialize. That is a rule for the feature, not a bug to route around: a stamp tool must not offer an
+  empty stamp.
+* **Consequence for the plan:** the standalone harness cannot reach the persistence verdict, because the
+  verdict depends on wiring that only the shell has. So the order flips — build the real `PdfPage` wiring
+  first (draw layer with its filter factory, the text layer as a layer object, the accessibility manager)
+  and measure `saveDocument()` through it. That measurement remains the gate: **nothing in `0.6` may
+  claim a type persists until it is taken.**
+* The package root exports **no `EventBus`**, so a host cannot construct one the way the viewer does;
+  the manager was handed a recording stub and dispatches `annotationeditorparamschanged`,
+  `editingstateschanged`, `editorsrendered` and `reporttelemetry`. That is the event surface
+  `onAnnotationChange` should be built on rather than invented.
+
+**Spike A, second pass (2026-09-26) — the gate, taken.** Driven through the mounted viewer
+(`playground/src/spikePersist.ts` + `spikeSetup.ts`, temporary) against `annotated-sample.pdf`, with the
+manager read off the `.pjsr-editor-layer` fiber rather than from a copy, so what is measured is the wiring
+the shell actually builds. The fixture had to be fixed first: its generator wrote each popup to `num + 50`
+while the page referenced `num + 100`, which both dangled four references and overwrote objects 60–61 —
+the page content streams. The document loaded, rendered a text layer and reported *zero* annotations, and
+the only reason that was noticed is that the spike asked for a count. The generator now resolves every
+reference and points at every xref offset before it writes (`.spike`-verified: with the old `num + 50` it
+exits 1 naming the two dangling refs).
+
+Verdict per editor type, `saveDocument()` followed by reopening the returned bytes and counting subtypes
+(baseline 1 each of Highlight, Underline, StrikeOut, Squiggly, Text, Ink, FreeText and 7 Popups):
+
+| Type | Created | In storage | Survives the save |
+| --- | --- | --- | --- |
+| Highlight (from a real text selection) | yes | yes | **yes** — 1 → 2 |
+| Ink (cloned from a real `/Ink` via `serialize(true)` → `deserialize`) | yes | yes | **yes** — 1 → 2 |
+| Free text (same clone route) | yes | yes | **yes** — 2 saved bytes: 6,058 → 8,585 |
+| Stamp (`pasteEditor` with a generated PNG) | yes | yes | **no** — the save throws on `imageRef` |
+| Signature | yes | yes | **no** — the save throws in `serializeDraw` |
+| Underline / strikeout / squiggly | **cannot be created** | — | — |
+
+* **There is no subtype.** `AnnotationEditorType` in 6.3.289 is FREETEXT, HIGHLIGHT, STAMP, INK, POPUP,
+  SIGNATURE and COMMENT; `AnnotationEditorParamsType` has no `HIGHLIGHT_TYPE_*`; the editor sources contain
+  no `subtype` token at all. So the first pass's five-classes inference was wrong in both directions: a
+  reader cannot draw an underline, and cannot edit one either — the worker reports
+  `isEditable: false` for `/Underline`, `/StrikeOut`, `/Squiggly`, `/Text` and `/Popup`, and `true` only
+  for `/Highlight`, `/Ink` and `/FreeText`. Those three are exactly the editors `layer.enable()` produced
+  from the fixture's nine rendered annotation elements, so our wiring is complete as far as the engine goes.
+* **An untouched annotation stays untouched.** Each converted editor reported `serialize(false) === null`
+  while unmodified, so it never entered `doc.annotationStorage` and the saved bytes still held one
+  annotation of that subtype, not two. Editing an existing annotation therefore replaces it rather than
+  stacking a copy on it — which is what the `annotationElementId` link is for.
+* **Four collaborators the shell has to supply, each found by a throw rather than by reading:**
+  `AnnotationLayer` must be given the manager (it registers `#editableAnnotations` and calls
+  `renderAnnotationElement` only when it has one); the editor layer must be given the *annotation layer*
+  (`enable()` converts `getEditableAnnotations()`, and null means nothing to convert); `DrawLayer` needs
+  `page.filterFactory` **and** a `setParent()` call, which pdf.js never makes for itself — the first
+  editor otherwise dies on `null.append` inside `#createSVG`; and the manager's highlight-colours argument
+  must be a non-empty `NAME=RRGGBB` string, because it memoises to `null` when absent and the first
+  `layer.add()` then dies in `getNonHCMColorName` while building telemetry.
+* **`.textLayer` is load-bearing, measured both ways.** pdf.js finds the layer a selection belongs to with
+  `target.closest('.textLayer')`, six times over. On the same span with the class: one editor added. With
+  the class removed and everything else identical: zero. The viewer's own sheet therefore carries the
+  engine's class alongside ours on the text layer container.
+* `data-main-rotation` needed no host work: pdf.js's own `setLayerDimensions` writes it, measured as `"0"`
+  on our text layer and feeding `getSelectionBoxes`' rotation math.
+* **The engine's selection toolbar is hidden by our sheet, and the reason is measurable.** Every one of its
+  buttons carries a `data-l10n-id` and nothing else — the viewer passes `l10n: null` to the layer, so the
+  only button on a selected highlight (`pdfjs-editor-colorpicker-button`) reports an accessible name of
+  `null` — and its glyphs come from `url(images/…svg)` in the engine's own folder, which this package does
+  not ship. Its position depends on a CSS custom property the engine writes into an inline `calc()`: with
+  `--editor-toolbar-vert-offset` absent the whole `top` declaration is invalid, and measured the toolbar sat
+  inside the mark. Move, resize and keyboard delete need none of it, so it is hidden and named as a gap
+  rather than shipped nameless. Colour and a labelled delete belong in the viewer's own bar, where both can
+  be translated: that work is `#118`.
+* **What `0.6`'s editor layer costs.** `annotateFeature` bundles to **1.85 kB gz over core** against the
+  4 kB per-feature gate — the 0.87 kB first recorded here was the three tools alone, before `#120`'s
+  colour select and Delete — and is now one of the seven measured paths in `check-size.mjs` with the marker
+  `createEditorEventBus` — absent from core, present in its own, in both bundlers. Before this the feature
+  was in the export map but not in the marker list, so a static import of it by the shell would have passed
+  CI. `annotate.css` is the seventh sheet (11,648 B source → 3,891 B minified) and, like the others, is
+  asserted to exist by the asset step and imported by the consumer smoke app.
+* Of the manager's sixteen arguments, the ones this feature leaves null are read through optional chaining,
+  except `editorUndoBar`, which pdf.js assigns and never reads. `viewerAlert` being null is a real gap, not
+  a cosmetic one: `a11yAlert` returns early, so no edit is announced to a screen reader. Tracked under the
+  accessibility work below.
+* The signature verdict is not "needs more UI": `SignatureManager` is not among the 62 names
+  `pdfjs-dist` exports from its root, so a host cannot build one. Signing stays out of `0.6`, and the
+  measured reason is in the tool type's comment.
+* **Harness note for anyone repeating this:** the automation tab reports `innerWidth: 0`, so the run needs
+  a forced layout box (the spike styles `.app-viewer`/`.pjsr-viewer` to 1040×820) *and* must avoid
+  centre-based creation — `#getCenterPoint` clamps against `window.innerWidth` and hands back negative
+  page coordinates there. Explicit `{offsetX, offsetY}` is what a real pointer event would have carried.
+
+So `0.6` is:
+
 * Wire `AnnotationEditorLayer` + `AnnotationEditorUIManager` into `PdfPage`, replacing the `null` it
-  passes today: highlight, underline, strikeout, squiggly, free text, ink, stamp,
-  image stamp and drawn signature.
-* Create, select, move, resize and **delete** annotations, including pre-existing ones.
+  passes today: **highlight, free text and ink** — the three the engine can create and the three now
+  measured to survive a save.
+* Create, select, move, resize and **delete** annotations, including the pre-existing `/Highlight`,
+  `/Ink` and `/FreeText` ones.
 * Interactive popups — `.popupAnnotation` is `pointer-events: none` today in `src/styles/viewer.css`, which
   is the rule that keeps the layer from swallowing page interaction.
 * `enableXfa: true` and `XfaLayer` so XFA documents display at all.
 * `onAnnotationChange` events, plus re-export of the editor classes from `/headless`.
-* Annotation keyboard accessibility.
+* Annotation keyboard accessibility, including the live region the manager needs for its announcements.
 * Ships as a **feature from `0.4`**, not shell code, so apps that never annotate don't pay for it.
+
+**Architecture, decided 2026-09-26.** One constraint sets the shape: `feature.pageProps()` is merged
+once and handed to *every* page, so it can only ever carry document-wide things. The editor stack splits
+along exactly that line.
+
+* **The feature's `Runner` owns the document-wide pieces** — one `AnnotationEditorUIManager`, the active
+  tool, and the event emitter — mounted once per viewer, destroyed when the document changes. This is the
+  same authority `formsFeature` holds over annotation storage, and it is why controls can render three
+  times without tripping over state.
+* **`PdfPage` owns the per-page pieces** — the canvas's wrapper `div`, this page's `DrawLayer`, and its
+  `AnnotationEditorLayer` — because those are per page by nature and the page already builds the text and
+  annotation layers they attach to. The merged page props carry exactly one thing, the manager
+  (`annotationEditorUIManager`), and its presence is what makes a page build an editor layer at all: the
+  active tool is React state in the Runner, which forwards it to the manager through `updateMode`, and the
+  storage is the document's own, so neither belongs in a page prop.
+* **The event bus is ours.** `pdfjs-dist`'s root exports no `EventBus`, so the feature hands the manager a
+  small emitter it writes itself — which is also what makes `onAnnotationChange` possible: the manager's
+  own `editingstateschanged` / `editorsrendered` / `annotationeditorparamschanged` come back through it,
+  and the feature narrows those to one documented viewer event rather than leaking four engine names.
+* **The manager is given the viewer root and a `classList`, not a page-view registry.** It was planned
+  around `getPagesVisible()` / `getPageView()` / `scrollPageIntoView()`; measured, the only thing it takes
+  from the viewer argument is `classList.toggle('noUserSelect', …)`, so the stub is
+  `{ classList: root.classList }` and the container is the same root, handed to the feature as
+  `shell.rootRef` rather than as a node so that reading the shell costs nothing before mount.
+* **`textLayer` is passed as `{ div }`** — the layer's own `disable()` reaches `textLayer.div` — while
+  `DrawLayer` takes the node itself. Getting these two the wrong way round produces a constructor-time
+  throw with no hint of the cause, which is what cost the spike its detour.
+* **Storage is shared, not duplicated**: editors write into `doc.annotationStorage`, the same store
+  `formsFeature` reads, so an edit and a form value cannot disagree, and print and download already carry
+  both.
+* **Stamp and signature are out, on measurement rather than on taste.** Both reach `annotationStorage` and
+  then break the save for the whole document — `imageRef` for an empty stamp, `serializeDraw` for a
+  signature with no `SignatureManager` behind it — so the rule is not "refuse an empty stamp at the tool"
+  but "do not offer a tool whose half-finished state corrupts a download". `SignatureManager` is not
+  exported by the package root, so signing cannot be finished here at all.
+
+**One ink tool, decided 2026-09-26, and what had to be measured first.** The feature's ink and the shell's
+`draw` control do the same gesture with different consequences: the overlay prints but never reaches a
+download, the annotation does both. Offering both is how a reader loses work, so `PdfFeature` gained
+`replaces`, the shell folds those ids into the same `hide` list the application writes
+(`withReplacedControls`), and `annotateFeature` declares `replaces: ['draw']`. Verified in the browser from
+one known state: annotate off → `Draw on document`; on → `Highlight / Add text / Ink` and no draw; off again
+→ draw back. Nothing was deleted, so no host that does not mount `annotate` lost a byte or a control; the
+retirement question for the now-duplicated overlay machinery is `#124` at the freeze.
+
+The fold had one risk that had to be settled before hiding anything: that an editor's ink, having no
+replay in the print pipeline, would print blank. Measured on the operator list rather than on pixels
+(this tab's canvas readback is not trustworthy) — page 2 print-intent fetch: **41 ops with an empty
+`annotationStorage`, 48 with one `/Ink` authored by the editor**, with the cache control in place (a second
+fetch through a fresh `doc.annotationStorage.print` instance returned the same key and the same 41, so the
+key is content-derived and the two fetches are the same request shape). `separateAnnots` stayed
+`{form: false, canvas: false}` either way, which is the same answer the print pipeline already relies on.
+So pdf.js draws stored ink itself at print intent, and the fold is safe.
+
+The same fetches found a defect, filed rather than fixed here: the display-intent list is **48 ops plain,
+16 with `isEditing: true`**, keys differing — pdf.js leaves annotation drawing out of the canvas when told
+an editor is on screen, and `PdfPage` never says. `#123`.
+
+**#122 — do editors survive the shell? (2026-09-26.)** One authored editor of each kind, then zoom
+100 %→110 %→fit-width, a 90° turn, and `single`→`spread`→`continuous` (the layout switch is the unmount
+lever, because scroll-driven mounting cannot be reached in this tab: the handler defers its state update
+into a frame that never arrives). Every stage re-read the manager, the annotation storage and each editor's
+box relative to its own page. **Zoom and unmount pass cleanly**: three editors stayed in the manager and in
+storage the whole way, detached exactly when their page unmounted (`layout-single` → one layer, one page,
+page 2's editors `attached: false` but still in storage), and came back with identical page-relative
+geometry. The same DOM node came back, not a rebuilt one — each `div` was stamped with its editor id before
+the churn and the stamp survived all eight stages, which is the re-adoption `render({viewport})` is for. A
+final `saveDocument()` after everything: **8,606 bytes, Highlight 2 / Ink 2 / FreeText 2, every other
+subtype at its baseline** — nothing lost and nothing duplicated by the rebuilds.
+
+**Rotation failed, twice, in two different places.** First the layer: pdf.js writes `data-main-rotation` on
+`.pjsr-editor-layer` just as it does on the text and annotation layers — measured `"90"` with
+`transform: none` — so the page turned (792×612) and its marks stayed in unrotated space. `annotate.css`
+now mirrors the core sheet's three swap rules for that layer, and the fix is measured rather than assumed:
+a mark authored upright still covers its words after the turn (span `747,72,16×268`, editor
+`746,71,19×269`), with the same probe reporting `71,27,269×19` — misaligned — once the rule is disabled at
+runtime. Second the authoring path: a highlight **made while the page is turned** displayed across its own
+text — editor `926,89,330×19` over a span at `909,90,15×329`.
+
+**The second failure was not the stylesheet, and not the data.** Marking the same sentence upright and then
+at 90° produced page-space data that agrees to 0.2 pt (`rect [71.3,723.7,334.8,738.6]` against
+`[71.3,723.9,334.8,738.9]`), so a reader's download was never at risk — this was placement only. Disabling
+the per-editor rule at runtime put the turned-authored mark exactly on its words (`908,89,19×330` against a
+span at `909,90,15×329`), which names the cause: pdf.js tags such an editor `data-editor-rotation="270"`
+for a viewer that leaves the **layer** unrotated and turns each box instead, and we turn the layer, so the
+mark was transformed twice. `annotate.css` therefore carries no `[data-editor-rotation]` rules — the
+deliberate omission is commented where the rules would have been — and the shell now drives scale and
+rotation through the bus (`scalechanging`/`rotationchanging`, the events the manager registers in its
+constructor and does real work in) rather than assigning `viewParameters`, which had also been setting
+`realScale` 1.3333× low. Measured after: all four states — upright, turned, authored-while-turned, back
+upright — report their mark covering the text, and `realScale` is the engine's own `scale × PDF_TO_CSS_UNITS`
+(1.6225 → 2.1634). The one number it left unmeasured — whether an ink stroke's on-screen width tracks zoom — is
+taken in `#123`'s section below, and it does.
+
+**#118 — popups, keyboard access, announcements (2026-09-26.)** Three fixes, one retraction.
+* **A note could be seen but not used.** The engine's own sheet pairs `pointer-events: none` on the popup's
+  container with `pointer-events: auto` and `user-select: text` on the note itself; our port had the first
+  half and then `user-select: none`. Measured after the fix: `pointerEvents: auto`, `userSelect: text`,
+  `cursor: text`. The hit-test I also wrote for this came back `null` — a 0×0 window has no point to hit —
+  so the computed styles carry the claim, not that probe.
+* **Announcements needed our own words.** The manager's alert argument was null, which silenced
+  `a11yAlert`; but handing it a plain element would not have helped either — it writes only
+  `data-l10n-id`, which conveys nothing while `l10n` is null. The Runner now creates a clipped
+  `role="status"` region, observes that attribute, and writes the mapped catalog string into it
+  (`highlightAdded` / `freeTextAdded` / `inkAdded`), then clears the attribute so a second highlight of the
+  same kind is a mutation and not a no-op. Measured: `"Highlight added"` after one mark, again after the
+  second, no leftover attribute.
+* **Focus and selection are now visible on the mark**, which they must be because this viewer hides the
+  engine's toolbar: rules in the CSSOM, and a focused editor reports `outline-style: solid`, a selected one
+  `1.6px` (reported value; `dpr` rounding) in `--pjsr-accent`.
+* **Retracted: "annotations are unreachable by keyboard".** I read the popup's `click`/`pointerenter`
+  bindings, found no `Enter` among them, wrote a keydown bridge — and the measurement then showed Enter no
+  longer toggling. `PopupElement.#keyDown` already binds `Enter` (and `Escape` when pinned) on the
+  annotation container, so my handler was toggling it twice. Removed; re-measured without it: three Enters,
+  three `hidden` flips, focus retained, and Enter on a non-popup annotation does nothing and throws nothing.
+  The bridge was ~20 lines of new behaviour in `PdfPage` that the engine already provided — the usual cost
+  of inferring a gap from a source read instead of testing the baseline first.
+* Delete-by-keyboard was confirmed working while I was there: with an editor active
+  (`uiManager.setActiveEditor`, which is what registers a selection — `editor.select()` alone does not), a
+  `Delete` keydown took the count from 2 to 1. A labelled delete button in the bar is now cheap, since
+  `hasSelection` is available from `editingstateschanged`; it belongs with the colour control in `#120`.
+
+**#123 — who paints the mark.** `page.render` now receives `isEditing`, and a spy on `PDFPageProxy.prototype.render`
+says so rather than the code implying it: arming produced `p1 isEditing=true` and `p2 isEditing=true` in one commit,
+disarming `isEditing=false` for both — exactly one call per mounted page per toggle. What the flag takes out of the
+canvas is the worker's `isEditable` set and nothing else: page 1 goes from 80 operators to 71 (its one highlight
+leaves, its underline, strikeout, squiggle, note and five popups stay), page 2 from 41 to 16 (ink and free text
+leave, both popups stay). The other half of the claim is that what left is still painted, measured with a tool
+armed: each editable annotation is held by an editor whose `annotationElementId` names it
+(`Highlight/10R` → `_HighlightEditor`, `Ink/15R` → `_InkEditor`, `FreeText/16R` → `_FreeTextEditor`), each attached
+to its page with a box (489×29, 165×64, 191×42), and each annotation's own layer element reporting `hidden: true`.
+After disarming, the editors are gone — the engine `remove()`s a converted editor that has not been modified, in
+`AnnotationEditorLayer.disable()` — and all three elements read `present hidden=false`, so the canvas paints them
+again. Nothing is ever painted by nobody: the pairing is the engine's own, because `updateMode` reaches
+`#enableAll()`/`#disableAll()` for the same predicate `annotationEditorEditing` reports (`mode !== NONE`), and the
+reference viewer computes it identically at `web/pdf_viewer.mjs:9732`.
+
+* **Retracted: "arming costs 4 repaints per page pair."** It costs two renders for two mounted pages, and the four
+  came from my oracle: a `MutationObserver` reads `target.width` at *callback* time, so all four records reported
+  the value the canvas had already settled on. Shadowing the `width` accessor on each canvas logged the real
+  sequence — `c0 → 0, c1 → 0, c0 → 1241, c1 → 1241`, every write from `PdfPage` itself (the cleanup releases the
+  pixel buffer, the next run sizes it) and none from pdf.js in this path, which takes the canvas dimensions it is
+  given. Re-running the original counter with `attributeOldValue: true` reproduces it: two `1241→…` and two
+  `0→1241`. The fix was to the measurement, not to the component; there was no doubled render to find.
+* **The arm race, timed rather than assumed:** the render call goes out at 17 ms, both pages' editors exist by
+  18 ms, the repaints settle at 26 ms. So the transient is ~8 ms of the mark painted twice, not a window where
+  nobody paints it — the benign direction, and why the reference viewer's `pagerendered` barrier
+  (`web/pdf_viewer.mjs:9741`) is not worth porting yet.
+* **Filed as `#126`: the repaint is document-wide.** `annotationEditorEditing` knows nothing about pages, so arming
+  re-renders every mounted canvas. On `outline-sample.pdf` — three pages, two mounted, **no annotations at all** —
+  that is still two renders with `isEditing=true` and zero editors produced, pure cost. The viewer guards it with
+  `hasEditableAnnotations()`; we could too, off the annotation list `PdfPage` already fetches, but the pressure
+  case is a long document and the fixture that shows it is `#114`.
+* **Closed on the side: the ink width `#125` left unmeasured.** It tracks zoom, to four decimals: the draw layer's
+  svg carries `stroke-width = thickness × realScale`, its path carries `vector-effect: non-scaling-stroke` so the
+  value lands in screen pixels, and the three zooms measured 4.3268 → 4.66667 → 5.33333 px against `realScale`
+  2.1634 → 2.3333 → 2.6667 — ratios 1.0785 and 1.2326, identical to the scale's own. The same page carries a
+  suggestive neighbour: the shell's own freehand layer reads `stroke-width="3.2451"` at that moment, which is
+  `thickness × scale` without the `96/72` — the same 1.3333 factor `#125`'s `realScale` bug carried, arriving
+  instead from a unit convention (that tool's width is a screen-pixel choice, this one a PDF point). Not a defect
+  in either, and one more reason `#124` has to pick one of the two inks rather than keep both.
+
+**#114 and #119 — XFA composes, and the fixture records why it took three tries.** `0.3` wrote that pdf.js's
+parser rejects a hand-written packet. That was true of *that* packet and it is not true in general:
+`playground/fixtures/xfa-sample.pdf`, built by `scripts/make-xfa-pdf.mjs`, renders. Four conditions gate the path
+at all (`get xfaFactory`, `pdf.worker.mjs:60003`): `enableXfa`, `/NeedsRendering true` on the **catalog**, an
+`/XFA` entry in the AcroForm, and **no `/Fields`** — a document with both is an AcroForm wearing an XFA hat and
+never reaches the parser. The two capability flags `0.3` reports are computed from that same pair, and the
+fixture reads `IsXFAPresent: true`, `IsAcroFormPresent: false`, which is the whole point of surfacing them.
+
+* **Three shapes, each found by a failed run rather than by reading the spec.** The datasets island needs the
+  `<data>` wrapper (`Binder` reads `root.datasets.data`, and `DatasetsNamespace` knows only `datasets` and
+  `data`). The page box comes from `<medium short="500pt" long="700pt"/>` and from nowhere else —
+  `PageArea[$toHTML]()` checks `this.medium`, warns *"XFA - No medium specified in pageArea: please file a bug"*
+  without it, and the page div then has no size, so `XFAFactory.dims` are `NaN`. And a data element named
+  `name`, `length` or `prototype` kills the parse with `DatasetsNamespace[e] is not a function`: the factory is
+  a **class**, so `Object.hasOwn(DatasetsNamespace, 'name')` is true and the "element factory" it finds is
+  `Function.name`. `<name>` is an ordinary field name in real forms, so that one is a pdf.js bug; the fixture's
+  fields are `applicantName`/`applicantCountry` and the generator's self-check fails if a datasets element ever
+  collides again.
+* **The failure mode is the finding, not the shapes.** None of the three shows up as a degraded render. Layout
+  throwing is caught inside `_createPages()`, which leaves `dims` undefined, and the *next* line —
+  `getNumPages()` reading `this.dims.length` — rejects the **load**. Both bad attempts surfaced as
+  `UnknownErrorException: Cannot read properties of undefined (reading 'length')` with no document, no
+  capabilities, and no hint about the template. So with `enableXfa` on by default (ours, and the viewer's), a
+  document whose template pdf.js cannot lay out is one the shell cannot open at all. `Compatibility` has to say
+  that, because "we render XFA" would otherwise imply a graceful path that does not exist.
+* **What the shell did before, measured rather than remembered.** An XFA document in `0.5`'s viewer showed
+  **zero text spans and zero canvas operators** — a blank sheet. `0.3`'s "renders nothing" was right about the
+  outcome and wrong about the mechanism: `page.getTextContent()` *does* return the XFA strings (it
+  short-circuits to `XfaText.textContent`), which is why search can index such a document, while the text
+  layer's `page.streamTextContent()` has no XFA branch at all, which is why nothing was painted.
+* **The wiring.** `PdfPage` renders the tree into a child div of `.pjsr-xfa-layer` and keeps that div in a ref,
+  because `XfaLayer.render` **appends** — rendering the same div twice gives 40 elements where one gives 20,
+  measured — and re-uses it through `XfaLayer.update`, which only re-applies the transform, exactly as
+  `XfaLayerBuilder` does. The text layer is skipped for these pages, as the reference viewer skips it
+  (`!pdfPage.isPureXfa`, `web/pdf_viewer.mjs:7165`): the layer holds the form's own words and a second copy
+  would be selectable twice. Two stylesheet facts: the geometry of every node arrives inline from the template,
+  so the ported rules only position the layer and style the widgets; and `.xfaLayer` must be given
+  `position: absolute; top: 0; left: 0; transform-origin: 0 0` over a `position: relative` `.xfaPage`, without
+  which the form flows *below* the canvas — measured at 806 px down the page before the rule was written.
+* **Measured after.** The fixture's MediaBox is 612×792 and its template box is 500×700; the mounted page is
+  500×700 (`pageInfoView [0, 0, 500, 700]`), so the **template drives the geometry and the shell's layout math
+  follows it unchanged** — no `getXfaPageViewport` equivalent needed. The layer's box is the canvas's box
+  (`0,0,993×1390` at scale 1.986), two `<input>`s carry the bound datasets values (`Ada Lovelace`, `United
+  Kingdom`), and 21 elements is the count at every stage: after a zoom step to scale 2 the same div still holds
+  21, the field keeps the typed value and the caret, a 90° rotation moves the field inside the turned page
+  (`146,173,26×346`, transform `matrix(0, 1.44, -1.44, 0, 1008, 0)`), and rotating back reproduces the upright
+  boxes exactly. Selection works on layer text, and with the annotate feature enabled the toolbar shows **no**
+  annotate control while the page still composes — the `isPureXfa` gate from `0.3` doing the job the reference
+  viewer does with a console warning. Cost: core 23.39 → **23.60 kB**, shell 49.46 → **49.96 kB**.
+* **Two gaps, both filed rather than smoothed over.** `#127`: saving an edited XFA document throws
+  (`Cannot read properties of null (reading 'toString')`), which may be the engine's XFA-packet rewriter
+  needing an array-form `/XFA` entry that this single-stream fixture does not have — so the sentence "XFA
+  persistence is excluded" is still unmeasured, and the docs must not claim either way. `#128`: search marks
+  and thumbnails both read the canvas, so on an XFA page a match is found but nothing is highlighted and the
+  sidebar thumbnail is an empty 132×185 buffer.
+* **One harness fact that cost a detour.** There is no warning channel to read: 6.3's
+  `PDFDocumentLoadingTask` has `onProgress` and `onPassword` and **no `onWarning`**, and the worker's `warn()`
+  is a `console.warn` inside the worker, so `XFA - No medium specified in pageArea` and
+  `DatasetsNamespace[e] is not a function` were visible only in the tab's console log. Two consequences for
+  how diagnostics are built here: the page must be asked for its own `getXfa()`/`getTextContent()` when the
+  goal is to see what the XFA path produced (`page.htmlForXfa` is not a thing in this version — it is
+  `getXfa()`, and the document-level one is `allXfaHtml`), and a spike that loads a document through the app
+  must prove the *new* document mounted, because polling for "a canvas exists" answers immediately from the
+  one already on screen. The `xfa` probes measured a stale thesis paper that way before the poll was fixed.
+* **Cost.** Core 23.39 → **23.60 kB gz**, shell 49.46 → **49.96 kB**, `all` 31.78 → 31.98; the XFA rules
+  ride in the core stylesheet, because a page's rendering cannot be an opt-in the way a toolbar control can.
+
+**#120 — the host's event, two controls, and a save gate that was never looking at annotations.** What
+shipped: `onAnnotationChange` on the shell, derived from the manager's own `editingstateschanged`; a
+highlight-colour select and a Delete in the annotate group; `readEditingState`, `readEditingParams` and the
+palette out of `lib/editing-state` and through both barrels; the label catalog 106 → **115** keys across
+`0.6`, two of them this task's (`deleteAnnotation`, `highlightColour`). The
+event needs no plumbing of its own because the manager merges every dispatch into its previous state and
+fires only on a difference, so the viewer hears about a keyboard delete exactly when the engine considers
+one to have happened.
+
+* **The colour bug was silent, and the first explanation of it was wrong.** A palette value written
+  `FFFF00` is valid input to pdf.js's parser and invalid as a paint, and an invalid `fill` resolves
+  *through inheritance* rather than failing — so a reader's highlight was a black bar over their text. My
+  first report said the mark was invisible; measured against the fix it was `rgb(0, 0, 0)` where
+  `#FFFF00` gives `rgb(255, 255, 0)`. The palette now carries its `#`s and
+  `editing-state.test.ts` asserts the built string's shape, because the failure mode is a page that looks
+  vandalised rather than an error.
+* **One dispatch covers both cases a colour control can mean.** `switchannotationeditorparams` reaches
+  `updateParams`, which recolours the *selected* editors and, with nothing selected, sets the default for
+  the next mark — so the viewer needs no mode logic to make "recolour this" and "paint the next one this
+  colour" the same control. The swatch reads back through `annotationeditorparamschanged`, which is why it
+  can show the colour of a mark this viewer did not make.
+* **`setActiveEditor` does not select, and a probe that assumed it did produced a false reading for a
+  while.** It sets the private `#activeEditor` and pushes `propertiesToUpdate` at the UI; `#selectedEditors`
+  — what `hasSelectedEditor`, and so `canDelete`, reports on — is filled by `selectAll`/`#selectEditors`.
+  Re-measured through the real path: Delete is `disabled` in **both** DOM copies of the group at rest, live
+  the moment a mark exists (creating one selects it), live under `selectAll`, and after the click editors
+  `2 → 0`, svg marks `2 → 0`, storage `4 → 3`, disabled again, and the host log reads
+  `delete=true → delete=false`.
+* **Deleting a mark the file already had is not the same as deleting one the reader made.** Two editors went
+  away and only one storage entry did, because `removeEditor` drops a new editor's entry and keeps the one
+  carrying an `annotationElementId` — a pre-existing annotation has to be *recorded as deleted* or the save
+  puts it back. Unmeasured before this; it is the reason a deletion survives a round trip.
+* **`isEmpty` is not "unchanged", and the sentence in the prop's docs is now measured.**
+  `HighlightEditor.isEmpty()` is `!lines.length`, and `#isEmpty()` asks the whole document: zero editors is
+  empty, one editor defers to it. So a mark made over a whitespace text span — which is what
+  `spans[0]` of a pdf.js text layer often is — is an **empty** editor, and the state says empty with a mark
+  visibly on the page. After every mark is deleted, `isEmpty` is true while `canUndo` is still true. A host
+  that gated Save on `isEmpty` would therefore lose work on close, which is the reason the event publishes
+  both rather than one merged flag.
+* **The defect that mattered: the download control never saved annotations.**
+  `download({ withFormValues })` chose its branch on `forms.isDirty`, and `isDirty` compares *field values*.
+  Measured on `annotated-sample.pdf` with one highlight on the page and nothing else changed:
+  `getData()` returned 6,058 B with the pristine file's own hash and one `/Highlight`; `saveDocument()`
+  returned 7,067 B with two. So a document marked up in a viewer without `formsFeature` — or with it, and no
+  field touched — downloaded clean, silently. The gate is now `forms.isDirty || annotate.editing.canUndo`,
+  and the fix is asserted at the byte level through the control: untouched → 6,058 B, identical; one mark →
+  7,067 B with the second `/Highlight` and an incremental update. `withFormValues` was renamed
+  **`saveEdits`** in the same change, because the name is what hid the bug: `saveDocument()` writes the whole
+  `annotationStorage`, and field values and marks are the same kind of entry in it.
+* **`annotationStorage.size` is the tempting gate and the wrong one.** Arming the highlight tool converts the
+  file's own annotations into editors, which puts **three** entries in storage with the reader having
+  changed nothing; disarming takes it back to zero. `canUndo` is false in that state, true after one mark,
+  false after undoing it and true after a mark-then-delete — which is the right answer in all four cases,
+  with the last one saving a file that did not need it. That is the benign direction, and the reason the
+  undo stack is the gate.
+* **A type that flattered its call sites, caught by the first feature-level DOM test.** `usePdfFeaturePeer`
+  was declared to return `S` while the store's `get()` hands back a frozen `{}` until the peer's effect
+  publishes — so `annotate.editing.canUndo` threw on the first render of every viewer that mounted both
+  features. The hook now returns `Partial<S>`; the crash became four tests in `features/download.test.tsx`,
+  one per peer combination.
+* **Dead surface, measured before deleting.** `parseHighlightPalette` had no user in `src` — every consumer
+  builds the palette string rather than parsing it — and dropping it plus its two re-exports took shell
+  51.02 → **50.88 kB** and headless 26.93 → **26.78 kB**, leaving `core+annotate` unchanged at 25.51: the
+  bundler had already shaken it out of the feature, so it was only ever costing the entry points that
+  published it. Those two shell/headless figures are the readings at that moment; the 50.87 and 26.78
+  below are after the download gate, which moved them again.
+* **Cost, accepted in the same change.** Shell 49.07 → **50.87 kB**, headless 25.79 → **26.78**,
+  `core+annotate` +1.37 and `all` +1.39 over the 0.6 re-baseline, through `npm run size:update`; the
+  annotate feature itself is 1.85 kB of its 4 kB gate, and download moved 0.75 → 0.77 for the two-peer ask.
+* **Two readings that were wrong before they were right, recorded because both looked fine.** The
+  playground log prepends, so a `slice(-3)` of it reported the three *oldest* events of the session and
+  appeared to show the delete's effect on state several steps early; and the probe that "proved" a selection
+  had made one with `setActiveEditor`. Both were fixed by measuring the engine's own numbers instead of the
+  harness's, which is the same lesson `#123` recorded in a different dress.
+
+### 0.6.0 — closed 2026-09-26
+
+Cumulative measured cost, gzipped, worst of esbuild and Rollup: core **22.97 → 23.66 kB** (+0.69 for
+the editor wiring every page carries), shell **48.29 → 50.87**, headless **25.78 → 26.78**. Over core:
+print 2.53, download 0.77, forms 1.96, outline 0.95, layers 1.19, attachments 1.08, **annotate 1.85**;
+all seven **32.75 kB** (+9.09). `annotate.css` is the seventh sheet, 11,648 B source → 3,891 B minified.
+The catalog is **115** strings (106 before this release). **313 tests in 25 files**, up from 288. The
+baseline was re-accepted twice — once for the feature and its controls, once at the close so the
+committed numbers are exact and every quoted figure in README, docs and this file matches them.
+
+**The release's real defect was in the feature that already existed.** Download chose
+`saveDocument()` on `forms.isDirty`, which reads field values only, so annotation marks were written to
+storage and then left out of the file: 6,058 B identical to the original with one `/Highlight`, against
+7,067 B with two. `0.6` shipped the authoring tools; without the gate fix the reader's marks would have
+evaporated on save, which is the whole point of the release. It is measured on both sides — the annotate
+round trip and a form-field edit that actually differs from the document's own value (5,582 B from the
+control, byte-identical to `saveDocument()`, against 5,073 B from `getData()`).
+
+**What the close pass found: nothing broken, and three bugs in its own harness.** All eight fixtures
+mount with the right page counts, the editor layer present, and **zero console errors**; the XFA fixture
+still reports 21 layer elements, 0 text spans and 0 canvas ink, exactly as `#119` measured. Three
+apparent failures were mine, and each was killed by a number rather than by reasoning: a
+`.pjsr-password-actions button` selector clicked **Cancel** (the submit is `button[type=submit]`), which
+produced `error: "No password given"` and `numPages: 0` — the "encrypted document never mounts" report;
+typing `Ada Lovelace` into `fullName` set nothing dirty because that is what the fixture already holds,
+which is why that download was byte-identical; and searching for `the` in `outline-sample.pdf` returned
+nothing because the fixture's text is "Page 1: Introduction … Phase 4 fixture" — `Page` returns 1 of 3
+with two marks on the page, with the editor layer mounted. **The rule this is the third instance of: a
+close pass that reports a defect must first show the same oracle passing on an input known to be good.**
+
+**Two things this release does not claim.** Saving an edited XFA document (`#127`) and the cost of
+arming a tool on a long document (`#126`, the document-wide repaint). Both are filed with their
+measurement, and the docs say so rather than implying the surface is complete.
 
 ### 0.7.0 — Edit: writing the engine cannot do
 The only release that touches the zero-dependency rule.
@@ -567,7 +1020,9 @@ what `0.4` shipped; each is recorded so the later releases inherit the list rath
   what it will send.
 * **`findFeatureKey` returns the winning binding but not the feature it came from.** Harmless today;
   `0.6`'s editor layer will want both, to say which feature refused a chord. A return-shape change, so
-  it has to happen before the API freeze.
+  it has to happen before the API freeze. **Already satisfied** — checked while designing `0.6`: the
+  signature in `src/lib/features.ts:200` is `{ feature, binding } | null` and the loop returns both. This
+  bullet outlived the change that fixed it, which is what a review of the review is for.
 * **`INK_COLORS` and `INK_WIDTHS` are exported mutable arrays**, so a consumer that sorts one in place
   changes every viewer on the page. Freezing them is an API-surface change and belongs with the same
   freeze review.
@@ -587,10 +1042,11 @@ what `0.4` shipped; each is recorded so the later releases inherit the list rath
 
 ## Spikes and gates
 
-* **Spike A — before `0.6` closes.** For each editor type: create an annotation, call
-  `saveDocument()`, diff the bytes. Decides which types `0.6` may honestly ship as persistent and
-  which must wait for `0.7`. Form fields already survive; editors are newer machinery, so expect a
-  partial result.
+* **Spike A — taken, 2026-09-26.** Each editor type created, `saveDocument()` called, the returned bytes
+  reopened and their annotations counted: highlight, ink and free text persist; stamp and signature break
+  the save instead of persisting; underline, strikeout and squiggly cannot be created or edited by this
+  engine at all. The full result, including the four collaborators the shell has to supply, is in
+  *Spike A, second pass* under `0.6.0 — Mark`.
 * **Spike B — before `0.7` closes.** Compare candidate writers on size, ESM quality and maintenance,
   and confirm one works as an optional peer the core build never imports.
 * Sequencing: `0.2`'s `labels` gates `0.5` (no double string extraction); `0.3` gates `0.6` (an
@@ -601,21 +1057,54 @@ what `0.4` shipped; each is recorded so the later releases inherit the list rath
 ## Fixtures we do not have
 
 `playground/fixtures/` holds generated PDFs for forms, outlines, RC4 encryption, CID cMaps,
-document-level JavaScript, and — added for `0.5` — embedded files plus three optional-content groups
-(`attachments-ocg-sample.pdf`, one group off by default). Later releases additionally need: an XFA
-document, a pre-annotated PDF (to exercise editing and deleting existing annotations), a
-signature-bearing form, and a 20-page PDF for reorder. These should come from generator scripts like
-the existing `scripts/make-*-pdf.mjs`, not downloads.
+document-level JavaScript, embedded files plus three optional-content groups
+(`attachments-ocg-sample.pdf`, one group off by default), and — added for `0.6` —
+`annotated-sample.pdf` (`scripts/make-annotated-pdf.mjs`): page 1 carries a highlight, underline,
+strikeout and squiggly over known text plus a sticky note, page 2 an ink stroke and a free-text box,
+each with a `/Popup`. Verified in the browser: both annotation layers render, all seven markup classes
+appear, console clean.
+
+Also added for `0.6`: `xfa-sample.pdf` (`scripts/make-xfa-pdf.mjs`), a **pure XFA** document — a catalog
+with `/NeedsRendering true`, an AcroForm whose `/XFA` is one embedded XDP packet and which has no
+`/Fields`, a template with a `<medium>`-sized page area and four marked objects, and a datasets island
+that binds two values into fields. Its MediaBox (612×792) deliberately disagrees with the template box
+(500×700) so a measurement can tell which one the shell laid the page out from; it composes, and
+`#119` renders it. The generator asserts the four container conditions and the packet's shape before
+writing a byte, because every one of them was violated in an earlier attempt that then failed as an
+opaque load error.
+
+Still needed: a signature-bearing form (a `/Sig` field — the reason `FR-16` stays *partial* above), the
+1,000-page document for the `PRD.md:22` performance bar, and a 20-page PDF for reorder. An XFA packet in
+the **array** form (`/XFA [ '' <xdp> '/template' … '/datasets' … ]`), which is what real producers write
+and what `#127` needs to settle persistence, is also still missing. These should come from generator
+scripts like the existing `scripts/make-*-pdf.mjs`, not downloads.
 
 ## Policy conflicts to resolve
 
-* **Peer floor.** Resolved for the engine major in `0.1.2`: the range is now `^5.0.0 || ^6.2.108`,
-  the floor being set by CVE-2026-16633 (`>= 5.6.83, < 6.2.108`, no 5.x patched) rather than by our
-  own API usage. **Still open for `0.6`:** the editor classes live under `display/editor/*` and
-  `AnnotationEditorType.SIGNATURE` / `TextLayerImages` are recent additions, so `0.6` needs the floor
-  raised to whatever version introduced them — a breaking peer change, which the CHANGELOG policy
-  says to announce loudly even at `0.x`. Note the security floor and the feature floor may end up
-  demanding different things, in which case dropping v5 entirely becomes the cleaner answer.
+* **Peer floor — resolved for `0.6`, measured 2026-09-26.** The range had been `^5.0.0 || ^6.2.108`,
+  where the 6.x floor came from CVE-2026-16633 (`>= 5.6.83, < 6.2.108`, **no 5.x release fixes it**) and
+  the 5.x half was permitted by our own API usage, not endorsed by it. `0.6`'s editor layer is what forced
+  the question, and the answer came from parsing `build/pdf.mjs` in each version rather than from the
+  type declarations, because Node cannot import that module at all:
+
+  | Version | `AnnotationEditorUIManager` constructor | Editor layer options |
+  | --- | --- | --- |
+  | 5.0.375 | **14 positional args** — no `viewerAlert`, no `commentManager`, so every later slot shifts | identical ten keys |
+  | 5.7.284 | 16 — `(container, viewer, viewerAlert, altTextManager, commentManager, signatureManager, eventBus, pdfDocument, pageColors, highlightColors, enableHighlightFloatingButton, enableUpdatedAddImage, enableNewAltTextWhenAddingImage, mlManager, editorUndoBar, supportsPinchToZoom)` | identical ten keys |
+  | 6.2.108 / 6.3.289 | the same 16, same order | identical ten keys |
+
+  Positional parameters mean this is not a detail: one call cannot serve both 5.0.x and 5.7+, because
+  5.0.375 would receive `viewerAlert` in the `altTextManager` slot and `altTextManager` in
+  `signatureManager`'s — an editor layer configured wrong, silently. `TextLayerImages` is also absent
+  from 5.0.375 while everything else in the set exists throughout. So the security floor and the feature
+  floor did end up demanding different things, exactly as this bullet predicted, and the clean answer is
+  the one it named: **`^6.2.108` only, v5 dropped.** Keeping `^5.7.0` alongside would work signature-wise
+  but means advertising a line with no patch for a high-severity engine CVE — supporting it would be
+  promising to test a configuration we advise against. Consequences: the CI `consumer` matrix collapses to
+  one engine, and the 5.x compatibility branches already in the tree (`normalizeAttachments`' inline
+  `content`, the `getAttachmentContent` feature test, the legacy `order`/`groups` fallbacks) become dead
+  code to remove as part of `0.6`'s seam work, announced as the breaking peer change the CHANGELOG policy
+  requires.
 * **v6 runtime coverage.** `0.1.2` verified 6.3.289 by hand in a browser and the CI `consumer` job now
   builds the packed tarball against `^5` and `^6.2.108`. That coverage must be kept: every later
   release should pass on both, and `0.7`'s writer work should be measured on 6.x, not 5.7.284.
@@ -625,3 +1114,12 @@ the existing `scripts/make-*-pdf.mjs`, not downloads.
 * **Changing the unpkg default in `0.3`** is a behavior change. `CHANGELOG.md` counts only API, CSS
   token and supported-major changes as breaking, so a default flip is arguably a minor — decide it
   deliberately rather than by accident.
+* **FR-18 asks for "freehand drawing/signatures"; the engine cannot sign.** `PRD.md:122` names signatures
+  alongside freehand drawing, and Spike A measured that pdf.js 6.3 will not do it: a signature editor needs
+  a `SignatureManager`, which is not among the 62 names the package root exports, and while an editor with
+  no signature data sits in the annotation storage `saveDocument()` throws — so offering the tool would put
+  a reader's download at risk for a mark they cannot complete. The resolution `0.6` takes is that the
+  requirement's drawn mark is served by ink (already shipped: freehand strokes that print and save), a
+  cryptographic `/Signature` widget is not in any release, and the PRD row stays as the customer wrote it
+  rather than being edited to match what turned out to be possible. If signatures are genuinely required,
+  they are a separate feature to price, not a toggle to flip.

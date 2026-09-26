@@ -1,0 +1,313 @@
+/* pdfjs-react-reader — annotation editors, shipped with features/annotate
+ * Import this alongside 'pdfjs-react-reader/styles.css'. The theme tokens live
+ * in the core sheet; everything here is rules this file needs and the core
+ * stylesheet must not carry, because a feature you did not ask for should not be
+ * styled for.
+ *
+ * Why these particular rules and not a port of the engine's ~1,000 lines of
+ * editor CSS: `pdfjs-react-reader` names its own layers, and the engine positions
+ * what it builds entirely from class selectors it owns. Every rule below is one
+ * that a measurement found load-bearing — without `position: absolute` on an
+ * editor, for instance, the boxes are static and stack in normal flow at the
+ * bottom of the page, and the toolbar's inline `top: calc(… + var(…))` resolves
+ * to `auto` when the token it references is missing. */
+
+/* Two tokens pdf.js reads off `document.documentElement` with `getComputedStyle`
+ * while its editor classes initialise, which is why they cannot live on the
+ * layer: `--freetext-padding` is `parseFloat`'d with no fallback (absent means
+ * NaN, and every free-text box then sizes wrong), and `--outline-width` becomes
+ * the pixel-to-page-unit conversion for an editor's border. */
+:root {
+  --freetext-padding: 6px;
+  --outline-width: 2px;
+}
+
+.pjsr-editor-layer {
+  position: absolute;
+  inset: 0;
+  /* Above the annotation layer's own z-index, because an editor has to be
+     clickable where its annotation already is. */
+  z-index: 3;
+  transform-origin: 0 0;
+  /* The engine's editors measure handles and padding against this: a layer whose
+     font-size is inherited is a layer of 14px handles on a 100%-scaled page. */
+  font-size: calc(100px * var(--total-scale-factor, 1));
+  cursor: auto;
+  /* Appears inside the `top` the engine writes for a selected editor's toolbar. */
+  --editor-toolbar-vert-offset: 8px;
+}
+
+/* No tool armed: the layer must not stand between the reader and text selection,
+ * the wheel, or a form widget. `disabled` is the class the engine toggles when it
+ * releases pointer events, and it is on the layer from construction. */
+.pjsr-editor-layer.disabled {
+  pointer-events: none;
+}
+
+/* Highlight mode is the exception: the markups stay hittable so a reader can
+ * select one, while the gaps between them keep selecting text. */
+.pjsr-editor-layer.disabled.highlightEditing
+  :is(.freeTextEditor, .inkEditor, .stampEditor, .highlightEditor .internal) {
+  pointer-events: auto;
+}
+
+.pjsr-editor-layer.freetextEditing {
+  cursor: text;
+}
+
+.pjsr-editor-layer.inkEditing {
+  cursor: crosshair;
+}
+
+/* The engine adds `waiting` while it gathers what a tool needs. */
+.pjsr-editor-layer.waiting {
+  content: '';
+  cursor: wait;
+}
+
+/* A turned page. pdf.js writes `data-main-rotation` on this layer exactly as it
+ * does on the text and annotation layers — measured `"90"` with
+ * `transform: none`, which left every editor sitting in unrotated page space
+ * while its page turned: the mark lay across the wrong axis, and a new one
+ * dropped where the pointer was not. The same swap the core sheet applies to the
+ * other two layers, kept here because the core sheet must not carry rules for a
+ * feature the application did not ask for (FR-22). */
+.pjsr-editor-layer[data-main-rotation='90'] {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.pjsr-editor-layer[data-main-rotation='180'] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+.pjsr-editor-layer[data-main-rotation='270'] {
+  transform: rotate(270deg) translateX(-100%);
+}
+
+/* The editor boxes. Their `left`/`top`/`width`/`height` arrive as inline
+ * percentages from the engine, so nothing here chooses a position — it only makes
+ * positioning possible. */
+.pjsr-editor-layer :is(.freeTextEditor, .inkEditor, .stampEditor, .highlightEditor) {
+  position: absolute;
+  background: transparent;
+  z-index: 1;
+  max-width: 100%;
+  max-height: 100%;
+  transform-origin: 0 0;
+  /* A drag inside an editor is drawing, not scrolling. */
+  touch-action: none;
+  cursor: auto;
+  border: 0;
+  outline: 0;
+}
+
+.pjsr-editor-layer .selectedEditor {
+  z-index: 4;
+}
+
+/* Focus and selection have to be visible on the mark itself, because this viewer
+ * hides the engine's selection toolbar — its buttons carry a `data-l10n-id` and
+ * no accessible name once `l10n` is null. Measured before: a keyboard reader could
+ * land on a mark (`tabIndex` 0, `role="mark"`, labelled with the words it covers)
+ * and see nothing at all. The two states get different treatments because they
+ * mean different things: focus is where the reader is, selection is what the next
+ * keystroke acts on. */
+.pjsr-editor-layer :is(.highlightEditor, .freeTextEditor, .inkEditor, .stampEditor):focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: 1px;
+}
+
+.pjsr-editor-layer .highlightEditor:focus-visible .internal {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: 1px;
+}
+
+.pjsr-editor-layer .selectedEditor {
+  outline: 2px solid color-mix(in srgb, var(--pjsr-accent) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pjsr-editor-layer :is(.highlightEditor, .freeTextEditor, .inkEditor, .stampEditor) {
+    transition: outline-color 0.12s;
+  }
+}
+
+/* No `[data-editor-rotation]` rules here, and that is deliberate rather than an
+ * omission. pdf.js tags an editor authored on a turned page with the counter-
+ * rotation for a viewer that leaves the *layer* unrotated and turns each box
+ * instead. We turn the layer, the way the engine's own sheet turns any element
+ * carrying `data-main-rotation`, so applying both transforms one mark twice:
+ * measured, a highlight made while the page sat at 90° displayed as a 330×19 band
+ * across a 15×329 line, and the same mark displayed at 908,89,19×330 — on its
+ * words — with only the layer turned. The saved data was right either way; this
+ * is placement. */
+
+/* ---------- highlight ---------- */
+/* The box never takes a pointer; its `internal` does. Without this pair a
+ * highlight swallows the selection it was made from. */
+.pjsr-editor-layer .highlightEditor {
+  pointer-events: none;
+}
+
+.pjsr-editor-layer .highlightEditor .internal {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.pjsr-editor-layer .highlightEditor.disabled .internal {
+  pointer-events: none;
+}
+
+/* ---------- ink ---------- */
+.pjsr-editor-layer .inkEditor .inkEditorCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* ---------- free text ---------- */
+.pjsr-editor-layer .freeTextEditor {
+  padding: calc(var(--freetext-padding) * var(--total-scale-factor, 1));
+  width: auto;
+  height: auto;
+  line-height: 1.15;
+}
+
+/* The engine writes the font-size inline (`calc(10px * var(--total-scale-factor))`)
+ * because the layer's 100px anchor is not what text should inherit. */
+.pjsr-editor-layer .freeTextEditor .internal {
+  overflow: visible;
+  white-space: nowrap;
+  text-align: start;
+  background: transparent;
+  border: 0;
+  color: var(--pjsr-fg);
+  /* Not selectable while resting: a click on existing text should select the
+     page's text, and only editing mode (`contenteditable`) takes it back. */
+  user-select: none;
+}
+
+.pjsr-editor-layer .freeTextEditor .internal:focus {
+  outline: 0;
+  user-select: auto;
+}
+
+.pjsr-editor-layer .freeTextEditor .internal:empty::before {
+  content: attr(default-content);
+  color: var(--pjsr-muted-fg);
+}
+
+.pjsr-editor-layer .freeTextEditor .overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.pjsr-editor-layer .freeTextEditor .overlay.enabled {
+  display: block;
+}
+
+/* ---------- the draw layer ---------- */
+/* Highlight and ink outlines are appended to the canvas wrapper by `PdfPage`
+ * (`setParent` is never called inside pdf.js), and each gets inline percentages
+ * for its box. Static, they ignore those and overflow the page in both
+ * directions; they must never take a pointer, because they cover the text. */
+.pjsr-canvas-wrapper > svg {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* ---------- the engine's selection toolbar ---------- */
+/* Hidden on purpose, and not an unfinished affordance. It is built by pdf.js with
+ * `data-l10n-id` attributes only, and this viewer passes `l10n: null` to the layer,
+ * so every button in it is nameless — and its icons come from image assets in the
+ * engine's own folder that this package does not ship. What a reader can do
+ * without it: move and resize by dragging the box or its handles, and delete from
+ * the keyboard while the editor has focus. Colour and a labelled delete belong to
+ * the viewer's own bar, where both can be translated; until they exist the toolbar
+ * would be an accessibility defect with a shadow on it. */
+.pjsr-editor-layer .editToolbar {
+  display: none;
+}
+
+/* The live region the editor announcements are written into. Clipped rather than
+ * `display: none` or `visibility: hidden`, because a live region that is not in
+ * the accessibility tree before the text changes is announced late or not at all —
+ * the whole point is the change, so the box has to be present and unreadable-only. */
+.pjsr-alert {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- the feature's own tool picker ---------- */
+.pjsr-annotate {
+  display: flex;
+  align-items: center;
+  gap: var(--pjsr-cluster-gap);
+}
+
+/* The armed tool reads as pressed, and keeps the accent on its icon rather than a
+ * filled plate, so three adjacent buttons do not turn into one bright block. */
+.pjsr-annotate .pjsr-button[aria-pressed='true'] {
+  color: var(--pjsr-accent);
+  background: color-mix(in srgb, var(--pjsr-accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pjsr-accent) 40%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pjsr-annotate .pjsr-button {
+    transition:
+      color 0.12s,
+      background-color 0.12s;
+  }
+}
+
+/* The colour the next mark will use, shown as a plate rather than only a word:
+ * "Pink" and "Red" are one letter apart in a collapsed select, and the reader is
+ * choosing a paint. The border keeps a near-white colour from vanishing into the
+ * toolbar, and the shadow makes it read as a control rather than a swatch of paper. */
+.pjsr-annotate-swatch {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid var(--pjsr-border);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pjsr-fg) 8%, transparent);
+}
+
+/* The palette as a select, not pdf.js's ColorPicker: that one is a toolbar widget
+ * whose labels come from Fluent, and this viewer hides the engine's toolbar. A
+ * select is keyboard-native, announces its own value, and needs no icon assets. */
+.pjsr-annotate-colour {
+  box-sizing: border-box;
+  height: var(--pjsr-control-h);
+  padding: 0 6px;
+  border: 1px solid var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+  background: var(--pjsr-bg);
+  color: var(--pjsr-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pjsr-annotate-colour:focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: 1px;
+}

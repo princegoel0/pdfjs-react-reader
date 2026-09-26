@@ -43,17 +43,47 @@ const download = usePdfDownload({ doc, fileName: 'contract.pdf' });
 
 // Original bytes, untouched.
 download.download();
-// Incremental update carrying the current form values.
-download.download({ withFormValues: true });`}</code>
+// Incremental update carrying what is in the annotation storage.
+download.download({ saveEdits: true });`}</code>
       </pre>
       <p>
-        <code>withFormValues</code> uses <code>saveDocument()</code>, which produces an editable
-        form — the <code>/AcroForm</code> dictionary survives, values are written as{' '}
-        <code>/V</code> with regenerated appearances. It is not a flatten. The{' '}
-        <code>downloadFeature</code> passes <code>withFormValues</code> only when{' '}
-        <code>formsFeature</code> is mounted and <code>isDirty</code> is true, so an untouched
-        document — or one whose form feature you never imported — downloads byte-identical to the
-        original.
+        <code>saveEdits</code> uses <code>saveDocument()</code>, which produces an editable form — the{' '}
+        <code>/AcroForm</code> dictionary survives, values are written as <code>/V</code> with
+        regenerated appearances, and annotation marks go in as annotations rather than painted into
+        the page. It is not a flatten. Without it you get <code>getData()</code>, which is the file as
+        it was loaded — measured: with one highlight on the page and nothing else changed,{' '}
+        <code>getData()</code> returned the original 6,058 bytes and <code>saveDocument()</code>{' '}
+        returned 7,067 with a second <code>/Highlight</code> in them.
+      </p>
+      <p>
+        The <code>downloadFeature</code> control decides that for you: it saves when{' '}
+        <code>formsFeature</code> reports <code>isDirty</code> <em>or</em> <code>annotateFeature</code>{' '}
+        reports <code>canUndo</code>, and hands back the original file otherwise. The second half is
+        recent and load-bearing — asking only the form feature meant a document marked up without one
+        downloaded with the marks missing. <code>canUndo</code> is the flag that works because arming a
+        tool is not an edit: converting the page&apos;s own annotations into editors puts entries in{' '}
+        <code>annotationStorage</code> without the reader having changed anything, so the storage&apos;s
+        size says &ldquo;save&rdquo; when nothing needs saving.
+      </p>
+
+      <h2>Gate your own save on the editor</h2>
+      <pre>
+        <code>{`<PdfViewer
+  src="/contract.pdf"
+  features={[annotateFeature, downloadFeature]}
+  onAnnotationChange={(state) => {
+    setSaveEnabled(state.canUndo);       // not state.isEmpty
+    setDirty(state.canUndo);             // "discard your changes?" on close
+  }}
+/>`}</code>
+      </pre>
+      <p>
+        <code>state.canDelete</code> is what a Delete button of your own reads, <code>isEditing</code>{' '}
+        says a tool is armed or a mark is active, and <code>hasSelectedText</code> says the highlight
+        tool has something to work on. The event is the engine&apos;s own report, so it fires for a
+        change made with the keyboard as readily as one made through this viewer&apos;s controls — and{' '}
+        <code>isEmpty</code> is not a save gate: after every mark is deleted it reads empty while the
+        deletion itself is still unsaved.
       </p>
 
       <h2>Read and write forms programmatically</h2>
@@ -134,7 +164,8 @@ node scripts/make-outline-pdf.mjs    # 3 pages, bookmarks, named destinations
 node scripts/make-encrypted-pdf.mjs  # RC4-40 encrypted, password "secret"
 node scripts/make-cjk-pdf.mjs        # CID-encoded, so the cMap path is exercised
 node scripts/make-scripted-pdf.mjs   # document-level JavaScript
-node scripts/make-attachments-ocg-pdf.mjs  # 3 attached files + 3 layers, one off by default`}</code>
+node scripts/make-attachments-ocg-pdf.mjs  # 3 attached files + 3 layers, one off by default
+node scripts/make-annotated-pdf.mjs  # highlight, underline, strikeout, squiggly, note, ink, free text`}</code>
       </pre>
     </>
   );

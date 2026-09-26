@@ -1,0 +1,202 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 60 0 R /Annots [10 0 R 110 0 R 11 0 R 111 0 R 12 0 R 112 0 R 13 0 R 113 0 R 14 0 R 114 0 R] >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 61 0 R /Annots [15 0 R 115 0 R 16 0 R 116 0 R] >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Highlight /F 4 /CA 0.4 /Rect [72 697 372 713] /C [1 1 0] /QuadPoints [72 713 372 713 72 697 372 697] /P 4 0 R /Popup 110 0 R /T (Reviewer) >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Underline /F 4 /CA 0.4 /Rect [72 673 340 689] /C [0 0 0] /QuadPoints [72 689 340 689 72 673 340 673] /P 4 0 R /Popup 111 0 R  >>
+endobj
+12 0 obj
+<< /Type /Annot /Subtype /StrikeOut /F 4 /CA 0.4 /Rect [72 649 356 665] /C [1 0 0] /QuadPoints [72 665 356 665 72 649 356 649] /P 4 0 R /Popup 112 0 R  >>
+endobj
+13 0 obj
+<< /Type /Annot /Subtype /Squiggly /F 4 /CA 0.4 /Rect [72 625 388 641] /C [0 0.6 0] /QuadPoints [72 641 388 641 72 625 388 625] /P 4 0 R /Popup 113 0 R  >>
+endobj
+14 0 obj
+<< /Type /Annot /Subtype /Text /F 4 /Name /Comment /Rect [520 700 536 716] /C [1 0.8 0.2] /Contents (Check the figures against the 2025 returns) /P 4 0 R /Popup 114 0 R >>
+endobj
+15 0 obj
+<< /Type /Annot /Subtype /Ink /F 4 /CA 1 /Rect [72 500 200 560] /C [0 0 0] /Border [0 0 2] /InkList [[76 504 92 552 120 508 150 548 196 512]] /P 5 0 R /Popup 115 0 R >>
+endobj
+16 0 obj
+<< /Type /Annot /Subtype /FreeText /F 4 /Rect [72 430 300 462] /C [0.6 0.6 1] /DA (/F1 12 Tf 0 g) /Contents (Inserted by a reader) /TexColor [0 0 0] /P 5 0 R /Popup 116 0 R >>
+endobj
+60 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 612 792] /Length 598 >>
+stream
+BT /F1 16 Tf 1 0 0 1 72 750 Tm (Marked up before you opened this file) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 727 Tm (The sentence below carries four text annotations.) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 700 Tm (Highlighted, underlined, struck out and squiggled.) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 676 Tm (A second line is underlined here for comparison.) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 652 Tm (A third line is struck out here instead.) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 628 Tm (And a fourth is squiggled to mark uncertainty.) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 596 Tm (The note icon at the top right has an open popup.) Tj ET
+endstream
+endobj
+61 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 612 792] /Length 276 >>
+stream
+BT /F1 16 Tf 1 0 0 1 72 750 Tm (Page two holds an ink stroke and free text.) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 727 Tm (Both were authored by another viewer, not by pdf.js.) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 480 Tm (The ink above is one polyline; the box below is editable text.) Tj ET
+endstream
+endobj
+110 0 obj
+<< /Type /Annot /Subtype /Popup /Parent 10 0 R /Rect [380 697 540 793] /X 12 /Y -12 >>
+endobj
+111 0 obj
+<< /Type /Annot /Subtype /Popup /Parent 11 0 R /Rect [348 673 508 769] /X 12 /Y -12 >>
+endobj
+112 0 obj
+<< /Type /Annot /Subtype /Popup /Parent 12 0 R /Rect [364 649 524 745] /X 12 /Y -12 >>
+endobj
+113 0 obj
+<< /Type /Annot /Subtype /Popup /Parent 13 0 R /Rect [396 625 556 721] /X 12 /Y -12 >>
+endobj
+114 0 obj
+<< /Type /Annot /Subtype /Popup /Parent 14 0 R /Rect [520 580 700 700] /X 12 /Y -12 /Open true >>
+endobj
+115 0 obj
+<< /Type /Annot /Subtype /Popup /Parent 15 0 R /Rect [210 480 390 600] /X 12 /Y -12 >>
+endobj
+116 0 obj
+<< /Type /Annot /Subtype /Popup /Parent 16 0 R /Rect [310 410 490 530] /X 12 /Y -12 >>
+endobj
+xref
+0 117
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000191 00000 n 
+0000000403 00000 n 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000570 00000 n 
+0000000754 00000 n 
+0000000925 00000 n 
+0000001096 00000 n 
+0000001268 00000 n 
+0000001456 00000 n 
+0000001641 00000 n 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000001833 00000 n 
+0000002533 00000 n 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000002911 00000 n 
+0000003015 00000 n 
+0000003119 00000 n 
+0000003223 00000 n 
+0000003327 00000 n 
+0000003442 00000 n 
+0000003546 00000 n 
+trailer
+<< /Size 117 /Root 1 0 R >>
+startxref
+3650
+%%EOF

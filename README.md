@@ -4,10 +4,10 @@ A headless-first PDF viewer for React, built directly on [pdfjs-dist](https://ww
 MIT-licensed, no feature behind a paywall.
 
 It ships the parts that are tedious to get right — virtualized rendering, the canvas/text/annotation
-layer stack, worker lifecycle, whole-document search, AcroForm editing, printing — as hooks you can
-drive from your own interface, plus an optional drop-in component for when you just need a viewer.
-In that component, a capability is an import rather than a prop, so the bundle holds only the ones you
-mounted.
+layer stack, worker lifecycle, whole-document search, AcroForm editing, annotation editing, printing —
+as hooks you can drive from your own interface, plus an optional drop-in component for when you just
+need a viewer. In that component, a capability is an import rather than a prop, so the bundle holds
+only the ones you mounted.
 
 Every one of those has a runnable example on the
 [documentation site](https://princegoel0.github.io/pdfjs-react-reader/).
@@ -35,8 +35,8 @@ export function Report() {
 
 `<PdfViewer src="…" />` on its own is a viewer that reads: pages, selectable text, search,
 thumbnails, ink, zoom, rotation, layout. Print, save, fillable form widgets, the bookmarks tab, the
-layers tab and the attachments tab are `printFeature`, `downloadFeature`, `formsFeature`,
-`outlineFeature`, `layersFeature` and `attachmentsFeature`.
+layers tab, the attachments tab and marking up the document are `printFeature`, `downloadFeature`,
+`formsFeature`, `outlineFeature`, `layersFeature`, `attachmentsFeature` and `annotateFeature`.
 
 ## What it does
 
@@ -51,8 +51,15 @@ Core, in every import of the shell:
   matches. Supply your own `find` object and the bar runs on your answers instead.
 - **Thumbnails, rotation, layout modes** (continuous, single page, two-page spread). Rotation works
   per page as well as globally, and the text and annotation layers turn with it.
-- **Annotations on screen** — link annotations and markup render read-only; freehand ink is stored in
-  PDF user space, so zoom and rotation both map correctly, and it prints.
+- **Annotations, read or written** — link annotations and markup render as the file says, and
+  `annotateFeature` turns that layer into an editor: highlight, free text and ink, a colour chosen from
+  the engine's own palette, and a Delete that is live only while a mark is selected. The marks are real
+  PDF annotations, so they survive zoom, rotation and scrolling a page out of the way, and
+  `downloadFeature` writes them into the file. Freehand ink without the feature is stored in PDF user
+  space, so zoom and rotation both map correctly, and it prints.
+- **XFA forms render** — a pure-XFA document is painted from its template by `XfaLayer` rather than
+  showing nothing, at the page size the template asks for. Filling one in and saving it back is not
+  supported.
 - **Document structure that acts** — a link that switches a layer does switch it, and the layers panel
   agrees with it; a paperclip annotation saves the file it carries on double-click or `Ctrl/Cmd + Enter`.
 - **Encrypted documents** with a built-in password prompt you can replace.
@@ -61,7 +68,9 @@ Core, in every import of the shell:
   from your own origin, an opt-in Trusted Types policy, and a `capabilities` report of what the
   opened document declares.
 - **Driven from code** — a `ref` handle (`goToPage`, `zoomTo`, `rotatePage`, `search`,
-  `toggleFullscreen`, …) and change events that report what the user did rather than what mounted.
+  `toggleFullscreen`, …) and change events that report what the user did rather than what mounted:
+  page, scale, layout, fullscreen, and `onAnnotationChange` for what the editor can undo, delete or
+  save right now.
 - **Gestures** — Ctrl/Cmd + wheel (which is also how a trackpad pinch arrives), two-finger pinch on
   touch, keyboard paging, optional drag-and-drop to open a file, any percentage from 25 % to 500 %, and
   an `Automatic` mode that fits a landscape page whole and a portrait one by width.
@@ -77,22 +86,23 @@ Opt-in, one import each:
 
 | Feature | Adds | Cost over core |
 | --- | --- | --- |
-| `features/print` | Print at print intent — all pages, the current one, or a range the reader picks — honouring stored form values and ink, with a memory-budgeted resolution, a cancellable progress loop and `Ctrl/Cmd + P`. | 2.49 kB |
-| `features/download` | Download of the original bytes, or an incremental save carrying the edits. | 0.71 kB |
+| `features/print` | Print at print intent — all pages, the current one, or a range the reader picks — honouring stored form values and ink, with a memory-budgeted resolution, a cancellable progress loop and `Ctrl/Cmd + P`. | 2.53 kB |
+| `features/download` | Download of the original bytes, or an incremental save carrying the edits — field values and annotation marks both ride the same storage. | 0.77 kB |
 | `features/forms` | AcroForm widgets — text, checkbox, radio, choice, button — wired to pdf.js annotation storage, with `createFormsFeature({ onChange })` and programmatic get/set/reset. | 1.96 kB |
-| `features/outline` | The bookmarks sidebar tab. | 0.90 kB |
-| `features/layers` | A sidebar tab listing the document's optional-content groups, switching one and having every page redraw. | 1.16 kB |
-| `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.07 kB |
+| `features/outline` | The bookmarks sidebar tab. | 0.95 kB |
+| `features/layers` | A sidebar tab listing the document's optional-content groups, switching one and having every page redraw. | 1.19 kB |
+| `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.08 kB |
+| `features/annotate` | Marking up the document: pdf.js's own editor manager behind three tools — highlight, free text, ink — with a highlight colour from the engine's palette, and a Delete that is live only while a mark is selected. Undo and redo are on the state the feature publishes, so the controls are yours to place. | 1.85 kB |
 
-All six together cost 7.35 kB, less than their sum, because they share the shell they attach to.
+All seven together cost 9.09 kB, less than their sum, because they share the shell they attach to.
 They are also the reference for writing your own: the contract and the authoring hooks are public.
-(Those are the current `0.5.0` build's numbers; see [Size](#size) for how they are measured.)
+(Those are the `0.6` build's numbers; see [Size](#size) for how they are measured.)
 
 ## Requirements
 
 | Package | Required | Tested with |
 | --- | --- | --- |
-| `pdfjs-dist` | `^5.0.0 \|\| ^6.2.108` | 6.3.289 |
+| `pdfjs-dist` | `^6.2.108` | 6.3.289 |
 | `react` | `^18.0.0 \|\| ^19.0.0` | 18.3.1, 19.3.0 |
 | `react-dom` | `^18.0.0 \|\| ^19.0.0` | 18.3.1, 19.3.0 |
 
@@ -102,9 +112,13 @@ Nothing else at runtime — no state library, no date library, no polyfills, no 
 `canvasContext.canvas`), so a v4 install would show blank pages rather than fail loudly. 4.2.67 also
 lacks the `TextLayer` export. See [CHANGELOG.md](./CHANGELOG.md) for the full reasoning.
 
-The 6.x floor is `6.2.108` rather than `6.0.0` on purpose: CVE-2026-16633 (high — arbitrary
-JavaScript execution when opening a malicious PDF) affects `>= 5.6.83, < 6.2.108`, and no 5.x release
-fixes it. v5 stays supported, but if you can move to `6.2.108` or later you should.
+The floor is `6.2.108` rather than `6.0.0` on purpose: CVE-2026-16633 (high — arbitrary JavaScript
+execution when opening a malicious PDF) affects `>= 5.6.83, < 6.2.108`, so 6.0.x and 6.1.x are inside
+the vulnerable band as much as v5 is. v5 was supported until `0.6`, which dropped it: pdf.js's
+`AnnotationEditorUIManager` takes its arguments **positionally**, and 5.0.x has two fewer of them, so
+the same call cannot configure an editor layer on both lines — and 5.7+, where the signature matches,
+has no release that fixes the CVE. Supporting it would mean advising a line we simultaneously tell you
+to leave.
 
 Your bundler needs to handle ESM and `exports` maps — Vite 5+, webpack 5+, Rollup 4+, esbuild and
 Turbopack all work. There is no CommonJS build.
@@ -115,8 +129,8 @@ Turbopack all work. There is no CommonJS build.
 | --- | --- |
 | `pdfjs-react-reader` | Everything: the `PdfViewer` shell, its parts, the feature contract, and every headless hook. Importing `PdfViewer` does not drag in features you did not mount. |
 | `pdfjs-react-reader/headless` | Hooks and pure helpers only — no shell components. |
-| `pdfjs-react-reader/features/{print,download,forms,outline,layers,attachments}` | One optional capability each. |
-| `pdfjs-react-reader/styles.css` + `/print.css` `/forms.css` `/outline.css` `/layers.css` `/attachments.css` | The default theme for the core chrome, as CSS custom properties, then one sheet per feature. Separate files because a bundler drops CSS that no JavaScript imports — import the sheets for what you mounted, and nothing else. |
+| `pdfjs-react-reader/features/{print,download,forms,outline,layers,attachments,annotate}` | One optional capability each. |
+| `pdfjs-react-reader/styles.css` + `/print.css` `/forms.css` `/outline.css` `/layers.css` `/attachments.css` `/annotate.css` | The default theme for the core chrome, as CSS custom properties, then one sheet per feature that has markup of its own. Separate files because a bundler drops CSS that no JavaScript imports — import the sheets for what you mounted, and nothing else. |
 
 ## Headless
 
@@ -237,13 +251,14 @@ function ReadingView(props) {
 ```
 
 `ViewerRoot` carries the theme tokens, the keyboard and drop handlers and the mounted features'
-runners, so print, save, forms and the outline panel work there exactly as they do in the default
-layout; your own components inside it read the same state through `useViewer()`.
+runners, so print, save, forms, the outline panel and the annotation editors work there exactly as
+they do in the default layout; your own components inside it read the same state through
+`useViewer()`.
 
 ## Writing a feature
 
 A feature is a value: a `Runner` component that owns the hooks and publishes state, plus optional
-toolbar controls, a sidebar panel, key bindings and per-page props. The four built-ins are written
+toolbar controls, a sidebar panel, key bindings and per-page props. The seven built-ins are written
 against this same contract.
 
 ```tsx
@@ -340,7 +355,8 @@ declared on `.pjsr-viewer`:
 
 Because the viewer declares the tokens on its own root, set them on that element — a stylesheet rule
 as above, or the `style` prop for a runtime value. The rules are spread across one sheet per tier
-(`styles.css`, then `print.css`, `forms.css`, `outline.css`, `layers.css`, `attachments.css`) so a
+(`styles.css`, then `print.css`, `forms.css`, `outline.css`, `layers.css`, `attachments.css`,
+`annotate.css`) so a
 feature you did not mount also costs you no CSS, but they all read the same tokens. See
 `docs/src/examples/ThemeExample.tsx` for full dark
 and sepia presets.
@@ -368,24 +384,25 @@ under `(pointer: coarse)`, 32 px with a mouse.
 
 ## Size
 
-Gzipped, excluding `pdfjs-dist` and React (both peer dependencies). Measured on the `0.5.0` build:
+Gzipped, excluding `pdfjs-dist` and React (both peer dependencies). Measured on the `0.6` build:
 each row is one consumer file bundled with esbuild and with Rollup, and the larger of the two, so a
 path only counts as small if two independent tree-shakers agree.
 
 | What you import | Size | Over core |
 | --- | --- | --- |
-| `PdfViewer`, no features — pages, text, search, ink, thumbnails, chrome | 22.97 kB | — |
-| `+ printFeature` | 25.46 kB | +2.49 kB |
-| `+ downloadFeature` | 23.68 kB | +0.71 kB |
-| `+ formsFeature` | 24.92 kB | +1.96 kB |
-| `+ outlineFeature` | 23.87 kB | +0.90 kB |
-| `+ layersFeature` | 24.12 kB | +1.16 kB |
-| `+ attachmentsFeature` | 24.03 kB | +1.07 kB |
-| All six | 30.31 kB | +7.35 kB |
+| `PdfViewer`, no features — pages, text, search, ink, thumbnails, chrome | 23.66 kB | — |
+| `+ printFeature` | 26.19 kB | +2.53 kB |
+| `+ downloadFeature` | 24.43 kB | +0.77 kB |
+| `+ formsFeature` | 25.62 kB | +1.96 kB |
+| `+ outlineFeature` | 24.60 kB | +0.95 kB |
+| `+ layersFeature` | 24.85 kB | +1.19 kB |
+| `+ attachmentsFeature` | 24.74 kB | +1.08 kB |
+| `+ annotateFeature` | 25.51 kB | +1.85 kB |
+| All seven | 32.75 kB | +9.09 kB |
 | A single headless hook (`usePdfDocument`) | 2.59 kB | — |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
-48.29 kB for `index.js` and 25.78 kB for `headless.js`, each with `styles.css`.
+50.87 kB for `index.js` and 26.78 kB for `headless.js`, each with `styles.css`.
 
 CI runs `npm run size`, which compares each path against the numbers committed in
 `size-baseline.json` and fails when one grows more than 2 % above them (plus 256 bytes of slack, so
@@ -430,6 +447,7 @@ node scripts/make-encrypted-pdf.mjs  # RC4-40 encrypted, password "secret"
 node scripts/make-cjk-pdf.mjs        # CID-encoded, so the cMap path is exercised
 node scripts/make-scripted-pdf.mjs   # document-level JavaScript
 node scripts/make-attachments-ocg-pdf.mjs  # 3 attached files + 3 layers, one off by default
+node scripts/make-annotated-pdf.mjs  # highlight, underline, strikeout, squiggly, note, ink, free text
 ```
 
 `playground/` exercises the whole surface against generated fixtures (AcroForm, outline with named
@@ -439,7 +457,7 @@ development, against the built `dist` in CI.
 
 ## Status
 
-Version `0.5.0`, built on `dev`. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are committed
+Version `0.6.0`, built on `dev`. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are committed
 locally and publish together with `1.0.0`, which is the shipping rule in
 [`ROADMAP.md`](./ROADMAP.md) §Releases. While the package is pre-1.0 a minor may break the API — `0.4`
 did, with six `PdfViewer` props becoming four feature imports — so pin exactly.

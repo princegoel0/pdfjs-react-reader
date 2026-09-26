@@ -13,6 +13,7 @@ import 'pdfjs-react-reader/print.css';
 import 'pdfjs-react-reader/forms.css';
 import 'pdfjs-react-reader/outline.css';
 import 'pdfjs-react-reader/layers.css';
+import 'pdfjs-react-reader/annotate.css';
 import 'pdfjs-react-reader/attachments.css';
 
 // Deliberately no `workerSrc`: auto-detection is the path that regressed in 0.1.0.

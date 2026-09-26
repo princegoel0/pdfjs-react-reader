@@ -37,10 +37,16 @@ export function Introduction() {
           spread; thumbnails are core, and the bookmarks tab is a feature you import.
         </li>
         <li>
-          <strong>Forms, printing and download as features.</strong> Interactive AcroForm widgets
-          (text, checkbox, radio, choice, button) wired to pdf.js annotation storage; a print
-          pipeline that renders every page at print intent; a save that can carry your form edits.
-          Each is an import, and each is measured in the Footprint table below.
+          <strong>Forms, annotation editing, printing and download as features.</strong> Interactive
+          AcroForm widgets (text, checkbox, radio, choice, button) wired to pdf.js annotation storage;
+          highlight, free text and ink marks that are real PDF annotations and go back into the file on
+          save; a print pipeline that renders every page at print intent; a save that can carry your
+          edits. Each is an import, and each is measured in the Footprint table below.
+        </li>
+        <li>
+          <strong>XFA forms render.</strong> A pure-XFA document is painted from its own template
+          instead of showing a blank page — reading and filling are pdf.js&apos;s, and saving one back
+          is not supported.
         </li>
         <li>
           <strong>Freehand ink.</strong> Core, and it goes to the printer with the page.
@@ -84,7 +90,9 @@ export function Introduction() {
           </tr>
           <tr>
             <td>
-              <code>pdfjs-react-reader/features/{'{print | download | forms | outline}'}</code>
+              <code>
+                pdfjs-react-reader/features/{'{print | download | forms | outline | layers | attachments | annotate}'}
+              </code>
             </td>
             <td>
               One optional capability each: its <code>Runner</code>, toolbar control, keys and panel,
@@ -102,11 +110,13 @@ export function Introduction() {
           </tr>
           <tr>
             <td>
-              <code>pdfjs-react-reader/{'{print | forms | outline}'}.css</code>
+              <code>
+                pdfjs-react-reader/{'{print | forms | outline | layers | attachments | annotate}'}.css
+              </code>
             </td>
             <td>
-              The rules for those three features' markup, as separate files because a bundler drops
-              CSS that no JavaScript imports.
+              The rules for those features' markup, as separate files because a bundler drops CSS that
+              no JavaScript imports.
             </td>
           </tr>
         </tbody>
@@ -131,55 +141,62 @@ export function Introduction() {
             <td>
               <code>PdfViewer</code> alone — pages, text, search, ink, thumbnails, chrome
             </td>
-            <td>22.97 kB</td>
+            <td>23.66 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>
               <code>+ printFeature</code>
             </td>
-            <td>25.46 kB</td>
-            <td>+2.49 kB</td>
+            <td>26.19 kB</td>
+            <td>+2.53 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ downloadFeature</code>
             </td>
-            <td>23.68 kB</td>
-            <td>+0.71 kB</td>
+            <td>24.43 kB</td>
+            <td>+0.77 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ formsFeature</code>
             </td>
-            <td>24.92 kB</td>
+            <td>25.62 kB</td>
             <td>+1.96 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ outlineFeature</code>
             </td>
-            <td>23.87 kB</td>
-            <td>+0.90 kB</td>
+            <td>24.60 kB</td>
+            <td>+0.95 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ layersFeature</code>
             </td>
-            <td>24.12 kB</td>
-            <td>+1.16 kB</td>
+            <td>24.85 kB</td>
+            <td>+1.19 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ attachmentsFeature</code>
             </td>
-            <td>24.03 kB</td>
-            <td>+1.07 kB</td>
+            <td>24.74 kB</td>
+            <td>+1.08 kB</td>
           </tr>
           <tr>
-            <td>All six</td>
-            <td>30.31 kB</td>
-            <td>+7.35 kB</td>
+            <td>
+              <code>+ annotateFeature</code>
+            </td>
+            <td>25.51 kB</td>
+            <td>+1.85 kB</td>
+          </tr>
+          <tr>
+            <td>All seven</td>
+            <td>32.75 kB</td>
+            <td>+9.09 kB</td>
           </tr>
           <tr>
             <td>
@@ -191,13 +208,13 @@ export function Introduction() {
         </tbody>
       </table>
       <p>
-        All six together cost less than their sum, because each is measured against the same core they
+        All seven together cost less than their sum, because each is measured against the same core they
         attach to. The two shipped-file paths are what a bundler that cannot tree-shake pays for the
-        whole entry surface: <strong>48.29 kB</strong> for <code>index.js</code> and{' '}
-        <strong>25.78 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>.
+        whole entry surface: <strong>50.87 kB</strong> for <code>index.js</code> and{' '}
+        <strong>26.78 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>.
       </p>
       <p>
-        Measured on 0.5.0. CI runs <code>npm run size</code>, which compares every path against the
+        Measured on 0.6.0. CI runs <code>npm run size</code>, which compares every path against the
         numbers committed in <code>size-baseline.json</code> and fails on growth beyond 2&nbsp;%
         (+256&nbsp;B of slack for minifier jitter), and fails on its own if any single feature costs
         more than 4&nbsp;kB over core. It is a ratchet rather than a ceiling: a library that grows

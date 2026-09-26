@@ -27,11 +27,11 @@ export function Compatibility() {
               <code>pdfjs-dist</code>
             </td>
             <td>
-              <code>^5.0.0 || ^6.2.108</code>
+              <code>^6.2.108</code>
             </td>
             <td>6.3.289</td>
             <td>
-              The engine. Rendering, text, annotations and printing all go straight to it.
+              The engine. Rendering, text, annotations, editing and printing all go straight to it.
             </td>
           </tr>
           <tr>
@@ -63,7 +63,7 @@ export function Compatibility() {
 # react and react-dom must already be in the app`}</code>
       </pre>
 
-      <h2>Why the 6.x floor is 6.2.108</h2>
+      <h2>Why the floor is 6.2.108, and why v5 went away in 0.6</h2>
       <p>
         Not <code>^6.0.0</code>. <strong>CVE-2026-16633</strong> (<code>GHSA-hq66-cqwq-w95j</code>,
         high) is arbitrary JavaScript execution when a malicious PDF is opened, and it covers{' '}
@@ -71,11 +71,22 @@ export function Compatibility() {
         a permissive 6 floor would advertise vulnerable engines as supported.
       </p>
       <p>
-        More importantly, no 5.x release fixes it. The previous <code>^5.0.0</code> range therefore
-        did more than allow a vulnerable version — it <em>excluded</em> every patched one, so an app
-        following our own docs could not install a fixed <code>pdfjs-dist</code> without a
-        peer-resolution error. v5 remains supported because dropping it would break existing installs
-        for no security gain; if you can move to <code>6.2.108</code> or later, you should.
+        No 5.x release fixes it either. The earlier <code>^5.0.0</code> range therefore did more than
+        allow a vulnerable version — it <em>excluded</em> every patched one, so an app following our
+        own docs could not install a fixed <code>pdfjs-dist</code> without a peer-resolution error. v5
+        stayed supported while that was the only thing at stake: dropping it would have broken installs
+        for no security gain, since a v5 user could not reach a fixed 5.x anyway.
+      </p>
+      <p>
+        Annotation editing changed the balance, and the deciding evidence is mechanical rather than
+        editorial. <code>AnnotationEditorUIManager</code> takes its arguments <strong>positionally</strong>,
+        and 5.0.375 accepts fourteen while 5.7.284 and every 6.x accept sixteen with
+        <code>viewerAlert</code> and <code>commentManager</code> inserted near the front — so the same
+        construction hands <code>viewerAlert</code> to a v5 <code>altTextManager</code> slot and
+        misconfigures the layer in silence. 5.7+ matches 6.x signature-for-signature, but 5.7 is the
+        unpatchable CVE line, so keeping it would mean promising to support a configuration we tell you
+        to leave. The range is <code>^6.2.108</code>, one floor for both reasons. This is a breaking peer
+        change, announced here as the versioning policy requires even at <code>0.x</code>.
       </p>
       <p>
         Note this is the engine's vulnerability, not ours, and we cannot patch it from here. Our own
@@ -151,7 +162,8 @@ export function Compatibility() {
             <td>
               Import <code>pdfjs-react-reader/styles.css</code>, plus{' '}
               <code>print.css</code> / <code>forms.css</code> / <code>outline.css</code> /{' '}
-              <code>layers.css</code> / <code>attachments.css</code> for the
+              <code>layers.css</code> / <code>attachments.css</code> /{' '}
+              <code>annotate.css</code> for the
               features you mounted, or supply your own rules for the <code>.pjsr-*</code> classes. The
               text layer in particular needs its positioning CSS or selectable text will overlay the
               page incorrectly.
@@ -207,7 +219,7 @@ export function Compatibility() {
 
       <h2>Bundle size</h2>
       <p>
-        Gzipped, excluding <code>pdfjs-dist</code> and React, measured on 0.5.0. Each row is a real
+        Gzipped, excluding <code>pdfjs-dist</code> and React, measured on the 0.6 build. Each row is a real
         consumer file bundled once with esbuild and once with Rollup, and the larger number is
         reported, so a path only counts as small if two independent tree-shakers agree. CI fails the
         build when a path grows more than 2&nbsp;% above the numbers committed in{' '}
@@ -225,52 +237,57 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>22.97 kB</td>
+            <td>23.66 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>25.46 kB</td>
-            <td>+2.49 kB</td>
+            <td>26.19 kB</td>
+            <td>+2.53 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>23.68 kB</td>
-            <td>+0.71 kB</td>
+            <td>24.43 kB</td>
+            <td>+0.77 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>24.92 kB</td>
+            <td>25.62 kB</td>
             <td>+1.96 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>23.87 kB</td>
-            <td>+0.90 kB</td>
+            <td>24.60 kB</td>
+            <td>+0.95 kB</td>
           </tr>
           <tr>
             <td>Core + layers</td>
-            <td>24.12 kB</td>
-            <td>+1.16 kB</td>
+            <td>24.85 kB</td>
+            <td>+1.19 kB</td>
           </tr>
           <tr>
             <td>Core + attachments</td>
-            <td>24.03 kB</td>
-            <td>+1.07 kB</td>
+            <td>24.74 kB</td>
+            <td>+1.08 kB</td>
           </tr>
           <tr>
-            <td>All six features</td>
-            <td>30.31 kB</td>
-            <td>+7.35 kB</td>
+            <td>Core + annotate</td>
+            <td>25.51 kB</td>
+            <td>+1.85 kB</td>
+          </tr>
+          <tr>
+            <td>All seven features</td>
+            <td>32.75 kB</td>
+            <td>+9.09 kB</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>48.29 kB</td>
+            <td>50.87 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>25.78 kB</td>
+            <td>26.78 kB</td>
             <td>—</td>
           </tr>
           <tr>
@@ -297,7 +314,7 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.5.0</code>. While it is pre-1.0, minor versions may contain breaking
+        The package is <code>0.6.0</code>. While it is pre-1.0, minor versions may contain breaking
         changes, so pin exactly in an application. <code>0.4</code> is one such minor: six{' '}
         <code>PdfViewer</code> props became four feature imports, listed at{' '}
         <a href="#/features">Features &amp; tiers</a>. The full release entry, the development log and

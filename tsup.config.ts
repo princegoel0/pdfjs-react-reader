@@ -11,6 +11,7 @@ export default defineConfig({
     'features/forms': 'src/features/forms.tsx',
     'features/outline': 'src/features/outline.tsx',
     'features/layers': 'src/features/layers.tsx',
+    'features/annotate': 'src/features/annotate.tsx',
     'features/attachments': 'src/features/attachments.tsx',
   },
   format: ['esm'],

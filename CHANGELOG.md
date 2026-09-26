@@ -5,6 +5,114 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-09-26
+
+Marking. The viewer can now write into the document as well as read it: highlights, free text and ink,
+authored through pdf.js's own editor stack, held in the document's annotation storage, and carried back
+out into the file by Download. XFA forms, which used to render as a blank sheet, now render.
+
+The measurement that scoped the release: of the five editor types the layer registers, **three survive
+`saveDocument()`**. A stamp created with no image has nothing to serialize and the save dies inside
+pdf.js with `Cannot destructure property 'imageRef'`, and `SignatureManager` is not among the 62 names
+the package exports, so a host cannot build one either. So `0.6` ships the three that persist and says so,
+rather than offering two tools that lose the reader's work on save.
+
+### Added
+
+- **`annotateFeature`** (`pdfjs-react-reader/features/annotate`, **+1.85 kB** over core) — pdf.js's
+  `AnnotationEditorUIManager` owned by the feature's `Runner`, one per document, with each page's
+  `AnnotationEditorLayer` registered to it. Three tools in one control — Highlight, Add text, Ink — mutually
+  exclusive, each pressed-again-to-stop, plus a highlight colour and a Delete. `annotate.css` is the seventh
+  sheet (11,648 B source, 3,891 B minified). Marks are real PDF annotations: measured to survive a zoom step,
+  a 90° turn, and their own page being unmounted and remounted, and a `saveDocument()` after eight such
+  stages produced each authored subtype exactly once.
+- **The highlight colour control**, a labelled `select` over the engine's own seven-colour palette with a
+  swatch beside it. It dispatches `switchannotationeditorparams`, which is one call that covers both cases:
+  with a mark selected it recolours that mark, with nothing selected it sets the colour the next mark gets.
+  A `ColorPicker` was not used because it renders the toolbar it expects to live in, whose buttons have no
+  accessible name outside Fluent.
+- **`onAnnotationChange`** on `PdfViewer`, reporting `{ isEditing, isEmpty, canUndo, canRedo, canDelete,
+  hasSelectedText }` from the manager's own `editingstateschanged` — so a host hears about a change made with
+  the keyboard as readily as one made through our controls. Gate a Save on `canUndo`, not `isEmpty`: after
+  every mark is deleted the state reads `empty=true, canUndo=true`, which is a host hiding unsaved work.
+- **`lib/editing-state`**, re-exported from both entries: `readEditingState`, `readEditingParams`,
+  `HIGHLIGHT_COLORS`, `HIGHLIGHT_COLOR_PARAM`, `HIGHLIGHT_PALETTE_STRING`, `DEFAULT_HIGHLIGHT_COLOR`,
+  `type PdfAnnotationState` — the same derivation the shell uses, for a host writing their own editor UI.
+- **`isEditing` now reaches `page.render`** (`#123`). With a tool armed the canvas stops painting the
+  annotations the editors are painting, which is the pairing pdf.js's own viewer computes the same way:
+  fixture page 1 goes 80 → 71 operators (its highlight leaves, its underline, squiggly and note stay), page 2
+  41 → 16.
+- **XFA forms render** (`#119`). A pure-XFA page is painted from its own template by `XfaLayer` into
+  `.pjsr-xfa-layer`, the text layer steps aside as the reference viewer's does, and the template's
+  `<medium>` rather than the MediaBox decides the page box — `xfa-sample.pdf` asks for 500×700 in a 612×792
+  file and mounts at 500×700, with the layout math following unchanged. 21 elements, stable across a zoom and
+  a rotation, edits and caret surviving both.
+- **Annotation popups and keyboard access** (`#118`) — a popup opens on click and pins, the container pair
+  that made hit-testing fail is fixed in `viewer.css`, and the manager's alert region announces additions in
+  the reader's own language. pdf.js only writes `data-l10n-id` and expects Fluent to render it, so the
+  feature observes the attribute, substitutes the catalog string, and removes it (otherwise a repeated
+  announcement is not a mutation and never fires).
+- **Two fixtures with self-checking generators**: `annotated-sample.pdf` (every annotation subtype, plus a
+  paperclip) and `xfa-sample.pdf`. Both generators resolve every reference and validate the xref offsets
+  before writing — the first version of `annotated-sample.pdf` had been silently unusable, dangling four
+  references over the page content streams while the viewer painted a text layer and nothing looked wrong.
+- `core+annotate` is an eighth measured path in `npm run size`, with the marker `createEditorEventBus`:
+  absent from core, present in its own tier. The feature was previously in the export map but not in the
+  marker list, so the shell statically importing it would have passed CI.
+- Nine labels (`106 → 115`), including `deleteAnnotation` and `highlightColour`; `TrashIcon` in the shared
+  icon family.
+
+### Changed
+
+- **The `pdfjs-dist` peer is now `^6.2.108`: v5 is dropped.** `AnnotationEditorUIManager` takes its 16
+  arguments **positionally** and 5.0.x has two fewer, so every later slot shifts — the same construction
+  silently misconfigures a v5 editor layer rather than failing. 5.7 has the matching signature and no
+  release that fixes CVE-2026-16633, so supporting it would mean advising a line we tell you to leave.
+  **Breaking** for a v5 install; the CI consumer matrix is one entry now.
+- **`usePdfDownload`'s `withFormValues` is `saveEdits`. Breaking** for anyone who passed it. The rename is
+  not cosmetic: `saveDocument()` writes the whole `annotationStorage`, in which a field value and a highlight
+  are the same kind of entry, and the old name said only the first.
+- **`usePdfFeaturePeer` returns `Partial<S>`.** A peer publishes from an effect, so on the first render
+  there is nothing there; the hook's type claimed otherwise and the call site obeyed it.
+- **`annotateFeature` takes the shell's freehand toggle out of the bar** while it is mounted, through
+  `PdfFeature.replaces` — folded into the same `hide` list the `controls` prop writes, so `hide` keeps its
+  meaning and a host that already hid it is not contradicted. Nothing was deleted: without the feature the
+  viewer still draws, prints and replays ink. Which of the two inks is the one that saves is a 1.0 decision.
+- Scale and rotation reach the manager as `scalechanging` / `rotationchanging` **dispatches** instead of an
+  assignment to `viewParameters`. The handlers do work invisible from outside — `realScale = scale × 96/72`,
+  the walk over editors waiting to be rescaled, and committing the one in flight — and the assignment was
+  leaving `realScale` 1.3333× low (1.6225 where the engine computes 2.1634).
+
+### Fixed
+
+- **Download dropped the reader's marks.** The control chose its branch on `forms.isDirty`, which compares
+  field values, and `getData()` is the file as it was loaded. Measured with one highlight on the page and
+  nothing else changed: 6,058 B identical to the original and one `/Highlight` in it, against 7,067 B and two
+  from `saveDocument()`. The gate is now either editing peer, and it is proven through the control's own
+  bytes: untouched downloads byte-identical, one mark downloads the mark. `canUndo` is the flag because
+  arming a tool is not an edit — conversion alone puts three entries in storage.
+- **A highlight painted black over the reader's text.** The palette was handing the manager values without
+  their `#`, which parse fine and are invalid as a paint, and an invalid `fill` resolves through inheritance
+  rather than failing. Now `#FFFF00`, measured `rgb(255, 255, 0)` where it had computed to `rgb(0, 0, 0)`.
+- **A crash on the first render of a viewer mounting both editing features** — the nested peer read
+  described above, thrown before any effect had published.
+- **Two rotation defects in the editor layer.** `.pjsr-editor-layer` carries `data-main-rotation` too, so it
+  now mirrors the core sheet's three swap rules (without them a mark sat on blank paper after any turn); and
+  a mark *authored* at 90° no longer displays across its own text — pdf.js sets
+  `data-editor-rotation` for a viewer that leaves the layer unrotated and rotates each box, and we rotate the
+  layer, so applying both transformed it twice. The mark's page-space data was correct the whole time:
+  the same sentence measured upright and sideways agrees to 0.2 pt.
+
+### Notes on verification
+
+`npm run verify` green — typecheck, **313 tests in 25 files**, build, size gate — plus a browser pass over
+the playground and the docs site, whose drop-in example now demos the feature (it is a second host app, and
+it is where `replaces: ['draw']` was confirmed). Baseline re-accepted with `npm run size:update` and every
+quoted figure in the README, the docs pages and the ROADMAP re-derived from it: core 23.66 kB, annotate
++1.85, download +0.77, all seven 32.75, shell 50.87, headless 26.78. Two things this release deliberately
+does not claim: that XFA documents can be saved back (unmeasured, `#127`), and that arming a tool is free
+(document-wide repaint, filed with its measurement as `#126`).
+
 ## [0.5.0] — 2026-09-26
 
 Composition. The viewer's state moved behind one object, the parts became importable, and the toolbar's
@@ -655,8 +763,10 @@ of published versions.
 
 ## How to pick a version
 
-1. Install the same major of `pdfjs-dist` you already use — this package requires `^5.0.0 || ^6.2.108`.
-   On v5 you are on a release with no fix for CVE-2026-16633, so move to 6.2.108 or later when you can.
+1. Install `pdfjs-dist` 6.2.108 or later — that is the whole peer range as of `0.6`. Older majors are
+   not an option: 6.0.x, 6.1.x and every 5.x release carry CVE-2026-16633 (arbitrary JavaScript
+   execution on opening a malicious PDF) with no fix inside the line, and `0.6`'s editor layer cannot be
+   configured on 5.0.x at all because pdf.js passes the manager's arguments positionally.
 2. React 18 or 19 both work; nothing else is required at runtime.
-3. Pin an exact version in an application (`pdfjs-react-reader` `0.4.0`, not `^0.4.0`) until 1.0.0,
+3. Pin an exact version in an application (`pdfjs-react-reader` `0.5.0`, not `^0.5.0`) until 1.0.0,
    because 0.x minor releases may include breaking changes.

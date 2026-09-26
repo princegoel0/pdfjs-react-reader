@@ -442,6 +442,103 @@
   background: color-mix(in srgb, var(--pjsr-accent) 55%, transparent);
 }
 
+/* ---------- XFA pages ---------- */
+/* Adapted from pdf.js pdf_viewer.css (Apache-2.0, © Mozilla). The class names here
+   are the engine's, not ours: `XfaLayer.render` overwrites the container's `class`
+   with `xfaLayer xfaFont` and writes the geometry of every node inline from the
+   template's own layout. So these rules supply only what inline styles cannot —
+   where the layer sits in the page, how the widgets look, and what the pointer may
+   reach. Without the positioning pair the whole form flows *below* the canvas
+   instead of over it, which is what the first measurement of a rendered layer
+   showed: the page div landing 806 px down the page. */
+
+.pjsr-xfa-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.pjsr-xfa-layer .xfaLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  color: var(--pjsr-fg);
+  line-height: 1.2;
+  text-align: initial;
+  background-color: transparent;
+}
+
+.pjsr-xfa-layer .xfaPage {
+  position: relative;
+  overflow: hidden;
+}
+
+.pjsr-xfa-layer .xfaContentarea {
+  position: absolute;
+}
+
+.pjsr-xfa-layer .xfaPrintOnly {
+  display: none;
+}
+
+/* The engine inherits typefaces through this pair; a template that names no font
+   then renders in the viewer's UI font rather than in the browser default. */
+.pjsr-xfa-layer .xfaLayer * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: -0.01px;
+  line-height: inherit;
+  text-align: inherit;
+  background-color: transparent;
+  pointer-events: auto;
+}
+
+.pjsr-xfa-layer .xfaLayer :is(div, svg, svg *) {
+  pointer-events: none;
+}
+
+.pjsr-xfa-layer .xfaLayer a {
+  color: var(--pjsr-accent);
+}
+
+.pjsr-xfa-layer :is(.xfaTextfield, .xfaSelect, .xfaButton, .xfaCheckbox, .xfaRadio) {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background-color: transparent;
+}
+
+.pjsr-xfa-layer .xfaTextfield {
+  resize: none;
+}
+
+.pjsr-xfa-layer .xfaSelect {
+  padding-inline: 2px;
+}
+
+.pjsr-xfa-layer .xfaButton {
+  cursor: pointer;
+  text-align: center;
+}
+
+.pjsr-xfa-layer .xfaRich {
+  white-space: pre-wrap;
+}
+
+.pjsr-xfa-layer :is(.xfaTextfield, .xfaSelect, .xfaButton, .xfaCheckbox, .xfaRadio):focus-visible {
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: -1px;
+}
+
+.pjsr-xfa-layer .xfaLayer *:required {
+  outline: 1.5px solid var(--pjsr-danger-fg);
+}
+
 /* ---------- viewport & pages ---------- */
 
 .pjsr-body {
@@ -496,8 +593,15 @@
   display: block;
 }
 
+/* The canvas's box, and the element the annotation editors append their drawing
+   SVGs to. It stays below the text layer so a highlight tints the page image
+   without dimming the text on top of it. */
+.pjsr-canvas-wrapper {
+  position: relative;
+}
+
 /* ---------- annotation layer (links and markups) ---------- */
-/* Adapted from pdf.js pdf_viewer.css (MIT, © Mozilla); the editor-layer rules
+/* Adapted from pdf.js pdf_viewer.css (Apache-2.0, © Mozilla); the editor-layer rules
    are omitted because we render annotations read/write through pdf.js directly,
    and the form-widget rules live in forms.css with the feature that draws them. */
 
@@ -584,8 +688,15 @@
   box-shadow: var(--pjsr-menu-shadow);
   color: var(--pjsr-fg);
   line-height: 1.4;
-  -webkit-user-select: none;
-  user-select: none;
+  /* The pair the layer above depends on: the popup's container is transparent to
+     the pointer so the page stays interactive around it, and the note itself is
+     not. Measured without these two lines, a hit-test at the popup's own centre
+     returned the text layer beneath it — the note could be seen but not selected,
+     clicked, or copied, which is the only thing a note is for. */
+  pointer-events: auto;
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .pjsr-annotation-layer .popup * {
@@ -841,7 +952,7 @@
 }
 
 /* ---------- text layer ---------- */
-/* Adapted from pdf.js text_layer.css (MIT, © Mozilla). */
+/* Adapted from pdf.js text_layer.css (Apache-2.0, © Mozilla). */
 
 .pjsr-text-layer {
   --scale-round-x: 1px;

@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import { PdfViewer } from '../../dist/index.js';
+import { annotateFeature } from '../../dist/features/annotate.js';
 import { attachmentsFeature } from '../../dist/features/attachments.js';
 import { downloadFeature } from '../../dist/features/download.js';
 import { formsFeature } from '../../dist/features/forms.js';
@@ -17,6 +18,7 @@ export const View = () =>
       formsFeature,
       outlineFeature,
       layersFeature,
+      annotateFeature,
       attachmentsFeature,
     ],
   });

@@ -15,6 +15,7 @@ const sheets = [
   ['src/styles/forms.css', 'dist/forms.css'],
   ['src/styles/outline.css', 'dist/outline.css'],
   ['src/styles/layers.css', 'dist/layers.css'],
+  ['src/styles/annotate.css', 'dist/annotate.css'],
   ['src/styles/attachments.css', 'dist/attachments.css'],
 ];
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyControlConfig, mergeToolbarItems, planToolbarOverflow } from './toolbar';
+import { applyControlConfig, mergeToolbarItems, planToolbarOverflow, withReplacedControls } from './toolbar';
 import type { ToolbarItemMeasure } from './toolbar';
 
 /** The real control set, in visual order, at the desktop token sizes. */
@@ -223,5 +223,43 @@ describe('mergeToolbarItems', () => {
     const out = mergeToolbarItems(base, []);
     expect(out).not.toBe(base);
     expect(out).toEqual(base);
+  });
+});
+
+describe('withReplacedControls', () => {
+  it('hands back the host object untouched when no feature takes anything over', () => {
+    // Identity matters: the toolbar memoises on this, and every viewer that does
+    // not annotate must keep the configuration it already had.
+    const config = { hide: ['meta'], order: ['search', 'page'] } as const;
+    expect(withReplacedControls(config, [])).toBe(config);
+    expect(withReplacedControls(undefined, [])).toBeUndefined();
+  });
+
+  it('adds a hide list where the host had none', () => {
+    expect(withReplacedControls(undefined, ['draw'])).toEqual({ hide: ['draw'] });
+  });
+
+  it('keeps what the host hid and everything else it configured', () => {
+    const out = withReplacedControls(
+      { hide: ['meta'], priorities: { layout: 2 }, order: ['search'] },
+      ['draw'],
+    );
+    expect(out).toEqual({
+      hide: ['meta', 'draw'],
+      priorities: { layout: 2 },
+      order: ['search'],
+    });
+  });
+
+  it('removes the replaced control from a bar that is otherwise configured around it', () => {
+    // The composition the shell relies on: a host that re-ordered `draw` still
+    // loses it, because removal runs before ordering.
+    const list = [
+      { id: 'search', priority: 4 },
+      { id: 'draw', priority: 6 },
+      { id: 'print', priority: 8 },
+    ];
+    const config = withReplacedControls({ order: ['draw', 'search'] }, ['draw']);
+    expect(applyControlConfig(list, config).map((item) => item.id)).toEqual(['search', 'print']);
   });
 });

@@ -5,3 +5,7 @@ playground/dist/
 .DS_Store
 .screenshots/
 *.tgz
+# Scratch spikes: throwaway probes and version installs that should never be
+# staged. Anything produced here has to be reproduced by a real test or script
+# before its result is relied on.
+.spike/

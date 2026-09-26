@@ -130,3 +130,29 @@ export const CloseIcon = (props: IconProps) => (
     <path d="M18 6 6 18M6 6l12 12" />
   </svg>
 );
+
+/** A chisel marker over a baseline: the highlight tool. */
+export const HighlightIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="m10 12 6-6 4 4-6 6z" />
+    <path d="M4 21h8" />
+  </svg>
+);
+
+/** A serif T: the free-text tool, matching the glyph pdf.js draws for it. */
+export const TrashIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="M4 7h16" />
+    <path d="M9 7V4h6v3" />
+    <path d="M6 7l1 13h10l1-13" />
+    <path d="M10 11v5M14 11v5" />
+  </svg>
+);
+
+export const TextIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="M6 5h12" />
+    <path d="M12 5v14" />
+    <path d="M9 19h6" />
+  </svg>
+);

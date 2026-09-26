@@ -11,13 +11,17 @@ export interface UsePdfDownloadOptions {
 
 export interface PdfDownloadOptions {
   /**
-   * Embed the current form values instead of saving the file as loaded.
+   * Write what the reader changed into the file instead of handing back the bytes it
+   * was loaded from.
    *
-   * pdf.js writes an incremental update with the stored values and regenerated
-   * appearance streams, so the fields stay interactive: this is "save", not a
-   * true flatten (flattening needs a PDF writer, which this library is not).
+   * pdf.js answers this with an incremental update built from the document's
+   * `annotationStorage`, which is where *both* kinds of edit land: the value of a
+   * form field and a highlight a reader made. Callers therefore pick this branch on
+   * "is anything pending", not on which feature made the change. The fields stay
+   * interactive and the marks stay selectable — this is "save", not a true flatten,
+   * which would need a PDF writer and is not what this library is.
    */
-  withFormValues?: boolean;
+  saveEdits?: boolean;
 }
 
 export interface UsePdfDownloadResult {
@@ -57,7 +61,7 @@ export function usePdfDownload({
     setIsBusy(true);
     setError(null);
     try {
-      const bytes = options.withFormValues
+      const bytes = options.saveEdits
         ? await current.saveDocument()
         : await current.getData();
       downloadBytes(bytes, pdfFileName(fileNameRef.current));

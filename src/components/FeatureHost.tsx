@@ -146,9 +146,17 @@ export function usePdfFeatureState<S extends object = FeaturePublication>(): S {
   return scope.get(scope.feature.id) as S;
 }
 
-/** Another feature's state, e.g. download asking forms whether the doc is dirty. */
-export function usePdfFeaturePeer<S extends object = FeaturePublication>(id: string): S {
-  return useScope().get(id) as S;
+/**
+ * Another feature's state, e.g. download asking forms whether the doc is dirty.
+ *
+ * `Partial`, because a peer's Runner publishes from an effect: until that effect has
+ * run — the first render of every viewer, and every render of a feature that mounts
+ * later — the store hands back a frozen empty object. Reading a nested field off the
+ * peer without a guard is therefore a crash, not a miss, and the type is written to
+ * say so rather than to flatter the call site.
+ */
+export function usePdfFeaturePeer<S extends object = FeaturePublication>(id: string): Partial<S> {
+  return useScope().get(id) as Partial<S>;
 }
 
 /** The options given to the `create*Feature` factory that made this feature. */

@@ -3,14 +3,15 @@ export function Features() {
     <>
       <h1>Features &amp; tiers</h1>
       <p className="doc-lede">
-        Four things a viewer can do to a document — print it, save it, fill it in, show its outline — are
-        values you import. The reason is arithmetic: measured against <code>0.3</code>,{' '}
+        Seven things a viewer can do to a document — print it, save it, fill it in, show its outline,
+        switch its layers, hand over its attachments, mark it up — are values you import. The reason is
+        arithmetic: measured against <code>0.3</code>,{' '}
         <code>PdfViewer</code> with every feature prop switched off cost <strong>24.09 kB</strong> gzipped
         against <strong>24.07 kB</strong> with them all on. A prop turns a control off. Only an import
         decides what your bundle contains.
       </p>
 
-      <h2>The six built-ins</h2>
+      <h2>The seven built-ins</h2>
       <table className="doc-table">
         <thead>
           <tr>
@@ -33,7 +34,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/print.css</code>
             </td>
-            <td>2.49 kB</td>
+            <td>2.53 kB</td>
           </tr>
           <tr>
             <td>
@@ -44,7 +45,7 @@ export function Features() {
               edited — an incremental <code>saveDocument()</code> that keeps the fields interactive.
             </td>
             <td>none needed</td>
-            <td>0.71 kB</td>
+            <td>0.77 kB</td>
           </tr>
           <tr>
             <td>
@@ -69,7 +70,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/outline.css</code>
             </td>
-            <td>0.90 kB</td>
+            <td>0.95 kB</td>
           </tr>
           <tr>
             <td>
@@ -85,7 +86,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/layers.css</code>
             </td>
-            <td>1.16 kB</td>
+            <td>1.19 kB</td>
           </tr>
           <tr>
             <td>
@@ -101,19 +102,36 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/attachments.css</code>
             </td>
-            <td>1.07 kB</td>
+            <td>1.08 kB</td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/features/annotate</code>
+            </td>
+            <td>
+              Marking up the document: one pdf.js <code>AnnotationEditorUIManager</code> per document,
+              three tools — highlight, free text, ink — a highlight colour from the engine&apos;s own
+              palette, and a Delete enabled only while a mark is selected. The marks are PDF
+              annotations, so they go back into the file on save and survive zoom, rotation and
+              scrolling a page out of the way. It takes the shell&apos;s freehand toggle&apos;s place
+              in the bar rather than sitting next to it, because this is the ink that saves.
+            </td>
+            <td>
+              <code>pdfjs-react-reader/annotate.css</code>
+            </td>
+            <td>1.85 kB</td>
           </tr>
         </tbody>
       </table>
 
       <p>
-        Cost is measured, not estimated, and the figures below are the current <code>0.5</code> build
+        Cost is measured, not estimated, and the figures below are the <code>0.6</code> build
         (re-measured at each release close): <code>npm run size</code> bundles one file per
         consumer import with both esbuild and Rollup and reports the larger of the two, so a feature is
-        only &ldquo;small&rdquo; if two independent tree-shakers agree. All six together cost 7.35 kB
-        over the <code>22.97 kB</code> core — less than their sum, because they share the shell they attach
+        only &ldquo;small&rdquo; if two independent tree-shakers agree. All seven together cost 9.09 kB
+        over the <code>23.66 kB</code> core — less than their sum, because they share the shell they attach
         to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
-        bundle pays. Summing the shipped files of the whole root entry instead gives 48.29 kB, because
+        bundle pays. Summing the shipped files of the whole root entry instead gives 50.87 kB, because
         that entry re-exports every headless hook whether or not you name one — so quote the import,
         not the entry.
       </p>
@@ -185,8 +203,7 @@ const forms = createFormsFeature({ onChange: (values) => save(values) });
 
       <h2>The authoring hooks</h2>
       <p>
-        Exported from the package root, for a feature of your own — annotation editing in the roadmap
-        starts here:
+        Exported from the package root, for a feature of your own — which is how <code>annotateFeature</code>, the newest of the seven, is written:
       </p>
       <ul>
         <li>
@@ -244,8 +261,7 @@ export const progressFeature: PdfFeature = {
 
       <h2>Stylesheets, per tier</h2>
       <p>
-        <code>styles.css</code> carries the core chrome and nothing else; the widget, print and outline
-        rules live in their own sheets so a viewer that mounted neither ships neither. They are separate{' '}
+        <code>styles.css</code> carries the core chrome and nothing else; the widget, print, outline, layer, attachment and editor rules live in their own sheets so a viewer that mounted neither ships neither. They are separate{' '}
         <code>import</code> statements on purpose: a bundler strips CSS that no JavaScript file imports,
         and every attempt to smuggle a feature’s stylesheet inside its module ends with the import removed
         and the styles silently missing. <code>{'sideEffects: ["**/*.css"]'}</code> is what exempts them

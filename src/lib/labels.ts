@@ -16,6 +16,29 @@ export interface PdfViewerLabels {
   drawOnDocument: string;
   exitDrawingMode: string;
   drawingTools: string;
+  /** Group name for the tools the annotate feature contributes. */
+  annotationTools: string;
+  highlightTool: string;
+  freeTextTool: string;
+  inkTool: string;
+  /**
+   * The Delete control the annotate group adds. The engine's own toolbar has one,
+   * but its buttons are icon-only with the label behind a `data-l10n-id` this
+   * viewer never resolves, so it has no accessible name — which is why the group
+   * carries its own rather than showing the engine's.
+   */
+  deleteAnnotation: string;
+  /** The highlight-colour control, whose value is one of the engine's palette names. */
+  highlightColour: string;
+  /**
+   * Announced when the reader adds a mark. pdf.js signals these moments by
+   * writing a `data-l10n-id` onto the alert element it was handed, which conveys
+   * nothing unless its Fluent bundles are running — this viewer passes `l10n: null`
+   * — so the words have to come from this catalog.
+   */
+  highlightAdded: string;
+  freeTextAdded: string;
+  inkAdded: string;
   drawLabel: string;
   drawWithColor: string;
   penWidth: string;
@@ -154,6 +177,15 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   drawOnDocument: 'Draw on document',
   exitDrawingMode: 'Exit drawing mode',
   drawingTools: 'Drawing tools',
+  annotationTools: 'Annotation tools',
+  highlightTool: 'Highlight',
+  freeTextTool: 'Add text',
+  inkTool: 'Ink',
+  deleteAnnotation: 'Delete selected annotation',
+  highlightColour: 'Highlight colour',
+  highlightAdded: 'Highlight added',
+  freeTextAdded: 'Text added',
+  inkAdded: 'Drawing added',
   drawLabel: 'Draw',
   drawWithColor: 'Draw with {color}',
   penWidth: 'Pen width',

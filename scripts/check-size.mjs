@@ -101,6 +101,7 @@ const FEATURES = [
   { name: 'forms', marker: 'usePdfFormValues' },
   { name: 'outline', marker: 'usePdfOutline' },
   { name: 'layers', marker: 'usePdfOptionalContent' },
+  { name: 'annotate', marker: 'createEditorEventBus' },
   { name: 'attachments', marker: 'usePdfAttachments' },
 ];
 

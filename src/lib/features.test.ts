@@ -3,6 +3,7 @@ import {
   findFeatureKey,
   mergeFeaturePageProps,
   NO_FEATURES,
+  replacedControlIds,
   samePublication,
   type AnyPdfFeature,
   type FeaturePublication,
@@ -139,5 +140,26 @@ describe('findFeatureKey', () => {
   it('lets a later feature override an earlier claim on the same chord', () => {
     const features = [keyFeature('first', 'g'), keyFeature('second', 'g')];
     expect(findFeatureKey(features, states({}), shell, eventFor('g'))?.feature.id).toBe('first');
+  });
+});
+
+describe('replacedControlIds', () => {
+  const feature = (id: string, replaces?: string[]): AnyPdfFeature => ({ id, replaces });
+
+  it('is empty for a feature list where nobody declares a takeover', () => {
+    // The counterfactual: without this the shell's `draw` control would vanish
+    // from some viewer no one configured that way.
+    expect(replacedControlIds([feature('print'), feature('forms')])).toEqual([]);
+    expect(replacedControlIds(NO_FEATURES)).toEqual([]);
+  });
+
+  it('collects the ids from the features that do', () => {
+    expect(replacedControlIds([feature('print'), feature('annotate', ['draw'])])).toEqual(['draw']);
+  });
+
+  it('says each id once when two features drop the same control', () => {
+    expect(
+      replacedControlIds([feature('annotate', ['draw']), feature('ink2', ['draw', 'search'])]),
+    ).toEqual(['draw', 'search']);
   });
 });

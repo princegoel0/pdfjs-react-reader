@@ -9,11 +9,12 @@
  * by `scripts/check-size.mjs`, not by a comment.
  */
 import type { ComponentType } from 'react';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { AnnotationEditorUIManager, PDFDocumentProxy } from 'pdfjs-dist';
 import type { AnnotationValueStore } from './form';
 import type { InkStroke } from './ink';
 import type { PdfViewerLabels, PdfViewerLabelsOverride } from './labels';
 import type { PageLayout, ScaleMode } from './layout';
+import type { PdfAnnotationState } from './editing-state';
 import type { OptionalContentConfigHandle } from './optional-content';
 
 /** What a feature's Runner publishes for its own controls and the shell to read. */
@@ -25,6 +26,24 @@ export interface FeaturePageProps {
   annotationStorage?: AnnotationValueStore | null;
   formVersion?: number;
   onFormChange?: () => void;
+  /**
+   * True while an annotation tool is armed, forwarded to `page.render()`.
+   *
+   * pdf.js then leaves the *editable* annotations out of the canvas
+   * (`mustBeViewedWhenEditing` returns `!data.isEditable`), which is what stops a
+   * page from painting a highlight twice — once as the annotation it was, once as
+   * the editor holding it. Document-wide, because every page is editing or none
+   * is, so it can ride the merged page props.
+   */
+  annotationEditorEditing?: boolean;
+  /**
+   * The document-wide editor manager, when a feature owns one.
+   *
+   * Deliberately the only editor thing that fits here: page props are merged once
+   * and handed to every page, so anything per-page — the draw layer, the editor
+   * layer itself — has to be built by the page that owns the divs it attaches to.
+   */
+  annotationEditorUIManager?: AnnotationEditorUIManager | null;
 }
 
 /**
@@ -51,6 +70,14 @@ export interface PdfViewerShell {
   /** Routes a failure into the viewer's own `onError`. */
   reportError: (error: Error) => void;
   /**
+   * Routes an annotation-editor change into the viewer's own `onAnnotationChange`.
+   *
+   * The manager is the only thing that knows a mark has moved, and the callback is a
+   * prop of the component that mounted the feature — so a feature cannot reach it
+   * directly, and the seam has to be here. Same shape as `reportError`.
+   */
+  reportAnnotationChange: (state: PdfAnnotationState) => void;
+  /**
    * Asks every mounted page to redraw without changing any of its inputs.
    *
    * A layer switched through `OptionalContentConfig` changes what the engine paints
@@ -71,6 +98,15 @@ export interface PdfViewerShell {
   optionalContentConfig: OptionalContentConfigHandle | null;
   /** Freehand strokes on a 0-based page. Ink is core chrome, and print needs it. */
   inkStrokesForPage: (index: number) => InkStroke[];
+  /**
+   * The viewer's root element, as a ref.
+   *
+   * A feature that must hand a DOM node to engine code — an annotation editor
+   * needs a container to route keyboard and pointer events through — reads this
+   * inside an effect. It is the ref rather than the element so that depending on
+   * the shell object costs nothing before mount.
+   */
+  rootRef: { current: HTMLElement | null };
   openSidebar: (open: boolean, tab?: string) => void;
 }
 
@@ -133,6 +169,20 @@ export interface PdfFeature<S extends object = FeaturePublication> {
   /** Merged into every page's props, last mounted wins on a clash. */
   pageProps?(state: S): FeaturePageProps;
   controls?: readonly PdfFeatureControl<S>[];
+  /**
+   * Built-in control ids this feature takes over, which the shell then hides.
+   *
+   * It exists for the case where two controls do one job: `annotateFeature`
+   * replaces `draw`, because its ink is a real `/Ink` annotation that saves and
+   * prints, while the shell's draws an overlay that prints but never reaches a
+   * download. Offered side by side, the two are indistinguishable until one of
+   * them loses the reader's work.
+   *
+   * Declaring it here rather than telling hosts to write `controls: { hide: … }`
+   * means the fold travels with the feature, and the shell still needs no import
+   * of it to apply the rule.
+   */
+  replaces?: readonly string[];
   panel?: PdfFeaturePanel<S>;
   keys?: readonly PdfFeatureKeyBinding<S>[];
   /** Per-instance options for features built by a `create*Feature` factory. */
@@ -184,6 +234,18 @@ export function mergeFeaturePageProps(
     Object.assign(merged, feature.pageProps(get(feature.id)));
   }
   return merged;
+}
+
+/**
+ * The built-in control ids the mounted features take over, deduplicated.
+ *
+ * Reading it from the list rather than from each feature's own control means the
+ * shell never has to know what a feature imports: `annotate` says `draw`, and the
+ * shell hides it.
+ */
+export function replacedControlIds(features: readonly AnyPdfFeature[]): string[] {
+  const ids = features.flatMap((feature) => feature.replaces ?? []);
+  return ids.length ? [...new Set(ids)] : ids;
 }
 
 /**

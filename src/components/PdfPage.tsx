@@ -1,8 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AnnotationEditorLayer,
   AnnotationLayer,
+  DrawLayer,
   RenderingCancelledException,
   TextLayer,
+  XfaLayer,
+  type AnnotationEditorUIManager,
   type PDFDocumentProxy,
   type PDFPageProxy,
   type RenderTask,
@@ -85,6 +89,17 @@ export interface PdfPageProps {
    * whatever the sidebar just did.
    */
   optionalContentConfig?: OptionalContentConfigHandle | null;
+  /**
+   * The document-wide editor manager, published by the annotate feature through
+   * its page props. Present means this page builds an editor layer of its own,
+   * with a draw layer and the text layer the editors draw against.
+   */
+  annotationEditorUIManager?: AnnotationEditorUIManager | null;
+  /**
+   * A tool is armed, so the canvas must leave the editable annotations out —
+   * their editors draw them. See {@link FeaturePageProps.annotationEditorEditing}.
+   */
+  annotationEditorEditing?: boolean;
   /** Notified after the user edits a form field. */
   onFormChange?: () => void;
   /** Freehand strokes for this page. */
@@ -126,6 +141,8 @@ export const PdfPage = memo(function PdfPage({
   formVersion = 0,
   contentVersion = 0,
   optionalContentConfig = null,
+  annotationEditorUIManager = null,
+  annotationEditorEditing = false,
   onFormChange,
   inkStrokes,
   inkDrawing = false,
@@ -136,8 +153,13 @@ export const PdfPage = memo(function PdfPage({
 }: PdfPageProps) {
   const labels = useLabels();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
   const annotationRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const annotationLayerRef = useRef<AnnotationLayer | null>(null);
+  const xfaRef = useRef<HTMLDivElement | null>(null);
+  const xfaDivRef = useRef<HTMLDivElement | null>(null);
   const taskRef = useRef<RenderTask | null>(null);
   const [page, setPage] = useState<PDFPageProxy | null>(null);
   const [textLayer, setTextLayer] = useState<TextLayer | null>(null);
@@ -212,6 +234,11 @@ export const PdfPage = memo(function PdfPage({
       viewport,
       transform,
       background: '#ffffff',
+      // While a tool is armed the editors draw the annotations they hold, so the
+      // canvas has to stop drawing them too. pdf.js skips exactly the annotations
+      // whose `isEditable` the worker reports true, so links, markups and notes
+      // that no editor can hold keep painting.
+      isEditing: annotationEditorEditing,
       // A new promise each render on purpose: pdf.js only reads it once, and the
       // value inside is the stable shared config. Putting this in the effect's
       // deps instead would re-render every page on every parent render.
@@ -234,13 +261,28 @@ export const PdfPage = memo(function PdfPage({
       canvas.width = 0;
       canvas.height = 0;
     };
-  }, [page, viewport, devicePixelRatio, maxRenderPixels, maxRenderSide, contentVersion, optionalContentConfig, reportError]);
+  }, [
+    page,
+    viewport,
+    devicePixelRatio,
+    maxRenderPixels,
+    maxRenderSide,
+    contentVersion,
+    optionalContentConfig,
+    annotationEditorEditing,
+    reportError,
+  ]);
 
   // The layer is built only for page/scale/rotation changes; highlight updates
   // are layered on top by the effect below without a full rebuild.
+  //
+  // A pure-XFA page is skipped, as it is in pdf.js's own viewer
+  // (`web/pdf_viewer.mjs`: `!pdfPage.isPureXfa`): the XFA layer underneath carries
+  // the form's text as real elements, so a text layer over it would be a second
+  // copy of every word for selection and for a screen reader to find.
   useEffect(() => {
     const container = textLayerRef.current;
-    if (!page || !container || !viewport) return;
+    if (!page || !container || !viewport || page.isPureXfa === true) return;
 
     let cancelled = false;
     const layer = new TextLayer({
@@ -275,26 +317,36 @@ export const PdfPage = memo(function PdfPage({
     const container = annotationRef.current;
     if (!page || !container || !viewport || !linkService) return;
 
+    // Built before the annotations are fetched so that the editor layer, whose
+    // effect runs later in the same commit, has the instance to link to. The
+    // layer only reads the editable elements when a mode is armed, which is
+    // always after the render below has resolved.
+    //
+    // AnnotationLayer types its collaborators nominally (PDFLinkService and
+    // AnnotationStorage live in the unbundled web layer), so we hand it our
+    // structural implementations via a single cast.
+    const layer = new AnnotationLayer({
+      div: container,
+      viewport,
+      page,
+      linkService,
+      annotationStorage,
+      accessibilityManager: null,
+      annotationCanvasMap: null,
+      // With a manager the layer records which elements an editor can take
+      // over, and hands each one to it. Without it, editing an existing
+      // annotation would add a second copy instead of moving that one.
+      annotationEditorUIManager,
+      structTreeLayer: null,
+      commentManager: null,
+    } as unknown as ConstructorParameters<typeof AnnotationLayer>[0]);
+    annotationLayerRef.current = layer;
+
     let cancelled = false;
     (async () => {
       const annotations = await page.getAnnotations({ intent: 'display' });
       if (cancelled) return;
       container.replaceChildren();
-      // AnnotationLayer types its collaborators nominally (PDFLinkService and
-      // AnnotationStorage live in the unbundled web layer), so we hand it our
-      // structural implementations via a single cast.
-      const layer = new AnnotationLayer({
-        div: container,
-        viewport,
-        page,
-        linkService,
-        annotationStorage,
-        accessibilityManager: null,
-        annotationCanvasMap: null,
-        annotationEditorUIManager: null,
-        structTreeLayer: null,
-        commentManager: null,
-      } as unknown as ConstructorParameters<typeof AnnotationLayer>[0]);
       await layer.render({
         annotations,
         viewport,
@@ -315,9 +367,21 @@ export const PdfPage = memo(function PdfPage({
 
     return () => {
       cancelled = true;
+      if (annotationLayerRef.current === layer) {
+        annotationLayerRef.current = null;
+      }
       container.replaceChildren();
     };
-  }, [page, viewport, linkService, annotationStorage, renderForms, formVersion, reportError]);
+  }, [
+    page,
+    viewport,
+    linkService,
+    annotationStorage,
+    annotationEditorUIManager,
+    renderForms,
+    formVersion,
+    reportError,
+  ]);
 
   // Surface user edits in the form widgets; storage is written synchronously by
   // pdf.js before these bubble, so reading it here sees the new values.
@@ -331,6 +395,117 @@ export const PdfPage = memo(function PdfPage({
       container.removeEventListener('input', handleFormEvent);
     };
   }, [handleFormEvent]);
+
+  // A pure-XFA page has no painted page at all: the canvas for `xfa-sample.pdf`
+  // measures zero operators, and the form exists as a DOM tree the worker laid out
+  // from the template. `XfaLayer` is what turns that tree into the page, so this is
+  // the difference between a document and a blank sheet.
+  //
+  // The engine's classes (`xfaLayer`, `xfaPage`, `xfaTextfield`, ...) are what the
+  // stylesheet keys off, because `XfaLayer.render` overwrites the container's own
+  // `class` attribute — which is also why the layer is a child of ours rather than
+  // our div itself.
+  useEffect(() => {
+    const host = xfaRef.current;
+    if (!page || !host) return;
+    if (page.isPureXfa !== true) {
+      if (host.firstChild) host.replaceChildren();
+      return;
+    }
+    if (!viewport) return;
+
+    let cancelled = false;
+    (async () => {
+      const xfaHtml = await page.getXfa();
+      if (cancelled || !xfaHtml) return;
+      // Kept across viewport changes: `XfaLayer.render` *appends* a whole tree to the
+      // container it is given, so rendering twice into one div doubles the page
+      // (measured 20 elements then 40). `update` is the re-render path — it re-applies
+      // the transform and nothing else — and rebuilding here would also cost the
+      // field that is currently focused.
+      let div = xfaDivRef.current;
+      if (!div || !div.isConnected) {
+        div = document.createElement('div');
+        xfaDivRef.current = div;
+        host.replaceChildren(div);
+      }
+      const params = {
+        div,
+        viewport: viewport.clone({ dontFlip: true }),
+        xfaHtml,
+        annotationStorage,
+        linkService,
+        intent: 'display',
+      } as unknown as Parameters<typeof XfaLayer.render>[0];
+      if (div.childElementCount > 0) XfaLayer.update(params);
+      else XfaLayer.render(params);
+    })().catch((err: unknown) => {
+      if (cancelled) return;
+      reportError(err);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page, viewport, annotationStorage, linkService, reportError]);
+
+  // Annotation editors, when a feature has published a manager. The manager is
+  // document-wide and the feature owns it; the draw layer and the editor layer are
+  // per page, so this is where they are built. `layer.destroy()` unregisters the
+  // layer from the manager, and `render()` re-adopts any editors the manager holds
+  // for this page index — which is what lets an edit survive the page being
+  // scrolled out of the viewport and back.
+  useEffect(() => {
+    const container = editorRef.current;
+    const textContainer = textLayerRef.current;
+    if (!annotationEditorUIManager || !container || !textContainer || !page || !viewport) return;
+
+    // `AnnotationEditorLayer` reads `textLayer.div` while `DrawLayer` observes the
+    // node, so the two collaborators take opposite things. Swapping them throws
+    // inside the manager's `addLayer` before a single editor exists.
+    //
+    // The draw layer needs three things pdf.js's own page view gives it and a
+    // bare `new DrawLayer` does not: the page's `filterFactory` (highlight and ink
+    // editors set CSS filters through it), a `parent` to append its SVG roots to
+    // (`setParent` is never called from inside the library, so without it the very
+    // first editor throws on `null.append`), and that parent *below* the text layer
+    // so a highlight tints the page image without dimming the selectable text.
+    const drawLayer = new DrawLayer({
+      pageIndex: pageNumber - 1,
+      textLayer: textContainer,
+      filterFactory: page.filterFactory,
+      pageColors: null,
+    });
+    const canvasWrapper = canvasWrapperRef.current;
+    if (canvasWrapper) drawLayer.setParent(canvasWrapper);
+    const layer = new AnnotationEditorLayer({
+      uiManager: annotationEditorUIManager,
+      pageIndex: pageNumber - 1,
+      div: container,
+      structTreeLayer: null,
+      accessibilityManager: null,
+      // The link the other way: `layer.enable()` asks this annotation layer for
+      // the elements an editor can take over, so leaving it null would make
+      // every existing annotation invisible to the editors and let a new one
+      // stack on top of it.
+      annotationLayer: annotationLayerRef.current,
+      drawLayer,
+      textLayer: { div: textContainer },
+      viewport,
+      l10n: null,
+    } as unknown as ConstructorParameters<typeof AnnotationEditorLayer>[0]);
+
+    layer.render({ viewport }).catch((err: unknown) => {
+      if (err instanceof RenderingCancelledException) return;
+      reportError(err);
+    });
+
+    return () => {
+      layer.destroy();
+      drawLayer.destroy();
+      container.replaceChildren();
+    };
+  }, [annotationEditorUIManager, page, viewport, pageNumber, reportError]);
 
   const markedDivsRef = useRef<HTMLElement[]>([]);
   const lastNavRef = useRef(0);
@@ -366,18 +541,35 @@ export const PdfPage = memo(function PdfPage({
 
   return (
     <>
-      <canvas
-        ref={canvasRef}
-        className={className}
-        role="img"
-        aria-label={formatLabel(labels.pageLabel, { page: pageNumber })}
-      />
-      <div ref={textLayerRef} className="pjsr-text-layer" style={layerStyle} />
+      {/* The canvas's own box, and the draw layer's parent — pdf.js's page view
+          appends its editor SVGs to the canvas wrapper, not to the page, so that
+          they paint over the image and under the text. */}
+      <div ref={canvasWrapperRef} className="pjsr-canvas-wrapper">
+        <canvas
+          ref={canvasRef}
+          className={className}
+          role="img"
+          aria-label={formatLabel(labels.pageLabel, { page: pageNumber })}
+        />
+      </div>
+      {/*
+       * `textLayer` is not our naming, and it is not cosmetic: pdf.js's editors
+       * find the layer a selection lives in with `target.closest('.textLayer')`,
+       * six times over, so without that exact class a text selection can never
+       * become a highlight. Our own sheet styles `.pjsr-text-layer`.
+       */}
+      <div ref={textLayerRef} className="pjsr-text-layer textLayer" style={layerStyle} />
       <div
         ref={annotationRef}
         className={`pjsr-annotation-layer${inkDrawing ? ' pjsr-annotation-layer--inert' : ''}`}
         style={layerStyle}
       />
+      {annotationEditorUIManager && (
+        <div ref={editorRef} className="pjsr-editor-layer" style={layerStyle} />
+      )}
+      {/* XFA composes at the editor layer's level, which is pdf.js's own ordering
+          (`LAYERS_ORDER` puts `xfaLayer` and `annotationEditorLayer` together). */}
+      <div ref={xfaRef} className="pjsr-xfa-layer" />
       {viewport && inkSettings && (
         <InkLayer
           strokes={inkStrokes ?? []}

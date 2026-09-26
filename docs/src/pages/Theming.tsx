@@ -98,17 +98,18 @@ export function Theming() {
         Everything is prefixed <code>pjsr-</code> and flat — no CSS modules, no hashed class names —
         so you can also target parts directly when a token is not enough:
         <code>.pjsr-toolbar</code>, <code>.pjsr-page</code>, <code>.pjsr-text-layer</code>,{' '}
-        <code>.pjsr-ink-layer</code>, <code>.pjsr-sidebar</code>, <code>.pjsr-thumbnail</code>,{' '}
+        <code>.pjsr-ink-layer</code>, <code>.pjsr-editor-layer</code>, <code>.pjsr-xfa-layer</code>,{' '}
+        <code>.pjsr-sidebar</code>, <code>.pjsr-thumbnail</code>,{' '}
         <code>.pjsr-overflow-menu</code>. The print container is <code>.pjsr-print</code> and its
         rules live under <code>@media print</code> in <code>print.css</code>; there is deliberately no{' '}
         <code>@page</code> rule, so the library cannot interfere with the host app&apos;s own
         printing.
       </p>
       <p>
-        The rules are spread over six files — <code>styles.css</code> for the core chrome, then{' '}
+        The rules are spread over seven files — <code>styles.css</code> for the core chrome, then{' '}
         <code>print.css</code>, <code>forms.css</code>, <code>outline.css</code>,{' '}
-        <code>layers.css</code> and <code>attachments.css</code> — so a viewer that
-        mounted none of those features downloads none of their CSS. The split changes which file a
+        <code>layers.css</code>, <code>attachments.css</code> and <code>annotate.css</code> — so a
+        viewer that mounted none of those features downloads none of their CSS. The split changes which file a
         rule is in, not how it is themed: every sheet reads the same tokens, and the feature markup
         sits inside <code>.pjsr-viewer</code>, so your overrides reach it. The one exception is the
         print container, which the pipeline appends to <code>&lt;body&gt;</code> because the viewer

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PdfViewer, type AnyPdfFeature, type PageLayout } from 'pdfjs-react-reader';
+import { annotateFeature } from 'pdfjs-react-reader/features/annotate';
 import { downloadFeature } from 'pdfjs-react-reader/features/download';
 import { formsFeature } from 'pdfjs-react-reader/features/forms';
 import { outlineFeature } from 'pdfjs-react-reader/features/outline';
@@ -22,14 +23,16 @@ export function ShellExample() {
   const [print, setPrint] = useState(true);
   const [download, setDownload] = useState(true);
   const [outline, setOutline] = useState(true);
+  const [annotate, setAnnotate] = useState(false);
 
-  // Three of the viewer's capabilities are features you name here, so switching
-  // one off is switching its code off in your bundle, not hiding a button.
+  // Each capability a reader might use is a feature named here, so switching one
+  // off is switching its code off in your bundle, not hiding a button.
   const features: AnyPdfFeature[] = [
     ...(print ? [printFeature] : []),
     ...(download ? [downloadFeature] : []),
     ...(forms ? [formsFeature] : []),
     ...(outline ? [outlineFeature] : []),
+    ...(annotate ? [annotateFeature] : []),
   ];
 
   return (
@@ -50,6 +53,16 @@ export function ShellExample() {
           <CheckKnob label="Print feature" checked={print} onChange={setPrint} />
           <CheckKnob label="Download feature" checked={download} onChange={setDownload} />
           <CheckKnob label="Outline feature" checked={outline} onChange={setOutline} />
+          <CheckKnob
+            label="Annotate feature"
+            checked={annotate}
+            onChange={(checked) => {
+              setAnnotate(checked);
+              // Marking up a document and taking it away are one story, so the
+              // download control comes on with it rather than saving an empty file.
+              if (checked) setDownload(true);
+            }}
+          />
         </>
       }
     >

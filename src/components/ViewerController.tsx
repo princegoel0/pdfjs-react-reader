@@ -13,16 +13,19 @@ import {
   findFeatureKey,
   mergeFeaturePageProps,
   NO_FEATURES,
+  replacedControlIds,
   type AnyPdfFeature,
   type FeaturePageProps,
   type PdfViewerShell,
 } from '../lib/features';
+import { withReplacedControls } from '../lib/toolbar';
 import { FeaturePart, useFeatureStore } from './FeatureHost';
 import type { FeatureStore } from './FeatureHost';
 import type { PdfViewerHandle, PdfViewerProps } from './PdfViewer';
 import type { SidebarTab, SidebarTabSpec } from './Sidebar';
 import type { ToolbarControls, ToolbarItem } from './Toolbar';
 import type { PageMatch } from '../lib/search';
+import type { PdfAnnotationState } from '../lib/editing-state';
 import type { PdfPoint } from '../lib/ink';
 import {
   enterFullscreen,
@@ -190,6 +193,7 @@ export function useViewerController({
   onLayoutChange,
   onCapabilities,
   onFullscreenChange,
+  onAnnotationChange,
   onExternalLink,
   enableWheelZoom = true,
   enablePinchZoom = true,
@@ -292,6 +296,16 @@ export function useViewerController({
   onErrorRef.current = onError;
   const handlePageError = useCallback((err: Error) => {
     onErrorRef.current?.(err);
+  }, []);
+
+  // Same treatment for the annotation state: a host's inline arrow must not give the
+  // shell a new identity, because every feature that depends on the shell object would
+  // re-run on each parent render. The engine already reports a difference only when
+  // one exists, so this forwards rather than diffing a second time.
+  const onAnnotationChangeRef = useRef(onAnnotationChange);
+  onAnnotationChangeRef.current = onAnnotationChange;
+  const handleAnnotationChange = useCallback((state: PdfAnnotationState) => {
+    onAnnotationChangeRef.current?.(state);
   }, []);
 
   // Always called, even when a host supplies its own: hooks cannot be conditional,
@@ -406,10 +420,15 @@ export function useViewerController({
       setScaleMode,
       setLayout: setPageLayout,
       reportError: handlePageError,
+      reportAnnotationChange: handleAnnotationChange,
       inkStrokesForPage: ink.strokesForPage,
       repaint,
       contentVersion,
       optionalContentConfig,
+      // The ref, not the node: features read it inside effects, which run after the
+      // root exists, and a node here would change identity on mount and re-run
+      // everything that depends on the shell.
+      rootRef,
       openSidebar: (open, tab) => {
         setSidebarOpen(open);
         if (tab) setSidebarTab(tab);
@@ -427,6 +446,7 @@ export function useViewerController({
       labels,
       scrollToPage,
       handlePageError,
+      handleAnnotationChange,
       ink.strokesForPage,
       repaint,
       contentVersion,
@@ -464,8 +484,14 @@ export function useViewerController({
     return items.sort((a, b) => a.priority - b.priority);
   }, [features, store, shellApi, resolvedLabels]);
 
-  const featurePanels = useMemo<SidebarTabSpec[]>(
-    () =>
+  // A feature that supersedes a built-in says so in `replaces`; hiding it here is
+  // what lets the shell do that without importing the feature it is hiding.
+  const toolbarControls = useMemo(
+    () => withReplacedControls(controls, replacedControlIds(features)),
+    [controls, features],
+  );
+
+  const featurePanels = useMemo<SidebarTabSpec[]>(    () =>
       features
         .filter((feature) => feature.panel)
         .map((feature) => ({
@@ -865,7 +891,7 @@ export function useViewerController({
     shellApi,
     pageProps,
     featureItems,
-    controls,
+    controls: toolbarControls,
     featurePanels,
     activePanelFeature,
     ActivePanel,

@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle } from 'react';
 import type { CSSProperties } from 'react';
 import type { AssetUrl } from '../lib/assets';
 import type { PdfViewerLabelsOverride } from '../lib/labels';
+import type { PdfAnnotationState } from '../lib/editing-state';
 import type { PageLayout, ScaleMode } from '../lib/layout';
 import type { PdfCapabilities, PasswordReason, PasswordSubmit } from '../headless/usePdfDocument';
 import type { PdfFindController } from '../headless/usePdfSearch';
@@ -92,6 +93,17 @@ export interface PdfViewerProps {
   onCapabilities?: (capabilities: PdfCapabilities) => void;
   /** Fired when the viewer enters or leaves fullscreen. */
   onFullscreenChange?: (active: boolean) => void;
+  /**
+   * Fired when an annotation editor reports a change, with what it says about itself.
+   *
+   * Only the annotate feature can produce one, and the engine fires the underlying
+   * event only when something actually differs — so this is a change signal rather
+   * than a mode signal, and it covers the paths no toolbar button is on: a keyboard
+   * delete, an undo, a mark moved by hand. `state.canUndo` is the field to gate a
+   * Save button on; `state.isEmpty` is not, because undoing everything leaves the
+   * storage holding the deltas.
+   */
+  onAnnotationChange?: (state: PdfAnnotationState) => void;
   /**
    * Intercept clicks on external links. When provided, the browser's own
    * navigation is prevented and the URL is handed here — the viewer never

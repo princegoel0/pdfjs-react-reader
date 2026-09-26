@@ -195,6 +195,15 @@ export {
   workerAutoDetectionFailed,
 } from './lib/worker';
 export {
+  HIGHLIGHT_COLORS,
+  HIGHLIGHT_COLOR_PARAM,
+  HIGHLIGHT_PALETTE_STRING,
+  DEFAULT_HIGHLIGHT_COLOR,
+  readEditingParams,
+  readEditingState,
+  type PdfAnnotationState,
+} from './lib/editing-state';
+export {
   isAllowedSource,
   normalizeSource,
   resolveSourceUrl,

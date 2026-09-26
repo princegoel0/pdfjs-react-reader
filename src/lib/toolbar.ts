@@ -51,6 +51,24 @@ export interface ToolbarControlConfig {
 }
 
 /**
+ * Fold the control ids that mounted features take over into the host's own list.
+ *
+ * One mechanism, not two: a feature's `replaces` becomes an entry in the same
+ * `hide` the application writes, so `hide` keeps its meaning of removal-before
+ * anything else, and a host that already hid that control — or replaced it with
+ * its own under the same id — is contradicted by nothing. The host's object comes
+ * back untouched when no feature asks for anything, which keeps the toolbar's
+ * memoisation stable for every viewer that does not annotate.
+ */
+export function withReplacedControls(
+  config: ToolbarControlConfig | undefined,
+  replaces: readonly string[],
+): ToolbarControlConfig | undefined {
+  if (!replaces.length) return config;
+  return { ...config, hide: [...(config?.hide ?? []), ...replaces] };
+}
+
+/**
  * Apply the application's configuration to a list of controls.
  *
  * Removal runs first, which is what makes `hide` mean what it says: a hidden

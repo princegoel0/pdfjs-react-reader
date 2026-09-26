@@ -7,6 +7,9 @@ import { Shell } from './pages/Shell';
 import { Features } from './pages/Features';
 import { Headless } from './pages/Headless';
 import { Theming } from './pages/Theming';
+// Read rather than typed, because a badge that has to be edited at each release is
+// a badge that says 0.4.0 three releases late.
+import { version } from '../../package.json';
 import { Recipes } from './pages/Recipes';
 
 interface DocPage {
@@ -60,7 +63,7 @@ export function App() {
     <>
       <header className="doc-header">
         <span className="doc-logo">pdfjs-react-reader</span>
-        <span className="doc-badge">v0.4.0</span>
+        <span className="doc-badge">v{version}</span>
         <nav className="doc-links" aria-label="Documentation sections">
           <a href="#/compatibility">Compatibility</a>
           <a href="#/shell">Shell</a>

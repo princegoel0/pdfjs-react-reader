@@ -10,3 +10,4 @@ export const FORMS_FEATURE_ID = 'forms';
 export const OUTLINE_FEATURE_ID = 'outline';
 export const LAYERS_FEATURE_ID = 'layers';
 export const ATTACHMENTS_FEATURE_ID = 'attachments';
+export const ANNOTATE_FEATURE_ID = 'annotate';

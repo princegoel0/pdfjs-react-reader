@@ -39,7 +39,7 @@ const HOOKS: [string, string][] = [
   ],
   [
     'usePdfDownload({ doc, fileName?, onError? })',
-    'Saves the file. Returns { download, isBusy, error }; `download()` takes { withFormValues? }, which writes an incremental save instead of the original bytes.',
+    'Saves the file. Returns { download, isBusy, error }; `download()` takes { saveEdits? }, which writes an incremental save carrying what is in the annotation storage — field values and annotation marks both — instead of the bytes the document was loaded from.',
   ],
 ];
 
@@ -78,9 +78,11 @@ export function Headless() {
 
       <h2>Rendering pages</h2>
       <p>
-        <code>PdfPage</code> draws one page: canvas, selectable text layer, annotation layer and ink
-        overlay. The virtualizer hands you rows (<code>virtualSlots</code>) already grouped for the
-        active layout, positioned by <code>offsetTop</code>:
+        <code>PdfPage</code> draws one page: canvas, selectable text layer, annotation layer, ink
+        overlay, and — when a feature hands it an editor manager — the annotation editor layer. A pure
+        XFA page is painted from its template instead of the text layer. The virtualizer hands you rows
+        (<code>virtualSlots</code>) already grouped for the active layout, positioned by
+        <code>offsetTop</code>:
       </p>
       <pre>
         <code>{`<div ref={containerRef} style={{ height: totalHeight, position: 'relative' }}>
@@ -107,10 +109,12 @@ export function Headless() {
         scrollbar stops guessing after the first page renders.
       </p>
       <p>
-        <code>PdfPage</code> draws annotations read-only. A form you can type into needs{' '}
-        <code>renderForms</code> plus the <code>annotationStorage</code>, <code>formVersion</code> and{' '}
-        <code>onFormChange</code> that <code>usePdfFormValues</code> hands back — which is precisely
-        what <code>formsFeature</code> does through its <code>pageProps</code>.
+        <code>PdfPage</code> renders annotations read-only until something hands it an editor: a
+        typable form needs <code>renderForms</code> plus the <code>annotationStorage</code>,{' '}
+        <code>formVersion</code> and <code>onFormChange</code> that <code>usePdfFormValues</code> hands
+        back, and marking the page up needs the <code>annotationEditorUIManager</code> and{' '}
+        <code>annotationEditorEditing</code> pair. Those are exactly what <code>formsFeature</code> and{' '}
+        <code>annotateFeature</code> publish through their <code>pageProps</code>.
       </p>
 
       <h2>Two rules that matter</h2>
@@ -197,7 +201,9 @@ search.nextMatch();
         <code>collectWidgets</code>, <code>readFormValues</code>, <code>resolveRenderScale</code>,{' '}
         <code>maxRenderPixelsFor</code>, <code>pdfAssetUrls</code>, <code>isAllowedSource</code>,{' '}
         <code>flattenOptionalContent</code>, <code>normalizeAttachments</code>,{' '}
-        <code>automaticFitMode</code>, <code>normalizeSource</code>. The three a replaceable find
+        <code>automaticFitMode</code>, <code>normalizeSource</code>, <code>readEditingState</code>,{' '}
+        <code>readEditingParams</code>, <code>HIGHLIGHT_COLORS</code>,{' '}
+        <code>HIGHLIGHT_PALETTE_STRING</code>. The three a replaceable find
         strategy needs — <code>planFind</code>, <code>findPageMatches</code>, <code>countPerPage</code>{' '}
         — are on the root entry as well, because <code>find</code> is a shell prop and a host should not
         have to import from two places to build one.

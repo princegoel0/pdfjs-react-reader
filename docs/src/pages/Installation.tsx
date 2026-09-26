@@ -17,7 +17,7 @@ yarn add pdfjs-react-reader pdfjs-dist`}</code>
       </pre>
       <p>
         <code>pdfjs-dist</code> is a peer dependency on purpose: it stays your copy, at your
-        version, and the package requires <code>^5.0.0 || ^6.2.108</code> — see{' '}
+        version, and the package requires <code>^6.2.108</code> — see{' '}
         <a href="#/compatibility">Versions &amp; compatibility</a> for why v4 is excluded and why the
         6.x floor is 6.2.108. React 18 or 19 is required. The build is ESM-only
         (<code>"type": "module"</code>) with generated TypeScript declarations.
@@ -32,7 +32,8 @@ import 'pdfjs-react-reader/print.css';
 import 'pdfjs-react-reader/forms.css';
 import 'pdfjs-react-reader/outline.css';
 import 'pdfjs-react-reader/layers.css';
-import 'pdfjs-react-reader/attachments.css';`}</code>
+import 'pdfjs-react-reader/attachments.css';
+import 'pdfjs-react-reader/annotate.css';`}</code>
       </pre>
       <p>
         <code>styles.css</code> once per app, near your other global CSS. Skip it if you are building
@@ -47,8 +48,8 @@ import 'pdfjs-react-reader/attachments.css';`}</code>
       <p>
         <code>{'<PdfViewer src="/a.pdf" />'}</code> is a viewer that reads: pages, selectable text,
         search, thumbnails, ink, zoom and rotation. Print, save, fillable form widgets, the bookmarks
-        tab, the layers panel and the attachments panel are features you add, because they are imports
-        and an import is the only thing
+        tab, the layers panel, the attachments panel and marking the document up are features you add,
+        because they are imports and an import is the only thing
         that decides what your bundle contains:
       </p>
       <pre>
@@ -59,10 +60,11 @@ import { formsFeature } from 'pdfjs-react-reader/features/forms';
 import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { layersFeature } from 'pdfjs-react-reader/features/layers';
 import { attachmentsFeature } from 'pdfjs-react-reader/features/attachments';
+import { annotateFeature } from 'pdfjs-react-reader/features/annotate';
 
 <PdfViewer
   src="/a.pdf"
-  features={[printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature]}
+  features={[printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature, annotateFeature]}
 />`}</code>
       </pre>
       <p>

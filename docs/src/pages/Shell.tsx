@@ -2,13 +2,13 @@ import { FormsExample } from '../examples/FormsExample';
 
 const PROPS: [string, string, string][] = [
   ['src', 'PdfSource', 'Required. URL, path, data URI, base64, File/Blob, or PDF bytes. Changing it reloads in place — keep the value stable across renders.'],
-  ['features', 'readonly PdfFeature[]', 'What this viewer can do beyond reading: printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature or one you wrote. Defaults to none — the code you do not import is code you do not ship.'],
+  ['features', 'readonly PdfFeature[]', 'What this viewer can do beyond reading: printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature, annotateFeature or one you wrote. Defaults to none — the code you do not import is code you do not ship.'],
   ['controls', 'ToolbarControls', 'The bar’s own contents: `hide` by id, `priorities` to change what folds first, `order` to place controls, `add` for ones you wrote. Feature control ids work here too.'],
   ['find', 'PdfFindController', 'Replace the finding strategy, keep the find bar. Any object shaped like `usePdfSearch`’s result works — a server-side index, a stemmed or fuzzy matcher. The marks, the counter and Enter/Shift+Enter all read your answers.'],
   ['workerSrc', 'string', 'Pins the pdf.js worker location. Auto-detected when omitted.'],
   ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
   ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
-  ['enableXfa', 'boolean', 'Render XFA forms. Defaults to true, which is what a dynamic XFA needs to have any content at all.'],
+  ['enableXfa', 'boolean', 'Render XFA forms. Defaults to true, which is what a dynamic XFA needs to have any content at all: the page is then painted from its own template by `XfaLayer` and the text layer steps aside. Reading works; saving an XFA back is not supported.'],
   ['defaultScale', 'number | "fit-width" | "fit-page" | "automatic"', 'Initial zoom. 1 = 100%; any percentage from 25 to 500 is accepted, not just the presets. "automatic" fits a landscape page whole and a portrait one by width.'],
   ['defaultLayout', '"continuous" | "single" | "spread"', 'Row grouping.'],
   ['defaultRotation', 'number', 'Initial rotation in degrees; the toolbar rotates from here.'],
@@ -30,6 +30,7 @@ const PROPS: [string, string, string][] = [
   ['onScaleChange', '(scale) => void', 'The effective zoom, including what a fit mode resolves to.'],
   ['onLayoutChange', '(layout) => void', 'The layout mode.'],
   ['onFullscreenChange', '(active) => void', 'Follows the real element, so Escape counts too.'],
+  ['onAnnotationChange', '(state) => void', "What the editor can do right now: `isEditing`, `isEmpty`, `canUndo`, `canRedo`, `canDelete`, `hasSelectedText`. Fires when the engine's own state differs from what it last reported, so it counts a keyboard delete as readily as a click. Gate a Save on `canUndo`, not `isEmpty`."],
   ['onExternalLink', '(url) => void', 'Clicks on external links: navigation is prevented and the URL comes here.'],
   ['onPasswordRequired', '(submit, reason) => void', 'Encrypted document. Supplying it replaces the built-in prompt.'],
   ['onError', '(error) => void', 'Loading and per-page render failures.'],
@@ -187,7 +188,7 @@ export function Viewer() {
 
       <h2>Labels</h2>
       <p>
-        Every string in the shell — about ninety of them, from <code>aria-label</code>s to the
+        Every string in the shell — 115 of them, from <code>aria-label</code>s to the
         “3 of 416 · p12” counter — lives in one typed catalog with an English default. Pass a partial
         object and only the keys you name change:
       </p>
@@ -433,8 +434,9 @@ export const ReadingView = forwardRef<PdfViewerHandle, PdfViewerProps>(function 
       </pre>
       <p>
         <code>ViewerRoot</code> is the frame: the element that carries the theme tokens, the keyboard
-        and drop handlers, and the mounted features’ <code>Runner</code>s — so print, download, forms
-        and the outline panel work exactly as they do in the default layout. Your own components inside
+        and drop handlers, and the mounted features’ <code>Runner</code>s — so print, download, forms,
+        the outline panel and the annotation editors work exactly as they do in the default layout.
+        Your own components inside
         it read the same state with <code>useViewer()</code>, which is how a host-written page counter
         or a set of buttons needs no props passed to it.
       </p>

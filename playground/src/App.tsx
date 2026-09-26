@@ -11,6 +11,7 @@ import { CustomLayoutViewer, progressControl } from './CustomLayout';
 import { useHostIndexFind } from './HostFind';
 import { downloadFeature } from 'pdfjs-react-reader/features/download';
 import { createFormsFeature } from 'pdfjs-react-reader/features/forms';
+import { annotateFeature } from 'pdfjs-react-reader/features/annotate';
 import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { printFeature } from 'pdfjs-react-reader/features/print';
 import { layersFeature } from 'pdfjs-react-reader/features/layers';
@@ -20,6 +21,7 @@ import 'pdfjs-react-reader/print.css';
 import 'pdfjs-react-reader/forms.css';
 import 'pdfjs-react-reader/outline.css';
 import 'pdfjs-react-reader/layers.css';
+import 'pdfjs-react-reader/annotate.css';
 import 'pdfjs-react-reader/attachments.css';
 import './app.css';
 
@@ -66,6 +68,9 @@ export default function App() {
   // layers and attached files, and an empty tab on the usual document is noise.
   const [withLayers, setWithLayers] = useState(false);
   const [withAttachments, setWithAttachments] = useState(false);
+  // Annotation authoring needs a document with room to annotate and a reader who
+  // means to draw on it, so it starts off.
+  const [withAnnotate, setWithAnnotate] = useState(false);
   // The same props, rendered through a layout written in playground/src/CustomLayout.tsx.
   const [compound, setCompound] = useState(false);
   // Find results come from playground/src/HostFind.tsx instead of the engine's text.
@@ -84,6 +89,7 @@ export default function App() {
     ...(withOutline ? [outlineFeature] : []),
     ...(withLayers ? [layersFeature] : []),
     ...(withAttachments ? [attachmentsFeature] : []),
+    ...(withAnnotate ? [annotateFeature] : []),
   ];
 
   const note = useCallback((message: string) => {
@@ -107,6 +113,11 @@ export default function App() {
       note(`capabilities form=${c.form} xfa=${c.renderedFromXfa} js=${c.hasJSActions}`),
     onFullscreenChange: (active) => note(`onFullscreenChange ${active}`),
     onExternalLink: (link) => note(`onExternalLink ${link}`),
+    onAnnotationChange: (state) =>
+      note(
+        `onAnnotationChange editing=${state.isEditing} empty=${state.isEmpty} ` +
+          `undo=${state.canUndo} delete=${state.canDelete}`,
+      ),
     enableDrop: dropEnabled,
     onDropFile: (dropped) => note(`onDropFile ${dropped.name}`),
     controls: trim
@@ -229,6 +240,14 @@ export default function App() {
               onChange={(e) => setWithAttachments(e.target.checked)}
             />
             &nbsp;attachments
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={withAnnotate}
+              onChange={(e) => setWithAnnotate(e.target.checked)}
+            />
+            &nbsp;annotate
           </label>
         </span>
         <label>
