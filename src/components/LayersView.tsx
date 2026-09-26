@@ -54,7 +54,7 @@ export function LayersView({ rows, loading = false, error, onToggle }: LayersVie
                 onChange={(event) => onToggle(row.id, event.target.checked)}
               />
               <span className="pjsr-layers-name" title={row.name || row.id}>
-                {row.name || row.id}
+                {row.name || labels.untitledEntry}
               </span>
             </label>
           </li>

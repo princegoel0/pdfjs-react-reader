@@ -743,6 +743,16 @@ export function useViewerController({
           }
           repaint();
         },
+        getAttachmentContent: async (id) => {
+          const current = docRef.current as unknown as {
+            getAttachmentContent?: (attachmentId: string) => Promise<Uint8Array | null>;
+          } | null;
+          // pdf.js 5.x has no such method — it ships the bytes with the attachment
+          // list instead — so an older engine reads as "nothing to fetch" rather
+          // than throwing inside pdf.js's click handler.
+          if (typeof current?.getAttachmentContent !== 'function') return null;
+          return (await current.getAttachmentContent(id)) ?? null;
+        },
       }),
     [doc, effectiveSrc, repaint, handlePageError],
   );
@@ -776,7 +786,10 @@ export function useViewerController({
       goToPage: (page) => scrollToPageRef.current(clampPage(page, numPagesRef.current)),
       zoomTo: (scale) => setScaleMode(clampScale(scale)),
       zoomBy: (factor) => setScaleMode(zoomBy(resolvedScaleRef.current, factor)),
-      fitTo: (mode) => setScaleMode(mode === 'width' ? 'fit-width' : 'fit-page'),
+      fitTo: (mode) =>
+        setScaleMode(
+          mode === 'width' ? 'fit-width' : mode === 'page' ? 'fit-page' : 'automatic',
+        ),
       setLayout: (layout) => setPageLayout(layout),
       rotate: (degrees) => setRotation((r) => normalizeRotation(r + degrees)),
       rotatePage: (page, degrees) => rotatePageRef.current(page, degrees),

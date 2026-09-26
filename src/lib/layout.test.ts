@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyRotation,
+  automaticFitMode,
   computeLayout,
   computeSlots,
   findStartIndex,
@@ -19,6 +20,26 @@ describe('applyRotation', () => {
     expect(applyRotation(dims, 180)).toEqual(dims);
     expect(applyRotation(dims, 360)).toEqual(dims);
     expect(applyRotation(dims, -90)).toEqual({ width: 800, height: 600 });
+  });
+});
+
+describe('automaticFitMode', () => {
+  it('fits a portrait page by width', () => {
+    expect(automaticFitMode({ width: 612, height: 792 })).toBe('fit-width');
+  });
+
+  it('fits a landscape page as a whole', () => {
+    expect(automaticFitMode({ width: 792, height: 612 })).toBe('fit-page');
+  });
+
+  it('gives a square page width, which is the tie-break it documents', () => {
+    expect(automaticFitMode({ width: 500, height: 500 })).toBe('fit-width');
+  });
+
+  it('follows the shape the reader sees, so rotation is applied first', () => {
+    const portrait = { width: 612, height: 792 };
+    expect(automaticFitMode(portrait)).toBe('fit-width');
+    expect(automaticFitMode(applyRotation(portrait, 90))).toBe('fit-page');
   });
 });
 

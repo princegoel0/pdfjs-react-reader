@@ -4,7 +4,21 @@ export interface PageDims {
 }
 
 /** Numeric zoom factor, or an automatic mode resolved against the viewport. */
-export type ScaleMode = 'fit-width' | 'fit-page' | number;
+export type ScaleMode = 'fit-width' | 'fit-page' | 'automatic' | number;
+
+/**
+ * Which fit mode `automatic` means for a page of these dimensions.
+ *
+ * A portrait page is fitted by width, because a text column wants the whole
+ * horizontal run and the reader is already scrolling vertically. A landscape
+ * page is fitted as a whole, since fitting a wide page by width pushes its
+ * bottom off screen and turns one page into three scrolls. Orientation is read
+ * after the user's rotation, so a turned page is treated as the shape the
+ * reader actually sees; a square page takes width.
+ */
+export function automaticFitMode(dims: PageDims): 'fit-width' | 'fit-page' {
+  return dims.width > dims.height ? 'fit-page' : 'fit-width';
+}
 
 export const DEFAULT_PAGE_ESTIMATE: PageDims = { width: 612, height: 792 };
 

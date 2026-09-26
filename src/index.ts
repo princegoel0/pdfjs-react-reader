@@ -138,12 +138,22 @@ export {
   type CreatePdfLinkServiceOptions,
   type PdfLinkService,
 } from './lib/link-service';
+/**
+ * The search helpers are on both entries on purpose: a host replacing the shell's
+ * find strategy through `PdfViewer`'s `find` prop builds it from the same planner
+ * the built-in one uses, without reaching into the headless entry.
+ */
 export {
   buildPageText,
+  convertMatchRanges,
   convertMatches,
+  countPerPage,
   escapeRegExp,
   extractAllText,
   extractPageText,
+  findPageMatches,
+  planFind,
+  type FindPlan,
   type PageMatch,
   type PageTextIndex,
   type ResolvedSearchOptions,
@@ -213,6 +223,7 @@ export {
 } from './lib/canvas';
 export {
   applyRotation,
+  automaticFitMode,
   computeLayout,
   computeSlots,
   findStartIndex,

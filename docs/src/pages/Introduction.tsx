@@ -131,55 +131,55 @@ export function Introduction() {
             <td>
               <code>PdfViewer</code> alone — pages, text, search, ink, thumbnails, chrome
             </td>
-            <td>22.59 kB</td>
+            <td>22.97 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>
               <code>+ printFeature</code>
             </td>
-            <td>25.09 kB</td>
-            <td>+2.50 kB</td>
+            <td>25.46 kB</td>
+            <td>+2.49 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ downloadFeature</code>
             </td>
-            <td>23.37 kB</td>
-            <td>+0.78 kB</td>
+            <td>23.68 kB</td>
+            <td>+0.71 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ formsFeature</code>
             </td>
-            <td>24.55 kB</td>
+            <td>24.92 kB</td>
             <td>+1.96 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ outlineFeature</code>
             </td>
-            <td>23.50 kB</td>
-            <td>+0.92 kB</td>
+            <td>23.87 kB</td>
+            <td>+0.90 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ layersFeature</code>
             </td>
-            <td>23.74 kB</td>
+            <td>24.12 kB</td>
             <td>+1.16 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ attachmentsFeature</code>
             </td>
-            <td>23.87 kB</td>
-            <td>+1.29 kB</td>
+            <td>24.03 kB</td>
+            <td>+1.07 kB</td>
           </tr>
           <tr>
             <td>All six</td>
-            <td>30.15 kB</td>
-            <td>+7.56 kB</td>
+            <td>30.31 kB</td>
+            <td>+7.35 kB</td>
           </tr>
           <tr>
             <td>
@@ -193,8 +193,8 @@ export function Introduction() {
       <p>
         All six together cost less than their sum, because each is measured against the same core they
         attach to. The two shipped-file paths are what a bundler that cannot tree-shake pays for the
-        whole entry surface: <strong>47.19 kB</strong> for <code>index.js</code> and{' '}
-        <strong>25.47 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>.
+        whole entry surface: <strong>48.29 kB</strong> for <code>index.js</code> and{' '}
+        <strong>25.78 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>.
       </p>
       <p>
         Measured on 0.5.0. CI runs <code>npm run size</code>, which compares every path against the

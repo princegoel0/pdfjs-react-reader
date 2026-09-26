@@ -12,6 +12,12 @@ export interface PdfLinkService {
   goToDestination(dest: unknown): void;
   executeNamedAction(action: unknown): void;
   executeSetOCGState(action: unknown): void;
+  /**
+   * pdf.js's annotation layer calls this when a reader double-clicks a paperclip or
+   * an embedded-file link, and a missing method is a TypeError inside its handler
+   * rather than a visible failure.
+   */
+  getAttachmentContent(id: string): Promise<Uint8Array | null>;
   eventBus: {
     dispatch(name: string, args?: unknown): void;
     on(name: string, listener: (args: unknown) => void): void;
@@ -38,12 +44,19 @@ export interface CreatePdfLinkServiceOptions {
    * the failure a reader cannot diagnose: the link is there and it is inert.
    */
   onSetOCGState?: (action: SetOCGStateAction) => void;
+  /**
+   * Reads one attachment's bytes by the id the engine minted for it. Names come
+   * from the catalog's tree; annotation-held files get an `attachmentRef:` id, and
+   * only the engine knows which is which.
+   */
+  getAttachmentContent?: (id: string) => Promise<Uint8Array | null>;
 }
 
 const URL_OPTIONS = { addDefaultProtocol: true, tryConvertEncoding: true } as const;
 
 export function createPdfLinkService(options: CreatePdfLinkServiceOptions = {}): PdfLinkService {
-  const { baseUrl = null, onDestination, onExternalLink, onSetOCGState } = options;
+  const { baseUrl = null, onDestination, onExternalLink, onSetOCGState, getAttachmentContent } =
+    options;
 
   const resolve = (url: string | null): URL | null => {
     if (!url) return null;
@@ -81,6 +94,16 @@ export function createPdfLinkService(options: CreatePdfLinkServiceOptions = {}):
     },
     executeNamedAction() {
       // Named actions (PrintPage, NextPage, …) are a no-op without scripting.
+    },
+    async getAttachmentContent(id) {
+      if (!getAttachmentContent) return null;
+      try {
+        return await getAttachmentContent(id);
+      } catch {
+        // A file the engine cannot read is not the reader's problem to see: the
+        // click does nothing rather than rejecting inside pdf.js's own handler.
+        return null;
+      }
     },
     executeSetOCGState(action) {
       // pdf.js hands over exactly `{ state, preserveRB }`, the shape

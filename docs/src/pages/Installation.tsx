@@ -30,11 +30,13 @@ yarn add pdfjs-react-reader pdfjs-dist`}</code>
 // and, for the features you mounted:
 import 'pdfjs-react-reader/print.css';
 import 'pdfjs-react-reader/forms.css';
-import 'pdfjs-react-reader/outline.css';`}</code>
+import 'pdfjs-react-reader/outline.css';
+import 'pdfjs-react-reader/layers.css';
+import 'pdfjs-react-reader/attachments.css';`}</code>
       </pre>
       <p>
         <code>styles.css</code> once per app, near your other global CSS. Skip it if you are building
-        your own UI from the headless hooks and bringing your own styles. The three feature sheets are
+        your own UI from the headless hooks and bringing your own styles. The feature sheets are
         separate files on purpose: a bundler drops CSS that no JavaScript module imports, so a
         feature's rules cannot ride inside its own module, and one file per tier is what lets a
         download-only viewer ship no print rules at all. <code>download</code> needs no sheet — its
@@ -44,8 +46,9 @@ import 'pdfjs-react-reader/outline.css';`}</code>
       <h2>Optional capabilities</h2>
       <p>
         <code>{'<PdfViewer src="/a.pdf" />'}</code> is a viewer that reads: pages, selectable text,
-        search, thumbnails, ink, zoom and rotation. Print, save, fillable form widgets and the
-        bookmarks tab are features you add, because they are imports and an import is the only thing
+        search, thumbnails, ink, zoom and rotation. Print, save, fillable form widgets, the bookmarks
+        tab, the layers panel and the attachments panel are features you add, because they are imports
+        and an import is the only thing
         that decides what your bundle contains:
       </p>
       <pre>
@@ -54,8 +57,13 @@ import { printFeature } from 'pdfjs-react-reader/features/print';
 import { downloadFeature } from 'pdfjs-react-reader/features/download';
 import { formsFeature } from 'pdfjs-react-reader/features/forms';
 import { outlineFeature } from 'pdfjs-react-reader/features/outline';
+import { layersFeature } from 'pdfjs-react-reader/features/layers';
+import { attachmentsFeature } from 'pdfjs-react-reader/features/attachments';
 
-<PdfViewer src="/a.pdf" features={[printFeature, downloadFeature, formsFeature, outlineFeature]} />`}</code>
+<PdfViewer
+  src="/a.pdf"
+  features={[printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature]}
+/>`}</code>
       </pre>
       <p>
         See <a href="#/features">Features &amp; tiers</a> for what each one adds, what it costs, and

@@ -175,6 +175,7 @@ export {
 } from './lib/canvas';
 export {
   applyRotation,
+  automaticFitMode,
   computeLayout,
   computeSlots,
   findStartIndex,

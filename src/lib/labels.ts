@@ -22,6 +22,8 @@ export interface PdfViewerLabels {
   undoStroke: string;
   undoLabel: string;
   clearAllDrawings: string;
+  /** The short form on the button; `clearAllDrawings` is its accessible name. */
+  clearLabel: string;
   zoomIn: string;
   zoomOut: string;
   zoomLevel: string;
@@ -44,6 +46,8 @@ export interface PdfViewerLabels {
   pageLayout: string;
   fitWidth: string;
   fitPage: string;
+  /** The zoom select's orientation-aware option (FR-06's `Automatic`). */
+  zoomAutomatic: string;
   layoutContinuous: string;
   layoutSingle: string;
   layoutSpread: string;
@@ -52,6 +56,11 @@ export interface PdfViewerLabels {
   pagesRegion: string;
   pageLabel: string;
   pageOf: string;
+  /**
+   * The trailing half of the page counter, shown beside the page field, which
+   * already carries the current number — so this one cannot be `pageOf`.
+   */
+  pageCountOf: string;
   zoomPercent: string;
   loadingDocument: string;
   loadFailed: string;
@@ -151,6 +160,7 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   undoStroke: 'Undo stroke',
   undoLabel: 'Undo',
   clearAllDrawings: 'Clear all drawings',
+  clearLabel: 'Clear',
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
   zoomLevel: 'Zoom level',
@@ -171,6 +181,7 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   pageLayout: 'Page layout',
   fitWidth: 'Fit width',
   fitPage: 'Fit page',
+  zoomAutomatic: 'Automatic',
   layoutContinuous: 'Continuous',
   layoutSingle: 'Single',
   layoutSpread: 'Spread',
@@ -178,6 +189,7 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   pagesRegion: 'PDF pages',
   pageLabel: 'Page {page}',
   pageOf: 'Page {page} of {total}',
+  pageCountOf: 'of {total}',
   zoomPercent: '{percent}%',
   loadingDocument: 'Loading PDF…',
   loadFailed: 'Failed to load PDF: {message}',

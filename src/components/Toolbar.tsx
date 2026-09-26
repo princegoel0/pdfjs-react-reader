@@ -14,7 +14,7 @@ import {
   parseZoomPercent,
   ZOOM_LEVELS,
 } from '../lib/zoom';
-import { formatLabel } from '../lib/labels';
+import { formatLabel, type PdfViewerLabels } from '../lib/labels';
 import { useLabels } from './labels-context';
 import {
   ChevronLeftIcon,
@@ -37,10 +37,16 @@ export type { PageLayout, ScaleMode };
 export { ZOOM_LEVELS } from '../lib/zoom';
 export const INK_COLORS = ['#d92d20', '#4f46e5', '#067647', '#181d27'];
 
-export const INK_WIDTHS = [
-  { label: 'Thin', value: 1.5 },
-  { label: 'Medium', value: 3 },
-  { label: 'Thick', value: 6 },
+/**
+ * The pen widths on offer, each naming the catalog key that words it. The names
+ * live in the catalog and not here so that a translated shell has no English
+ * fallback left in the control — which also means a fourth entry has to bring
+ * its own key rather than a literal.
+ */
+export const INK_WIDTHS: { value: number; labelKey: keyof PdfViewerLabels }[] = [
+  { value: 1.5, labelKey: 'penThin' },
+  { value: 3, labelKey: 'penMedium' },
+  { value: 6, labelKey: 'penThick' },
 ];
 
 export interface ToolbarProps {
@@ -297,7 +303,11 @@ export function Toolbar({
       priority: 11,
       label: labels.overflowPageCount,
       hideOnly: true,
-      node: <span className="pjsr-page-count">of {numPages || '—'}</span>,
+      node: (
+        <span className="pjsr-page-count">
+          {formatLabel(labels.pageCountOf, { total: numPages || '—' })}
+        </span>
+      ),
     },
     {
       id: 'next',
@@ -389,10 +399,13 @@ export function Toolbar({
           onChange={(e) => {
             const value = e.target.value;
             onScaleModeChange(
-              value === 'fit-width' || value === 'fit-page' ? value : Number(value),
+              value === 'fit-width' || value === 'fit-page' || value === 'automatic'
+                ? value
+                : Number(value),
             );
           }}
         >
+          <option value="automatic">{labels.zoomAutomatic}</option>
           <option value="fit-width">{labels.fitWidth}</option>
           <option value="fit-page">{labels.fitPage}</option>
           {/* A custom scale has no matching option, which would leave the select
@@ -748,9 +761,9 @@ export function Toolbar({
             value={String(inkSettings.width)}
             onChange={(e) => onInkSettingsChange({ width: Number(e.target.value) })}
           >
-            {INK_WIDTHS.map((option, i) => (
+            {INK_WIDTHS.map((option) => (
               <option key={option.value} value={String(option.value)}>
-                {[labels.penThin, labels.penMedium, labels.penThick][i] ?? option.label}
+                {labels[option.labelKey]}
               </option>
             ))}
           </select>
@@ -769,7 +782,7 @@ export function Toolbar({
             aria-label={labels.clearAllDrawings}
             onClick={() => onInkClear?.()}
           >
-            Clear
+            {labels.clearLabel}
           </button>
           <button
             type="button"

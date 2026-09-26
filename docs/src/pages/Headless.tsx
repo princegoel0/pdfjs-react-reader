@@ -191,11 +191,16 @@ search.nextMatch();
       <p>
         Everything the hooks are built from is exported too, so you can unit-test your own logic
         against it: <code>computeSlots</code>, <code>findVisibleRange</code>,{' '}
-        <code>buildPageText</code>, <code>planPrintPages</code>, <code>planPrintScale</code>,{' '}
+        <code>buildPageText</code>, <code>planFind</code>, <code>findPageMatches</code>,{' '}
+        <code>countPerPage</code>, <code>planPrintPages</code>, <code>planPrintScale</code>,{' '}
         <code>strokePathD</code>, <code>drawInkStrokes</code>, <code>parseDestination</code>,{' '}
         <code>collectWidgets</code>, <code>readFormValues</code>, <code>resolveRenderScale</code>,{' '}
         <code>maxRenderPixelsFor</code>, <code>pdfAssetUrls</code>, <code>isAllowedSource</code>,{' '}
-        <code>normalizeSource</code>.
+        <code>flattenOptionalContent</code>, <code>normalizeAttachments</code>,{' '}
+        <code>automaticFitMode</code>, <code>normalizeSource</code>. The three a replaceable find
+        strategy needs — <code>planFind</code>, <code>findPageMatches</code>, <code>countPerPage</code>{' '}
+        — are on the root entry as well, because <code>find</code> is a shell prop and a host should not
+        have to import from two places to build one.
       </p>
     </>
   );

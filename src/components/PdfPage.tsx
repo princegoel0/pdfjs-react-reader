@@ -13,6 +13,8 @@ import { resolveRenderScale } from '../lib/canvas';
 import { useLabels } from './labels-context';
 import { InkLayer } from './InkLayer';
 import { applyHighlights, unwrapMarks } from '../lib/highlight';
+import { attachmentMimeType } from '../lib/attachments';
+import { downloadBytes } from '../lib/download';
 import type { AnnotationValueStore } from '../lib/form';
 import type { OptionalContentConfigHandle } from '../lib/optional-content';
 import type { InkSettings, InkStroke, PdfPoint } from '../lib/ink';
@@ -22,6 +24,17 @@ import type { PageMatch } from '../lib/search';
 
 /** `RenderParameters` is not exported, and the OC promise's type is only named there. */
 type RenderParams = Parameters<PDFPageProxy['render']>[0];
+
+/**
+ * The one `DownloadManager` method pdf.js's annotation layer ever calls: double-clicking
+ * a paperclip (or `Ctrl/Cmd + Enter` on it) saves the file it carries. Created once
+ * because it holds no state, and a fresh object per render would rebuild the whole layer.
+ */
+const annotationDownloadManager = {
+  openOrDownloadData(data: Uint8Array, filename: string): void {
+    downloadBytes(data, filename, attachmentMimeType(filename) ?? 'application/octet-stream');
+  },
+};
 
 export interface PdfPageProps {
   doc: PDFDocumentProxy;
@@ -289,6 +302,9 @@ export const PdfPage = memo(function PdfPage({
         page,
         linkService,
         annotationStorage,
+        // pdf.js reads this off the render params, not the constructor, so a
+        // download manager placed on the layer itself is silently ignored.
+        downloadManager: annotationDownloadManager,
         renderForms,
         enableScripting: false,
       } as unknown as Parameters<AnnotationLayer['render']>[0]);

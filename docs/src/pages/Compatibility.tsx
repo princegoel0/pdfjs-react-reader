@@ -150,7 +150,8 @@ export function Compatibility() {
             <td>CSS</td>
             <td>
               Import <code>pdfjs-react-reader/styles.css</code>, plus{' '}
-              <code>print.css</code> / <code>forms.css</code> / <code>outline.css</code> for the
+              <code>print.css</code> / <code>forms.css</code> / <code>outline.css</code> /{' '}
+              <code>layers.css</code> / <code>attachments.css</code> for the
               features you mounted, or supply your own rules for the <code>.pjsr-*</code> classes. The
               text layer in particular needs its positioning CSS or selectable text will overlay the
               page incorrectly.
@@ -224,52 +225,52 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>22.59 kB</td>
+            <td>22.97 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>25.09 kB</td>
-            <td>+2.50 kB</td>
+            <td>25.46 kB</td>
+            <td>+2.49 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>23.37 kB</td>
-            <td>+0.78 kB</td>
+            <td>23.68 kB</td>
+            <td>+0.71 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>24.55 kB</td>
+            <td>24.92 kB</td>
             <td>+1.96 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>23.50 kB</td>
-            <td>+0.92 kB</td>
+            <td>23.87 kB</td>
+            <td>+0.90 kB</td>
           </tr>
           <tr>
             <td>Core + layers</td>
-            <td>23.74 kB</td>
+            <td>24.12 kB</td>
             <td>+1.16 kB</td>
           </tr>
           <tr>
             <td>Core + attachments</td>
-            <td>23.87 kB</td>
-            <td>+1.29 kB</td>
+            <td>24.03 kB</td>
+            <td>+1.07 kB</td>
           </tr>
           <tr>
             <td>All six features</td>
-            <td>30.15 kB</td>
-            <td>+7.56 kB</td>
+            <td>30.31 kB</td>
+            <td>+7.35 kB</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>47.19 kB</td>
+            <td>48.29 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>25.47 kB</td>
+            <td>25.78 kB</td>
             <td>—</td>
           </tr>
           <tr>

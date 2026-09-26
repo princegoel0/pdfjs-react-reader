@@ -1,4 +1,5 @@
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { basename } from 'node:path';
 import { transformSync } from 'esbuild';
 
 mkdirSync('dist', { recursive: true });
@@ -13,6 +14,8 @@ const sheets = [
   ['src/styles/print.css', 'dist/print.css'],
   ['src/styles/forms.css', 'dist/forms.css'],
   ['src/styles/outline.css', 'dist/outline.css'],
+  ['src/styles/layers.css', 'dist/layers.css'],
+  ['src/styles/attachments.css', 'dist/attachments.css'],
 ];
 
 for (const [from, to] of sheets) {
@@ -26,14 +29,30 @@ for (const [from, to] of sheets) {
 }
 
 /* TypeScript 5.6+ reports TS2882 for a side-effect CSS import with no
-   declaration, so every CSS export carries one. */
+   declaration, so every CSS export carries one. The list is derived from the
+   sheets above: a stylesheet added to one without the other was how
+   `layers.css` and `attachments.css` came to be importable and absent. */
 writeFileSync(
   'dist/styles.d.ts',
-  [
-    "declare module 'pdfjs-react-reader/styles.css';",
-    "declare module 'pdfjs-react-reader/print.css';",
-    "declare module 'pdfjs-react-reader/forms.css';",
-    "declare module 'pdfjs-react-reader/outline.css';",
-    '',
-  ].join('\n'),
+  sheets
+    .map(([, to]) => `declare module 'pdfjs-react-reader/${basename(to)}';`)
+    .join('\n') + '\n',
 );
+
+// The export map is the public contract, so this — the step that fills `dist/` —
+// is where it gets proven. `tsconfig.json` resolves `pdfjs-react-reader/*` onto
+// `src/`, so a target that exists only in the manifest typechecks, plays and
+// docs-builds perfectly while every consumer import of it fails.
+const { exports: exportMap } = JSON.parse(readFileSync('package.json', 'utf8'));
+const missing = Object.entries(exportMap).flatMap(([subpath, entry]) => {
+  const targets = typeof entry === 'string' ? [entry] : Object.values(entry);
+  return targets
+    .map((target) => target.replace(/^\.\//, ''))
+    .filter((file) => !existsSync(file))
+    .map((file) => `  ${subpath} -> ${file}`);
+});
+
+if (missing.length) {
+  console.error(`package.json exports point at files this build did not emit:\n${missing.join('\n')}`);
+  process.exit(1);
+}

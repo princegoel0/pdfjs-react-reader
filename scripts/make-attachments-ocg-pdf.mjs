@@ -60,7 +60,7 @@ const pageDict = (contents, annots) =>
     annots ? ` /Annots ${annots}` : ''
   } >>`;
 objects.set(5, pageDict(11, '[21 0 R]'));
-objects.set(6, pageDict(12));
+objects.set(6, pageDict(12, '[22 0 R]'));
 objects.set(7, pageDict(13));
 
 // A SetOCGState link, so the layer a reader can only reach through the sidebar can
@@ -110,6 +110,25 @@ objects.set(11, {
     // a link about rather than being an empty outline over blank paper.
     text(12, 472, 'Click this box to show the Stamp layer.'),
   ].join('\n'),
+});
+
+// A paperclip annotation carrying its own file, inline in `/FS` rather than as a
+// reference. The form matters: the engine registers the raw `/FS` object as the
+// attachment's address and only reads bytes if that resolves to a stream — so a
+// `/FS` pointing at a separate Filespec object names a dictionary, and the click
+// finds nothing. Inline is what Acrobat writes and what actually opens.
+objects.set(
+  22,
+  [
+    '<< /Type /Annot /Subtype /FileAttachment /Rect [480 700 516 736] /Contents (Saved straight from the page)',
+    '  /Name /Paperclip /F 4 /FS << /Type /Filespec /F (note-from-page-2.txt) /UF (note-from-page-2.txt)',
+    '  /Desc (Carried by an annotation, not the name tree) /EF << /F 23 0 R >> >> >>',
+  ].join('\n'),
+);
+const annotationBody = 'This file hangs off a FileAttachment annotation, not the catalog.';
+objects.set(23, {
+  dict: `<< /Type /EmbeddedFile /Subtype /text#2Fplain /Params << /Size ${annotationBody.length} >>`,
+  stream: annotationBody,
 });
 
 // Page 2 keeps one layer and one plain block, so "a page with fewer groups than

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import {
   applyRotation,
+  automaticFitMode,
   computeLayout,
   computeSlots,
   DEFAULT_PAGE_ESTIMATE,
@@ -208,10 +209,11 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
     const pad = viewport.width <= NARROW_VIEWPORT_MAX ? NARROW_HORIZONTAL_PADDING : HORIZONTAL_PADDING;
     const fitWidthScale = (viewport.width - pad - innerGap) / (base.width * pagesAcross);
     const fitHeight = base.height;
+    const mode = scale === 'automatic' ? automaticFitMode(base) : scale;
     const resolved =
-      scale === 'fit-width'
-        ? Math.max(0.1, fitWidthScale)
-        : Math.max(0.1, Math.min(fitWidthScale, (viewport.height - gap) / fitHeight));
+      mode === 'fit-page'
+        ? Math.max(0.1, Math.min(fitWidthScale, (viewport.height - gap) / fitHeight))
+        : Math.max(0.1, fitWidthScale);
     lastFitScale.current = resolved;
     return resolved;
   }, [scale, pageEstimate, rotationFor, viewport.width, viewport.height, gap, pageLayout]);

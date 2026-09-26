@@ -14,14 +14,56 @@ release carries one theme so the version number means something beyond "several 
 
 ## Where we are
 
-`FR-01`–`FR-19` and `FR-21`–`FR-23` are implemented, tested and browser-verified. `FR-20` is **not**
-complete: download offers the original bytes or a pdf.js incremental save, and
-`usePdfDownload`’s options in `src/headless/usePdfDownload.ts`
-states that this is "not a true flatten (flattening needs a PDF writer, which this library is not)".
-That sentence is what forces the writer subpath in `0.7`.
+Every requirement, its release, and whether it is actually met. This table replaces the range
+sentence this section used to carry (`FR-01`–`FR-19` and `FR-21`–`FR-23` are implemented), which was
+wrong in both directions: it silently omitted `FR-24`–`FR-28`, which `0.5` shipped, and it claimed
+`FR-16` and `FR-18` whole when each has a half scheduled for `0.6`. A range is not a status.
 
-`FR-21`–`FR-23` were added on 2026-09-24 alongside the tier decision below and shipped in `0.4` on
-2026-09-25.
+| FR | Requirement | Release | Status |
+| --- | --- | --- | --- |
+| `FR-01` | Input flexibility (URL, bytes, base64, `File`/`Blob`) | `0.1` | done |
+| `FR-02` | Worker configuration | `0.1`, fixed in `0.1.1` | done |
+| `FR-03` | Password protection | `0.1` hook, `0.7` prompt | done — wrong *and* right passwords exercised |
+| `FR-04` | Cancellation safety | `0.1` | done |
+| `FR-05` | Viewport virtualization | `0.1`, ceilings `0.3` | done — see the unmeasured bar below |
+| `FR-06` | Responsive zoom modes | `0.2` percentages, `0.5` `automatic` | done — 25–500 %, width, page, automatic |
+| `FR-07` | High-DPI adaptation | `0.3` | done |
+| `FR-08` | Page layouts | `0.1` | done |
+| `FR-09` | Rotation, per page and global | `0.1`, `0.2` | done |
+| `FR-10` | Outline | `0.1` | done |
+| `FR-11` | Thumbnails sidebar | `0.1`, fluid grid in phase 6b | done — `PRD` states "scale 0.15–0.25"; the code sizes from the column width and `devicePixelRatio` (`PdfThumbnail.tsx:64`), so that figure is not the rule |
+| `FR-12` | Jump-to-page with clamping | `0.1` | done |
+| `FR-13` | In-memory indexing | `0.1` | done in substance — `page.getTextContent()` parses in the pdf.js worker; the index is assembled on the main thread, yielding every five pages (`search.ts:272`) |
+| `FR-14` | Match highlighting | `0.1`, counts `0.5` | done |
+| `FR-15` | Search controls | `0.1`, `0.5` | done — case, whole-word, next/previous, `Indexing {percent}%` |
+| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6` | **partial** — every widget type except a signature is browser-verified; `form.ts:120` classifies `/Sig`, but no fixture carries one, so its rendering is unproven |
+| `FR-17` | Form data sync | `0.1` | done |
+| `FR-18` | Annotations view and draw | `0.1` view, ink `0.5`; authoring `0.6` | **partial** — links and markup render, freehand ink draws and prints; *drawing signatures* and creating highlights/annotations are `0.6` scope (see *0.6.0 — Mark*) |
+| `FR-19` | High-fidelity printing | `0.1`, ranges `0.5` | done — iOS Safari is excluded by design, which `PRD` does not mention |
+| `FR-20` | Document download | `0.7` | **not complete** — `doc.saveDocument()` is an incremental save, not a flatten; flattening needs a PDF writer, which is what `0.7` adds |
+| `FR-21` | Opt-in feature registration | `0.4` | done |
+| `FR-22` | Per-feature stylesheets | `0.4`, two more in `0.5` | done |
+| `FR-23` | Enforced size boundary | `0.4` | done — a ratchet, and the per-feature 4 kB gate |
+| `FR-24` | Optional-content layers | `0.5` | done |
+| `FR-25` | Embedded file list | `0.5` | done — both engine shapes, and annotation-held files save from the annotation |
+| `FR-26` | Replaceable find strategy | `0.5` | done |
+| `FR-27` | Search depth | `0.5` | done |
+| `FR-28` | Composed shell | `0.5` | done |
+
+**`FR-20` in full**, because it is the one open item that changes the API: download offers the
+original bytes or an incremental save carrying the edits, and
+`usePdfDownload`’s options state "not a true flatten (flattening needs a PDF writer, which this
+library is not)". That sentence is what forces the writer subpath in `0.7`.
+
+**One bar nothing has measured.** `PRD.md:22` promises "60 FPS scrolling on 1,000+ page documents
+with sub-100ms viewport render times". Every frame-timing measurement taken in this project’s
+history was made on documents of 3–14 pages, and no 1,000-page fixture has ever been opened here.
+`README` is careful about this — it cites a 400-page document only as the reason canvases are
+released on mobile Safari — but the requirement itself is unverified, so it is `0.8`’s work, not
+done. `0.8` needs a large fixture and a real number.
+
+`FR-21`–`FR-23` were added on 2026-09-24 alongside the tier decision below; `FR-24`–`FR-28` were
+added with `0.5` on 2026-09-26.
 
 ## What the engine gives us for free
 
@@ -100,8 +142,9 @@ Per tier, on the shipped build:
 | `+ all four` | 25.79 kB | +5.18 kB |
 
 Each row is the worse of esbuild and Rollup, and each is also asserted the other way: the hook a
-feature wraps (`usePdfPrint`, `usePdfDownload`, `usePdfFormValues`, `usePdfOutline`) is grepped out of
-the core bundle and into its own, on unminified output so a rename cannot hide it. Those four names
+feature wraps (`usePdfPrint`, `usePdfDownload`, `usePdfFormValues`, `usePdfOutline`, and since `0.5`
+`usePdfOptionalContent` and `usePdfAttachments`) is grepped out of
+the core bundle and into its own, on unminified output so a rename cannot hide it. Those names
 are the markers, chosen after the spike's broader set proved unreliable — `AnnotationMode` appears in
 a core bundle simply because our code imports that name from `pdfjs-dist`, so a marker has to be
 something only the feature defines.
@@ -138,30 +181,31 @@ Every requested feature, and the release that ships it.
 | --- | --- | --- |
 | Multiple viewing modes | `0.1` done | continuous / single / spread (`lib/layout.ts`) |
 | Direct pdf.js API access, TypeScript | `0.1` done | re-exports extended in `0.6` |
-| Zoom control, pinch zoom | `0.2` done | wheel + engine `TouchManager` pinch; `ZOOM_LEVELS` 0.25–5, any percentage accepted |
+| Zoom control, pinch zoom | `0.2` done, `0.5` automatic | wheel + engine `TouchManager` pinch; `ZOOM_LEVELS` 0.25–5, any percentage 25–500 %, and `automatic` (width-fit portrait, whole-page landscape) |
 | Drag-and-drop loading | `0.2` done | off by default; `acceptDrop` gates it, `onDropFile` always fires |
 | Fullscreen | `0.2` done | webkit spellings covered, control hidden where unsupported |
 | Accessibility | `0.2`, `0.6`, `0.8` | keyboard done in `0.2` → annotation access → audit |
-| Internationalization | `0.2` API done, `0.8` locales | ~90 strings behind one typed catalog |
+| Internationalization | `0.2` API done, `0.8` locales | 106 strings behind one typed catalog |
 | Advanced JS API | `0.2`, `0.5`, `0.6` | handle + events done in `0.2` → find controller → popups |
 | Mobile optimization | `0.2`, `0.8` | gestures done → real-device matrix |
-| **Basic vs full bundle weight** | **`0.4` done** | opt-in features; core shell 22.59 kB gz bundled (`0.5` build), each feature 0.78–2.50 kB over it |
+| **Basic vs full bundle weight** | **`0.4` done** | opt-in features; core shell 22.97 kB gz bundled (the `0.5` line, post-close), each feature 0.71–2.49 kB over it |
 | High-resolution rendering | `0.3` done | `devicePixelRatio` forwarded from `PdfViewer`, capped by the canvas ceilings |
 | Performance | `0.3` done | canvas area/side ceilings in `lib/canvas.ts`; virtualization and canvas zeroing already done |
 | Security / CSP | `0.3` done | `assetUrl` roots cMaps + fonts + wasm; `allowedSources`; opt-in Trusted Types policy |
 | Customizable toolbar and UI | `0.5` done | the parts are exported and read one controller; `controls` hides, re-ranks, re-orders and adds controls by id |
-| Rich sidebar | `0.5` done | thumbnails are core; outline, layers and attachments are feature tabs. `executeSetOCGState` is implemented — a document's own layer link and the layers panel drive one shared config. Left: an annotation that *opens* an attachment is still inert |
-| Advanced search | `0.5` done | case, whole-word, highlight-all, multi-word AND, regex, invalid-pattern reporting, per-page counts, and `find` to swap the strategy |
+| Rich sidebar | `0.5` done | thumbnails are core; outline, layers and attachments are feature tabs. `executeSetOCGState` is implemented — a document's own layer link and the layers panel drive one shared config, and a paperclip annotation saves the file it carries |
+| Advanced search | `0.5` done | case, whole-word, every match marked at once (not a toggle — it is unconditional), multi-word AND, regex, invalid-pattern reporting, per-page counts, and `find` to swap the strategy |
 | PDF annotation and editing | `0.6` create, `0.7` persist | |
 | Comprehensive form support (AcroForm + XFA) | `0.6` renders XFA | XFA persistence excluded permanently |
 | Page reordering | `0.7` | needs a PDF writer |
 
 ## Releases
 
-**How these ship (decided 2026-09-25).** `0.2`–`0.9` are committed on `dev` and kept **local**; nothing
+**How these ship (decided 2026-09-25).** `0.2`–`0.8` — the planned sequence, which has no `0.9` — are
+committed on `dev` and kept **local**; nothing
 is pushed, merged to `main` or published along the way. When the sequence is done we push `dev`, tag
 `1.0.0`, merge to `main`, and publish that one version. `0.1.2` is therefore never published — it is
-tagged on GitHub but npm goes `0.1.1` → `1.0.0`. The accepted cost: Actions do not run on `0.2`–`0.9`
+tagged on GitHub but npm goes `0.1.1` → `1.0.0`. The accepted cost: Actions do not run on `0.2`–`0.8`
 work, so `npm run verify` locally is the only gate, and the Pages docs site stays on 0.1.x content
 until the final merge.
 
@@ -274,7 +318,9 @@ No new dependencies. This is the architecture seam; see "The tier decision" abov
   paths with esbuild and Rollup, reporting the worse of each pair; `size-baseline.json` carries nine
   labels, those seven plus the two entry sums. It also asserts the four feature markers in both
   directions — absent from the core bundle, present in the bundle that names the feature — so a marker
-  that stopped meaning anything fails as loudly as a feature that came back.
+  that stopped meaning anything fails as loudly as a feature that came back. (`0.5` mounted two more
+  features, so today it bundles nine paths, `size-baseline.json` holds eleven labels, and there are six
+  markers; the four-above list is what `0.4` shipped.)
 * **The gate was tested by breaking it, both ways.** Re-adding a live `usePdfPrint` reference to
   `PdfViewer` and rebuilding: core went 20.61 → **22.10 kB** and *both* bundlers reported
   `FAIL usePdfPrint is in the core … bundle: the shell imports print again`, exit 1 — and the leak
@@ -332,7 +378,9 @@ React fiber):**
   The earlier hit was a transient resize in a different window state, not a defect. Recorded so it is
   not chased twice.
 * **What that bought:** a host can now arrange the viewer without forking it — `playground/src/CustomLayout.tsx`
-  is 70 lines and owns no state. What remains of the theme is the *contents* of the bar: the parts
+  is 97 lines and owns no state. (The "70 lines" this line claimed when it was written was wrong: the
+  file has measured 97 at every commit since the one that created it. A number typed rather than
+  measured, which is what the rest of this file tries not to do.) What remains of the theme is the *contents* of the bar: the parts
   compose, but their controls are still a fixed list with hardcoded priorities, which is the next
   bullet.
 
@@ -401,8 +449,24 @@ React fiber):**
   directions: a checkbox repaints the mounted canvases and moves the document's own link state, and
   clicking the fixture's `SetOCGState` link moves the checkbox. `--stamp-on` emits a twin whose only
   difference is the group default, which is what proves the flag drives visibility.
-  Not done, recorded: an annotation whose action *opens an attachment* is still inert, because pdf.js
-  reaches for `linkService.getAttachmentContent` and a `downloadManager`, neither of which we supply.
+  **The inert paperclip, closed after the release.** An annotation that *opens* an embedded file stayed
+  dead, because pdf.js reaches for `linkService.getAttachmentContent` and a `downloadManager` and we
+  supplied neither: the first was a `TypeError` inside pdf.js's own handler, and the second it reads off
+  the **render params**, not the `AnnotationLayer` constructor — a manager placed there is ignored
+  without a word. Both now exist, the save going through the same `downloadBytes` as the attachments tab.
+  Trigger is `dblclick` on the icon or `Ctrl + Enter` on the focused annotation, never `click`. Measured
+  in the browser on `attachments-ocg-sample.pdf`: either path produced one 65-byte `text/plain` blob and
+  one anchor click with `download="note-from-page-2.txt"`, console clean. It cost **+0.29 kB** on core,
+  which is where the save now lives — and bought attachments a cheaper over-core figure (1.29 → 1.08).
+  **The review after that found a worse one, in the packaging.** `layers.css` and `attachments.css` were in
+  the export map and the docs and never in `dist/` — the asset step still listed only the four sheets from
+  `0.4`. Nothing in-repo could see it: `tsconfig.json` resolves `pdfjs-react-reader/*.css` onto `src/`, so
+  typecheck, the playground and both docs builds all read the real file, and `check-size.mjs` sums files per
+  *entry*, so an absent sibling sheet is invisible. Fixed by emitting both, generating the `declare module`
+  list from the same array, adding an assertion that every `exports` target exists (failure proved against a
+  made-up path), and importing all six sheets in `scripts/consumer-smoke`, which had checked only
+  `styles.css` since `0.1.2`. **The lesson is about the gate, not the typo**: an in-repo green run proves
+  nothing about the artifact, which is why the consumer build exists at all.
 * **Landed: search depth.** Multi-word queries require **all** words on a page (pdf.js's own rule),
   `regex: true` compiles the query as an expression, an uncompilable pattern says `Invalid pattern`
   instead of "no results", and `counts` / `pagesWithMatches` give per-page totals. Measured on the
@@ -416,13 +480,30 @@ React fiber):**
   results"), which reports 3 where the engine reports 416 — the only version of that proof that
   cannot pass by accident. Cost of all of the above: **core 22.14 → 22.59 kB**.
 
+* **Landed after the close: `Automatic` zoom, which completes `FR-06`.** `ScaleMode` gained
+  `'automatic'`, a zoom-select option, and `handle.fitTo('automatic')`. The rule is
+  `automaticFitMode` in `src/lib/layout.ts`: a page wider than tall fits as a whole, a page tall as it is
+  long fits by width, and orientation is read *after* the user's rotation, because a turned page is the
+  shape the reader sees. Width-fit wins the square case. Pure and unit-tested, because the interesting
+  part is the tie-break and the rotation interaction, not the arithmetic. The reason it is orientation
+  rather than "the smaller of the two fits" is that min(width, height) fit *is* page-fit, so it would
+  have been a third name for an existing option — a wide page fitted by width pushes its foot off screen
+  and turns one page into three scrolls, which is what this mode exists to avoid.
+  **This was found by a document review, not by a user.** `PRD` had asked for it since §4.1 and every
+  release plan since `0.1` claimed the requirement range was met.
+
 ### 0.5.0 — closed 2026-09-26
 
-Cumulative measured cost of the release, gzipped, worst of esbuild and Rollup: core
-**20.61 → 22.59 kB** (+1.98 — memo 0.08, controller 0.51, context and parts 0.15, controls 0.32,
-shared layer config and repaint 0.45, search depth 0.45). Over core: print 2.50, download 0.78,
-forms 1.96, outline 0.92, layers 1.16, attachments 1.29; all six 7.56. Entry sums: shell 47.19,
-headless 25.47. 281 tests.
+Cumulative measured cost of the release and the work that closed after it, gzipped, worst of esbuild
+and Rollup: core **20.61 → 22.97 kB** (+2.36 — memo 0.08, controller 0.51, context and parts 0.15,
+controls 0.32, shared layer config and repaint 0.45, search depth 0.45, attachment save 0.29,
+`Automatic` zoom 0.09, two catalog strings 0.01 — which sum to 2.30, and the gap is exactly what
+measuring the whole rather than adding up the parts is for). Over core: print 2.49,
+download 0.71, forms 1.96, outline 0.90, layers 1.16, attachments 1.07; all six 7.35. Entry sums:
+shell 48.29, headless 25.78. 288 tests. The baseline was re-accepted once, at the end, for the
+attachment save, the catalog strings and `Automatic` together. Download and attachments each got
+*cheaper* over core while core grew, because `downloadBytes` and the MIME guess they both need are now
+core code — the paperclip annotation shares them with the attachments tab.
 
 **Compound components shipped in a different spelling.** This section asked for `PdfViewer.Root` /
 `.Toolbar` / `.Page`; what shipped is `ViewerRoot` / `ViewerToolbar` / `ViewerSidebar` / `ViewerPages`
@@ -464,13 +545,17 @@ The only release that touches the zero-dependency rule.
 ### 0.8.0 — Freeze: hardening
 * Real-device matrix: iOS Safari 14 and 15, where the `:has()` fallback for container queries is
   written but has never been measured on any Safari, plus Android Chrome.
+* The performance bar `PRD.md:22` states: a 1,000-page fixture from a generator script, frame timings
+  over a scripted scroll, and viewport render time. Nothing here has ever opened a document that large,
+  so the sentence is currently a claim and not a measurement.
 * Shipped locale catalog; text layer `TextLayer.update()` instead of a full rebuild.
 * One docs example per public API, including each tier combination; an upgrade guide; an
   API-freeze review.
 
 ### 1.0.0 — GA
-All `FR-01`–`FR-23` genuinely green, every feature-list row either shipped or documented as an
-explicit exclusion, and strict semver from then on.
+Every row of the §Where we are table — all `FR-01`–`FR-28`, where that claim used to stop at `FR-23` —
+genuinely green or documented as an explicit exclusion, the `PRD.md:22` performance bar measured on a
+document large enough to mean it, and strict semver from then on.
 
 ## Opened by the 0.4 review
 

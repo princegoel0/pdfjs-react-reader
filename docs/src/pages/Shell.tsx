@@ -9,7 +9,7 @@ const PROPS: [string, string, string][] = [
   ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
   ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
   ['enableXfa', 'boolean', 'Render XFA forms. Defaults to true, which is what a dynamic XFA needs to have any content at all.'],
-  ['defaultScale', 'number | "fit-width" | "fit-page"', 'Initial zoom. 1 = 100%. Any percentage is accepted, not just the presets.'],
+  ['defaultScale', 'number | "fit-width" | "fit-page" | "automatic"', 'Initial zoom. 1 = 100%; any percentage from 25 to 500 is accepted, not just the presets. "automatic" fits a landscape page whole and a portrait one by width.'],
   ['defaultLayout', '"continuous" | "single" | "spread"', 'Row grouping.'],
   ['defaultRotation', 'number', 'Initial rotation in degrees; the toolbar rotates from here.'],
   ['defaultPageRotations', 'Record<number, number>', 'Per-page rotation in degrees, keyed by 0-based page index.'],
@@ -40,13 +40,13 @@ const HANDLE: [string, string][] = [
   ['goToPage(page)', 'Scrolls to a 1-based page.'],
   ['zoomTo(scale)', 'Sets an absolute factor, clamped to 25–500%.'],
   ['zoomBy(factor)', 'Multiplies the zoom currently on screen.'],
-  ['fitTo(mode)', 'Switches to "width" or "page".'],
+  ['fitTo(mode)', 'Switches to "width", "page" or "automatic".'],
   ['setLayout(layout)', 'continuous, single or spread.'],
   ['rotate(degrees)', 'Rotates the whole document.'],
   ['rotatePage(page, degrees)', 'Rotates one page in place.'],
   ['openSidebar(open, tab?)', 'Opens the sidebar. The tab argument is a string, and the only tabs that exist are the ones mounted: `thumbnails` is core, while `outline`, `layers` and `attachments` need their feature.'],
   ['toggleFullscreen()', 'Needs a user gesture, like every fullscreen request.'],
-  ['search(query, options?)', 'Runs a search and reveals the search bar.'],
+  ['search(query, options?)', 'Runs a search and reveals the search bar. `options` takes the same `caseSensitive`, `wholeWord` and `regex` flags the find bar exposes, and several words in one query means all of them on a page.'],
 ];
 
 

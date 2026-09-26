@@ -33,7 +33,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/print.css</code>
             </td>
-            <td>2.50 kB</td>
+            <td>2.49 kB</td>
           </tr>
           <tr>
             <td>
@@ -44,7 +44,7 @@ export function Features() {
               edited — an incremental <code>saveDocument()</code> that keeps the fields interactive.
             </td>
             <td>none needed</td>
-            <td>0.78 kB</td>
+            <td>0.71 kB</td>
           </tr>
           <tr>
             <td>
@@ -69,7 +69,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/outline.css</code>
             </td>
-            <td>0.92 kB</td>
+            <td>0.90 kB</td>
           </tr>
           <tr>
             <td>
@@ -94,24 +94,26 @@ export function Features() {
             <td>
               The embedded-files sidebar tab: name, description and a save per file, with the bytes
               read only when asked for. pdf.js 5 ships the content inside the attachment list and 6
-              behind <code>getAttachmentContent()</code>; this feature reads either.
+              behind <code>getAttachmentContent()</code>; this feature reads either. A file that an
+              annotation carries rather than the name tree names saves from the annotation itself —
+              that path is core, so it works with or without this tab.
             </td>
             <td>
               <code>pdfjs-react-reader/attachments.css</code>
             </td>
-            <td>1.29 kB</td>
+            <td>1.07 kB</td>
           </tr>
         </tbody>
       </table>
 
       <p>
-        Cost is measured, not estimated, and the figures below are the <code>0.5</code> release
-        build (re-measured at each release close): <code>npm run size</code> bundles one file per
+        Cost is measured, not estimated, and the figures below are the current <code>0.5</code> build
+        (re-measured at each release close): <code>npm run size</code> bundles one file per
         consumer import with both esbuild and Rollup and reports the larger of the two, so a feature is
-        only &ldquo;small&rdquo; if two independent tree-shakers agree. All six together cost 7.56 kB
-        over the <code>22.59 kB</code> core — less than their sum, because they share the shell they attach
+        only &ldquo;small&rdquo; if two independent tree-shakers agree. All six together cost 7.35 kB
+        over the <code>22.97 kB</code> core — less than their sum, because they share the shell they attach
         to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
-        bundle pays. Summing the shipped files of the whole root entry instead gives 47.19 kB, because
+        bundle pays. Summing the shipped files of the whole root entry instead gives 48.29 kB, because
         that entry re-exports every headless hook whether or not you name one — so quote the import,
         not the entry.
       </p>

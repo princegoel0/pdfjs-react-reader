@@ -145,7 +145,8 @@ export interface PdfViewerHandle {
   /** Multiplies the zoom currently on screen by `factor`. */
   zoomBy: (factor: number) => void;
   /** Switches to an automatic fit mode. */
-  fitTo: (mode: 'width' | 'page') => void;
+  /** `'automatic'` picks width-fit or page-fit from the page's shape. */
+  fitTo: (mode: 'width' | 'page' | 'automatic') => void;
   setLayout: (layout: PageLayout) => void;
   /** Rotates the whole document by a multiple of 90 degrees. */
   rotate: (degrees: number) => void;

@@ -51,9 +51,12 @@
   white-space: nowrap;
 }
 
-.pjsr-layers-row:focus-visible {
+/* The ring goes on the checkbox, not the row: a `<label>` is not focusable, so a
+   `.pjsr-layers-row:focus-visible` rule can never match and the keyboard user
+   would get only the user-agent default. */
+.pjsr-layers-row input[type='checkbox']:focus-visible {
   outline: 2px solid var(--pjsr-accent);
-  outline-offset: -1px;
+  outline-offset: 2px;
 }
 
 .pjsr-layers-empty {

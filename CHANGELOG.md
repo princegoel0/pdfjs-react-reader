@@ -40,11 +40,11 @@ four, because the shell handed every page a fresh inline arrow each render, whic
   so it stays in the bar) and `print-pages` at 11 (All / Current / From–to, so it gives its place up first)
   — and the print button says what it will send (`Print pages 2–3`). `Ctrl/Cmd + P` prints the same
   selection. Scope state lives in the Runner, because a control can be rendered three times.
-  **+0.47 kB** on print (2.03 → 2.50 of its 4 kB gate).
+  **+0.47 kB** on print (2.02 → 2.49 of its 4 kB gate).
 - **`layersFeature`** (`pdfjs-react-reader/features/layers`) lists a document's optional-content groups as
   a sidebar tab and switches them; **`attachmentsFeature`** lists embedded files and saves them. Each ships
   its own stylesheet, and neither is in the core bundle: measured over core, **layers +1.16 kB**,
-  **attachments +1.29 kB**.
+  **attachments +1.07 kB**.
 - **`usePdfOptionalContent`** and **`usePdfAttachments`** as headless hooks, and the pure halves beside
   them (`planFind`, `findPageMatches`, `countPerPage`, `flattenOptionalContent`, `normalizeAttachments`).
 - **Search depth.** A query's words must **all appear on the page** (the rule pdf.js's own viewer uses),
@@ -55,9 +55,20 @@ four, because the shell handed every page a fresh inline arrow each render, whic
   contract — and the find bar, the marks and the navigation run on your answers. That is the seam for a
   server-side index or a stemmed matcher without rebuilding the chrome.
 - **`attachments-ocg-sample.pdf`** and `scripts/make-attachments-ocg-pdf.mjs`: three pages carrying embedded
-  files and three optional-content groups, one off by default, plus a `SetOCGState` link. `--stamp-on` and
+  files and three optional-content groups, one off by default, plus a `SetOCGState` link and a
+  `FileAttachment` annotation whose file reaches the save dialog. `--stamp-on` and
   `--out` emit a twin document differing only in that flag, which is how the default was shown to be what
   drives it.
+- **`Automatic` zoom completes `FR-06`.** The zoom select gains an `Automatic` option,
+  `defaultScale` and `ScaleMode` gain `'automatic'`, and `handle.fitTo` takes `'automatic'` beside
+  `'width'` and `'page'`. The rule is orientation: a landscape page is fitted whole, a portrait one by
+  width, rotation included — a page turned sideways is treated as the shape you are looking at.
+- **`planFind`, `findPageMatches`, `countPerPage`, `convertMatchRanges` and `FindPlan` are now
+  exported from the root entry too**, not only `/headless`. A host replacing the shell's find strategy
+  through the `find` prop builds it from the same planner the built-in one uses, without a second import
+  from a different entry point.
+  name, so a string the shell takes from a literal instead of the catalog shows up as untranslated English
+  where a test can see it. Deliberately blunt: the point is the residual, not any one label.
 
 ### Changed
 
@@ -69,12 +80,40 @@ four, because the shell handed every page a fresh inline arrow each render, whic
   and what readers read the space as. Measure of the difference: on the 14-page test document `trace`
   finds 416 matches and `trace monkey` finds 401, because pages with one word and not the other drop out.
 - `downloadBytes` takes a MIME type, so a saved attachment is not labelled `application/pdf`.
+- **`INK_WIDTHS` names a label rather than carrying one.** The exported array was
+  `{ label: 'Thin', value: 1.5 }`, so a host that built its own pen-width select from it got English no
+  matter what catalog it passed; it is `{ value: 1.5, labelKey: 'penThin' }` now and the shell's select
+  reads `labels[option.labelKey]`. **Breaking** for a host that imported it and read `.label` — which is
+  published in `0.1.x`, so it is recorded rather than waved through as unpublished.
 - `PdfViewerHandle.search` now takes the same options the find bar exposes, including `regex`.
 - The core viewer resolves the document's `OptionalContentConfig` once per load and passes it to every
   render, which is what `contentVersion`/`repaint` exist for: **+0.45 kB** on core.
 
 ### Fixed
 
+- **A paperclip annotation now saves the file it carries.** Double-clicking one, or pressing
+  `Ctrl/Cmd + Enter` while it has focus, asked pdf.js for `linkService.getAttachmentContent` — a method our
+  link service never declared — and then for a `downloadManager`, which it reads off the **render params**
+  rather than the `AnnotationLayer` constructor, so a manager placed there is ignored without a word. Both
+  are supplied now, and the save runs through `downloadBytes` with the same MIME guess the attachments tab
+  uses, so a `.txt` arrives as `text/plain` instead of `application/pdf`. Browser-measured: one 65-byte
+  blob and one anchor click naming `note-from-page-2.txt`. **+0.29 kB** on core, which is where the save
+  now lives — the reason `attachmentsFeature`'s cost over core fell from 1.29 kB to 1.07 kB.
+- **`pdfjs-react-reader/layers.css` and `/attachments.css` were promised and never built.** `package.json`
+  exported both and the docs told readers to import them, but the asset step minified four sheets, so a
+  consumer's bundler failed to resolve a file the manifest named — while every check inside the repo
+  passed, because `tsconfig.json` resolves `pdfjs-react-reader/*.css` onto `src/styles/*.css` and the
+  playground therefore wore the styles happily. Both sheets are emitted now; the `declare module` list is
+  generated from the same array so the two cannot drift again; the asset step exits 1 if any `exports`
+  target is missing (proved by pointing the map at a file nothing writes); and the consumer smoke app
+  imports all six sheets, so repeating this needs a manifest lie *and* a working bundler to hide it.
+- **The layers panel had no keyboard focus ring.** `.pjsr-layers-row:focus-visible` matched the `<label>`,
+  which is not focusable, so the rule could never fire and the checkbox fell back to the user-agent
+  default; the ring is on the checkbox now. An unnamed layer also stopped announcing its object id as its
+  name — it reads `(untitled)`, the way an unnamed outline entry does, with the id still in the tooltip.
+- **Two strings bypassed the label catalog.** The ink bar's `Clear` and the page counter's `of {n}` were
+  literals in `Toolbar.tsx`; they are `clearLabel` and `pageCountOf` now, which makes the catalog the
+  complete set it claimed to be for the bar.
 - **Rotating a page's layer state now reaches the page.** pdf.js builds a *new*
   `OptionalContentConfig` on every `getOptionalContentConfig()` call, and a `render()` that is not handed
   one fetches its own — so switching a layer on any instance the caller holds changes nothing on screen.
@@ -369,7 +408,7 @@ report what the user did, and the gestures a reader expects from a PDF viewer.
 - **Fullscreen** on the viewer root, with the webkit spellings covered and the control hidden where
   the platform has no element fullscreen (iPhone, iPad Safari). State follows
   `fullscreenchange`, not our own request, so Escape leaves the toolbar honest.
-- **Any zoom percentage**, not just the fourteen presets: a percentage box beside the zoom select
+- **Any zoom percentage**, not just the sixteen presets: a percentage box beside the zoom select
   accepts `150`, `150%` or ` 150 % `, clamps to 25–500 %, and returns the box to the value on screen
   when the edit is unparseable rather than snapping the zoom somewhere.
 - **Per-page rotation.** `rotatePage(page, degrees)` and `defaultPageRotations`, keyed by 0-based
