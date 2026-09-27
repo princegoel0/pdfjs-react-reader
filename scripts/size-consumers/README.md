@@ -11,4 +11,5 @@ follow them and this repo deliberately ships none. A path that is measured is a
 path whose shape is known, so the relative form is the safer lie to tell.
 
 Keep `react`, `react-dom` and `pdfjs-dist` out of these bundles: the application
-supplies them, and `pdfjs-dist` alone is ~532 kB gzipped against our tens.
+supplies them, and `pdfjs-dist` alone gzips to 128.6 kB on the main thread
+against our tens.
