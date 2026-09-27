@@ -54,16 +54,18 @@ wrong in both directions: it silently omitted `FR-24`–`FR-28`, which `0.5` shi
 download offers the original bytes or pdf.js's incremental save, and `usePdfDownload`'s options say so:
 that branch is "save", not a true flatten, because flattening "needs a PDF writer" — and they now point at
 `pdfjs-react-reader/edit` for it. That tier is what `0.7` adds, with the writer as an **optional peer**, so
-the sentence stays true of the core — a host who imports only the viewer never bundles a 251.6 kB gzip
+the sentence stays true of the core — a host who imports only the viewer never bundles a 245.5 kB gzip
 parser — and the limit becomes a choice. See *0.7.0 — Edit* for the measured difference between the two
 files.
 
-**One bar nothing has measured.** `PRD.md:22` promises "60 FPS scrolling on 1,000+ page documents
-with sub-100ms viewport render times". Every frame-timing measurement taken in this project’s
-history was made on documents of 3–14 pages, and no 1,000-page fixture has ever been opened here.
-`README` is careful about this — it cites a 400-page document only as the reason canvases are
-released on mobile Safari — but the requirement itself is unverified, so it is `0.8`’s work, not
-done. `0.8` needs a large fixture and a real number.
+**One bar, now measured.** `PRD.md:22` promises "60 FPS scrolling on 1,000+ page documents with
+sub-100ms viewport render times". Until `0.7` closed, every frame-timing measurement in this project's
+history had been made on documents of 3–14 pages. `scripts/make-long-pdf.mjs` now writes a 1,000-page
+fixture with a nested page tree and three cycling page boxes, and against it in Chromium the bar is
+met: **38–55 ms** to reach and paint a cold page anywhere in the document, and **no frame over 16.7 ms**
+across a reader-speed scroll of 400 frames with two to four canvases mounted throughout. What that does
+*not* buy is a device claim — the harness ran at ~140 Hz, and no Safari or Android measurement exists,
+which is the part `0.8` still owes. See *0.7.0 — closed* for the whole table.
 
 `FR-21`–`FR-23` were added on 2026-09-24 alongside the tier decision below; `FR-24`–`FR-28` were
 added with `0.5` on 2026-09-26.
@@ -1058,7 +1060,8 @@ browser, because a byte count says what is in a file and only the engine says wh
 
 **Flatten shipped (2026-09-26), as the `edit` tier — `pdfjs-react-reader/edit`, 0.82 kB of our own over
 core.** `@cantoo/pdf-lib` is an **optional peer** (`peerDependenciesMeta`), external in tsup and in the
-size gate, so the writer's own 251.6 kB gzipped is a number a host sees only if they import the tier. The
+size gate, so the writer's own 245.5 kB gzipped (251.6 kB as Spike B measured it, 245.5 kB bundled
+minified at the close) is a number a host sees only if they import the tier. The
 gate's marker for it is deliberately not one of our symbols: it is the peer's own specifier,
 `@cantoo/pdf-lib`, which must be **absent from core and present only in that tier** — the failure worth
 catching is the writer arriving in a bundle that never asked for it, and the check passes.
@@ -1416,14 +1419,62 @@ without it; the counterfactual for the *wording* is the sentence above, not a te
 automation — the gesture path is dispatch-tested. That XFA can be saved, or that its edit path was
 tested: the save is measured across every container we can generate and the edit is not, because our
 packets bind no `dataId` (`#137`). And that an XFA page has a thumbnail — it paints zero operators, so
-the sidebar shows an empty 132×185 buffer (`#136`). `#114`'s 1,000-page fixture, the pressure case for
-`#126` and the bar for `0.8`, is still the document this project has never opened.
+the sidebar shows an empty 132×185 buffer (`#136`).
+
+**`#114`'s other half, closed the same day: the 1,000-page fixture exists, and the `PRD.md:22` bar
+it was built for is now measured.** `scripts/make-long-pdf.mjs` writes 1,000 pages into a **nested page
+tree** — 100 leaves of ten pages, ten groups, one root, four levels from catalog to page — because that
+is what a real producer writes at this size and a flat `/Kids` would let the engine off the hook for
+`/Parent` chains, intermediate `/Count`s and tree descent altogether. Three page boxes cycle by
+`page % 3`, so no single measured height can stand in for a thousand slots; one marker line per page, so
+a whole-document index has to read every stream. 375 kB, 2,113 objects, and the generator refuses to
+write unless every node's `/Count` equals what its children report and every page names its own node back
+— which it earned on the first run, catching a `/Kids` of bare numbers where `N 0 R` references belong,
+and a 22 MB xref built by sparse object numbering.
+
+Chromium, Windows, the playground's shell, the surface visible:
+
+| What | Number |
+| --- | --- |
+| Open the document (`numPages` known, page 1000 resolvable) | **67 ms** |
+| All 1,000 page viewports (the virtualizer's layout pass) | **55 ms**, 3 distinct boxes |
+| Twenty pages painted at scale 1.5, spread through the file | **142 ms** total, ~7 ms each, no cold-page penalty |
+| Every page's text (what a whole-document search must read) | **173 ms**, 3,000 items, 48,893 chars |
+| First paint through the shell | **220 ms** |
+| Reader-speed scroll — 100 px/frame, 14,259 px/s, 65 pages, 400 frames | p50 **7 ms**, p99 13.8, max **14.0**, **zero frames over 16.7 ms** |
+| Whole-document scroll — 1,100 px/frame, 135,000 px/s, all 1,000 pages | 4.9 s, p99 14 ms, max **20.9 ms**, zero over 24 ms |
+| Cold jump to page 250 / 500 / 750 / 1000, timed to ink | **55 / 55 / 38 / 46 ms** |
+| Canvases mounted at any moment across all of it | **2 to 4** |
+
+So `PRD.md:22`'s two claims hold on the only machine this project can measure: sub-100 ms viewport
+render is met at 38–55 ms, and 60 FPS scrolling is met with every frame of a reader-speed pass inside
+the 16.7 ms budget. **Three things the numbers do not say.** rAF here ran at about 140 Hz (p50 7 ms), so
+the budget was met on a machine that is not the target — no real device has been measured, and the
+README's Safari and Firefox note is untouched by any of this. The whole-document pass moved at twenty
+times a human scroll. And the heap figure (48 MB) is Chromium's own coarse `performance.memory`, not a
+measurement of containment: what actually evidences containment is that between two and four canvases
+were mounted for the entire traversal.
+
+Two defects fell out of the numbers, and neither is cosmetic. The laid-out height of this document grew
+from **615,186 px to 954,482 px** as pages were measured, because the virtualizer's estimate comes from
+page 1 — the shortest of the three boxes. A fast scroll therefore shows a page counter that lags
+(it read 692 at the bottom mid-flight, and 1,000 once settled), and a scrollbar is ~35 % of its eventual
+length on arrival (`#138`). And the console was **not** clean on this document: eleven
+`Maximum update depth exceeded` errors in one run, React's 50-update guard breaking a cycle whose last
+stack frame is a `setState` in `PdfPage`. The A/B is tight — the identical sequence with the zoom pinned
+at 100 % is clean, and the identical sequence on `page-order-sample.pdf` (20 pages, four of them
+landscape, fit-width resolving to 162 %) is clean too, so it takes a fit mode *and* a document this
+long. `reportPageDims` and the release's own `hasEditable` state are both ruled out in the task, which
+leaves `setTextLayer` under a `resolvedScale`-derived viewport (`#139`). So the frame numbers above were
+taken from a session that also produced a React abort, and they stand as timings, not as a clean bill of
+health.
 
 ### 0.8.0 — Freeze: hardening* Real-device matrix: iOS Safari 14 and 15, where the `:has()` fallback for container queries is
   written but has never been measured on any Safari, plus Android Chrome.
-* The performance bar `PRD.md:22` states: a 1,000-page fixture from a generator script, frame timings
-  over a scripted scroll, and viewport render time. Nothing here has ever opened a document that large,
-  so the sentence is currently a claim and not a measurement.
+* The performance bar `PRD.md:22` states: **the fixture and the desktop numbers are done** (see the
+  block above — 1,000 pages, sub-100 ms cold render, no dropped frame at reader speed). What is left is
+  measuring the same scroll on the devices in the bullet above, which is the only part of the claim still
+  unverified.
 * Shipped locale catalog; text layer `TextLayer.update()` instead of a full rebuild.
 * One docs example per public API, including each tier combination; an upgrade guide; an
   API-freeze review.
@@ -1506,10 +1557,12 @@ a hybrid that also carries `/Fields`. What none of them produce is a field that 
 the input a `fieldid` and no `dataId`, so `XfaLayer.setupStorage` never attaches and `#127`'s edit half is
 still open.
 
-Still needed: a signature-bearing form (a `/Sig` field — the reason `FR-16` stays *partial* above), the
-1,000-page document for the `PRD.md:22` performance bar, and an XFA packet whose fields reach the datasets
-with a `dataId`, which is the only way to answer whether a reader's keystroke in a LiveCycle form can be
-saved. These should come from generator scripts like the existing `scripts/make-*-pdf.mjs`, not downloads.
+Still needed: a signature-bearing form (a `/Sig` field — the reason `FR-16` stays *partial* above), and an
+XFA packet whose fields reach the datasets with a `dataId`, which is the only way to answer whether a
+reader's keystroke in a LiveCycle form can be saved. Built at the `0.7` close: `long-sample.pdf`
+(`scripts/make-long-pdf.mjs`), 1,000 pages in a nested tree with three cycling page boxes, which is what
+the `PRD.md:22` bar has now been measured against. These should come from generator scripts like the
+existing `scripts/make-*-pdf.mjs`, not downloads.
 
 ## Policy conflicts to resolve
 

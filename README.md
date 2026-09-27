@@ -490,6 +490,7 @@ node scripts/make-annotated-pdf.mjs  # highlight, underline, strikeout, squiggly
 node scripts/make-page-order-pdf.mjs # 20 pages, each printing its own number, page 5 rotated
 node scripts/make-xfa-pdf.mjs        # pure XFA: single-stream /XFA packet, no /Fields
 node scripts/make-xfa-array-pdf.mjs  # the same packet in array form, and an AcroForm hybrid
+node scripts/make-long-pdf.mjs       # 1,000 pages in a nested tree, for the performance bar
 ```
 
 `playground/` exercises the whole surface against generated fixtures (AcroForm, outline with named
