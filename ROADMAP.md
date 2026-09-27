@@ -64,8 +64,9 @@ history had been made on documents of 3–14 pages. `scripts/make-long-pdf.mjs` 
 fixture with a nested page tree and three cycling page boxes, and against it in Chromium the bar is
 met: **38–55 ms** to reach and paint a cold page anywhere in the document, and **no frame over 16.7 ms**
 across a reader-speed scroll of 400 frames with two to four canvases mounted throughout. What that does
-*not* buy is a device claim — the harness ran at ~140 Hz, and no Safari or Android measurement exists,
-which is the part `0.8` still owes. See *0.7.0 — closed* for the whole table.
+*not* buy is a device claim — the harness ran at about 145 Hz, and no Safari or Android measurement
+exists. `0.8` closed with the desktop side done and that half still owed (`#141`), so it is now a `1.0`
+condition rather than a `0.8` task. See *0.7.0 — closed* for the whole table.
 
 `FR-21`–`FR-23` were added on 2026-09-24 alongside the tier decision below; `FR-24`–`FR-28` were
 added with `0.5` on 2026-09-26.
@@ -191,10 +192,10 @@ Every requested feature, and the release that ships it.
 | Zoom control, pinch zoom | `0.2` done, `0.5` automatic | wheel + engine `TouchManager` pinch; `ZOOM_LEVELS` 0.25–5, any percentage 25–500 %, and `automatic` (width-fit portrait, whole-page landscape) |
 | Drag-and-drop loading | `0.2` done | off by default; `acceptDrop` gates it, `onDropFile` always fires |
 | Fullscreen | `0.2` done | webkit spellings covered, control hidden where unsupported |
-| Accessibility | `0.2`, `0.6`, `0.8` | keyboard done in `0.2` → annotation access → audit |
-| Internationalization | `0.2` API done, `0.8` locales | 106 strings behind one typed catalog |
+| Accessibility | `0.2`, `0.6` | keyboard done in `0.2` → annotation access in `0.6`. The full audit the row promised for `0.8` was not done there; it is a `1.0` item. |
+| Internationalization | `0.2`, `0.8` done | 134 strings behind one typed catalog; `de`, `es` and `fr` ship complete from `0.8` as `pdfjs-react-reader/locales/<lang>` |
 | Advanced JS API | `0.2`, `0.5`, `0.6` | handle + events done in `0.2` → find controller → popups |
-| Mobile optimization | `0.2`, `0.8` | gestures done → real-device matrix |
+| Mobile optimization | `0.2`, `0.8` | gestures done in `0.2`; the real-device matrix is still open (`#141`) and cannot be run from this harness |
 | **Basic vs full bundle weight** | **`0.4` done** | opt-in features; core shell 22.97 kB gz bundled (the `0.5` line, post-close), each feature 0.71–2.49 kB over it |
 | High-resolution rendering | `0.3` done | `devicePixelRatio` forwarded from `PdfViewer`, capped by the canvas ceilings |
 | Performance | `0.3` done | canvas area/side ceilings in `lib/canvas.ts`; virtualization and canvas zeroing already done |
@@ -1640,20 +1641,41 @@ contract and the authoring hooks were each added against a host that needed them
 added them, with an example. What `1.0` is now promising is 203 names, 117 of them reachable values, and
 that number is written here so a later widening is a decision and not a drift.
 
-### 0.8.0 — Freeze: hardening
+### 0.8.0 — Freeze: hardening ✅ built and closed 2026-09-27 (local `dev`; pushed and published with 1.0.0)
 
-* Real-device matrix: iOS Safari 14 and 15, where the `:has()` fallback for container queries is
-  written but has never been measured on any Safari, plus Android Chrome.
-* The performance bar `PRD.md:22` states: **the fixture and the desktop numbers are done** (see the
-  block above — 1,000 pages, sub-100 ms cold render, no dropped frame at reader speed). What is left is
-  measuring the same scroll on the devices in the bullet above, which is the only part of the claim still
-  unverified.
-* Shipped locale catalog — open. **`#138`, `#139` and `#140` are closed**, each in the block above:
-  the mean box the unmeasured rows are sized from, the update-depth guard read as the development
-  artefact it is (with the page box's clamp, which was a real defect), and the text layer re-laid out
-  by `TextLayer.update()` instead of rebuilt.
-* One docs example per public API, including each tier combination; an upgrade guide; an
-  API-freeze review.
+* **Open, and not doable from here: the real-device matrix.** iOS Safari 14 and 15, where the `:has()`
+  fallback for container queries is written but has never run on a Safari, plus Android Chrome. Every
+  frame number in this file, `0.7`'s and `0.8`'s included, is Chromium on one Windows machine at about
+  145 Hz. `#141` stays open until that is measured or the device claim is dropped.
+* Done: shipped locale catalog; text layer `TextLayer.update()` instead of a full rebuild; and the four
+  defects `0.7` handed over — the mean box the unmeasured rows are sized from (`#138`), the update-depth
+  guard read as the development artefact it is, with the page box's clamp, which was a real defect
+  (`#139`), the text layer re-laid out on a zoom step (`#140`), XFA thumbnails (`#136`), and the XFA
+  keystroke question, answered by discarding its premise (`#137`). All five in the block above.
+* Done: the API-freeze review and the upgrade guide. The docs item was "one example per public API"; what
+  shipped instead is the API-surface page that names every value export of every barrel, because counting
+  first found 60 unnamed values and an example each was not the thing that was missing. The 61 unnamed
+  *types* are stated as the residual. Each tier combination already has one.
+
+### 0.8.0 — closed 2026-09-27
+
+Cumulative measured cost, gzipped, worst of esbuild and Rollup: core **24.26 → 24.77 kB** (+0.51 for the
+sample spread, the composed thumbnail and the re-laid-out text layer), shell **51.91 → 52.61**, headless
+**26.82 → 27.13**. Over core: print 2.50, download 0.77, forms 1.92, outline 0.93, layers 1.20,
+attachments 1.10, annotate 1.87, **edit 3.58**; all eight **37.03 kB** (+12.25). Three new shipped files,
+`locales/{de,es,fr}.js`, at **2.18 / 2.19 / 2.19 kB** — separate entry points, so no path above moves
+because of them. The catalog is still **134** strings. **393 tests in 32 files**, up from 365 in 31. The
+baseline was re-accepted at the close, so every figure in README, the docs pages and this file is the
+committed number. Performance, re-measured on the 1,000-page fixture: reader-speed scroll p50 7.0 ms,
+max 14.1 ms, **zero** frames over 16.7; the 1,100 px/frame pass, which had peaked at 20.9 ms, now peaks
+at 14.0 with the same zero, and the React guard's trips fell from eleven to none or two.
+
+Still open when `0.8` closes: `#124`, whether core freehand ink is retired before `1.0`, and `#141`, the
+device matrix. Deferred by decision, not by running out of time: freezing the mutable exported
+collections (`DEFAULT_LABELS`, `INK_COLORS`, `INK_WIDTHS`, `HIGHLIGHT_COLORS`, `ZOOM_LEVELS`,
+`PRINT_SCALES`, `DEFAULT_PAGE_ESTIMATE`), which is a contract change for anyone writing to one and
+therefore `1.0`'s to make. The three catalogs added here *are* frozen, since nothing could be relying on
+them yet.
 
 ### 1.0.0 — GA
 Every row of the §Where we are table — all `FR-01`–`FR-28`, where that claim used to stop at `FR-23` —
