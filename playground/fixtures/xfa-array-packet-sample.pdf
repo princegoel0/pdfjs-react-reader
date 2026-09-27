@@ -1,0 +1,105 @@
+%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm 30 0 R /NeedsRendering true >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 612 792] /Length 166 >>
+stream
+BT /F1 16 Tf 72 700 Td (Painted by the PDF canvas, not the XFA layer) Tj ET
+BT /F1 11 Tf 72 676 Td (If this line is visible, the array packet was not laid out.) Tj ET
+endstream
+endobj
+30 0 obj
+<< /XFA [(template) 31 0 R] /DR << /Font << /Helv 3 0 R >> >> >>
+endobj
+31 0 obj
+<< /Type /EmbeddedFile /Length 1443 >>
+stream
+<?xml version="1.0" encoding="UTF-8"?>
+<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">
+<template xmlns="http://www.xfa.org/schema/xfa-template/3.9/">
+  <subform name="form1" w="500pt" h="700pt" x="0pt" y="0pt" placement="block">
+    <pageSet>
+      <pageArea name="PageArea1" id="Page1">
+        <medium short="500pt" long="700pt" orientation="portrait"/>
+        <contentArea x="60pt" y="60pt" w="380pt" h="580pt"/>
+      </pageArea>
+    </pageSet>
+    <desc><text>XFA fixture</text></desc>
+    <draw name="heading" x="60pt" y="560pt" w="400pt" h="24pt">
+      <value><text>Painted by the XFA layer, not the canvas</text></value>
+    </draw>
+    <field name="applicantName" x="60pt" y="520pt" w="240pt" h="18pt">
+      <desc><text>Name</text></desc>
+      <ui><textEdit/></ui>
+      <value><text>Fallback</text></value>
+    </field>
+    <field name="applicantCountry" x="60pt" y="490pt" w="240pt" h="18pt">
+      <desc><text>Country</text></desc>
+      <ui><textEdit/></ui>
+      <value><text>Fallback</text></value>
+    </field>
+    <draw name="footnote" x="60pt" y="110pt" w="400pt" h="18pt">
+      <value><text>End of the template</text></value>
+    </draw>
+  </subform>
+</template>
+<datasets xmlns="http://www.xfa.org/schema/xfa-data/1.0/">
+  <data>
+    <form1 xmlns="urn:xfa:fixture">
+      <applicantName>Ada Lovelace</applicantName>
+      <applicantCountry>United Kingdom</applicantCountry>
+    </form1>
+  </data>
+</datasets>
+</xdp:xdp>
+endstream
+endobj
+xref
+0 32
+0000000000 65535 f 
+0000000009 00000 n 
+0000000096 00000 n 
+0000000153 00000 n 
+0000000223 00000 n 
+0000000349 00000 n 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000616 00000 n 
+0000000697 00000 n 
+trailer
+<< /Size 32 /Root 1 0 R >>
+startxref
+2213
+%%EOF

@@ -19,7 +19,8 @@ export interface PdfDownloadOptions {
    * form field and a highlight a reader made. Callers therefore pick this branch on
    * "is anything pending", not on which feature made the change. The fields stay
    * interactive and the marks stay selectable — this is "save", not a true flatten,
-   * which would need a PDF writer and is not what this library is.
+   * which needs a PDF writer and so lives in `pdfjs-react-reader/edit`, outside the
+   * zero-dependency boundary of the core.
    */
   saveEdits?: boolean;
 }
@@ -61,9 +62,17 @@ export function usePdfDownload({
     setIsBusy(true);
     setError(null);
     try {
-      const bytes = options.saveEdits
-        ? await current.saveDocument()
-        : await current.getData();
+      /*
+       * An XFA document cannot be committed. `saveDocument()` is measured against all three
+       * `/XFA` container shapes the fixtures are written in: the single stream rejects either
+       * way, and an array rejects while `annotationStorage` is empty — where an array does
+       * answer, its bytes either drop the edit or will not reopen. Falling back to the loaded
+       * bytes costs nothing a reader could see: these packets bind their fields without a
+       * `dataId`, so `XfaLayer.setupStorage` never attaches and what is typed into a field never
+       * reaches the storage a save would have written.
+       */
+      const commits = options.saveEdits && current.isPureXfa !== true;
+      const bytes = commits ? await current.saveDocument() : await current.getData();
       downloadBytes(bytes, pdfFileName(fileNameRef.current));
     } catch (err) {
       const next = err instanceof Error ? err : new Error(String(err));

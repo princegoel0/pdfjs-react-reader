@@ -26,6 +26,9 @@ export default defineConfig({
         replacement: target(`features/$1.${fromDist ? 'js' : 'tsx'}`),
       },
       { find: /^pdfjs-react-reader\/headless$/, replacement: target('headless.ts') },
+      /* The writer tier, in both layouts, so a docs example can show the optional
+         peer the same way the playground does. */
+      { find: /^pdfjs-react-reader\/edit$/, replacement: target(`edit.${fromDist ? 'js' : 'tsx'}`) },
       { find: /^pdfjs-react-reader$/, replacement: target(fromDist ? 'index.js' : 'index.ts') },
     ],
   },

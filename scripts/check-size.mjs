@@ -85,7 +85,7 @@ const filePaths = [
  * Consumer paths: what a bundling application is served.
  * ------------------------------------------------------------------ */
 
-const EXTERNAL_RE = [/^react($|\/|-)/, /^react-dom/, /^pdfjs-dist/];
+const EXTERNAL_RE = [/^react($|\/|-)/, /^react-dom/, /^pdfjs-dist/, /^@cantoo\/pdf-lib/];
 const ESBUILD_EXTERNAL = [
   'react',
   'react/*',
@@ -93,6 +93,7 @@ const ESBUILD_EXTERNAL = [
   'react-dom/*',
   'pdfjs-dist',
   'pdfjs-dist/*',
+  '@cantoo/pdf-lib',
 ];
 
 const FEATURES = [
@@ -103,6 +104,13 @@ const FEATURES = [
   { name: 'layers', marker: 'usePdfOptionalContent' },
   { name: 'annotate', marker: 'createEditorEventBus' },
   { name: 'attachments', marker: 'usePdfAttachments' },
+  /*
+   * The edit tier's marker is the optional peer's own specifier, not one of our
+   * symbols, because the failure worth catching here is the writer arriving in a
+   * bundle that never asked for it. It stays an import rather than inlined code, so
+   * the string is present in the tier and impossible to mistake for our own.
+   */
+  { name: 'edit', marker: '@cantoo/pdf-lib' },
 ];
 
 const consumerPaths = [

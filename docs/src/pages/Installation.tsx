@@ -3,8 +3,9 @@ export function Installation() {
     <>
       <h1>Installation &amp; worker</h1>
       <p className="doc-lede">
-        Two dependencies to line up: React, and a <code>pdfjs-dist</code> version you are
-        comfortable with. The worker is resolved for you, with two escape hatches.
+        Two dependencies to line up — React, and a <code>pdfjs-dist</code> version you are
+        comfortable with — and an optional third that only the page-editing tier asks for. The worker
+        is resolved for you, with two escape hatches.
       </p>
 
       <h2>Install</h2>
@@ -13,7 +14,10 @@ export function Installation() {
 
 # or
 pnpm add pdfjs-react-reader pdfjs-dist
-yarn add pdfjs-react-reader pdfjs-dist`}</code>
+yarn add pdfjs-react-reader pdfjs-dist
+
+# and only if you mount pdfjs-react-reader/edit:
+npm install @cantoo/pdf-lib`}</code>
       </pre>
       <p>
         <code>pdfjs-dist</code> is a peer dependency on purpose: it stays your copy, at your
@@ -21,6 +25,13 @@ yarn add pdfjs-react-reader pdfjs-dist`}</code>
         <a href="#/compatibility">Versions &amp; compatibility</a> for why v4 is excluded and why the
         6.x floor is 6.2.108. React 18 or 19 is required. The build is ESM-only
         (<code>"type": "module"</code>) with generated TypeScript declarations.
+      </p>
+      <p>
+        <code>@cantoo/pdf-lib</code> is an <em>optional</em> peer, and the only thing that asks for it
+        is the <code>edit</code> tier — the writer is what reorders pages and flattens marks, and the
+        core keeps its zero-dependency rule by not having one. Nothing is installed for you: without
+        it, importing <code>pdfjs-react-reader/edit</code> fails at build, and importing anything else
+        in the package works, typechecks and runs.
       </p>
 
       <h2>Import the theme</h2>
@@ -33,7 +44,8 @@ import 'pdfjs-react-reader/forms.css';
 import 'pdfjs-react-reader/outline.css';
 import 'pdfjs-react-reader/layers.css';
 import 'pdfjs-react-reader/attachments.css';
-import 'pdfjs-react-reader/annotate.css';`}</code>
+import 'pdfjs-react-reader/annotate.css';
+import 'pdfjs-react-reader/edit.css';`}</code>
       </pre>
       <p>
         <code>styles.css</code> once per app, near your other global CSS. Skip it if you are building
@@ -48,7 +60,8 @@ import 'pdfjs-react-reader/annotate.css';`}</code>
       <p>
         <code>{'<PdfViewer src="/a.pdf" />'}</code> is a viewer that reads: pages, selectable text,
         search, thumbnails, ink, zoom and rotation. Print, save, fillable form widgets, the bookmarks
-        tab, the layers panel, the attachments panel and marking the document up are features you add,
+        tab, the layers panel, the attachments panel, marking the document up, and moving or flattening
+        whole pages are features you add,
         because they are imports and an import is the only thing
         that decides what your bundle contains:
       </p>
@@ -61,10 +74,11 @@ import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { layersFeature } from 'pdfjs-react-reader/features/layers';
 import { attachmentsFeature } from 'pdfjs-react-reader/features/attachments';
 import { annotateFeature } from 'pdfjs-react-reader/features/annotate';
+import { editFeature } from 'pdfjs-react-reader/edit';
 
 <PdfViewer
   src="/a.pdf"
-  features={[printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature, annotateFeature]}
+  features={[printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature, annotateFeature, editFeature]}
 />`}</code>
       </pre>
       <p>

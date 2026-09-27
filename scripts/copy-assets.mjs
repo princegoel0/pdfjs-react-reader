@@ -17,6 +17,7 @@ const sheets = [
   ['src/styles/layers.css', 'dist/layers.css'],
   ['src/styles/annotate.css', 'dist/annotate.css'],
   ['src/styles/attachments.css', 'dist/attachments.css'],
+  ['src/styles/edit.css', 'dist/edit.css'],
 ];
 
 for (const [from, to] of sheets) {

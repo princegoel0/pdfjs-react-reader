@@ -3,15 +3,16 @@ export function Features() {
     <>
       <h1>Features &amp; tiers</h1>
       <p className="doc-lede">
-        Seven things a viewer can do to a document — print it, save it, fill it in, show its outline,
-        switch its layers, hand over its attachments, mark it up — are values you import. The reason is
+        Eight things a viewer can do to a document — print it, save it, fill it in, show its outline,
+        switch its layers, hand over its attachments, mark it up, rearrange its pages — are values you
+        import. The reason is
         arithmetic: measured against <code>0.3</code>,{' '}
         <code>PdfViewer</code> with every feature prop switched off cost <strong>24.09 kB</strong> gzipped
         against <strong>24.07 kB</strong> with them all on. A prop turns a control off. Only an import
         decides what your bundle contains.
       </p>
 
-      <h2>The seven built-ins</h2>
+      <h2>The eight built-ins</h2>
       <table className="doc-table">
         <thead>
           <tr>
@@ -34,7 +35,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/print.css</code>
             </td>
-            <td>2.53 kB</td>
+            <td>2.52 kB</td>
           </tr>
           <tr>
             <td>
@@ -58,7 +59,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/forms.css</code>
             </td>
-            <td>1.96 kB</td>
+            <td>1.94 kB</td>
           </tr>
           <tr>
             <td>
@@ -70,7 +71,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/outline.css</code>
             </td>
-            <td>0.95 kB</td>
+            <td>0.94 kB</td>
           </tr>
           <tr>
             <td>
@@ -102,7 +103,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/attachments.css</code>
             </td>
-            <td>1.08 kB</td>
+            <td>1.10 kB</td>
           </tr>
           <tr>
             <td>
@@ -121,38 +122,81 @@ export function Features() {
             </td>
             <td>1.85 kB</td>
           </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/edit</code>
+            </td>
+            <td>
+              The pages themselves, and a file that no longer needs a viewer. A <strong>Pages</strong>{' '}
+              sidebar tab lists every page and moves, turns and removes them through a <em>plan</em>:
+              rows answer to buttons or to a drag, each carries its own controls, and nothing is
+              written until Apply. Apply then replaces the document on screen with the result, Extract
+              hands the planned pages to the save dialog as a new file, and Split cuts the list at any
+              row into two files. <strong>Flatten</strong> is the other half: it bakes every mark and
+              field value into the page, so the marks survive a reader who opens the file somewhere with
+              no editor to show them. The one tier with a dependency of its own —{' '}
+              <code>@cantoo/pdf-lib</code>, an <em>optional</em> peer that nothing else imports.
+            </td>
+            <td>
+              <code>pdfjs-react-reader/edit.css</code>
+            </td>
+            <td>3.60 kB</td>
+          </tr>
         </tbody>
       </table>
 
       <p>
-        Cost is measured, not estimated, and the figures below are the <code>0.6</code> build
+        The optional peer is arranged so that the two ways to be wrong are both loud and neither is
+        silent. Not installing it and importing <code>pdfjs-react-reader/edit</code> is a bundler that
+        cannot resolve the module — it fails at build, on the machine that made the choice. Not
+        installing it and importing <em>anything else</em> is fine, including <code>tsc</code>: no shipped
+        declaration file names the writer, because every value crossing that boundary is bytes and plain
+        objects. The 245.5 kB the peer gzips to is therefore a decision you make once, at install, for the
+        one capability that needs it.
+      </p>
+
+      <p>
+        Cost is measured, not estimated, and the figures above are the <code>0.7</code> build
         (re-measured at each release close): <code>npm run size</code> bundles one file per
         consumer import with both esbuild and Rollup and reports the larger of the two, so a feature is
-        only &ldquo;small&rdquo; if two independent tree-shakers agree. All seven together cost 9.09 kB
-        over the <code>23.66 kB</code> core — less than their sum, because they share the shell they attach
+        only &ldquo;small&rdquo; if two independent tree-shakers agree. All eight together cost 12.26 kB
+        over the <code>24.26 kB</code> core — less than their sum, because they share the shell they attach
         to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
-        bundle pays. Summing the shipped files of the whole root entry instead gives 50.87 kB, because
+        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 51.91 kB, because
         that entry re-exports every headless hook whether or not you name one — so quote the import,
         not the entry.
+      </p>
+
+      <p>
+        The panel is one of a feature&apos;s two surfaces — the other is the control — and it is a
+        worked example of the contract: its <code>Runner</code> owns every hook (the plan, the undo
+        stack, the byte snapshot, the writer calls), the panel reads that state through{' '}
+        <code>usePdfFeatureState()</code> and owns no state of its own beyond what a drag needs, and
+        the live region writes its text a task after the notice changes rather than rendering it
+        straight, because a region that mounts already holding its words announces nothing.
       </p>
 
       <pre>
         <code>{`import { PdfViewer } from 'pdfjs-react-reader';
 import { printFeature } from 'pdfjs-react-reader/features/print';
 import { createFormsFeature } from 'pdfjs-react-reader/features/forms';
+import { createEditFeature } from 'pdfjs-react-reader/edit';
 import 'pdfjs-react-reader/styles.css';
 import 'pdfjs-react-reader/print.css';
 import 'pdfjs-react-reader/forms.css';
+import 'pdfjs-react-reader/edit.css';
 
 const forms = createFormsFeature({ onChange: (values) => save(values) });
+const edit = createEditFeature({ fileName: 'contract-edited.pdf' });
 
-<PdfViewer src="/contract.pdf" features={[printFeature, forms]} />;`}</code>
+<PdfViewer src="/contract.pdf" features={[printFeature, forms, edit]} />;`}</code>
       </pre>
 
       <p>
-        A <code>create*Feature</code> factory exists for the feature with a knob:{' '}
-        <code>{'scale'}</code> for print, <code>{'fileName'}</code> for download, <code>{'onChange'}</code>{' '}
-        for forms. Options are plain data on the feature value, so the component the shell mounts stays
+        A <code>create*Feature</code> factory exists for each feature with a knob:{' '}
+        <code>{'scale'}</code> for print, <code>{'fileName'}</code> for download and for the edit tier,{' '}
+        <code>{'onChange'}</code> for forms. Options are
+        plain data on the feature value, so the component the shell mounts stays
         the same component between renders.
       </p>
       <p>
@@ -203,7 +247,7 @@ const forms = createFormsFeature({ onChange: (values) => save(values) });
 
       <h2>The authoring hooks</h2>
       <p>
-        Exported from the package root, for a feature of your own — which is how <code>annotateFeature</code>, the newest of the seven, is written:
+        Exported from the package root, for a feature of your own — which is how <code>editFeature</code>, the newest of the eight, is written:
       </p>
       <ul>
         <li>
@@ -261,11 +305,54 @@ export const progressFeature: PdfFeature = {
 
       <h2>Stylesheets, per tier</h2>
       <p>
-        <code>styles.css</code> carries the core chrome and nothing else; the widget, print, outline, layer, attachment and editor rules live in their own sheets so a viewer that mounted neither ships neither. They are separate{' '}
+        <code>styles.css</code> carries the core chrome and nothing else; the widget, print, outline, layer, attachment, editor and page-list rules live in their own sheets so a viewer that mounted neither ships neither. They are separate{' '}
         <code>import</code> statements on purpose: a bundler strips CSS that no JavaScript file imports,
         and every attempt to smuggle a feature’s stylesheet inside its module ends with the import removed
         and the styles silently missing. <code>{'sideEffects: ["**/*.css"]'}</code> is what exempts them
         from the shaking.
+      </p>
+
+      <h2>The Pages tab, in its own words</h2>
+      <p>
+        A panel is a feature&apos;s other surface, and this one earned the right to exist by not being
+        bolted onto something core: thumbnails stay core, the rows that reorder them are the tier&apos;s.
+        Four things about what it shows are worth stating, because each one looked like a bug to the
+        person who wrote it.
+      </p>
+      <ul>
+        <li>
+          <strong>A row&apos;s label numbers the page in the file being edited, not a permanent name.</strong>{' '}
+          After an apply the list renumbers — the page that read &ldquo;Page 2 of 20&rdquo; is
+          &ldquo;Page 1 of 20&rdquo; in the document now on screen. That is what makes a second apply
+          compose against the new file rather than the old one.
+        </li>
+        <li>
+          <strong>The angle badge means &ldquo;changed here&rdquo;, not &ldquo;what the file
+          says&rdquo;.</strong> A page that arrived already rotated shows no badge, and the badge
+          disappears once applied. Reading every page&apos;s own <code>/Rotate</code> would mean a worker
+          round trip per page — a thousand of them for a thousand rows — for a decoration, so the panel
+          reports only what the reader changed in this session.
+        </li>
+        <li>
+          <strong>Nothing is written until Apply.</strong> Moves, turns and removals edit an array, so a
+          batch is undone by stepping a stack with no bytes touched; Apply is the one write, and
+          &ldquo;Undo the last apply&rdquo; restores from the single byte snapshot the tier holds. It is
+          one deep, and its button disables behind it, so the offer and the memory match.
+        </li>
+        <li>
+          <strong>Split makes two files, not five.</strong> A reader who wants equal parts can split
+          twice; a fourth download in one click is where a browser puts a permission prompt the viewer
+          cannot honestly earn. So the row says &ldquo;Split the list here&rdquo; and cuts at that slot
+          rather than offering a count.
+        </li>
+      </ul>
+      <p>
+        The same writer answers for <strong>Flatten</strong>, which is what makes marks survive outside a
+        viewer: <code>downloadFeature</code> can only add an incremental update, so the fields stay
+        interactive and a mark is still an object a renderer may choose not to draw. Flattening bakes them
+        into the page. Both are one import, and the pure helpers — <code>arrangePages</code>,{' '}
+        <code>flattenBytes</code>, the page-plan functions — are exported for a host who wants the
+        mechanism without the panel.
       </p>
 
       <h2>Upgrading from 0.3</h2>

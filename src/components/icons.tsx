@@ -105,6 +105,18 @@ export const ChevronRightIcon = (props: IconProps) => (
   </svg>
 );
 
+export const ChevronUpIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="m18 15-6-6-6 6" />
+  </svg>
+);
+
+export const ChevronDownIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
 export const PlusIcon = (props: IconProps) => (
   <svg {...base} {...props}>
     <path d="M12 5v14M5 12h14" />
@@ -140,6 +152,14 @@ export const HighlightIcon = (props: IconProps) => (
 );
 
 /** A serif T: the free-text tool, matching the glyph pdf.js draws for it. */
+export const SplitIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="M12 4v16" />
+    <path d="M8 8 4 12l4 4" />
+    <path d="m16 8 4 4-4 4" />
+  </svg>
+);
+
 export const TrashIcon = (props: IconProps) => (
   <svg {...base} {...props}>
     <path d="M4 7h16" />

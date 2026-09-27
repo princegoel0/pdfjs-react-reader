@@ -40,7 +40,7 @@ wrong in both directions: it silently omitted `FR-24`–`FR-28`, which `0.5` shi
 | `FR-17` | Form data sync | `0.1` | done |
 | `FR-18` | Annotations view and draw | `0.1` view, ink `0.5`; authoring `0.6` | **partial** — links and markup render, freehand ink draws and prints; authoring shipped in `0.6` as `annotateFeature` and, as measured, that means highlight, free text and ink — the engine cannot create or edit underline/strikeout/squiggly, and stamp and signature break the save (see *0.6.0 — Mark*) |
 | `FR-19` | High-fidelity printing | `0.1`, ranges `0.5` | done — iOS Safari is excluded by design, which `PRD` does not mention |
-| `FR-20` | Document download | `0.7` | **not complete** — `doc.saveDocument()` is an incremental save, not a flatten; flattening needs a PDF writer, which is what `0.7` adds |
+| `FR-20` | Document download | `0.1` incremental, `0.7` flatten | **done in two tiers** — the default download is `doc.saveDocument()`, an incremental save that carries form values *and* `0.6`'s marks but leaves them interactive; a true flatten (appearance streams moved into page content, fields gone) lives behind the opt-in `edit` tier, which is the only path allowed a PDF writer. Measured on `form-sample.pdf`: 5,582 B / 11 widgets interactive against 6,202 B / 0 widgets with the value read back as page text |
 | `FR-21` | Opt-in feature registration | `0.4` | done |
 | `FR-22` | Per-feature stylesheets | `0.4`, two more in `0.5` | done |
 | `FR-23` | Enforced size boundary | `0.4` | done — a ratchet, and the per-feature 4 kB gate |
@@ -50,10 +50,13 @@ wrong in both directions: it silently omitted `FR-24`–`FR-28`, which `0.5` shi
 | `FR-27` | Search depth | `0.5` | done |
 | `FR-28` | Composed shell | `0.5` | done |
 
-**`FR-20` in full**, because it is the one open item that changes the API: download offers the
-original bytes or an incremental save carrying the edits, and
-`usePdfDownload`’s options state "not a true flatten (flattening needs a PDF writer, which this
-library is not)". That sentence is what forces the writer subpath in `0.7`.
+**`FR-20` in full**, because it is the item whose answer is now split across two tiers. The default
+download offers the original bytes or pdf.js's incremental save, and `usePdfDownload`'s options say so:
+that branch is "save", not a true flatten, because flattening "needs a PDF writer" — and they now point at
+`pdfjs-react-reader/edit` for it. That tier is what `0.7` adds, with the writer as an **optional peer**, so
+the sentence stays true of the core — a host who imports only the viewer never bundles a 251.6 kB gzip
+parser — and the limit becomes a choice. See *0.7.0 — Edit* for the measured difference between the two
+files.
 
 **One bar nothing has measured.** `PRD.md:22` promises "60 FPS scrolling on 1,000+ page documents
 with sub-100ms viewport render times". Every frame-timing measurement taken in this project’s
@@ -73,7 +76,7 @@ assumed. `pdfjs-dist@5.7.284` exports:
 | Export | Unblocks |
 | --- | --- |
 | `AnnotationEditorLayer`, `AnnotationEditorUIManager`, `AnnotationEditorType` (`FREETEXT`, `HIGHLIGHT`, `STAMP`, `INK`, `POPUP`, `SIGNATURE`, `COMMENT`) | Annotation authoring without third-party code — `PdfPage` took `annotationEditorUIManager: null` until `0.6` mounted `annotateFeature`, which publishes the manager and `annotationEditorEditing` through `pageProps` |
-| `XfaLayer`, `enableXfa`, `page.getXfa()` | XFA **rendering**, wired in `0.6`. Saving an edited XFA document is unmeasured (`#127`) and a packet pdf.js cannot lay out rejects the load — see *0.6.0 — Mark* |
+| `XfaLayer`, `enableXfa`, `page.getXfa()` | XFA **rendering**, wired in `0.6`. Saving an edited XFA document is measured in `0.7` and cannot be trusted (`#127`, see *0.7.0 — Edit*); a packet pdf.js cannot lay out rejects the load — see *0.6.0 — Mark* |
 | `SignatureExtractor`, `SupportedImageMimeTypes`, `DrawLayer`, `TextLayerImages`, `renderRichText` | Signature and image/stamp annotations, rich-text free text |
 | `TouchManager` (`onPinchStart` / `onPinching` / `onPinchEnd`) | Pinch zoom instead of hand-written gesture math |
 | `OutputScale.capPixels(maxPixels, capAreaFactor)`, `FeatureTest` | Canvas-area capping. `FeatureTest` exposes **no** canvas-size probe, so the cap must be measured here and fed to `capPixels` |
@@ -197,9 +200,9 @@ Every requested feature, and the release that ships it.
 | Customizable toolbar and UI | `0.5` done | the parts are exported and read one controller; `controls` hides, re-ranks, re-orders and adds controls by id |
 | Rich sidebar | `0.5` done | thumbnails are core; outline, layers and attachments are feature tabs. `executeSetOCGState` is implemented — a document's own layer link and the layers panel drive one shared config, and a paperclip annotation saves the file it carries |
 | Advanced search | `0.5` done | case, whole-word, every match marked at once (not a toggle — it is unconditional), multi-word AND, regex, invalid-pattern reporting, per-page counts, and `find` to swap the strategy |
-| PDF annotation and editing | `0.6` create and save | marks go into the file through `saveDocument()`; `0.7` is about flattening, not persistence |
-| Comprehensive form support (AcroForm + XFA) | `0.6` renders XFA | XFA persistence excluded permanently |
-| Page reordering | `0.7` | needs a PDF writer |
+| PDF annotation and editing | `0.6` create and save | marks go into the file through `saveDocument()`; `0.7` added the flatten that makes them permanent (`edit`) |
+| Comprehensive form support (AcroForm + XFA) | `0.6` renders XFA | XFA cannot be saved: measured against every `/XFA` container shape we can generate (`0.7`), and its fields do not bind to `annotationStorage` at all. Whether a real-world packet's edits survive is untested, and the docs say so |
+| Page reordering | `0.7` done | the tier's Pages tab moves, turns and removes pages through a plan, and applies, extracts or splits it through the writer; a split makes two files, and a row's angle badge means "changed here" |
 
 ## Releases
 
@@ -864,7 +867,9 @@ fixture reads `IsXFAPresent: true`, `IsAcroFormPresent: false`, which is the who
   needing an array-form `/XFA` entry that this single-stream fixture does not have — so the sentence "XFA
   persistence is excluded" is still unmeasured, and the docs must not claim either way. `#128`: search marks
   and thumbnails both read the canvas, so on an XFA page a match is found but nothing is highlighted and the
-  sidebar thumbnail is an empty 132×185 buffer.
+  sidebar thumbnail is an empty 132×185 buffer. Both were answered in `0.7`: the persistence question
+  turned out to be about the container *and* about `dataId`, and the search half of `#128` shipped while
+  the thumbnail half did not — see *0.7.0 — Edit*.
 * **One harness fact that cost a detour.** There is no warning channel to read: 6.3's
   `PDFDocumentLoadingTask` has `onProgress` and `onPassword` and **no `onWarning`**, and the worker's `warn()`
   is a `console.warn` inside the worker, so `XFA - No medium specified in pageArea` and
@@ -984,19 +989,403 @@ close pass that reports a defect must first show the same oracle passing on an i
 
 **Two things this release does not claim.** Saving an edited XFA document (`#127`) and the cost of
 arming a tool on a long document (`#126`, the document-wide repaint). Both are filed with their
-measurement, and the docs say so rather than implying the surface is complete.
+measurement, and the docs say so rather than implying the surface is complete. Both were closed in
+`0.7` — the repaint to zero renders on a page with nothing editable, the save to "measured, and not
+to be trusted" — and the sentence that belonged in `Features` is written there rather than here.
 
 ### 0.7.0 — Edit: writing the engine cannot do
 The only release that touches the zero-dependency rule.
 
 * New export `pdfjs-react-reader/edit`, with the PDF writer as an **optional peer** so the core stays
-  dependency-free; `check-size.mjs` gains a measured path for it (Spike B decides the candidate).
-* True flattening, which completes FR-20.
-* Page reorder, delete, extract and split by dragging thumbnails, with undo.
-* Rotation and ink written into the saved document instead of living in view state.
+  dependency-free; `check-size.mjs` gains a measured path for it. **Done** — see *Flatten shipped*.
+* True flattening, which completes FR-20. **Done.**
+* Page reorder, delete, extract and split by dragging thumbnails, with undo. **Done**, in the tier's
+  own sidebar tab rather than on the core thumbnails — the one place the writer's peer can be required
+  without putting inert handles in the default shell. The two limits worth restating are that a split
+  makes two files rather than N, and that a row shows the angle the plan sets rather than the one the
+  file already carries.
+* Rotation written into the saved document instead of living in view state — done by the panel, which folds the viewer's own per-page turns into the file it applies.
+* Extract and split, still open: the plan already holds the bytes, but extracting must hand over a file rather than replace what is on screen, and splitting needs a decision about how many files a reader is asking for.
 
-### 0.8.0 — Freeze: hardening
-* Real-device matrix: iOS Safari 14 and 15, where the `:has()` fallback for container queries is
+**Spike B — taken (2026-09-26): the writer is `@cantoo/pdf-lib`, and flatten has to happen first.**
+Six candidates were examined on npm metadata, then the survivors were installed in a scratch tree and
+measured with our own esbuild path and our own fixtures, and finally read back through pdf.js in a
+browser, because a byte count says what is in a file and only the engine says what a reader gets.
+
+* **Who is out, and why.** `mupdf` 1.28.1 is AGPL-3.0-or-later, which an MIT library cannot take as a
+  peer no matter how capable it is. `pdf-writer` 1.1.3 and `pdfmake` 0.3.11 build documents from
+  scratch — neither can edit the one that is open, so neither can reorder a reader's pages. `pdfts` is
+  unpublished. That leaves `pdf-lib` 1.17.1 (MIT, last published **2022-05-12**) and its maintained fork
+  `@cantoo/pdf-lib` 2.11.1 (MIT, published **2026-09-15**).
+* **What they cost, bundled as a host would.** A consumer that loads, creates, copies, rotates, draws
+  and saves — so nothing reachable can be shaken away — bundles to **raw 431.1 kB / gzip 178.4 kB /
+  brotli 163.6 kB** for pdf-lib, against **raw 597.0 kB / gzip 251.6 kB / brotli 213.0 kB** for the
+  fork. Neither produced a single esbuild warning on `platform: browser`, so both are genuinely
+  browser-clean. The fork's extra weight is not the PDF code: its tree pulls `culori` (171 kB of
+  input), `html-entities` (69) and `node-html-better-parser` (36) for rich-text field appearances,
+  while its inflation dependency went from `pako` (219 kB) to `fflate` (91). For scale, the *entire*
+  viewer today is 23.66 kB core and 32.75 kB with all seven features, so the writer is 5.4× to 7.7×
+  everything else — the optional peer is what makes that acceptable, and the docs' size story has to
+  grow a tier to say so honestly.
+* **Capability is a tie on every job `0.7` planned.** Reordering `[2, 0, 1]` came back with the page
+  labels in that order; deleting the middle page left two; extracting page 2 produced a one-page file
+  holding page 2; rotating wrote `/Rotate` and reopened as 90° with the sibling untouched at 0°; and a
+  copy into a brand-new document kept every markup annotation — Highlight, Underline, StrikeOut,
+  Squiggly, Text and Popup, all ten, rendered in the DOM.
+* **Flattening is real, and it does not eat the reader's marks.** After `form.flatten()`, pdf.js reports
+  the filled value as **page text** (`Grace Hopper` in `getTextContent`, text spans 13 → 19) with **zero
+  Widget annotations** on that page — the appearance moved into the content stream, which is exactly
+  what FR-20 has been missing since `0.1`. And the page carrying a highlight and a link kept both,
+  which the API doc's phrase "all form fields and annotations associated are then removed" does not
+  make obvious.
+* **The trap that decides the design: `copyPages` carries widgets but not the AcroForm.** In a document
+  assembled by copying — the obvious way to reorder — `getForm().getFields()` returns **0 fields**, so
+  `flatten()` silently does nothing: pdf-lib left all nine orphaned widgets in place, the fork removed
+  one. A `flatten` built on a copied document would therefore appear to succeed while shipping an
+  interactive form, and `0.7`'s reorder would quietly strip a form's fields of their definitions. The
+  ordering is now fixed by measurement: **flatten the loaded document first, then move its pages**, and
+  page moves within one `PDFDocument` rather than a copy-out if a form must survive the edit.
+* One encoding note that cost a false finding: a filled field is written as UTF-16BE hex
+  (`/V <FEFF00470072…>`), so searching the bytes for the typed string reports "absent" for a value that
+  is correctly there. Same lesson as `#123`: prove the oracle can see the thing before trusting its
+  silence.
+* **Recommendation: the fork.** Capability is a tie, so the choice is maintenance against 73 kB of
+  gzip on an opt-in tier. This code parses and rewrites files from untrusted sources, and a parser that
+  has not shipped a release since 2022 is the worse risk; `@cantoo` also ships a real `exports` map and
+  is the branch that at least attempts the orphan-widget case. **Approved by the user on 2026-09-26**,
+  with the 251.6 kB figure in front of them, and it is why the writer is a peer rather than a dependency.
+
+
+**Flatten shipped (2026-09-26), as the `edit` tier — `pdfjs-react-reader/edit`, 0.82 kB of our own over
+core.** `@cantoo/pdf-lib` is an **optional peer** (`peerDependenciesMeta`), external in tsup and in the
+size gate, so the writer's own 251.6 kB gzipped is a number a host sees only if they import the tier. The
+gate's marker for it is deliberately not one of our symbols: it is the peer's own specifier,
+`@cantoo/pdf-lib`, which must be **absent from core and present only in that tier** — the failure worth
+catching is the writer arriving in a bundle that never asked for it, and the check passes.
+
+* Measured through the real control on `form-sample.pdf`, after typing a value the document does not
+  hold: the download control's file is 5,582 B with **11 widgets** (still interactive — the 0.6 gate
+  change is untouched), and the flatten control's is 6,202 B with **0 widgets, `/Fields [ ]`, 0 `/FT`**,
+  the value present as page text. Console clean both ways. The flattened file is *larger*, because an
+  appearance stream moved into page content rather than being dropped.
+* What `pdf-write.ts` promises and what the tests hold it to: a document with no form is reported as
+  `hadNoForm`, not as a successful flatten, and the reader's markup annotations survive — `/Highlight`,
+  `/Ink` and `/FreeText` counts identical in and out, which is the guard that keeps `0.7` from undoing
+  `0.6`.
+* **The peer leaves its `/AcroForm` dictionary in place, emptied.** The first version of that assertion
+  demanded the key be gone and failed on a real file: `Fields` becomes `[]` and no `/FT` remains, which
+  is what pdf.js keys `formType` off, so the observable claim is the one now tested. Assert what the
+  reader can see, not what the spec sketch implied.
+* **A new entry has to be registered in two vite configs.** The playground and the docs each alias
+  `pdfjs-react-reader/*` to source by explicit pattern, and neither had one for `/edit` — so the import
+  failed to resolve and the playground rendered nothing at all, which first looked like a broken probe
+  rather than a broken app. The symptom to remember: **`.app-url` missing from the DOM means the app
+  never mounted**, and checking that before debugging the probe would have saved the detour.
+
+**The two fixtures `0.7`'s remaining work is built on (2026-09-26).**
+
+* **`page-order-sample.pdf`** (`scripts/make-page-order-pdf.mjs`) is twenty pages whose display order is
+  a permutation of their object numbers (`200 + 7·i mod 20`), each printing its own slot *and* its object
+  number, with four landscape pages, one `/Rotate 90`, three outline entries by reference plus a fourth by
+  name, and two `/Link` annotations. Measured: for all twenty pages the printed slot, the printed object and
+  `doc.getPageIndex({num, gen})` agree, so the file cannot be read correctly by accident — which is the
+  whole point of a reorder fixture. Two engine behaviours fell out of it that the reorder design has to
+  respect: a rotated page's `getViewport({scale: 1})` is **792x612 while its MediaBox stays 612x792**, so the
+  layout box follows rotation and each slot must be re-measured rather than assumed; and `getAnnotations()`
+  hands back a Link's `/Dest` as an **unresolved `{num, gen}` reference**, so destinations travel with the
+  page object and survive a rebuild of `/Kids`.
+* **A named outline destination reaches the reader, and only because our code resolves it.**
+  `getOutline()` returns the bare string `"middle"` for `/Dest /middle`, and `resolveDestinationPageIndex`
+  returns `null` for it — `usePdfOutline.ts:26-33` is what turns the name into an array through
+  `doc.getDestination()` first. Clicking that row in the shell moved the reader 1 → 10 → 20 → 10, so FR-10
+  holds; but a host using the headless resolver directly gets `null`, which the docs should say. Note also
+  that `doc.resolveDestination` **does not exist** in 6.3 — a probe that reached for it threw, and the
+  method is `getDestination`.
+* **Array-form XFA renders exactly as well as the single stream.** Three fixtures
+  (`xfa-array-sample.pdf`, `xfa-array-packet-sample.pdf`, `xfa-hybrid-sample.pdf`) share one packet with
+  `xfa-sample.pdf` through `scripts/xfa-packet.mjs`, so the container is the only variable. The reason a
+  choice of shape was needed is in `_xfaStreams`: it keys the **first** pair `xdp:xdp` whatever its string
+  says, keys the **last** pair `/xdp:xdp`, takes middle pairs by name, and `XFAFactory._createDocument`
+  concatenates *every* stream in the map's seeded order only when both of those exist. So an array either
+  carries the whole packet in its first stream or must be cut so the pieces rejoin — and the generator
+  asserts that the join is byte-identical to the working packet before it writes a byte. Measured: both
+  array shapes return the identical node tree (`name: "div"`, one child, 2,850 characters serialised) and
+  the same 500x700 box the template asks for, and through the shell both XFA fields carry the bound datasets
+  values, `Ada Lovelace` and `United Kingdom`.
+* **The hybrid is the predicted no-show, and one probe oracle was wrong.** With `/Fields` present as well,
+  `isPureXfa` is false, the box is the MediaBox's 612x792, the canvas marker sentence paints, and the AcroForm
+  widget answers with its own `/V` ("Canvas value, not the XFA one") — the datasets island is never consulted.
+  Our shell then leaves an empty `.pjsr-xfa-layer` host, which is the designed behaviour
+  (`PdfPage.tsx:411-414` clears it rather than rendering into it). The mistake worth keeping: **XFA field
+  values do not appear in `getTextContent()`** — the bound name was absent from the text tree for the control
+  fixture too, so "did the packet bind?" is only answerable from the rendered inputs. A text-layer probe
+  reports "not bound" for a document that bound perfectly, and the same absence is why search cannot find a
+  value typed into an XFA field (`#128`).
+
+**Both fixtures `0.7` still needed, built and measured (2026-09-26).**
+
+* **`page-order-sample.pdf`** (`scripts/make-page-order-pdf.mjs`) — twenty pages whose `/Kids` order is a
+  permutation of their object numbers (`200 + 7·i mod 20`), each printing its own slot *and* the object
+  number it lives in, four of them landscape, one carrying `/Rotate 90`, with three outline entries by
+  reference, a fourth by name, and two `/Link` annotations. Measured engine-side: for all twenty pages the
+  printed slot, the printed object and `doc.getPageIndex({num, gen})` agree, so a tool that confuses an
+  index with a reference cannot read this file correctly by accident. Two facts came out of it that the
+  reorder design has to honour: **`getViewport({scale: 1})` on the rotated page is 792x612 while its
+  MediaBox stays 612x792** — the layout box follows rotation, so each slot must be re-measured after a move,
+  not re-used — and `getAnnotations()` hands a Link's `/Dest` back as an **unresolved `{num, gen}`
+  reference**, so a page's destinations travel with its object and survive a rebuilt `/Kids`.
+* **A named outline destination resolves, and not in the place you would look.** `getOutline()` returns the
+  bare string `"middle"` for `/Dest /middle`, and `resolveDestinationPageIndex` answers `null` for it; what
+  makes the row followable is `usePdfOutline.ts:26-33`, which resolves the name through
+  `doc.getDestination(name)` first. Measured by clicking: page 1 → the name row → 10, and the reference rows
+  → 20. Two names that are not what they seem: **`doc.resolveDestination` does not exist** in 6.3 (the
+  method is `getDestination`), and neither does `doc.destroy()` (the loading task owns the worker). A host
+  wiring the headless resolver by itself gets `null` for a named destination, which the docs should state.
+* **`xfa-array-sample.pdf`, `xfa-array-packet-sample.pdf` and `xfa-hybrid-sample.pdf`**
+  (`scripts/make-xfa-array-pdf.mjs`, sharing `scripts/xfa-packet.mjs` with `xfa-sample.pdf`, whose
+  regenerated bytes are md5-identical to the verified `0.6` fixture) exist because `_xfaStreams` does not
+  simply parse an array: it keys the **first** pair `xdp:xdp` whatever its string says, the **last** pair
+  `/xdp:xdp`, middle pairs by name, and `XFAFactory._createDocument` concatenates **every** stream — in the
+  map's seeded key order — only when both of those exist. So an array either carries the whole packet in its
+  first stream or must be cut so its pieces rejoin, and the generator asserts that its three fragments join
+  byte-identically to the working packet before writing. Measured: both array shapes give the identical node
+  tree (`name: "div"`, one child, 2,850 characters serialised), the same **500x700** box the template asks
+  for rather than the 612x792 MediaBox, and through the shell two `.pjsr-xfa-layer` inputs carrying the bound
+  datasets values, `Ada Lovelace` and `United Kingdom`. The array container is not second-class.
+* **The hybrid is the predicted no-show, and it corrected an oracle.** With `/Fields` present alongside the
+  array, `isPureXfa` is false, the box is the MediaBox's 612x792, the canvas marker sentence paints, and the
+  AcroForm widget answers from its own `/V` — the datasets island is never consulted. Our shell leaves an
+  empty `.pjsr-xfa-layer` host in that case by design (`PdfPage.tsx:411-414` clears it), and it also skips the
+  text layer for pure-XFA pages (`PdfPage.tsx:285`), which is the shape of `#128`. The mistake worth
+  keeping: **XFA field values do not appear in `getTextContent()`** — absent for the known-good control as
+  well as for the arrays — so "did the packet bind?" is answerable only from the rendered inputs, and a
+  text-layer probe reports "not bound" for a document that bound perfectly. The same absence is why search
+  cannot match a value typed into an XFA field.
+
+**Spike C — taken (2026-09-26): a reorder is a permutation of `/Kids`, and the obvious API is
+the broken one.** Four passes in Node against our own fixtures, then a read-back through the
+engine in a browser.
+
+* **`removePage()` deletes the object, so `removePage` + `insertPage` does not move a page — it
+  loses it.** The library's source is plain about it: `removePage` ends with
+  `this.context.delete(page.ref)`, while `insertPage(index, page)` re-inserts
+  `page.ref` — the reference of an object the context no longer holds. Measured on
+  `page-order-sample.pdf`: the saved `/Kids` names object 215 first, and **`215 0 obj` is not in
+  the file**. The tree, `/Count`, `getPageCount()` and the distinct-kid count all say twenty pages.
+  A reorder built this way ships a document whose first page is a dangling reference and reports
+  no problem anywhere.
+* **Rewriting the page tree instead is clean, and the library's own API follows it.** The primitive
+  is: look up the `/Pages` dictionary, `set(/Kids, refsInNewOrder)` and restate `/Count`. Measured:
+  every kid the tree names is written, the permutation is exactly what was asked for, two composed
+  moves read the *current* tree so a second drag lands correctly, and afterwards `getPage(i)` /
+  `getPages()` agree with the tree object-for-object (with `pageCache.invalidate()`), so the feature
+  can keep using the API rather than reloading the bytes after every interaction.
+* **Undo is the inverse permutation, and it is free.** Applying the inverse restored both the
+  original `/Kids` order and the original byte length. An undo stack is therefore an array of index
+  arrays, not a stack of document snapshots — which matters because a snapshot of a real document is
+  megabytes, and a permutation of a thousand pages is a few kilobytes.
+* **Everything that references a page by object rides along, and the engine confirms it.** After
+  moving page 5 to the front, the reader's read-back showed: the order was exactly as requested, the
+  page that carries `/Rotate 90` kept it **in its new slot** with a 792x612 viewport, the outline entry
+  "1. Opening (page 01)" resolved to **slot 2** (it followed the page, not the index it was written
+  against), and a `/Link` on that page still named its original target object. A form moved this way
+  keeps all 8 fields, and `flatten()` after the move logs nothing and produces 0 widgets — so the
+  "flatten before you reorder" constraint from Spike B is about `copyPages` throwing the AcroForm
+  away, not about moving pages inside one document. Markup annotations are unchanged across a move
+  (Highlight 1→1, Ink 2→2, FreeText 1→1, Popup 14→14).
+* **A delete is safe but silent, and that is a UI obligation.** `removePage()` is the right call for
+  deletion — the page is gone, `/Count` is restated, the file opens (19 pages, the remaining order
+  intact, every page still identifying itself). But the outline entry and the name-tree destination
+  that named the deleted page keep naming it: two references left dangling, **no console warning at
+  all**, and our resolver answers `null`, so the row simply does nothing. A delete that leaves a dead
+  outline row is a feature bug even though the file is valid, so the UI has to prune or disable those
+  rows — measured, not assumed.
+* **Two small API notes.** `page.setRotation()` needs the branded `degrees(90)`; a plain `90` throws
+  `Invalid rotation: 90` from `toDegrees`. And `save()` in this fork returns a **Promise**, unlike
+  pdf-lib 1.17's synchronous `save()` — `pdf-write.ts` already awaits it, and the first spike pass that
+  did not got a `Buffer` type error rather than a silent wrong answer, which is the right way to fail.
+* **Confirmed in a browser through the shipped tier export, not just in Node.** `arrangePages` was
+  imported from `pdfjs-react-reader/edit`, run on `page-order-sample.pdf`, and the output opened by
+  pdf.js: asking for page 5 at the front with page 2 rotated gave read-back
+  `5,1,2,3,4,6…20`, with the rotated page reporting **792x612 in its new slot 3** while the fixture's
+  own rotated page carried 792x612 to slot 1. The outline row "1. Opening (page 01)" resolved to
+  **slot 2** and the named destination to slot 10, both following their page object; the `/Link` on
+  page 1 still named object 200. Applying the inverse arrangement restored the order 1…20 (the bytes
+  are not identical to the generator's — the writer's save is ~10 kB smaller on this file — which is
+  why the claim is about order, not about bytes). Deleting page 10 left a document that opens as
+  19 pages with the remaining order intact, and the two destinations that named it resolved to `null`
+  rather than throwing. Extract and split needed no new mechanism: two arrangements over the same
+  source produced a 5-page and a 15-page file, the smaller one carrying only its own five page objects.
+
+**The seam a page editor needs, shipped and tested (2026-09-26).** Reordering pages produces a
+new file, so the tier has to be able to put bytes on screen. `useViewerController` now keeps a
+third source — `editedFile ?? droppedFile ?? src` — and publishes `replaceDocument(bytes, name?)`
+on the controller and on `PdfViewerShell`, alongside `pageRotations`, which a writer must fold into
+the file it produces. Two behaviours are tested rather than assumed, and both are the ones that fail
+quietly: a `Uint8Array` has no filename, so the document's label is carried across (otherwise the
+download control starts saving `document.pdf` over the file the reader was working on), and the host's
+`src` wins back as soon as it changes (the same rule drag-and-drop already follows — without it an app
+that navigates elsewhere is stranded on an edited copy of the previous document). The swap also clears
+per-page rotations, because they have just become `/Rotate` entries in the new file and would otherwise
+turn the page twice. Cost: +0.14 kB gz on every consumer path, which the ratchet accepts without a
+re-accept.
+
+**The open question is where the panel lives, and it is a product decision.** PRD asks for page
+editing "by dragging thumbnails", but thumbnails are core while the writer is an opt-in tier, so the
+choices are a new `Pages` sidebar tab owned by the tier, drag handles added to the core thumbnail strip
+that only do something when the tier is mounted, or a host-facing surface — the tier publishes `move`,
+`rotate`, `delete` and `undo` and the application draws the panel. The first keeps the writer's weight
+out of core and gives the feature its own accessible UI; the second is what PRD literally describes but
+puts inert affordances into the default shell; the third is cheapest and pushes work onto every host.
+Decide before building, because the undo model behind all three is the same: keep one base snapshot of
+the document as it was when the reader started editing, hold the plan (order, rotations, deletions) as
+data, and re-apply the plan to the snapshot — which is what makes a delete undoable, since a permutation
+alone cannot bring a page back.
+
+**The Pages tab shipped (2026-09-26), and the browser pass is what settled its semantics.** The
+tier contributes a sidebar panel rather than touching the core thumbnail strip, so the writer's peer
+stays opt-in and the affordance is never inert. What the model gives the UI, and what was measured
+through the real controls on `page-order-sample.pdf`:
+
+* Moving page 1 later re-titles the row **"Page 1 moved to position 2"** in the live region, and
+  applying it changed **the document on screen** — the first page's own printed text went from
+  "Page 01" to "Page 02", and the plan reset to a clean list of twenty. Applying is the only write;
+  every move, turn and removal before it is an array edit, so a batch is undone by stepping the
+  stack with no bytes touched at all (measured: two moves, one Undo, no call to the writer).
+* Rotating a page then moving it writes `/Rotate 90` onto **the page object**, and the viewer's first
+  page box changed from portrait to 744x574 after the apply — the rotation is in the file, not in
+  view state, which is the FR the release was meant to close.
+* Removing a page and applying left 19 pages both in the panel and in the toolbar's count.
+  **"Undo the last apply"** restored 20 — that is the one byte snapshot the tier holds, and its
+  undo button disables behind it, so the offer and the memory match rather than pretending depth.
+* Dragging row 1 onto row 4 moves it, and the row's own buttons do the same job for a keyboard.
+  The dispatch test covered `dragstart`/`dragover`/`drop`/`dragend` on the real handlers; a physical
+  pointer gesture through an automation tool was **not** exercised, which is the one claim here that
+  rests on the code being the same code rather than on a measured gesture.
+* Two consequences worth stating, because both surprised the author. **A row's label is the page's
+  number in the file being edited, not a permanent name**, so after an apply the list renumbers —
+  the page that was "Page 2 of 20" is "Page 1 of 20" in the new document, which is correct and is
+  also what makes a second apply compose cleanly. And the angle badge disappears once applied,
+  because the plan no longer holds a change; the panel does not currently read the file's own
+  `/Rotate`, so a page rotated before it was opened shows no badge. That is a real gap, not a
+  simplification, and it is filed below.
+* Cost: the tier went from 0.82 kB to **3.04 kB gz over core**, inside its 4 kB per-feature budget
+  but close enough that the next thing added to this panel needs its own measured reason. `core`
+  itself moved +0.31 kB for the seam, which the ratchet accepted.
+
+**Extract and split shipped next (2026-09-26), and the console caught a defect in the write path.**
+Both reuse the plan, so no new mechanism was needed; what they needed was a different *sink*.
+
+* Extract is `applyPageEdits`' bytes handed to the save dialog instead of to the viewer: same writer
+  pass, and the document on screen does not move. Measured through the real controls — after moving
+  page 1 later, the extracted file led with object 214 while the viewer still printed "Page 01 of 20",
+  and the plan stayed pending rather than being consumed, because nothing was written to the document.
+* Split is two arrangements from **one** save: the row's control cuts the planned list at that slot
+  and writes `-part-1.pdf` and `-part-2.pdf`, measured at 4 + 16 pages with the pending order
+  respected, and 10 + 10 in the file's own order with nothing pending. It does not need an edit
+  first — that was the design flaw the first test run caught, since "split this in two at page 10"
+  is the common request and the plan was being required to exist.
+* **Two files, not five.** A reader asking for equal parts can split twice, while a fourth or fifth
+  download in one click is where a browser puts a permission prompt the viewer cannot earn honestly.
+  That is the reason the row says "Split the list here" rather than offering a count, and it is a
+  scope limit rather than an oversight.
+* **The defect: `saveDocument()` on a document with nothing in `annotationStorage`.** pdf.js logs
+  "saveDocument called while `annotationStorage` is empty, please use the getData-method instead" —
+  one warning per write, on a path where the reader never touched a field or a mark, so a clean
+  reordering session printed three warnings the reader did not cause. The tier now asks the engine
+  the question directly (`annotationStorage.size`) and takes `getData()` when there is nothing to
+  commit, which is also the cheaper call. Both branches are pinned by a test. Asking the engine
+  rather than the features is deliberate: the download control reaches the same decision through
+  `forms.isDirty` and `annotate.editing`, which needs those peers mounted, while the storage size is
+  the fact those two only report on. Console clean afterwards, measured.
+* **A page's existing `/Rotate` is deliberately not shown.** 6.3 offers no all-pages overview call, so
+  the only sources are `getPage(i)` for every page — a thousand worker round trips for a badge on a
+  thousand rows — or parsing the file again with the writer. The badge therefore means *changed here*,
+  and the docs must say so rather than let the absence read as a bug.
+
+Cost after all of this: the tier is **3.49 kB gz over core against its 4 kB budget**, so roughly
+0.5 kB of room is left and the next thing added to this panel needs a measured reason or a deliberate
+raise of the gate.
+
+**The three things 0.7 was going to leave open, closed (2026-09-27).** Each came with a number, and
+two of the three changed the shape of the fix on the way.
+
+* **`#126` — arming a tool must not repaint a page that has nothing to take over.** The first fix
+  read `isEditable` off the fetch the annotation layer already makes and passed
+  `annotationEditorEditing && hasEditableRef.current` as the render parameter. Measured, it bought
+  nothing: `annotationEditorEditing` is itself an effect dependency, so the page repainted anyway and
+  only the flag changed — 2 renders on a document with no annotations, both now `isEditing=false`,
+  which is a wasted render rather than a lost mark. Making the *derived* value the dependency is what
+  works, and holding `hasEditable` in state rather than a ref is what closes the race the ref version
+  left open (arm before `getAnnotations` resolves, and the answer arrives to nobody). After that:
+  `outline-sample.pdf` (3 pages, 0 annotations, 2 mounted) costs **0 render calls** to arm, against
+  the 2 recorded before; `annotated-sample.pdf` (editable markups on both pages) still costs exactly
+  2, both `isEditing=true`, and `#123`'s safety property re-measured clean on the same build — every
+  editable annotation held by an editor, attached with a box, its own layer element hidden while
+  armed and `hidden=false` again after disarming. The earlier attempt at this measurement had
+  `armClicked: false` and proved nothing: it reached for the core "Draw on document" control, which
+  `annotateFeature` *replaces*, so the button was gone.
+* **`#127` — "XFA persistence excluded permanently" was a claim about one container.** The sentence
+  came from a fixture whose packet is a single `/XFA` stream, and the worker's rewriter wants an
+  array. Both shapes now exist, plus a whole-packet array and an AcroForm hybrid, and the save was
+  walked twice: once writing a storage key by hand, once by typing into the field the layer built.
+  Typing is the finding. `XfaLayer.setAttributes` binds a field to storage only
+  `if (storage && attributes.dataId)` (`pdf.mjs:1113`), and these packets give their inputs a
+  `fieldid` and no `dataId` — so `setupStorage` never attaches, the keystroke stays in the DOM
+  (`value` reads back what was typed) and `annotationStorage.size` stays **0**. There is no save to
+  test until a packet binds, which is a fact about what `scripts/make-xfa-pdf.mjs` emits, not about
+  LiveCycle forms. With an entry forced in, the single stream rejects (`reading 'toString'`), the
+  split array answers with bytes that keep `/XFA` but drop the value, and the whole-packet array
+  answers with bytes that **will not reopen** (`reading 'length'`); with storage empty all three
+  reject (`reading 'get'`). So: the *save* path is measured and cannot be trusted for a pure-XFA
+  document; the *edit* path is **not** measured, and the docs must say which is which. The guard
+  stays, and its comment now says what was observed instead of the inference that was written there.
+* **`#128` — search marks on an XFA page needed two fixes, and only one was in the TypeScript.**
+  Wrapping the layer's text nodes in spans gave the highlighter something to split, and the count
+  went from `1 of 1 · p1` with `marks: 0` to `marks: 1`, scrolled to it, with the layer's 23 elements
+  intact and the mark inline in a 365 px line at 69x27. It was still **invisible**: the mark rules are
+  scoped to `.pjsr-text-layer`, and `.pjsr-xfa-layer .xfaLayer *` sets `background-color: transparent`
+  on everything on the page. A DOM-only measurement would have called that done. The XFA rule tints
+  *behind* the glyphs instead of hiding them, because here the layer is the page — over a canvas the
+  mark's text is transparent, and `color: transparent` on XFA text would delete a word. Re-measured:
+  `background-color: color(srgb .31 .27 .90 / .55)`, `color: rgb(24, 29, 39)`, and the text-layer
+  path unchanged on a normal document (7 marks, still transparent text). Thumbnails stay blank —
+  132x185 with **0 non-white pixels** — which is the half of `#128` that is real work, not a selector,
+  and is filed separately.
+
+**The panel's own announcement took four attempts to be true, and every one was caught by measuring
+rather than by reading the code.** Applying is the action a reader most needs told about — the document
+under them has just changed — and the live region said nothing.
+
+* **The first cause was the reset that keeps a plan honest.** A new document voids the plan, so the
+  effect on `[shell.doc]` clears plan, history and notice — and `applyPageEdits` sets its notice
+  *before* the new document arrives, so the reset unsaid it one pass later. Fixed with a flag: a swap
+  this tier caused keeps its own announcement, while a document change from anywhere else still clears
+  it. Pinned both ways, with the counterfactual run to show the test fails without the fix.
+* **The second was that a swap is not one change.** The old document goes away while the new one loads,
+  so `shell.doc` moves twice, and a flag spent on the first pass was gone before the panel came back.
+  The grace now ends only when a non-null document arrives.
+* **The third was invisible to the tests.** `PagesPanel` returns `null` with no document, which
+  unmounts its markup but **not** its component instance — so the state holding the announced text
+  survived and the region remounted already full. A live region that mounts holding its words has not
+  changed, so there is nothing to announce. It now empties for the duration of the swap and writes
+  itself after the new document commits; the assertion that pins it is that the text is absent on the
+  render right after the remount and present one settle later.
+* **And the primitive was wrong twice over.** That write was a `requestAnimationFrame` until the
+  browser said no: this tab runs hidden, a hidden tab never paints, the callback never fired, and the
+  announcement was empty again in the measurement meant to confirm it. `setTimeout(0)` does the same
+  job and runs whether anyone is looking. Harness rule worth keeping: **a rAF in something that must
+  work in a background tab cannot be verified from one.**
+* Measured on the docs example with the tier mounted, on a fresh page: rotate announces
+  `Page 1 turned to 90 degrees`, remove announces `Page 3 removed`, apply announces
+  `Page changes applied` and survives the swap, and **Undo the last apply** now says
+  `Back to the document as it was before the apply`. The last of those is a wording fix, not a
+  mechanism one: the same notice kind had been serving both discard and undo-apply, and after an
+  undo-apply "Page changes discarded" described an action nobody had taken. Console clean across the
+  run — the one React *deps changed size between renders* warning seen mid-session was HMR replacing a
+  hook whose dependency list had just grown, and it did not recur on a fresh mount.
+
+### 0.8.0 — Freeze: hardening* Real-device matrix: iOS Safari 14 and 15, where the `:has()` fallback for container queries is
   written but has never been measured on any Safari, plus Android Chrome.
 * The performance bar `PRD.md:22` states: a 1,000-page fixture from a generator script, frame timings
   over a scripted scroll, and viewport render time. Nothing here has ever opened a document that large,
@@ -1047,8 +1436,10 @@ what `0.4` shipped; each is recorded so the later releases inherit the list rath
   the save instead of persisting; underline, strikeout and squiggly cannot be created or edited by this
   engine at all. The full result, including the four collaborators the shell has to supply, is in
   *Spike A, second pass* under `0.6.0 — Mark`.
-* **Spike B — before `0.7` closes.** Compare candidate writers on size, ESM quality and maintenance,
-  and confirm one works as an optional peer the core build never imports.
+* **Spike B — taken, 2026-09-26.** Six candidates examined, two viable, one recommended; the full
+  measurement (sizes, the capability matrix, and the ordering trap that changes `0.7`'s design) is in
+  *Spike B — taken* under `0.7.0 — Edit`. The optional-peer mechanics — a core build that never imports
+  the writer — are **not** proven by the spike and are `0.7`'s first build task.
 * Sequencing: `0.2`'s `labels` gates `0.5` (no double string extraction); `0.3` gates `0.6` (an
   editor layer at high zoom is exactly where an uncapped canvas fails); **`0.4` gates `0.5` and
   `0.6`** (toolbar controls become data, and heavy features need a seam to attach to); `0.7` gates
@@ -1073,11 +1464,18 @@ that binds two values into fields. Its MediaBox (612×792) deliberately disagree
 writing a byte, because every one of them was violated in an earlier attempt that then failed as an
 opaque load error.
 
+Built since, for `0.7`: `page-order-sample.pdf` (`scripts/make-page-order-pdf.mjs`), 20 pages each printing
+its own number with page 5 carrying `/Rotate 90`, so a move, a turn and a delete are all readable back out
+of the file rather than only off the screen; and three array-form `/XFA` containers
+(`scripts/make-xfa-array-pdf.mjs`) — the packet split across three pairs, the whole packet in one pair, and
+a hybrid that also carries `/Fields`. What none of them produce is a field that *binds*: the layout hands
+the input a `fieldid` and no `dataId`, so `XfaLayer.setupStorage` never attaches and `#127`'s edit half is
+still open.
+
 Still needed: a signature-bearing form (a `/Sig` field — the reason `FR-16` stays *partial* above), the
-1,000-page document for the `PRD.md:22` performance bar, and a 20-page PDF for reorder. An XFA packet in
-the **array** form (`/XFA [ '' <xdp> '/template' … '/datasets' … ]`), which is what real producers write
-and what `#127` needs to settle persistence, is also still missing. These should come from generator
-scripts like the existing `scripts/make-*-pdf.mjs`, not downloads.
+1,000-page document for the `PRD.md:22` performance bar, and an XFA packet whose fields reach the datasets
+with a `dataId`, which is the only way to answer whether a reader's keystroke in a LiveCycle form can be
+saved. These should come from generator scripts like the existing `scripts/make-*-pdf.mjs`, not downloads.
 
 ## Policy conflicts to resolve
 

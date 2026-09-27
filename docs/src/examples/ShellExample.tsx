@@ -5,6 +5,7 @@ import { downloadFeature } from 'pdfjs-react-reader/features/download';
 import { formsFeature } from 'pdfjs-react-reader/features/forms';
 import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { printFeature } from 'pdfjs-react-reader/features/print';
+import { editFeature } from 'pdfjs-react-reader/edit';
 import { CheckKnob, Example, SelectKnob } from '../components/Example';
 import { FORM_SAMPLE, SAMPLES } from '../fixtures';
 import source from './ShellExample.tsx?raw';
@@ -24,6 +25,7 @@ export function ShellExample() {
   const [download, setDownload] = useState(true);
   const [outline, setOutline] = useState(true);
   const [annotate, setAnnotate] = useState(false);
+  const [edit, setEdit] = useState(false);
 
   // Each capability a reader might use is a feature named here, so switching one
   // off is switching its code off in your bundle, not hiding a button.
@@ -33,6 +35,7 @@ export function ShellExample() {
     ...(forms ? [formsFeature] : []),
     ...(outline ? [outlineFeature] : []),
     ...(annotate ? [annotateFeature] : []),
+    ...(edit ? [editFeature] : []),
   ];
 
   return (
@@ -60,6 +63,16 @@ export function ShellExample() {
               setAnnotate(checked);
               // Marking up a document and taking it away are one story, so the
               // download control comes on with it rather than saving an empty file.
+              if (checked) setDownload(true);
+            }}
+          />
+          <CheckKnob
+            label="Edit feature"
+            checked={edit}
+            onChange={(checked) => {
+              setEdit(checked);
+              // The same story as annotate: a tier that writes files is pointless
+              // without the control that hands one to the reader.
               if (checked) setDownload(true);
             }}
           />

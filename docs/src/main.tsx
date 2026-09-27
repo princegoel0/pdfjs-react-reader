@@ -11,6 +11,7 @@ import 'pdfjs-react-reader/print.css';
 import 'pdfjs-react-reader/forms.css';
 import 'pdfjs-react-reader/outline.css';
 import 'pdfjs-react-reader/annotate.css';
+import 'pdfjs-react-reader/edit.css';
 import './docs.css';
 
 // The examples here run against a production build, where a bare

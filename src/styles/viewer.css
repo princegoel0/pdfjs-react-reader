@@ -442,6 +442,19 @@
   background: color-mix(in srgb, var(--pjsr-accent) 55%, transparent);
 }
 
+/* An XFA page paints its words in the layer itself, so a mark there tints behind
+   the glyphs instead of hiding them as it does over the canvas copy. It also has
+   to out-specify `.pjsr-xfa-layer .xfaLayer *` above, which zeroes every
+   background on the page. */
+.pjsr-xfa-layer mark.pjsr-mark {
+  background-color: color-mix(in srgb, var(--pjsr-accent) 22%, transparent);
+  border-radius: 2px;
+}
+
+.pjsr-xfa-layer mark.pjsr-mark--active {
+  background-color: color-mix(in srgb, var(--pjsr-accent) 55%, transparent);
+}
+
 /* ---------- XFA pages ---------- */
 /* Adapted from pdf.js pdf_viewer.css (Apache-2.0, © Mozilla). The class names here
    are the engine's, not ours: `XfaLayer.render` overwrites the container's `class`

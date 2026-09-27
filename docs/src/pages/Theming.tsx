@@ -106,9 +106,10 @@ export function Theming() {
         printing.
       </p>
       <p>
-        The rules are spread over seven files — <code>styles.css</code> for the core chrome, then{' '}
+        The rules are spread over eight files — <code>styles.css</code> for the core chrome, then{' '}
         <code>print.css</code>, <code>forms.css</code>, <code>outline.css</code>,{' '}
-        <code>layers.css</code>, <code>attachments.css</code> and <code>annotate.css</code> — so a
+        <code>layers.css</code>, <code>attachments.css</code>, <code>annotate.css</code> and{' '}
+        <code>edit.css</code> — so a
         viewer that mounted none of those features downloads none of their CSS. The split changes which file a
         rule is in, not how it is themed: every sheet reads the same tokens, and the feature markup
         sits inside <code>.pjsr-viewer</code>, so your overrides reach it. The one exception is the

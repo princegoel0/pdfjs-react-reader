@@ -2,13 +2,13 @@ import { FormsExample } from '../examples/FormsExample';
 
 const PROPS: [string, string, string][] = [
   ['src', 'PdfSource', 'Required. URL, path, data URI, base64, File/Blob, or PDF bytes. Changing it reloads in place — keep the value stable across renders.'],
-  ['features', 'readonly PdfFeature[]', 'What this viewer can do beyond reading: printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature, annotateFeature or one you wrote. Defaults to none — the code you do not import is code you do not ship.'],
+  ['features', 'readonly PdfFeature[]', 'What this viewer can do beyond reading: printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature, annotateFeature, editFeature or one you wrote. Defaults to none — the code you do not import is code you do not ship.'],
   ['controls', 'ToolbarControls', 'The bar’s own contents: `hide` by id, `priorities` to change what folds first, `order` to place controls, `add` for ones you wrote. Feature control ids work here too.'],
   ['find', 'PdfFindController', 'Replace the finding strategy, keep the find bar. Any object shaped like `usePdfSearch`’s result works — a server-side index, a stemmed or fuzzy matcher. The marks, the counter and Enter/Shift+Enter all read your answers.'],
   ['workerSrc', 'string', 'Pins the pdf.js worker location. Auto-detected when omitted.'],
   ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
   ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
-  ['enableXfa', 'boolean', 'Render XFA forms. Defaults to true, which is what a dynamic XFA needs to have any content at all: the page is then painted from its own template by `XfaLayer` and the text layer steps aside. Reading works; saving an XFA back is not supported.'],
+  ['enableXfa', 'boolean', 'Render XFA forms. Defaults to true, which is what a dynamic XFA needs to have any content at all: the page is then painted from its own template by `XfaLayer` and the text layer steps aside, and a search marks that text like any other. Saving one back is not offered, and `Versions & compatibility` says exactly which half of that was measured.'],
   ['defaultScale', 'number | "fit-width" | "fit-page" | "automatic"', 'Initial zoom. 1 = 100%; any percentage from 25 to 500 is accepted, not just the presets. "automatic" fits a landscape page whole and a portrait one by width.'],
   ['defaultLayout', '"continuous" | "single" | "spread"', 'Row grouping.'],
   ['defaultRotation', 'number', 'Initial rotation in degrees; the toolbar rotates from here.'],
@@ -45,7 +45,7 @@ const HANDLE: [string, string][] = [
   ['setLayout(layout)', 'continuous, single or spread.'],
   ['rotate(degrees)', 'Rotates the whole document.'],
   ['rotatePage(page, degrees)', 'Rotates one page in place.'],
-  ['openSidebar(open, tab?)', 'Opens the sidebar. The tab argument is a string, and the only tabs that exist are the ones mounted: `thumbnails` is core, while `outline`, `layers` and `attachments` need their feature.'],
+  ['openSidebar(open, tab?)', 'Opens the sidebar. The tab argument is a string, and the only tabs that exist are the ones mounted: `thumbnails` is core, while `outline`, `layers`, `attachments` and the edit tier’s `edit` need their feature.'],
   ['toggleFullscreen()', 'Needs a user gesture, like every fullscreen request.'],
   ['search(query, options?)', 'Runs a search and reveals the search bar. `options` takes the same `caseSensitive`, `wholeWord` and `regex` flags the find bar exposes, and several words in one query means all of them on a page.'],
 ];
@@ -435,10 +435,22 @@ export const ReadingView = forwardRef<PdfViewerHandle, PdfViewerProps>(function 
       <p>
         <code>ViewerRoot</code> is the frame: the element that carries the theme tokens, the keyboard
         and drop handlers, and the mounted features’ <code>Runner</code>s — so print, download, forms,
-        the outline panel and the annotation editors work exactly as they do in the default layout.
+        the outline panel, the annotation editors and the Pages tab work exactly as they do in the
+        default layout.
         Your own components inside
         it read the same state with <code>useViewer()</code>, which is how a host-written page counter
         or a set of buttons needs no props passed to it.
+      </p>
+      <p>
+        One more thing <code>useViewer()</code> carries, added for the edit tier and general in shape:{' '}
+        <code>replaceDocument(bytes, name?)</code>. It hands the viewer a whole new file as bytes and the
+        viewer loads it in place — the page count, the labels and the pages themselves come from the new
+        document, the label the download control saves under carries across unless a name is given, and
+        per-page rotations clear, because a caller that rewrote the document wrote them into it. A change
+        to the <code>src</code> prop, or a dropped file, wins over the replacement: the viewer never shows
+        a document its props do not describe. That is what lets Apply put a reordered file on the screen
+        without a remount, and it is there for any host with bytes of its own — a merge, a server-side
+        edit, a decryption step.
       </p>
       <p>
         Two routes, deliberately. The parts above read the viewer around them;{' '}

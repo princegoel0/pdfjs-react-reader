@@ -81,6 +81,8 @@ export interface ViewerController {
   isReady: boolean;
   error: Error | null;
   reload: (src?: PdfViewerProps['src']) => void;
+  /** Show different bytes in place of the document on screen; see `PdfViewerShell`. */
+  replaceDocument: (bytes: Uint8Array, name?: string) => void;
 
   // ---- geometry ------------------------------------------------------------
   /** The scrollable viewport element; also where wheel, pinch and click live. */
@@ -243,15 +245,21 @@ export function useViewerController({
   );
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [editedFile, setEditedFile] = useState<File | null>(null);
 
-  // A dropped document is an override, not a new prop: the host's `src` still
-  // wins the moment it changes, so an app navigating elsewhere is never stuck
-  // showing a file the user dragged in earlier.
-  const effectiveSrc = droppedFile ?? src;
+  /*
+   * A dropped or an edited document is an override, not a new prop: the host's `src` still
+   * wins the moment it changes, so an app navigating elsewhere is never stuck showing a file
+   * the user dragged in — or a page order a feature wrote — earlier. An edit outranks a drop
+   * because it is made against what is on screen, and both are cleared by anything that
+   * replaces the document outright.
+   */
+  const effectiveSrc = editedFile ?? droppedFile ?? src;
 
   useEffect(() => {
     setDroppedFile(null);
     setDragOver(false);
+    setEditedFile(null);
   }, [src]);
 
   // The built-in prompt stands down when the host renders its own, so an
@@ -405,6 +413,32 @@ export function useViewerController({
     return name ? name.replace(/\.pdf$/i, '') : undefined;
   }, [effectiveSrc]);
 
+  /*
+   * Put different bytes on screen in place of the current document.
+   *
+   * This is the seam a document-writing feature needs: reordering pages produces a new file,
+   * and the only way to show it is to load it. A bare `Uint8Array` has no name, so the label
+   * is carried across here — otherwise a reader who reorganises the pages finds that the
+   * download control has forgotten what the file was called.
+   *
+   * Per-page rotations are cleared by the swap because a caller that rewrites the document has
+   * written them into it, and the page would otherwise be turned twice.
+   */
+  const replaceDocument = useCallback(
+    (bytes: Uint8Array, name?: string) => {
+      const label = name ?? docLabel;
+      // Copied, because the caller's view may sit inside a larger buffer it still owns, and
+      // the document about to be loaded should not alias it.
+      const owned = new Uint8Array(bytes.byteLength);
+      owned.set(bytes);
+      setEditedFile(
+        new File([owned], label ? `${label}.pdf` : 'document.pdf', { type: 'application/pdf' }),
+      );
+      setPageRotations({});
+    },
+    [docLabel],
+  );
+
   const shellApi = useMemo<PdfViewerShell>(
     () => ({
       doc,
@@ -413,12 +447,17 @@ export function useViewerController({
       scale: resolvedScale,
       scaleMode,
       rotation,
+      pageRotations,
       documentLabel: docLabel,
+      replaceDocument,
       labels: resolvedLabels,
       labelsOverride: labels,
       scrollToPage,
       setScaleMode,
       setLayout: setPageLayout,
+      // Read through the ref: `rotatePage` is declared below the shell object, and calling
+      // through the ref is how the handle already reaches it.
+      rotatePage: (page, degrees) => rotatePageRef.current(page, degrees),
       reportError: handlePageError,
       reportAnnotationChange: handleAnnotationChange,
       inkStrokesForPage: ink.strokesForPage,
@@ -441,7 +480,9 @@ export function useViewerController({
       resolvedScale,
       scaleMode,
       rotation,
+      pageRotations,
       docLabel,
+      replaceDocument,
       resolvedLabels,
       labels,
       scrollToPage,
@@ -695,7 +736,11 @@ export function useViewerController({
       : file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
     if (!accepted) return;
     onDropFile?.(file);
-    if (enableDrop) setDroppedFile(file);
+    if (enableDrop) {
+      setDroppedFile(file);
+      // The edit belonged to the document this drop replaces.
+      setEditedFile(null);
+    }
   };
 
   const docRef = useRef(doc);
@@ -843,6 +888,7 @@ export function useViewerController({
     isReady,
     error,
     reload,
+    replaceDocument,
     containerRef,
     virtualSlots,
     totalHeight,

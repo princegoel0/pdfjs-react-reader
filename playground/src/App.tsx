@@ -12,6 +12,7 @@ import { useHostIndexFind } from './HostFind';
 import { downloadFeature } from 'pdfjs-react-reader/features/download';
 import { createFormsFeature } from 'pdfjs-react-reader/features/forms';
 import { annotateFeature } from 'pdfjs-react-reader/features/annotate';
+import { editFeature } from 'pdfjs-react-reader/edit';
 import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { printFeature } from 'pdfjs-react-reader/features/print';
 import { layersFeature } from 'pdfjs-react-reader/features/layers';
@@ -23,6 +24,7 @@ import 'pdfjs-react-reader/outline.css';
 import 'pdfjs-react-reader/layers.css';
 import 'pdfjs-react-reader/annotate.css';
 import 'pdfjs-react-reader/attachments.css';
+import 'pdfjs-react-reader/edit.css';
 import './app.css';
 
 // The standard pdf.js test document (14 pages).
@@ -71,6 +73,7 @@ export default function App() {
   // Annotation authoring needs a document with room to annotate and a reader who
   // means to draw on it, so it starts off.
   const [withAnnotate, setWithAnnotate] = useState(false);
+  const [withEdit, setWithEdit] = useState(false);
   // The same props, rendered through a layout written in playground/src/CustomLayout.tsx.
   const [compound, setCompound] = useState(false);
   // Find results come from playground/src/HostFind.tsx instead of the engine's text.
@@ -90,6 +93,7 @@ export default function App() {
     ...(withLayers ? [layersFeature] : []),
     ...(withAttachments ? [attachmentsFeature] : []),
     ...(withAnnotate ? [annotateFeature] : []),
+    ...(withEdit ? [editFeature] : []),
   ];
 
   const note = useCallback((message: string) => {
@@ -248,6 +252,14 @@ export default function App() {
               onChange={(e) => setWithAnnotate(e.target.checked)}
             />
             &nbsp;annotate
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={withEdit}
+              onChange={(e) => setWithEdit(e.target.checked)}
+            />
+            &nbsp;edit
           </label>
         </span>
         <label>

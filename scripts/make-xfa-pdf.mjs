@@ -22,6 +22,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { packetProblems, xfaFullPacket } from './xfa-packet.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PAGE = 4;
@@ -29,67 +30,11 @@ const ACROFORM = 30;
 const XFA = 31;
 
 /**
- * The XFA packet: a template with one page area and four marked objects, plus the
- * datasets island the binder merges field values from. Namespaces are what the
- * parser dispatches on (`XFAParser` keys elements by namespace id), so a wrong one
- * here drops the element rather than raising.
- *
- * Three shapes here are load-bearing and each was found by a failed measurement:
- *  - the page box is on `<medium short long>`, not on `<pageArea w h>`:
- *    `PageArea[$toHTML]()` reads only `this.medium`, and without it the page div is
- *    given no width or height, `XFAFactory.dims` become NaN and the viewport
- *    collapses — which is exactly the blank band the 0.3 attempt produced. pdf.js
- *    warns "XFA - No medium specified in pageArea: please file a bug." when it happens.
- *  - the datasets island needs the `<data>` wrapper: `Binder` reads
- *    `root.datasets.data`, and `DatasetsNamespace` knows only `datasets` and `data`.
- *  - the form root declares its own namespace: an element in the *datasets*
- *    namespace is dispatched through `DatasetsNamespace[name]`, which is a class, so
- *    a node called `name`, `length` or `prototype` resolves to `Function.name` /
- *    `Function.length` and the parser dies with "is not a function". A data node
- *    named `<name>` is common in real forms, which makes that a pdf.js bug; here the
- *    fields are renamed and the island is namespaced, so the fixture stands either way.
+ * The packet itself — its shape, and the three details inside it that a failed
+ * measurement each taught — lives in `./xfa-packet.mjs`, shared with
+ * `make-xfa-array-pdf.mjs` so the two fixtures differ only in their container.
  */
-const TEMPLATE_NS = 'http://www.xfa.org/schema/xfa-template/3.9/';
-const DATA_NS = 'http://www.xfa.org/schema/xfa-data/1.0/';
-
-const xfaPacket = `<?xml version="1.0" encoding="UTF-8"?>
-<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">
-<template xmlns="${TEMPLATE_NS}">
-  <subform name="form1" w="500pt" h="700pt" x="0pt" y="0pt" placement="block">
-    <pageSet>
-      <pageArea name="PageArea1" id="Page1">
-        <medium short="500pt" long="700pt" orientation="portrait"/>
-        <contentArea x="60pt" y="60pt" w="380pt" h="580pt"/>
-      </pageArea>
-    </pageSet>
-    <desc><text>XFA fixture</text></desc>
-    <draw name="heading" x="60pt" y="560pt" w="400pt" h="24pt">
-      <value><text>Painted by the XFA layer, not the canvas</text></value>
-    </draw>
-    <field name="applicantName" x="60pt" y="520pt" w="240pt" h="18pt">
-      <desc><text>Name</text></desc>
-      <ui><textEdit/></ui>
-      <value><text>Fallback</text></value>
-    </field>
-    <field name="applicantCountry" x="60pt" y="490pt" w="240pt" h="18pt">
-      <desc><text>Country</text></desc>
-      <ui><textEdit/></ui>
-      <value><text>Fallback</text></value>
-    </field>
-    <draw name="footnote" x="60pt" y="110pt" w="400pt" h="18pt">
-      <value><text>End of the template</text></value>
-    </draw>
-  </subform>
-</template>
-<datasets xmlns="${DATA_NS}">
-  <data>
-    <form1 xmlns="urn:xfa:fixture">
-      <applicantName>Ada Lovelace</applicantName>
-      <applicantCountry>United Kingdom</applicantCountry>
-    </form1>
-  </data>
-</datasets>
-</xdp:xdp>`;
+const xfaPacket = xfaFullPacket();
 
 // The PDF side. `NeedsRendering` belongs to the catalog; `/Fields` is absent on
 // purpose, and adding it would send the document down the AcroForm path instead.
@@ -160,29 +105,9 @@ if (!/\/NeedsRendering true/.test(catalog)) problems.push('catalog lost /NeedsRe
 const acroForm = objects.get(ACROFORM);
 if (/\/Fields/.test(acroForm)) problems.push('the AcroForm has /Fields, so isPureXfa can never be true');
 if (!/\/XFA \d+ 0 R/.test(acroForm)) problems.push('the AcroForm has no /XFA reference');
-if (!xfaPacket.startsWith('<?xml') || !/<xdp:xdp/.test(xfaPacket)) {
-  problems.push('the packet is not an xdp:xdp document');
-}
-for (const [name, needle] of [
-  ['template namespace', `xmlns="${TEMPLATE_NS}"`],
-  ['datasets namespace', `xmlns="${DATA_NS}"`],
-  ['pageSet', '<pageSet>'],
-  ['pageArea', '<pageArea'],
-  ['medium (the only thing that gives the page a size)', '<medium short='],
-  ['data wrapper', '<data>'],
-]) {
-  if (!xfaPacket.includes(needle)) problems.push(`the packet has no ${name} (${needle})`);
-}
-
-// Only inside the datasets island, because that is the one namespace the parser
-// dispatches through a *class*: `DatasetsNamespace[name]`.
-const island = xfaPacket.slice(xfaPacket.indexOf('<datasets'), xfaPacket.indexOf('</datasets>'));
-const colliding = [...island.matchAll(/<\s*([A-Za-z_][\w:-]*)/g)]
-  .map((m) => m[1])
-  .filter((name) => ['name', 'length', 'prototype'].includes(name));
-if (colliding.length) {
-  problems.push(`datasets element(s) named after a Function static: ${colliding.join(', ')}`);
-}
+// The packet's own assertions are shared with the array fixtures, so a change that
+// would break this document breaks those too and says so at generation time.
+problems.push(...packetProblems(xfaPacket));
 
 for (let num = 1; num < size; num++) {
   if (!objects.has(num)) continue;

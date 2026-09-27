@@ -11,3 +11,5 @@ export const OUTLINE_FEATURE_ID = 'outline';
 export const LAYERS_FEATURE_ID = 'layers';
 export const ATTACHMENTS_FEATURE_ID = 'attachments';
 export const ANNOTATE_FEATURE_ID = 'annotate';
+/** The `edit` tier's own id, so a feature can ask for it without importing the writer. */
+export const EDIT_FEATURE_ID = 'edit';

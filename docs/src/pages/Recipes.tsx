@@ -86,6 +86,55 @@ download.download({ saveEdits: true });`}</code>
         deletion itself is still unsaved.
       </p>
 
+      <h2>Rearrange, extract or split pages</h2>
+      <pre>
+        <code>{`import {
+  arrangePages,
+  initialPlan,
+  movePlanned,
+  removePlanned,
+  rotatePlanned,
+} from 'pdfjs-react-reader/edit';
+
+let plan = initialPlan(20);                  // 20 pages, nothing touched
+plan = movePlanned(plan, 0, 4);              // the first page down to slot 4
+plan = rotatePlanned(plan, 3, 90);           // whatever now sits in slot 3
+plan = removePlanned(plan, 7) ?? plan;       // null only if that was the last page
+
+const { bytes, pages, removed } = await arrangePages(original, plan);`}</code>
+      </pre>
+      <p>
+        The writer behind the Pages tab, on its own. A plan is plain data — an <code>order</code> of
+        indices into the document as loaded, and a <code>rotations</code> map keyed by the same
+        indices — so every operation before the write is an array edit, and undo is either the inverse
+        permutation or nothing at all. Slots, not page numbers: <code>movePlanned(plan, 0, 4)</code>{' '}
+        names two positions in the list as it currently stands, which is why a batch of moves composes
+        and why the panel&apos;s row labels renumber after an apply.
+      </p>
+      <p>
+        A move is a permutation of the page tree&apos;s <code>/Kids</code> with <code>/Count</code>{' '}
+        restated, never <code>removePage()</code> followed by <code>insertPage()</code>. The second one
+        cannot work here and the reason is in the writer: removal ends by deleting the page object, so
+        the tree it leaves behind names something that no longer exists, and the file fails to reopen.
+        That was measured before the mechanism was chosen, and it is the whole reason this tier
+        re-implements the ordering step.
+      </p>
+      <p>
+        Extract and split are the same call over a different slice — extract writes{' '}
+        <code>plan.order</code> as a new file, and a split writes two arrangements from one read of the
+        base bytes. None of them touches what is on screen: the viewer swaps to new bytes through{' '}
+        <code>useViewer()</code>&apos;s <code>replaceDocument(bytes, name)</code>, which is exactly what
+        the panel&apos;s Apply button does.
+      </p>
+      <p>
+        <strong>Flatten is a different thing, and it is worth knowing which one you want.</strong>{' '}
+        <code>{'download({ saveEdits: true })'}</code> adds an incremental update, so the fields stay
+        interactive and a mark stays an object a renderer may choose not to draw.{' '}
+        <code>flattenBytes</code> paints them into the page instead, which is what you want before
+        sending a file to someone with no editor — and what you want never to do to a document someone
+        is still filling in.
+      </p>
+
       <h2>Read and write forms programmatically</h2>
       <pre>
         <code>{`const form = usePdfFormValues({ doc });

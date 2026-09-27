@@ -61,12 +61,30 @@ export interface PdfViewerShell {
   /** Requested scale mode, which a numeric fit resolve never replaces. */
   scaleMode: ScaleMode;
   rotation: number;
+  /**
+   * Per-page rotation the reader set with the viewer's own control, keyed by 0-based page.
+   *
+   * A feature that writes the document has to fold these into it, because a swap of the
+   * document clears them: they become `/Rotate` entries rather than view state.
+   */
+  pageRotations: Record<number, number>;
   documentLabel?: string;
+  /**
+   * Show different bytes in place of the document on screen.
+   *
+   * A feature that rewrites the file needs this because the result cannot be shown in
+   * place: reordering pages is a new document, and a reader who cannot see it cannot keep
+   * going. The host's `src` still wins as soon as it changes, so an edit never outlives the
+   * document it was made against.
+   */
+  replaceDocument: (bytes: Uint8Array, name?: string) => void;
   labels: PdfViewerLabels;
   labelsOverride?: PdfViewerLabelsOverride;
   scrollToPage: (page: number) => void;
   setScaleMode: (mode: ScaleMode) => void;
   setLayout: (layout: PageLayout) => void;
+  /** Turn one page of the document on screen, in view state until a feature writes it. */
+  rotatePage: (page: number, degrees: number) => void;
   /** Routes a failure into the viewer's own `onError`. */
   reportError: (error: Error) => void;
   /**

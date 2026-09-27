@@ -6,9 +6,13 @@ const asset = (name: string) => `${import.meta.env.BASE_URL}${name}`;
 export const FORM_SAMPLE = asset('form-sample.pdf');
 export const OUTLINE_SAMPLE = asset('outline-sample.pdf');
 export const ENCRYPTED_SAMPLE = asset('encrypted-sample.pdf');
+export const ANNOTATED_SAMPLE = asset('annotated-sample.pdf');
+export const PAGE_ORDER_SAMPLE = asset('page-order-sample.pdf');
 
 export const SAMPLES = [
   { label: 'Form (2 pages)', value: FORM_SAMPLE },
   { label: 'Outline (3 pages)', value: OUTLINE_SAMPLE },
+  { label: 'Marked up (2 pages)', value: ANNOTATED_SAMPLE },
+  { label: 'Reorder me (20 pages)', value: PAGE_ORDER_SAMPLE },
   { label: 'Encrypted — password "secret"', value: ENCRYPTED_SAMPLE },
 ];

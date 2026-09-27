@@ -53,6 +53,8 @@ export interface PdfViewerLabels {
   rotateCounterclockwise: string;
   rotateClockwise: string;
   downloadDocument: string;
+  /** The `edit` tier's control: save the document with its form values made part of the page. */
+  flattenDocument: string;
   printDocument: string;
   cancelPrinting: string;
   cancelPrintingProgress: string;
@@ -107,6 +109,24 @@ export interface PdfViewerLabels {
   attachmentsEmpty: string;
   attachmentsFailed: string;
   downloadAttachment: string;
+  pagesTab: string;
+  movePageEarlier: string;
+  movePageLater: string;
+  removePage: string;
+  applyPages: string;
+  discardPages: string;
+  undoApplyPages: string;
+  pagesPending: string;
+  pagesMoved: string;
+  pagesRemoved: string;
+  pagesRotated: string;
+  pagesApplied: string;
+  extractPages: string;
+  pagesExtracted: string;
+  splitPagesHere: string;
+  pagesSplit: string;
+  pagesRestored: string;
+  pagesApplyReverted: string;
   expandSection: string;
   collapseSection: string;
   untitledEntry: string;
@@ -199,6 +219,7 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   rotateCounterclockwise: 'Rotate counterclockwise',
   rotateClockwise: 'Rotate clockwise',
   downloadDocument: 'Download document',
+  flattenDocument: 'Flatten and download',
   printDocument: 'Print document',
   cancelPrinting: 'Cancel printing',
   cancelPrintingProgress: 'Cancel printing ({percent}% rendered)',
@@ -244,6 +265,24 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   attachmentsEmpty: 'This document has no attached files.',
   attachmentsFailed: 'Could not read the attached files: {message}',
   downloadAttachment: 'Save “{name}”',
+  pagesTab: 'Pages',
+  movePageEarlier: 'Move page earlier',
+  movePageLater: 'Move page later',
+  removePage: 'Remove page',
+  applyPages: 'Apply page changes',
+  discardPages: 'Discard page changes',
+  undoApplyPages: 'Undo the last apply',
+  pagesPending: '{count} changes not applied',
+  pagesMoved: 'Page {page} moved to position {position}',
+  pagesRemoved: 'Page {page} removed',
+  pagesRotated: 'Page {page} turned to {angle} degrees',
+  pagesApplied: 'Page changes applied',
+  extractPages: 'Save these pages as a new file',
+  pagesExtracted: 'Saved {count} pages as a new file',
+  splitPagesHere: 'Split the list here',
+  pagesSplit: 'Saved {files} files: {first} pages, then {second}',
+  pagesRestored: 'Page changes discarded',
+  pagesApplyReverted: 'Back to the document as it was before the apply',
   expandSection: 'Expand {title}',
   collapseSection: 'Collapse {title}',
   untitledEntry: '(untitled)',

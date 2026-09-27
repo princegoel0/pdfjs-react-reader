@@ -1,0 +1,109 @@
+/* pdfjs-react-reader — the `edit` tier's page panel, shipped with pdfjs-react-reader/edit
+ * Import alongside 'pdfjs-react-reader/styles.css'. The theme tokens are in the core sheet;
+ * everything here is what the page list needs, so a host that did not ask for the tier is
+ * not carrying its layout. */
+
+.pjsr-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 4px;
+}
+
+/* The count the reader is working against: how many pages are still on the list, and
+   whether anything is waiting to be written. */
+.pjsr-pages-summary {
+  margin: 0;
+  color: var(--pjsr-muted-fg);
+  font-size: 11px;
+  font-variant-numeric: tabular nums;
+}
+
+.pjsr-pages-summary[data-state='pending'] {
+  color: var(--pjsr-accent);
+  font-weight: 600;
+}
+
+.pjsr-pages-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: pjsr-page-slot;
+}
+
+.pjsr-pages-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--pjsr-row-h);
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: var(--pjsr-bg);
+  cursor: grab;
+}
+
+.pjsr-pages-row:hover {
+  background: var(--pjsr-hover-bg);
+}
+
+/* The row being dragged stays legible but recedes, so the drop point is readable. */
+.pjsr-pages-row[draggable='true']:active {
+  cursor: grabbing;
+  opacity: 0.6;
+}
+
+.pjsr-pages-position {
+  flex: none;
+  width: 2.5ch;
+  color: var(--pjsr-muted-fg);
+  font-size: 11px;
+  font-variant-numeric: tabular nums;
+  text-align: right;
+}
+
+.pjsr-pages-page {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pjsr-fg);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pjsr-pages-angle {
+  margin-left: 6px;
+  color: var(--pjsr-accent);
+  font-size: 11px;
+  font-variant-numeric: tabular nums;
+}
+
+.pjsr-pages-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+/* Smaller than a toolbar control: four of these share a row with the page name, in a
+   sidebar that is 240 px wide at its narrowest. */
+.pjsr-button--page-edit {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+}
+
+.pjsr-pages-actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Present for a screen reader on every action, so it keeps its height when empty rather
+   than shifting the buttons under it. */
+.pjsr-pages-status {
+  min-height: 16px;
+  margin: 0;
+  color: var(--pjsr-muted-fg);
+  font-size: 11px;
+}

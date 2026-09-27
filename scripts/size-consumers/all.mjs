@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import { PdfViewer } from '../../dist/index.js';
+import { editFeature } from '../../dist/edit.js';
 import { annotateFeature } from '../../dist/features/annotate.js';
 import { attachmentsFeature } from '../../dist/features/attachments.js';
 import { downloadFeature } from '../../dist/features/download.js';
@@ -20,5 +21,6 @@ export const View = () =>
       layersFeature,
       annotateFeature,
       attachmentsFeature,
+      editFeature,
     ],
   });

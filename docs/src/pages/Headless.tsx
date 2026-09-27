@@ -80,7 +80,8 @@ export function Headless() {
       <p>
         <code>PdfPage</code> draws one page: canvas, selectable text layer, annotation layer, ink
         overlay, and — when a feature hands it an editor manager — the annotation editor layer. A pure
-        XFA page is painted from its template instead of the text layer. The virtualizer hands you rows
+        XFA page is painted from its template instead of the text layer, and a search marks that text
+        rather than finding it and showing nothing. The virtualizer hands you rows
         (<code>virtualSlots</code>) already grouped for the active layout, positioned by
         <code>offsetTop</code>:
       </p>

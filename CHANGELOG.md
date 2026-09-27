@@ -5,6 +5,124 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-09-27
+
+Writing where the engine cannot. This is the release that touches the zero-dependency rule, and the only
+one that does: a tier that reorders, rotates, removes, extracts and splits whole pages, plus a flatten
+that bakes a reader's marks into the page so they survive being opened somewhere with no editor. Both
+need a PDF parser, so `@cantoo/pdf-lib` arrives as an **optional peer** — named by exactly one shipped
+module, and by nothing at all unless you import `pdfjs-react-reader/edit`.
+
+The measurement that scoped it: pdf.js can write a page's *contents* back into a file and cannot move a
+page at all, because moving one is rewriting the page tree. And the tree cannot be rewritten through the
+writer's own page API either — `removePage()` ends by deleting the object it just unlisted, so
+remove-then-insert leaves a tree naming something that no longer exists and the file fails to reopen.
+That was confirmed four ways before the mechanism was chosen. What ships is a permutation of `/Kids` with
+`/Count` restated, which is why an undo is an inverse permutation, and why a *delete* — the one thing a
+permutation cannot bring back — needs the single byte snapshot the tier holds.
+
+### Added
+
+- **`editFeature`** (`pdfjs-react-reader/edit`, **+3.60 kB** over core, against a 4 kB per-feature
+  budget) — page rearranging and flatten, one tier, one dependency boundary. `createEditFeature({
+  fileName })` for a host that saves under a fixed name; `arrangePages`, `flattenBytes` and the pure
+  page-plan functions (`initialPlan`, `movePlanned`, `rotatePlanned`, `removePlanned`, `inversePlan`,
+  `plannedPages`) are exported for a host that wants the mechanism and no panel.
+- **The Pages tab**, a sidebar panel the tier owns rather than a drag handle bolted onto core's
+  thumbnails, so the affordance is never inert and the writer stays opt-in. Rows move by button or by
+  drag, each carries its own turn, split and remove controls, and the footer applies, extracts, undoes,
+  undoes the last apply, and discards. Every action is announced through a `role="status"` live region,
+  and a row's label numbers the page in the file being edited — so the list renumbers after an apply,
+  which is what makes a second apply compose against the new document rather than the old one.
+- **A plan, not an edit-in-place.** Moves, turns and removals mutate an array; nothing is written until
+  Apply. A batch is therefore undone by stepping a stack with no bytes touched (measured: two moves, one
+  Undo, no call to the writer at all), and Apply is the single write.
+- **Extract and split.** Extract is the same writer pass handed to the save dialog instead of to the
+  viewer, so the document on screen does not move. Split cuts the planned list at any row and writes two
+  files from **one** read of the base bytes — measured at 4 + 16 with a pending order and 10 + 10 in the
+  file's own order. Two files rather than five is a deliberate limit: a reader who wants equal parts can
+  split twice, while a fourth download in one click is where a browser puts a permission prompt this
+  viewer cannot honestly earn.
+- **Flatten**, the bar control and the state call, which is what makes marks permanent: `downloadFeature`
+  can only add an incremental update, so fields stay interactive and a mark stays an object a renderer
+  may choose not to draw.
+- **`replaceDocument(bytes, name?)`** on the controller and on `useViewer()` — the seam Apply uses, and
+  general: the viewer loads new bytes in place, the download label carries across, per-page rotations
+  clear, and a changed `src` or a dropped file wins over the replacement.
+- **`pdfjs-react-reader/edit.css`**, the eighth sheet (2,469 B source, 1,266 B minified), and **19 more
+  labels** — the catalogue is now 134 strings, up from 115.
+- **Four fixtures**: `page-order-sample.pdf` (20 pages, each printing its own number, page 5 carrying
+  `/Rotate 90`, so a move, a turn and a delete are readable back out of the file rather than only off
+  the screen) and three array-form `/XFA` containers — the packet split across three pairs, the whole
+  packet in one pair, and a hybrid that also carries `/Fields`.
+
+### Changed
+
+- **Arming an annotation tool no longer repaints a page that has nothing to take over.** The flag was
+  already gated in `PdfPage`, but `annotationEditorEditing` was itself an effect dependency, so every
+  mounted page still repainted — with the same answer, which is a wasted render rather than a lost mark.
+  The gate is now part of the effect's identity, and the page's own `isEditable` fact is state rather
+  than a ref, which also closes the race where a tool was armed before the annotation fetch resolved.
+  Measured on `outline-sample.pdf` (3 pages, no annotations, 2 mounted): arming costs **0 render calls**
+  where it used to cost 2. On `annotated-sample.pdf` it still costs exactly 2, both with the flag set,
+  and `0.6`'s safety property re-measured clean on the same build.
+- **Search now marks text on a pure-XFA page.** `XfaLayer.render` hands back bare text nodes, which a
+  highlighter cannot split, so each is wrapped in an element of its own and the highlighter reads those
+  when there is no text layer. `1 of 1 · p1` used to mean *one match, nothing shown*; it now means one
+  match, marked, and scrolled to, with the layer's own 23 elements intact.
+- **`saveDocument()` is no longer called on a document that has nothing to commit.** The tier asks the
+  engine `annotationStorage.size` and takes `getData()` otherwise — the cheaper call, and the one that
+  does not print pdf.js's own warning. Asking the engine rather than the features is deliberate: the
+  download control reaches the same decision through `forms.isDirty` and `annotate.editing`, which needs
+  those peers mounted, while the storage size is the fact those two only report on.
+
+### Fixed
+
+- Downloading or applying a **pure-XFA** document threw an opaque worker `UnknownErrorException`. Both
+  commit paths now check `isPureXfa` and hand back the loaded bytes, and a test pins that neither asks
+  the engine to commit one.
+- A search mark on an XFA page was **present in the DOM and invisible**, because the highlight rules were
+  scoped to `.pjsr-text-layer` while `.pjsr-xfa-layer .xfaLayer *` zeroes every background on the page.
+  The XFA rule tints *behind* the glyphs rather than hiding them: over a canvas the mark's own text is
+  transparent because the canvas paints the word, and here the layer *is* the page, so the same rule
+  would have deleted it. Re-measured on both paths — XFA `background-color` at 55 % accent with the text
+  colour intact, and a normal document's marks unchanged.
+- A clean page-editing session printed one pdf.js console warning per write, for a document whose storage
+  the reader had never touched. Console clean afterwards, measured.
+- **Applying did not announce itself.** The panel's `role="status"` region went silent on the one action
+  that changes the document under the reader, for three separate reasons found one at a time: the effect
+  that voids a plan when the document changes also unsaid the notice the apply had just set; a document
+  swap arrives as *two* changes (the old document going away, then the new one), so a flag consumed on
+  the first was spent before the panel came back; and returning `null` unmounts the panel's markup
+  without unmounting its component instance, so the region remounted already holding its text — which is
+  not a change, and so not announced. It now empties for the duration of the swap and writes itself one
+  task after the new document commits. `requestAnimationFrame` was the first choice for that write and
+  is wrong here: a hidden tab never paints, so the callback never ran.
+- **"Undo the last apply" said "Page changes discarded".** One notice kind was doing two jobs, and after
+  an undo-apply the sentence described an action nobody had taken. It has its own label now.
+
+### Notes on verification
+
+Verified in Chromium against the playground and the docs site: reorder, rotate and remove through the
+real controls, with the on-screen document changing after Apply (the first page's own printed text went
+from "Page 01" to "Page 02", and the panel renumbered from 20 rows to 19 after a removal); the same for
+extract, where the file led with the moved page while the viewer still showed the original order; split
+at 4 + 16 and 10 + 10; one-snapshot undo-apply restoring a removed page; the empty-storage warning gone;
+arming a tool costing zero renders on a page with nothing editable and two on a page with markups; and
+the XFA mark painted and readable in a screenshot. The live region was read back at timed samples rather
+than trusted: `Page 1 turned to 90 degrees`, `Page 3 removed`, `Page changes applied` surviving the
+swap, and `Back to the document as it was before the apply`. 365 unit tests, with the two new
+announcement assertions each run once more with the fix removed, to show they fail without it.
+`npm run verify` green, with the size ratchet re-accepted for the seam.
+
+**Three things this release does not claim.** That a *physical* pointer drag was exercised — the
+gesture path is dispatch-tested, not driven through automation. That XFA can be saved, and the sentence
+now says which half was measured: `saveDocument()` is unreliable across every container shape this
+project can generate, while the fixtures' fields bind without a `dataId`, so `XfaLayer.setupStorage`
+never attaches and no keystroke of ours ever reaches the storage a save would write — a real LiveCycle
+form's edit path is therefore unmeasured, and `#137` is that gap. And that an XFA page has a thumbnail:
+it paints zero operators, so the sidebar shows an empty 132×185 buffer, filed as `#136`.
+
 ## [0.6.0] — 2026-09-26
 
 Marking. The viewer can now write into the document as well as read it: highlights, free text and ink,

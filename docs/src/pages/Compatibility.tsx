@@ -9,8 +9,8 @@ export function Compatibility() {
 
       <h2>Runtime dependencies</h2>
       <p>
-        Three peer dependencies and nothing else. There is no bundled state library, no date
-        library, no polyfill package, and no CSS framework.
+        Three required peer dependencies, one optional, and nothing else. There is no bundled state
+        library, no date library, no polyfill package, and no CSS framework.
       </p>
       <table className="doc-table">
         <thead>
@@ -55,6 +55,22 @@ export function Compatibility() {
             </td>
             <td>18.3.1, 19.3.0</td>
             <td>DOM rendering for the shell and the annotation layer.</td>
+          </tr>
+          <tr>
+            <td>
+              <code>@cantoo/pdf-lib</code>
+            </td>
+            <td>
+              <code>^2.11.1</code>, <strong>optional</strong>
+            </td>
+            <td>2.11.1</td>
+            <td>
+              A PDF writer, and the reason the <code>edit</code> tier can rewrite a page tree at all.
+              Declared optional so a host that never mounts it neither installs it nor pays its 245.5 kB,
+              and named by exactly one shipped module — <code>pdf-write.ts</code> — so nothing else can
+              drag it in. Not installed, importing <code>pdfjs-react-reader/edit</code> fails at build
+              rather than at runtime, which is the loud way round.
+            </td>
           </tr>
         </tbody>
       </table>
@@ -117,6 +133,47 @@ export function Compatibility() {
       <p>
         Restoring v4 support means an engine-detection shim at three call sites plus a second
         verification pass over forms and printing. Say so if you need it.
+      </p>
+
+      <h2>What XFA can and cannot do</h2>
+      <p>
+        A document whose pages are composed from an XFA template renders — <code>XfaLayer</code> builds
+        it, at the box the template asks for rather than the MediaBox, and search marks its text the way
+        it marks a text layer. Saving one back is not offered: the viewer hands <code>getData()</code>{' '}
+        bytes to download and the edit tier refuses to write. That refusal is measured, and the
+        measurement has a boundary worth stating precisely, because the two halves of the sentence are
+        not equally supported.
+      </p>
+      <ul>
+        <li>
+          <strong>Measured: the save cannot be trusted.</strong> Against every <code>/XFA</code> container
+          this project can generate — a single stream, an array split across three pairs, an array holding
+          the whole packet, and a hybrid that also carries <code>/Fields</code> —{' '}
+          <code>saveDocument()</code> either rejects with an opaque worker error, or returns bytes that
+          drop the change, or returns bytes that will not reopen. Those are four fixtures and two
+          outcomes; none of them is a file you can hand back to a reader.
+        </li>
+        <li>
+          <strong>Not measured: whether a real form&apos;s edits could survive.</strong>{' '}
+          <code>XfaLayer</code> binds a field to <code>annotationStorage</code> only when the layout node
+          carries a <code>dataId</code>, and the packets these fixtures emit give their inputs a{' '}
+          <code>fieldid</code> and no <code>dataId</code>. So typing into a field of a fixture reaches the
+          DOM and nowhere else, and there is no edited document to save. A LiveCycle form from a real
+          producer may bind, and may then save — this package does not know, and would rather say so than
+          print a confident limit it did not observe.
+        </li>
+        <li>
+          <strong>Measured, and unfixable here: the thumbnail is blank.</strong> A pure-XFA page paints
+          zero operators, and a thumbnail is a painted canvas, so the sidebar shows an empty 132×185
+          buffer where the page should be. Composing the layer at print intent into that buffer is open
+          work.
+        </li>
+      </ul>
+      <p>
+        A document that declares XFA <em>and</em> AcroForm fields is the interesting middle case, and
+        pdf.js settles it the same way every time: the AcroForm wins, the packet is inert, and the save
+        path is the ordinary one. <code>onCapabilities</code> tells you which document you have before a
+        reader types into it.
       </p>
 
       <h2>Toolchain</h2>
@@ -219,7 +276,8 @@ export function Compatibility() {
 
       <h2>Bundle size</h2>
       <p>
-        Gzipped, excluding <code>pdfjs-dist</code> and React, measured on the 0.6 build. Each row is a real
+        Gzipped, excluding <code>pdfjs-dist</code>, React and the optional{' '}
+        <code>@cantoo/pdf-lib</code>, measured on the 0.7 build. Each row is a real
         consumer file bundled once with esbuild and once with Rollup, and the larger number is
         reported, so a path only counts as small if two independent tree-shakers agree. CI fails the
         build when a path grows more than 2&nbsp;% above the numbers committed in{' '}
@@ -237,57 +295,62 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>23.66 kB</td>
+            <td>24.26 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>26.19 kB</td>
-            <td>+2.53 kB</td>
+            <td>26.78 kB</td>
+            <td>+2.52 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>24.43 kB</td>
+            <td>25.03 kB</td>
             <td>+0.77 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>25.62 kB</td>
-            <td>+1.96 kB</td>
+            <td>26.20 kB</td>
+            <td>+1.94 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>24.60 kB</td>
-            <td>+0.95 kB</td>
+            <td>25.20 kB</td>
+            <td>+0.94 kB</td>
           </tr>
           <tr>
             <td>Core + layers</td>
-            <td>24.85 kB</td>
+            <td>25.45 kB</td>
             <td>+1.19 kB</td>
           </tr>
           <tr>
             <td>Core + attachments</td>
-            <td>24.74 kB</td>
-            <td>+1.08 kB</td>
+            <td>25.37 kB</td>
+            <td>+1.10 kB</td>
           </tr>
           <tr>
             <td>Core + annotate</td>
-            <td>25.51 kB</td>
+            <td>26.11 kB</td>
             <td>+1.85 kB</td>
           </tr>
           <tr>
-            <td>All seven features</td>
-            <td>32.75 kB</td>
-            <td>+9.09 kB</td>
+            <td>Core + edit</td>
+            <td>27.86 kB</td>
+            <td>+3.60 kB</td>
+          </tr>
+          <tr>
+            <td>All eight features</td>
+            <td>36.53 kB</td>
+            <td>+12.26 kB</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>50.87 kB</td>
+            <td>51.91 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>26.78 kB</td>
+            <td>26.82 kB</td>
             <td>—</td>
           </tr>
           <tr>
@@ -314,7 +377,7 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.6.0</code>. While it is pre-1.0, minor versions may contain breaking
+        The package is <code>0.7.0</code>. While it is pre-1.0, minor versions may contain breaking
         changes, so pin exactly in an application. <code>0.4</code> is one such minor: six{' '}
         <code>PdfViewer</code> props became four feature imports, listed at{' '}
         <a href="#/features">Features &amp; tiers</a>. The full release entry, the development log and

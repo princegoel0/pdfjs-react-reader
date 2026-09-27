@@ -123,6 +123,29 @@ export interface PdfPageProps {
  * object here defeats the memo, which is the same rule the layers already
  * follow, now with a cost attached.
  */
+/**
+ * Give each of the XFA layer's text runs an element of its own.
+ *
+ * `XfaLayer.render` hands back bare text nodes, and a search mark cannot wrap one without
+ * replacing it, which would leave every reference the next update holds detached. Putting each
+ * node in a span is the shape the highlighter already works on, and the span is what survives a
+ * mark being added and removed, so re-marking on the next keystroke is not chasing stale DOM.
+ */
+function wrapXfaText(nodes: Node[] | undefined): HTMLElement[] {
+  if (!nodes?.length) return [];
+  const spans: HTMLElement[] = [];
+  for (const node of nodes) {
+    const parent = node.parentNode;
+    if (!parent || node.nodeType !== 3) continue;
+    const span = document.createElement('span');
+    span.dataset.pjsrXfaText = '';
+    parent.replaceChild(span, node);
+    span.append(node);
+    spans.push(span);
+  }
+  return spans;
+}
+
 export const PdfPage = memo(function PdfPage({
   doc,
   pageNumber,
@@ -158,11 +181,30 @@ export const PdfPage = memo(function PdfPage({
   const annotationRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const annotationLayerRef = useRef<AnnotationLayer | null>(null);
+  /*
+   * Whether this page holds an annotation an editor can take over, read off the fetch the
+   * annotation layer already makes.
+   *
+   * Arming a tool is a document-wide signal, and without this gate every mounted page repaints
+   * to drop its editable annotations from the canvas — including the pages that hold none, whose
+   * render was pure cost. pdf.js's own viewer guards the same way: `PageView.toggleEditingMode()`
+   * returns early unless `hasEditableAnnotations()`.
+   *
+   * State rather than a ref, because the value has to be part of the render effect's identity for
+   * the repaint to be skipped at all — and because a tool armed before the fetch resolves then
+   * re-runs the effect once the answer arrives, instead of painting the canvas a copy of an
+   * editor. Setting it costs a React render, not a canvas paint: the annotation layer has just
+   * been rebuilt in the same tick anyway, and an unchanged value bails out.
+   */
+  const [hasEditable, setHasEditable] = useState(false);
   const xfaRef = useRef<HTMLDivElement | null>(null);
   const xfaDivRef = useRef<HTMLDivElement | null>(null);
   const taskRef = useRef<RenderTask | null>(null);
   const [page, setPage] = useState<PDFPageProxy | null>(null);
   const [textLayer, setTextLayer] = useState<TextLayer | null>(null);
+  // The XFA layer's markable divs, held as state because the highlight effect has to know
+  // the moment the layer is built.
+  const [xfaDivs, setXfaDivs] = useState<HTMLElement[]>([]);
 
   // Callback props are read through refs so a consumer's inline arrow never
   // changes an effect's identity: the pdf.js layers below rebuild by clearing
@@ -189,6 +231,8 @@ export const PdfPage = memo(function PdfPage({
         : null,
     [page, scale, rotation],
   );
+
+  const editingOnThisPage = annotationEditorEditing && hasEditable;
 
   useEffect(() => {
     let cancelled = false;
@@ -237,8 +281,12 @@ export const PdfPage = memo(function PdfPage({
       // While a tool is armed the editors draw the annotations they hold, so the
       // canvas has to stop drawing them too. pdf.js skips exactly the annotations
       // whose `isEditable` the worker reports true, so links, markups and notes
-      // that no editor can hold keep painting.
-      isEditing: annotationEditorEditing,
+      // that no editor can hold keep painting. Gated on this page actually holding
+      // one, because `annotationEditorEditing` is document-wide and a page with
+      // nothing editable has no reason to repaint at all — and the gate is part of
+      // the effect's identity, not just the parameter, so it skips the repaint
+      // rather than repeating it with the same answer.
+      isEditing: editingOnThisPage,
       // A new promise each render on purpose: pdf.js only reads it once, and the
       // value inside is the stable shared config. Putting this in the effect's
       // deps instead would re-render every page on every parent render.
@@ -269,7 +317,7 @@ export const PdfPage = memo(function PdfPage({
     maxRenderSide,
     contentVersion,
     optionalContentConfig,
-    annotationEditorEditing,
+    editingOnThisPage,
     reportError,
   ]);
 
@@ -346,6 +394,9 @@ export const PdfPage = memo(function PdfPage({
     (async () => {
       const annotations = await page.getAnnotations({ intent: 'display' });
       if (cancelled) return;
+      // Read here rather than in another effect: this fetch already happens for the layer,
+      // and the answer is what the canvas render below needs to know.
+      setHasEditable(annotations.some((a) => a.isEditable === true));
       container.replaceChildren();
       await layer.render({
         annotations,
@@ -437,8 +488,12 @@ export const PdfPage = memo(function PdfPage({
         linkService,
         intent: 'display',
       } as unknown as Parameters<typeof XfaLayer.render>[0];
-      if (div.childElementCount > 0) XfaLayer.update(params);
-      else XfaLayer.render(params);
+      if (div.childElementCount > 0) {
+        XfaLayer.update(params);
+      } else {
+        const rendered = XfaLayer.render(params) as unknown as { textDivs?: Node[] };
+        setXfaDivs(wrapXfaText(rendered?.textDivs));
+      }
     })().catch((err: unknown) => {
       if (cancelled) return;
       reportError(err);
@@ -507,16 +562,24 @@ export const PdfPage = memo(function PdfPage({
     };
   }, [annotationEditorUIManager, page, viewport, pageNumber, reportError]);
 
+  /*
+   * The divs a search mark wraps: the text layer's when there is one, and the XFA layer's
+   * when the page was composed from a template. Without the second, searching an XFA form
+   * reports "1 of 1" and paints nothing — the index comes from `getTextContent()`, which the
+   * engine short-circuits to the XFA tree, while the marks had nowhere to go.
+   */
   const markedDivsRef = useRef<HTMLElement[]>([]);
   const lastNavRef = useRef(0);
   useEffect(() => {
-    const container = textLayerRef.current;
-    if (!textLayer || !container) return;
+    const textContainer = textLayerRef.current;
+    const divs = textLayer?.textDivs ?? xfaDivs;
+    const container = textLayer ? textContainer : divs.length ? xfaRef.current : null;
+    if (!container || !divs.length) return;
 
     unwrapMarks(markedDivsRef.current);
     markedDivsRef.current = [];
     if (highlights && highlights.length > 0) {
-      applyHighlights(textLayer.textDivs, highlights, activeHighlight, markedDivsRef.current);
+      applyHighlights(divs, highlights, activeHighlight, markedDivsRef.current);
     }
 
     // Center the active mark only for fresh navigation requests; matches
@@ -532,7 +595,7 @@ export const PdfPage = memo(function PdfPage({
         .querySelector('.pjsr-mark--active')
         ?.scrollIntoView({ block: 'center', behavior: 'auto' });
     }
-  }, [textLayer, highlights, activeHighlight, navigateToActiveAt]);
+  }, [textLayer, xfaDivs, highlights, activeHighlight, navigateToActiveAt]);
 
   // pdf.js sizes text spans and layer dimensions against
   // --total-scale-factor, which its viewer CSS normally defines; we drive it
