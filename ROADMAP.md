@@ -993,7 +993,7 @@ measurement, and the docs say so rather than implying the surface is complete. B
 `0.7` — the repaint to zero renders on a page with nothing editable, the save to "measured, and not
 to be trusted" — and the sentence that belonged in `Features` is written there rather than here.
 
-### 0.7.0 — Edit: writing the engine cannot do
+### 0.7.0 — Edit: writing the engine cannot do ✅ built 2026-09-27 (local `dev`; pushed and published with 1.0.0)
 The only release that touches the zero-dependency rule.
 
 * New export `pdfjs-react-reader/edit`, with the PDF writer as an **optional peer** so the core stays
@@ -1384,6 +1384,40 @@ under them has just changed — and the live region said nothing.
   undo-apply "Page changes discarded" described an action nobody had taken. Console clean across the
   run — the one React *deps changed size between renders* warning seen mid-session was HMR replacing a
   hook whose dependency list had just grown, and it did not recur on a fresh mount.
+
+### 0.7.0 — closed 2026-09-27
+
+Cumulative measured cost, gzipped, worst of esbuild and Rollup: core **23.66 → 24.26 kB** (+0.60 for the
+replacement seam and the XFA span wrapper every page now carries), shell **50.87 → 51.91**, headless
+**26.78 → 26.82**. Over core: print 2.52, download 0.77, forms 1.94, outline 0.94, layers 1.19,
+attachments 1.10, annotate 1.85, **edit 3.60**; all eight **36.53 kB** (+12.26). `edit.js` ships at
+5.39 kB gz and is the only shipped file that names the writer. `edit.css` is the eighth sheet,
+2,469 B source → 1,266 B minified. The catalog is **134** strings (115 before this release).
+**365 tests in 31 files**, up from 313 in 25. The baseline was re-accepted at the close, so every figure
+in README, the docs pages and this file is the committed number.
+
+**The peer numbers moved too, and one of them had been wrong since `0.1`.** `pdfjs-dist` 6.3.289 gzips to
+128.6 kB on the main thread and 366.5 kB in its worker; `@cantoo/pdf-lib` to 245.5 kB minified. The
+"~532 kB" quoted in README and in `check-size.mjs`'s header was a 5.x measurement that survived two peer
+bumps because nothing recomputed it — the reminder being that a *for scale* number is still a claim, and
+a claim nobody re-measures quietly becomes the thing the docs defend rather than the thing the engine
+does.
+
+**What the close pass found: one real defect, and it was in the surface that already worked.** The Pages
+panel announced every edit while the reader made it and said nothing on Apply — three causes deep, each
+caught only by sampling the live region over time, and each invisible to a test that asserted the notice
+rather than the announcement (`#126`, `#127`, `#128` all measured clean; the arming and XFA-mark
+probes had to be re-run non-vacuously after a first attempt that clicked a button which the feature had
+replaced). The pass also caught the apply's own undo saying "Page changes discarded", which describes an
+action nobody took. Both new assertions were run once more with the fix removed, to show they fail
+without it; the counterfactual for the *wording* is the sentence above, not a test.
+
+**Three things this release does not claim.** That a physical pointer drag was ever driven through
+automation — the gesture path is dispatch-tested. That XFA can be saved, or that its edit path was
+tested: the save is measured across every container we can generate and the edit is not, because our
+packets bind no `dataId` (`#137`). And that an XFA page has a thumbnail — it paints zero operators, so
+the sidebar shows an empty 132×185 buffer (`#136`). `#114`'s 1,000-page fixture, the pressure case for
+`#126` and the bar for `0.8`, is still the document this project has never opened.
 
 ### 0.8.0 — Freeze: hardening* Real-device matrix: iOS Safari 14 and 15, where the `:has()` fallback for container queries is
   written but has never been measured on any Safari, plus Android Chrome.
