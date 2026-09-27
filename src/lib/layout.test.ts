@@ -6,7 +6,9 @@ import {
   computeSlots,
   findStartIndex,
   findVisibleRange,
+  meanBox,
   scaledPageSize,
+  spreadSample,
 } from './layout';
 
 describe('applyRotation', () => {
@@ -118,5 +120,59 @@ describe('computeSlots', () => {
     expect(computeSlots(0, 'continuous')).toEqual([]);
     expect(computeSlots(1, 'spread')).toEqual([[0]]);
     expect(computeSlots(2, 'spread')).toEqual([[0], [1]]);
+  });
+});
+
+describe('meanBox', () => {
+  it('is null for no boxes, which is the caller having measured nothing yet', () => {
+    expect(meanBox([])).toBeNull();
+  });
+  it('is the box itself for a document that turns out to be one size', () => {
+    expect(meanBox([{ width: 612, height: 792 }, { width: 612, height: 792 }])).toEqual({
+      width: 612,
+      height: 792,
+    });
+  });
+  it('averages each axis on its own', () => {
+    expect(meanBox([{ width: 792, height: 612 }, { width: 595, height: 842 }])).toEqual({
+      width: 693.5,
+      height: 727,
+    });
+  });
+  it('sums to the document, which is why it is the mean and not the median', () => {
+    const boxes = [
+      { width: 792, height: 612 },
+      { width: 595, height: 842 },
+      { width: 612, height: 792 },
+    ];
+    const average = meanBox(boxes)!;
+    expect(average.height * boxes.length).toBeCloseTo(boxes.reduce((s, b) => s + b.height, 0));
+    expect(average.width * boxes.length).toBeCloseTo(boxes.reduce((s, b) => s + b.width, 0));
+  });
+});
+
+describe('spreadSample', () => {
+  it('leaves page 1 to the caller, who has already fetched it', () => {
+    expect(spreadSample(1000, 12).every((n) => n > 1)).toBe(true);
+  });
+  it('reaches the end of the document without naming a page twice', () => {
+    const picks = spreadSample(1000, 12);
+    expect(picks.length).toBe(12);
+    expect(new Set(picks).size).toBe(12);
+    expect(picks[0]).toBe(2);
+    expect(Math.max(...picks)).toBe(1000);
+    expect([...picks].sort((a, b) => a - b)).toEqual(picks);
+  });
+  it('takes the middle when one page is enough', () => {
+    expect(spreadSample(1000, 1)).toEqual([501]);
+  });
+  it('gives every page once when asked for more than the document has', () => {
+    expect(spreadSample(4, 12)).toEqual([2, 3, 4]);
+  });
+  it('is empty where a mean over it would only repeat page 1', () => {
+    expect(spreadSample(2, 12)).toEqual([]);
+    expect(spreadSample(1, 12)).toEqual([]);
+    expect(spreadSample(0, 12)).toEqual([]);
+    expect(spreadSample(1000, 0)).toEqual([]);
   });
 });

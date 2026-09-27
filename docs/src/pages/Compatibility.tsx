@@ -295,62 +295,62 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>24.26 kB</td>
+            <td>24.77 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>26.78 kB</td>
-            <td>+2.52 kB</td>
+            <td>27.28 kB</td>
+            <td>+2.50 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>25.03 kB</td>
-            <td>+0.77 kB</td>
+            <td>25.55 kB</td>
+            <td>+0.78 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>26.20 kB</td>
-            <td>+1.94 kB</td>
+            <td>26.69 kB</td>
+            <td>+1.92 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>25.20 kB</td>
-            <td>+0.94 kB</td>
+            <td>25.71 kB</td>
+            <td>+0.93 kB</td>
           </tr>
           <tr>
             <td>Core + layers</td>
-            <td>25.45 kB</td>
-            <td>+1.19 kB</td>
+            <td>25.98 kB</td>
+            <td>+1.21 kB</td>
           </tr>
           <tr>
             <td>Core + attachments</td>
-            <td>25.37 kB</td>
+            <td>25.88 kB</td>
             <td>+1.10 kB</td>
           </tr>
           <tr>
             <td>Core + annotate</td>
-            <td>26.11 kB</td>
-            <td>+1.85 kB</td>
+            <td>26.64 kB</td>
+            <td>+1.86 kB</td>
           </tr>
           <tr>
             <td>Core + edit</td>
-            <td>27.86 kB</td>
-            <td>+3.60 kB</td>
+            <td>28.35 kB</td>
+            <td>+3.58 kB</td>
           </tr>
           <tr>
             <td>All eight features</td>
-            <td>36.53 kB</td>
-            <td>+12.26 kB</td>
+            <td>37.03 kB</td>
+            <td>+12.25 kB</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>51.91 kB</td>
+            <td>52.61 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>26.82 kB</td>
+            <td>27.10 kB</td>
             <td>—</td>
           </tr>
           <tr>
@@ -377,13 +377,124 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.7.0</code>. While it is pre-1.0, minor versions may contain breaking
-        changes, so pin exactly in an application. <code>0.4</code> is one such minor: six{' '}
-        <code>PdfViewer</code> props became four feature imports, listed at{' '}
-        <a href="#/features">Features &amp; tiers</a>. The full release entry, the development log and
-        the versioning policy live in <code>CHANGELOG.md</code> at the repository root, which GitHub
-        renders on the project home page.
+        The package is <code>0.8.0</code>. While it is pre-1.0, minor versions may contain breaking
+        changes, so pin exactly in an application. The full release entry, the development log and the
+        versioning policy live in <code>CHANGELOG.md</code> at the repository root, which GitHub renders
+        on the project home page.
       </p>
+
+      <h2>Upgrading, release by release</h2>
+      <p>
+        Every change a host had to act on, in the order it happened. Nothing here is a judgement call
+        the library made quietly: each line is something an application compiling against the previous
+        version would have had to change.
+      </p>
+      <table className="doc-table">
+        <thead>
+          <tr>
+            <th>From → to</th>
+            <th>What changed</th>
+            <th>What to do</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0.2 → 0.3</td>
+            <td>
+              A <code>src</code> string that was not recognisably a URL, a data URI or base64 stopped
+              being fetched and threw <code>TypeError</code> instead.
+            </td>
+            <td>Pass a URL, a <code>File</code>, bytes, or a <code>data:</code> URI. Anything else was a bug in the caller, and now says so at the call.</td>
+          </tr>
+          <tr>
+            <td>0.3 → 0.4</td>
+            <td>
+              Six <code>PdfViewer</code> props — <code>enablePrint</code>, <code>printScale</code>,{' '}
+              <code>enableDownload</code>, <code>downloadFileName</code>, <code>renderForms</code>,{' '}
+              <code>onFormValuesChange</code> — became features you import, and a feature’s sheet became a
+              second <code>…&lt;name&gt;.css</code> import.
+            </td>
+            <td>
+              <code>{`features: [printFeature, downloadFeature]`}</code> and{' '}
+              <code>import 'pdfjs-react-reader/print.css'</code>. The props were removed rather than
+              deprecated: a prop that silently stopped working is the failure this release existed to
+              remove.
+            </td>
+          </tr>
+          <tr>
+            <td>0.3 → 0.4</td>
+            <td>
+              <code>PdfPage</code>’s <code>renderForms</code> began defaulting to <code>false</code>, and{' '}
+              <code>SidebarTab</code> widened from a closed union to <code>string</code>.
+            </td>
+            <td>
+              Pass <code>renderForms</code> where a form should be fillable. The tab widening needs
+              nothing of you and lets a feature name its own tab.
+            </td>
+          </tr>
+          <tr>
+            <td>0.4 → 0.5</td>
+            <td>
+              A multi-word search query became several terms that all have to appear, where it had been
+              one exact phrase. <code>INK_WIDTHS</code> started carrying a label <em>key</em> rather than
+              an English word.
+            </td>
+            <td>
+              Quote a phrase if you want a phrase. If you render the pen widths yourself, read{' '}
+              <code>labels[option.labelKey]</code> — the array no longer holds text you can show, which
+              is the point: it never held your language.
+            </td>
+          </tr>
+          <tr>
+            <td>0.5 → 0.6</td>
+            <td>
+              The <code>pdfjs-dist</code> peer became <code>^6.2.108</code>; v5 was dropped.{' '}
+              <code>usePdfDownload</code>’s <code>withFormValues</code> was renamed{' '}
+              <code>saveEdits</code>, and <code>usePdfFeaturePeer</code> began returning{' '}
+              <code>Partial&lt;S&gt;</code>.
+            </td>
+            <td>
+              Upgrade the peer — v5 lacks the editor API the annotate tier needs, and the annotation
+              editor layer is the one place a version difference shows up as a crash rather than a
+              missing feature. Rename the option. If you published a peer’s state from an effect, expect{' '}
+              <code>undefined</code> on the first render and write the fallback you meant to.
+            </td>
+          </tr>
+          <tr>
+            <td>0.6 → 0.7</td>
+            <td>
+              Nothing a host had to change. A document with nothing to commit stopped being handed to{' '}
+              <code>saveDocument()</code>, and a tool being armed stopped repainting pages that hold no
+              editable annotation.
+            </td>
+            <td>Nothing. Both were the library taking back work it should not have done.</td>
+          </tr>
+          <tr>
+            <td>0.7 → 0.8</td>
+            <td>
+              The text layer is re-laid out on a zoom step instead of rebuilt, an XFA page’s thumbnail
+              now composes its form, and long mixed-size documents get a scroll bar that is right before
+              every page has been measured. Three label catalogs and the{' '}
+              <a href="#/api">API surface</a> page arrived.
+            </td>
+            <td>
+              Nothing. One new import is worth knowing about: <code>{`labels={DE_LABELS}`}</code>.
+            </td>
+          </tr>
+          <tr>
+            <td>0.x → 1.0</td>
+            <td>
+              The version where the surface stops moving. The plan is that 1.0 changes nothing except by
+              accident — see <a href="#/api">the API surface</a> for what is being promised, and the
+              release notes if it turns out otherwise.
+            </td>
+            <td>
+              If you are on any 0.x, the work to reach 1.0 is the six rows above. Pin the version, and
+              treat a minor bump as a real upgrade from there on.
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </>
   );
 }

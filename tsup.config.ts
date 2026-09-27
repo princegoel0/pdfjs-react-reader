@@ -16,6 +16,11 @@ export default defineConfig({
     'features/layers': 'src/features/layers.tsx',
     'features/annotate': 'src/features/annotate.tsx',
     'features/attachments': 'src/features/attachments.tsx',
+    // One entry per shipped catalog. Not re-exported from the index on purpose: a
+    // language is 134 strings, and importing the viewer should not hand it to you.
+    'locales/de': 'src/locales/de.ts',
+    'locales/es': 'src/locales/es.ts',
+    'locales/fr': 'src/locales/fr.ts',
   },
   format: ['esm'],
   target: 'es2022',

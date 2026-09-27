@@ -5,6 +5,97 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-09-27
+
+Hardening, and the freeze review. This release changed no API a host had to act on, added three
+languages and one docs page that says what the package has been promising, and spent most of its time
+on measurements that turned out to disagree with the reason each task was written down for. Two of the
+five defects closed here were closed by finding the premise was wrong rather than by fixing the code.
+
+The one that set the tone: `#137` asked for an XFA fixture whose fields bind, on the reading that ours
+do not, because the rendered input carries a `fieldId` and no `data-id`. `XfaLayer.setAttributes` has
+`case "dataId": break;` — the key is read from the layout object, used to attach the binding, and
+deliberately never written to the DOM. Asking the question the way the task framed it could only ever
+return "no". Asked as "does a keystroke arrive in annotation storage", on the fixture that already
+existed, it arrives: `annotationStorage.size` goes 0 → 1. So the reader's edit is recorded and cannot be
+written back, because `saveDocument()` throws on a pure-XFA document — which is what makes the download
+guard right, and the comment above it now says that instead of the binding story.
+
+### Added
+
+- **Three locale catalogs**: `pdfjs-react-reader/locales/de`, `/fr`, `/es`. 134 strings each, typed as
+  the complete `PdfViewerLabels` rather than the partial a host may send — so a key added to the English
+  source stops all three building until it is answered — and frozen, since a catalog is shared by every
+  viewer on the page. **2.18 kB gzipped** apiece. Separate entry points, not exports of the index:
+  importing the viewer must not hand you a language you did not ask for, and `core` is unchanged at
+  24.77 kB. `src/locales/locales.test.ts` asserts what a type cannot: the key list matches exactly, no
+  value is empty or padded, every `{page}`-style slot survives translation with its name intact, and the
+  catalog translates rather than echoing (four exceptions, each named in the test).
+- **`PdfThumbnail` composes an XFA page's form** (`#136`). Such a page has no painted page — its canvas
+  measures zero non-white pixels — so every thumbnail of an XFA document had been a blank card with a
+  number under it. The card now runs the same `XfaLayer.render` the page does, against the document's own
+  annotation storage, sized by `--total-scale-factor` at the card's scale.
+- **The API surface page** (`docs`, `#/api`): every value export of the three barrels, what it is for,
+  and the library layer grouped by module with its names listed verbatim. `1.0` freezes this list, and
+  60 of the index barrel's 115 values were named nowhere in the docs before it — thirteen of them outside
+  `lib/`, including whole components a host is meant to compose. All 115 are named now.
+- **An upgrade table**, release by release from `0.2` to `1.0`, on the compatibility page: what changed,
+  and what to do.
+- `meanBox` and `spreadSample`, exported from both barrels — the estimator `#138` introduced, on the same
+  criterion the rest of the library layer is judged by: a host writing its own windowing needs it.
+
+### Changed
+
+- **Rows the page-measurement has not reached are sized by the document's mean box, not page 1's**
+  (`#138`). The virtualizer now fetches twelve pages spread from the second page to the last alongside
+  page 1 and lays out every unmeasured row at their mean. On the 1,000-page fixture, the laid-out height
+  once the first measurement lands went from **809,005 px — 15.2 % short** of the 954,482 px the document
+  turns out to be — to **954,010 px, 0.04 % short**; where every one of 42 layout commits had been more
+  than 5 % off, now exactly one is, and that one is the frame before any page has been fetched, which no
+  estimate can reach. What did *not* change is the commit count, which is the finding: a chunk's
+  twenty-odd `reportPageDims` calls already land as one render, because React batches what one
+  synchronous tick schedules, so the batching pass this task asked for would have bought nothing.
+- **A zoom step re-lays the text layer out instead of rebuilding it** (`#140`). `PdfPage` had built its
+  `TextLayer` on `viewport`, which is a new object for a new scale exactly as for a new page, so every
+  step of a pinch threw the spans away and asked the worker to extract the page again. 39.8 ms against
+  **1.0 ms** for the tracemonkey title page's 163 spans; 9 ms against 0.2 ms for a two-span page, which
+  says the cost was the round trip and not the text. Verified through the shell: a span tagged before the
+  step is the same node after it and after a step back, with a byte-identical box, and the page's 56
+  search marks are still 56. A *turn* still rebuilds, on purpose — pdf.js's `update` re-applies rotation
+  to the layer box, not to spans positioned against the viewport it was built with.
+- **The React abort `0.7` reported is gone, and the performance bar moved with it.** Eleven
+  `Maximum update depth exceeded` errors on the stress pass became none to two, and the 1,000-page
+  fixture's reader-speed pass re-measured at p50 7.0 ms and max 14.0–14.1 ms with **zero** frames over
+  16.7 where it had been clean-but-max-14.0 already; the 1,100 px/frame pass, which had peaked at
+  20.9 ms, now peaks at 14.0 with the same zero. This is a side effect of the two changes above rather
+  than a fix aimed at it — the cycle React was breaking was work that both of them removed. `0.7`'s
+  entry called the console unclean; it is not, at a reader's speed, and at twenty times that the
+  remaining trips are React's own development instrumentation, which no production consumer can see.
+- **The page box now writes back the page it went to.** Typing `1000` into a 20-page document used to
+  leave `1000` in the box: the scroll clamps on its own, so `currentPage` never moves and the effect that
+  mirrors it into the field never runs.
+
+### Fixed
+
+- **Highlights flashed off and back on at every zoom step.** A consequence of the rebuild above rather
+  than a separate fault: the layer was cleared, re-rendered, and the marks re-wrapped. The spans are no
+  longer thrown away, so the marks stay where they were.
+- `usePdfDownload`'s comment claimed the save is refused because an XFA reader's keystroke never reaches
+  storage. It reaches storage; the save is refused because the writer cannot rebuild a packet. The guard
+  is unchanged, and the reason now matches the measurement.
+
+### Not done
+
+- **The real-device matrix (`#141`) is not done and cannot be from here.** iOS Safari 14 and 15, where
+  the `:has()` fallback for container queries is written but has never been measured on any Safari, and
+  Android Chrome. Every frame number in this release, and the one before it, is Chromium on one Windows
+  machine at roughly 145 Hz. `PRD.md:22`'s bar is met on that machine and unmeasured anywhere else.
+- **Freezing the exported collections** (`INK_COLORS`, `INK_WIDTHS`, `HIGHLIGHT_COLORS`, `ZOOM_LEVELS`,
+  `PRINT_SCALES`, `DEFAULT_PAGE_ESTIMATE`, `DEFAULT_LABELS`) is recommended by the freeze review and not
+  done here: it is a contract change for anyone currently writing to one, which is the behaviour worth
+  breaking, and `1.0` is the release with that allowance. The docs page tells a host to spread instead,
+  which is correct today and after.
+
 ## [0.7.0] — 2026-09-27
 
 Writing where the engine cannot. This is the release that touches the zero-dependency rule, and the only

@@ -1,4 +1,5 @@
 import { FormsExample } from '../examples/FormsExample';
+import { LabelsExample } from '../examples/LabelsExample';
 
 const PROPS: [string, string, string][] = [
   ['src', 'PdfSource', 'Required. URL, path, data URI, base64, File/Blob, or PDF bytes. Changing it reloads in place — keep the value stable across renders.'],
@@ -188,7 +189,7 @@ export function Viewer() {
 
       <h2>Labels</h2>
       <p>
-        Every string in the shell — 115 of them, from <code>aria-label</code>s to the
+        Every string in the shell — 134 of them, from <code>aria-label</code>s to the
         “3 of 416 · p12” counter — lives in one typed catalog with an English default. Pass a partial
         object and only the keys you name change:
       </p>
@@ -203,10 +204,38 @@ const de: PdfViewerLabelsOverride = {
 <PdfViewer src="/vertrag.pdf" labels={de} />`}</code>
       </pre>
       <p>
-        Values are templates, not functions, so a catalog can be plain JSON when locales arrive. Slots
-        that are left unfilled stay visible (<code>Go to page {'{page}'}</code>) rather than blanking
-        a control’s accessible name, and <code>formatLabel</code> is exported for your own chrome.
+        Values are templates, not functions, so a catalog is plain data: it can be loaded from a
+        server, diffed against the English source, and sent for translation without executing
+        anything. Slots that are left unfilled stay visible (<code>Go to page {'{page}'}</code>)
+        rather than blanking a control’s accessible name, and <code>formatLabel</code> is exported
+        for your own chrome.
       </p>
+
+      <h3>The shipped catalogs</h3>
+      <p>
+        Three complete languages ship with the package, one import each:
+      </p>
+      <pre>
+        <code>{`import { PdfViewer } from 'pdfjs-react-reader';
+import { DE_LABELS } from 'pdfjs-react-reader/locales/de';
+
+<PdfViewer src="/vertrag.pdf" labels={DE_LABELS} />`}</code>
+      </pre>
+      <p>
+        Each is typed as the whole <code>PdfViewerLabels</code> rather than the partial a host may
+        send, so a string added to the English source stops that catalog building until it is
+        answered too. They are separate entry points on purpose: German is 2.17 kB gzipped, and
+        importing the viewer must not hand you a language you did not ask for. Replace one word of
+        a shipped catalog the way you would override a default — <code>{`{ ...DE_LABELS, outlineTab: 'Inhaltsverzeichnis' }`}</code>.
+      </p>
+      <p>
+        What is checked is completeness and the slots, not the prose: a test walks every key of the
+        English catalog and asserts each language answers it, trims it, and carries exactly the{' '}
+        <code>{'{page}'}</code>-style placeholders the English template does — a dropped slot being
+        the one mistake a catalog can make that nothing else would ever notice. The wording itself
+        has not been through a native speaker, and corrections are wanted.
+      </p>
+      <LabelsExample />
 
       <h2>Forms</h2>
       <p>

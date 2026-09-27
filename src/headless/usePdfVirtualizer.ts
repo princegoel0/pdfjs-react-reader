@@ -8,7 +8,9 @@ import {
   DEFAULT_PAGE_ESTIMATE,
   findStartIndex,
   findVisibleRange,
+  meanBox,
   scaledPageSize,
+  spreadSample,
   type LayoutResult,
   type PageDims,
   type PageLayout,
@@ -76,6 +78,12 @@ export interface UsePdfVirtualizerResult {
 }
 
 const DIM_CHUNK_SIZE = 25;
+/**
+ * How many pages are weighed to size the rows the sweep has not reached yet. See
+ * {@link meanBox}: the figure is the laid-out height's error at first paint, and a
+ * dozen pages cost one batch of `getPage` calls that the sweep would make anyway.
+ */
+const SAMPLE_SIZE = 12;
 const HORIZONTAL_PADDING = 32;
 const NARROW_HORIZONTAL_PADDING = 8;
 const NARROW_VIEWPORT_MAX = 640;
@@ -103,10 +111,9 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dims, setDims] = useState<ReadonlyMap<number, PageDims>>(new Map());
   const [estimate, setEstimate] = useState<PageDims>(DEFAULT_PAGE_ESTIMATE);
+  const [average, setAverage] = useState<PageDims | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-
-  const inflight = useRef(new Set<number>());
 
   const reportPageDims = useCallback((index: number, pageDims: PageDims) => {
     setDims((prev) => {
@@ -121,32 +128,47 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
   useEffect(() => {
     setDims(new Map());
     setEstimate(DEFAULT_PAGE_ESTIMATE);
-    inflight.current.clear();
+    setAverage(null);
   }, [doc]);
 
-  // Seed the estimate from page 1, then measure remaining pages in background
-  // chunks so real dimensions progressively replace estimates.
+  // Seed the layout: page 1's box for the fit modes to work against, the mean of a
+  // sample spread through the document for the rows the sweep has not reached, and
+  // then every remaining page in chunks. A chunk's twenty-odd reports land as one
+  // render, because React batches the updates a tick makes.
   useEffect(() => {
     if (!doc || numPages === 0) return;
     let cancelled = false;
 
+    const boxOf = async (pageNumber: number): Promise<PageDims> => {
+      const page = await doc.getPage(pageNumber);
+      const box = page.getViewport({ scale: 1 });
+      return { width: box.width, height: box.height };
+    };
+
     (async () => {
-      const first = await doc.getPage(1);
+      // Page 1 and the sample are fetched together and published together. The first
+      // layout needs both figures — the box the scale is fitted to, and the mean the
+      // rows nobody has reached are sized from — and resolving them one after the
+      // other spends a commit laying the document out by page 1 alone.
+      const picks = spreadSample(numPages, SAMPLE_SIZE);
+      const [first, sampled] = await Promise.all([boxOf(1), Promise.all(picks.map(boxOf))]);
       if (cancelled) return;
-      const base = first.getViewport({ scale: 1 });
-      setEstimate({ width: base.width, height: base.height });
-      reportPageDims(0, { width: base.width, height: base.height });
+      setEstimate(first);
+      reportPageDims(0, first);
+      for (let i = 0; i < picks.length; i++) {
+        reportPageDims(picks[i]! - 1, sampled[i]!);
+      }
+      setAverage(meanBox([first, ...sampled]));
 
       for (let start = 1; start < numPages; start += DIM_CHUNK_SIZE) {
         if (cancelled) return;
         const end = Math.min(start + DIM_CHUNK_SIZE, numPages);
-        const pages = await Promise.all(
-          Array.from({ length: end - start }, (_, i) => doc.getPage(start + i + 1)),
+        const boxes = await Promise.all(
+          Array.from({ length: end - start }, (_, i) => boxOf(start + i + 1)),
         );
         if (cancelled) return;
-        for (let i = 0; i < pages.length; i++) {
-          const base = pages[i]!.getViewport({ scale: 1 });
-          reportPageDims(start + i, { width: base.width, height: base.height });
+        for (let i = 0; i < boxes.length; i++) {
+          reportPageDims(start + i, boxes[i]!);
         }
       }
     })().catch(() => {
@@ -191,6 +213,16 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
 
   const pageEstimate = dims.get(0) ?? estimate;
 
+  /*
+   * What a row is sized from before its own page has been measured.
+   *
+   * Not `pageEstimate`: that is the box the fit modes work against, and it is right to
+   * be page 1, because page 1 is the page in view. Sizing the *other* thousand rows by
+   * it is what left a mixed-size document's laid-out height a sixth short at first paint
+   * and 36 % long before that, and the scrollbar keeps a reader's place by that height.
+   */
+  const layoutEstimate = average ?? estimate;
+
   // A zero-width viewport (hidden container, transient layout collapse) would
   // otherwise drive fit modes to the 0.1 floor, shrink the layout, and clamp
   // away the user's scroll position. Hold the last good fit scale instead.
@@ -223,14 +255,14 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
       let width = (group.length - 1) * gap;
       let height = 0;
       for (const i of group) {
-        const s = scaledPageSize(dims.get(i), estimate, resolvedScale, rotationFor(i));
+        const s = scaledPageSize(dims.get(i), layoutEstimate, resolvedScale, rotationFor(i));
         width += s.width;
         height = Math.max(height, s.height);
       }
       return { width, height };
     });
     return computeLayout(sizes, gap);
-  }, [slots, dims, estimate, resolvedScale, rotationFor, gap]);
+  }, [slots, dims, layoutEstimate, resolvedScale, rotationFor, gap]);
 
   // Keep the topmost visible row anchored when layout shifts underneath it
   // (dimension corrections, zoom changes) so the viewport doesn't jump.
@@ -282,12 +314,12 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
       if (!indices || offsetTop === undefined || height === undefined) continue;
       let width = (indices.length - 1) * gap;
       for (const i of indices) {
-        width += scaledPageSize(dims.get(i), estimate, resolvedScale, rotationFor(i)).width;
+        width += scaledPageSize(dims.get(i), layoutEstimate, resolvedScale, rotationFor(i)).width;
       }
       out.push({ indices, pageNumber: indices[0]! + 1, offsetTop, width, height });
     }
     return out;
-  }, [visible, slots, layout, dims, estimate, resolvedScale, rotationFor, gap]);
+  }, [visible, slots, layout, dims, layoutEstimate, resolvedScale, rotationFor, gap]);
 
   const scrollToPage = useCallback(
     (pageNumber: number, behavior: ScrollBehavior = 'auto') => {

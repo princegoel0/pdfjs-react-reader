@@ -896,6 +896,8 @@
 
 .pjsr-thumbnail-frame {
   display: block;
+  /* The containing block for the composed form on a page that has one. */
+  position: relative;
   width: 100%;
   /* Provisional until the page ratio is measured, then overridden inline;
      aspect-ratio (not min-height) is what reserves the space. */
@@ -905,6 +907,12 @@
   border: 1px solid var(--pjsr-border);
   border-radius: var(--pjsr-radius);
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+  /* `XfaLayer` sizes its own sheet through `setLayerDimensions`, which writes
+     `round(down, var(--total-scale-factor) * 612px, var(--scale-round-x))` — the same
+     pair `.pjsr-page` carries, and without it the declaration is invalid and the form
+     is laid out in a box of no width at all. */
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
   transition:
     border-color 0.12s ease,
     box-shadow 0.12s ease;
@@ -914,6 +922,15 @@
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* The composed form on a card. It is a picture of the form, not a second live copy:
+   `aria-hidden` and `inert` say so, and the fields inside are `tabindex="-1"` for the
+   engines that do not honour `inert`. The page's own sheet already keeps the pointer off
+   it, so a click reaches the card and turns the page. */
+
+.pjsr-thumbnail-xfa {
+  z-index: 1;
 }
 
 .pjsr-thumbnail-label {

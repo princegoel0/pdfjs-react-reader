@@ -80,6 +80,15 @@ const styleSheet = existsSync(join(dist, 'styles.css')) ? ['styles.css'] : [];
 const filePaths = [
   { label: 'shell', files: [...reachableFrom('index.js'), ...styleSheet] },
   { label: 'headless', files: [...reachableFrom('headless.js'), ...styleSheet] },
+  /*
+   * The shipped catalogs, measured as the files a consumer is served rather than as a
+   * bundle: a catalog imports nothing, so the only question about it is how many bytes
+   * of words it carries, and ratcheting that is what keeps a 134-string file from
+   * quietly turning into a 400-string one.
+   */
+  { label: 'catalog:de', files: reachableFrom('locales/de.js') },
+  { label: 'catalog:es', files: reachableFrom('locales/es.js') },
+  { label: 'catalog:fr', files: reachableFrom('locales/fr.js') },
 ];
 
 /* ------------------------------------------------------------------ *

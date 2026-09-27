@@ -321,22 +321,33 @@ export const PdfPage = memo(function PdfPage({
     reportError,
   ]);
 
-  // The layer is built only for page/scale/rotation changes; highlight updates
-  // are layered on top by the effect below without a full rebuild.
+  // The layer is built for a page and a turn of it, and re-laid-out for a change of
+  // scale; highlight updates are layered on top by the effect below without a rebuild.
   //
   // A pure-XFA page is skipped, as it is in pdf.js's own viewer
   // (`web/pdf_viewer.mjs`: `!pdfPage.isPureXfa`): the XFA layer underneath carries
   // the form's text as real elements, so a text layer over it would be a second
   // copy of every word for selection and for a screen reader to find.
+  //
+  // `viewport` is deliberately *not* a dependency. It is a new object for a new scale
+  // as much as for a new page, and rebuilding on it re-ran the worker's text
+  // extraction for the page: measured on the tracemonkey title page, 163 spans cost
+  // 39.8 ms to rebuild at 150 % against 1 ms to re-lay out, and the rebuild also tore
+  // the search marks out with it, so a zoom step flashed the highlights off and back on.
+  // The viewport is read through a ref so the build still sees the one this render
+  // laid the page out at, without a scale change pulling the effect back in.
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
   useEffect(() => {
     const container = textLayerRef.current;
-    if (!page || !container || !viewport || page.isPureXfa === true) return;
+    const at = viewportRef.current;
+    if (!page || !container || !at || page.isPureXfa === true) return;
 
     let cancelled = false;
     const layer = new TextLayer({
       textContentSource: page.streamTextContent(),
       container,
-      viewport,
+      viewport: at,
     });
 
     layer
@@ -345,7 +356,7 @@ export const PdfPage = memo(function PdfPage({
         if (!cancelled) setTextLayer(layer);
       })
       .catch((err: unknown) => {
-        // Expected when the layer is cancelled mid-render (unmount, zoom step).
+        // Expected when the layer is cancelled mid-render (unmount, page change).
         if (cancelled || (err instanceof Error && err.name === 'AbortException')) return;
         reportError(err);
       });
@@ -356,7 +367,17 @@ export const PdfPage = memo(function PdfPage({
       layer.cancel();
       container.replaceChildren();
     };
-  }, [page, viewport, reportError]);
+  }, [page, rotation, reportError]);
+
+  // The spans pdf.js lays out are positioned in percentages and sized from
+  // `--total-scale-factor`, so a scale change needs only `--scale-x` recomputed for
+  // each one — which is what `update()` does, synchronously, over the divs already in
+  // the layer. It is a no-op when the scale has not moved, so the effect that follows
+  // a build costs nothing.
+  useEffect(() => {
+    if (!textLayer || !viewport) return;
+    textLayer.update({ viewport });
+  }, [textLayer, viewport]);
 
   // Annotations (links, markups, form widgets). pdf.js's `AnnotationLayer.update`
   // only repositions the layer, so programmatic form writes force a re-render

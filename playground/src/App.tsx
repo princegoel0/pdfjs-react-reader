@@ -17,6 +17,7 @@ import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { printFeature } from 'pdfjs-react-reader/features/print';
 import { layersFeature } from 'pdfjs-react-reader/features/layers';
 import { attachmentsFeature } from 'pdfjs-react-reader/features/attachments';
+import { DE_LABELS } from 'pdfjs-react-reader/locales/de';
 import 'pdfjs-react-reader/styles.css';
 import 'pdfjs-react-reader/print.css';
 import 'pdfjs-react-reader/forms.css';
@@ -55,6 +56,10 @@ export default function App() {
   const [url, setUrl] = useState('');
   const [appliedUrl, setAppliedUrl] = useState('');
   const [german, setGerman] = useState(false);
+  // The shipped catalog, imported the way an application imports it. The partial
+  // override above is the different case: it exists to prove that a catalog which
+  // answers only some keys keeps the English for the rest.
+  const [germanCatalog, setGermanCatalog] = useState(false);
   const [dropEnabled, setDropEnabled] = useState(true);
   const [assetMode, setAssetMode] = useState<'' | 'cdn' | '/pdfjs-dist/'>('');
   const [restrict, setRestrict] = useState(false);
@@ -106,7 +111,7 @@ export default function App() {
     src,
     assetUrl: assetMode || undefined,
     allowedSources: restrict ? ['/fixtures/'] : undefined,
-    labels: german ? GERMAN : undefined,
+    labels: germanCatalog ? DE_LABELS : german ? GERMAN : undefined,
     features,
     find: hostFind ? hostFindController : undefined,
     onError: (err) => console.error('[playground] viewer error', err),
@@ -168,6 +173,14 @@ export default function App() {
         <label>
           <input type="checkbox" checked={german} onChange={(e) => setGerman(e.target.checked)} />
           &nbsp;Partial German labels
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={germanCatalog}
+            onChange={(e) => setGermanCatalog(e.target.checked)}
+          />
+          &nbsp;Shipped German catalog
         </label>
         <label>
           <input

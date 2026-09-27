@@ -230,10 +230,19 @@ export function Toolbar({
     };
   }, [menuOpen]);
 
+  // `type="number"` only enforces min/max on the spinner and the keyboard, so a typed
+  // value can leave the document. The scroll clamps, but `currentPage` then never
+  // changes and the sync effect never runs — so the box has to be corrected here,
+  // or it keeps showing a page that does not exist.
   const commitPage = () => {
     const parsed = Number.parseInt(pageInput, 10);
-    if (Number.isFinite(parsed)) onPageChange(parsed);
-    else setPageInput(String(currentPage));
+    if (!Number.isFinite(parsed)) {
+      setPageInput(String(currentPage));
+      return;
+    }
+    const target = Math.min(Math.max(parsed, 1), numPages || 1);
+    if (target !== parsed) setPageInput(String(target));
+    onPageChange(target);
   };
 
   const selectValue = typeof scaleMode === 'number' ? String(scaleMode) : scaleMode;

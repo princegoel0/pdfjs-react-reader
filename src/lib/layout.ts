@@ -40,6 +40,43 @@ export function scaledPageSize(
   return { width: base.width * scale, height: base.height * scale };
 }
 
+/**
+ * The mean of several page boxes: what a row whose own page has not been measured
+ * yet is sized from.
+ *
+ * Page 1's box is a poor stand-in for a document whose pages differ from it. Measured
+ * on the 1,000-page fixture, whose three boxes cycle evenly through the file, laying
+ * the unmeasured rows out at page 1's shape put the laid-out height 15 % short, and at
+ * the pre-load default 36 % long. A dozen boxes taken spread through the document bring
+ * the same figure inside 2 %, and cost nothing the sweep was not already paying.
+ */
+export function meanBox(boxes: PageDims[]): PageDims | null {
+  if (boxes.length === 0) return null;
+  let width = 0;
+  let height = 0;
+  for (const box of boxes) {
+    width += box.width;
+    height += box.height;
+  }
+  return { width: width / boxes.length, height: height / boxes.length };
+}
+
+/**
+ * `count` 1-based page numbers spread evenly across a document, from its second page
+ * to its last, never page 1.
+ *
+ * Page 1 is excluded because it has been fetched already and its box is on its way to
+ * the layout: sampling it again would weight the mean toward whatever the first page
+ * happens to be, which is the bias the sample exists to remove.
+ */
+export function spreadSample(numPages: number, count: number): number[] {
+  if (numPages < 3 || count < 1) return [];
+  const n = Math.min(count, numPages - 1);
+  if (n === 1) return [Math.round((numPages + 2) / 2)];
+  const step = (numPages - 2) / (n - 1);
+  return Array.from({ length: n }, (_, k) => 2 + Math.round(k * step));
+}
+
 export interface LayoutResult {
   /** offsets[i] = content-space Y where page i starts. */
   offsets: number[];

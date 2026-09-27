@@ -158,69 +158,69 @@ export function Introduction() {
             <td>
               <code>PdfViewer</code> alone — pages, text, search, ink, thumbnails, chrome
             </td>
-            <td>24.26 kB</td>
+            <td>24.77 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>
               <code>+ printFeature</code>
             </td>
-            <td>26.78 kB</td>
-            <td>+2.52 kB</td>
+            <td>27.28 kB</td>
+            <td>+2.50 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ downloadFeature</code>
             </td>
-            <td>25.03 kB</td>
-            <td>+0.77 kB</td>
+            <td>25.55 kB</td>
+            <td>+0.78 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ formsFeature</code>
             </td>
-            <td>26.20 kB</td>
-            <td>+1.94 kB</td>
+            <td>26.69 kB</td>
+            <td>+1.92 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ outlineFeature</code>
             </td>
-            <td>25.20 kB</td>
-            <td>+0.94 kB</td>
+            <td>25.71 kB</td>
+            <td>+0.93 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ layersFeature</code>
             </td>
-            <td>25.45 kB</td>
-            <td>+1.19 kB</td>
+            <td>25.98 kB</td>
+            <td>+1.21 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ attachmentsFeature</code>
             </td>
-            <td>25.37 kB</td>
+            <td>25.88 kB</td>
             <td>+1.10 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ annotateFeature</code>
             </td>
-            <td>26.11 kB</td>
-            <td>+1.85 kB</td>
+            <td>26.64 kB</td>
+            <td>+1.86 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ editFeature</code> — pages and flatten
             </td>
-            <td>27.86 kB</td>
-            <td>+3.60 kB</td>
+            <td>28.35 kB</td>
+            <td>+3.58 kB</td>
           </tr>
           <tr>
             <td>All eight</td>
-            <td>36.53 kB</td>
-            <td>+12.26 kB</td>
+            <td>37.03 kB</td>
+            <td>+12.25 kB</td>
           </tr>
           <tr>
             <td>
@@ -234,14 +234,14 @@ export function Introduction() {
       <p>
         All eight together cost less than their sum, because each is measured against the same core they
         attach to. The two shipped-file paths are what a bundler that cannot tree-shake pays for the
-        whole entry surface: <strong>51.91 kB</strong> for <code>index.js</code> and{' '}
-        <strong>26.82 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
+        whole entry surface: <strong>52.61 kB</strong> for <code>index.js</code> and{' '}
+        <strong>27.10 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
         <code>edit.js</code> is its own 5.39 kB, and it is the only shipped file that imports the writer.
         For scale, <code>pdfjs-dist</code> gzips to 128.6 kB on the main thread and 366.5 kB in its
         worker, and <code>@cantoo/pdf-lib</code> to 245.5 kB.
       </p>
       <p>
-        Measured on 0.7.0. CI runs <code>npm run size</code>, which compares every path against the
+        Measured on 0.8.0. CI runs <code>npm run size</code>, which compares every path against the
         numbers committed in <code>size-baseline.json</code> and fails on growth beyond 2&nbsp;%
         (+256&nbsp;B of slack for minifier jitter), and fails on its own if any single feature costs
         more than 4&nbsp;kB over core. It is a ratchet rather than a ceiling: a library that grows

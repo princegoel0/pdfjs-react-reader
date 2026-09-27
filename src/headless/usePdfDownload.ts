@@ -65,11 +65,14 @@ export function usePdfDownload({
       /*
        * An XFA document cannot be committed. `saveDocument()` is measured against all three
        * `/XFA` container shapes the fixtures are written in: the single stream rejects either
-       * way, and an array rejects while `annotationStorage` is empty — where an array does
-       * answer, its bytes either drop the edit or will not reopen. Falling back to the loaded
-       * bytes costs nothing a reader could see: these packets bind their fields without a
-       * `dataId`, so `XfaLayer.setupStorage` never attaches and what is typed into a field never
-       * reaches the storage a save would have written.
+       * way — on `xfa-sample.pdf` it throws `Cannot read properties of null (reading
+       * 'toString')` from inside the engine — and an array rejects while `annotationStorage`
+       * is empty. What is *not* the reason is the field binding: typing into these packets
+       * does reach storage (`annotationStorage.size` goes 0 → 1 on a keystroke), because
+       * `XfaLayer.setAttributes` computes a `dataId` for every field and deliberately leaves
+       * it out of the DOM, so the absence of a `data-id` attribute measures nothing. The save
+       * is refused because the writer cannot rebuild a packet, not because the edit was lost
+       * before it got there. Falling back to the loaded bytes costs a reader nothing.
        */
       const commits = options.saveEdits && current.isPureXfa !== true;
       const bytes = commits ? await current.saveDocument() : await current.getData();

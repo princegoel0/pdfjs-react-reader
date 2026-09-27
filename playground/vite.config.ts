@@ -49,6 +49,8 @@ export default defineConfig({
       // import, and the playground runs from source rather than from dist.
       { find: /^pdfjs-react-reader\/(\w+)\.css$/, replacement: r('../src/styles/$1.css') },
       { find: /^pdfjs-react-reader\/features\/(\w+)$/, replacement: r('../src/features/$1.tsx') },
+      // Shipped locale catalogs, same source-for-dist substitution as the features.
+      { find: /^pdfjs-react-reader\/locales\/(\w\w)$/, replacement: r('../src/locales/$1.ts') },
       // The writer tier is its own entry, not a feature: it is the one place the
       // optional peer may be imported.
       { find: /^pdfjs-react-reader\/edit$/, replacement: r('../src/edit.tsx') },

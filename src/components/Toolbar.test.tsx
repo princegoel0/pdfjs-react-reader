@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { DEFAULT_LABELS, type PdfViewerLabels } from '../lib/labels';
 import { LabelsContext } from './labels-context';
 import { Toolbar, INK_WIDTHS } from './Toolbar';
@@ -70,5 +70,53 @@ describe('Toolbar labels', () => {
       'Medium',
       'Thick',
     ]);
+  });
+});
+
+function pageBox(currentPage: number, numPages: number) {
+  const onPageChange = vi.fn();
+  const { container } = render(
+    <LabelsContext.Provider value={DEFAULT_LABELS}>
+      <Toolbar
+        currentPage={currentPage}
+        numPages={numPages}
+        scaleMode="fit-width"
+        resolvedScale={1}
+        onPageChange={onPageChange}
+        onScaleModeChange={vi.fn()}
+      />
+    </LabelsContext.Provider>,
+  );
+  return { input: container.querySelector<HTMLInputElement>('.pjsr-page-input'), onPageChange };
+}
+
+describe('Toolbar page box', () => {
+  it('asks for a page the document has', () => {
+    const { input, onPageChange } = pageBox(3, 14);
+    if (!input) throw new Error('no page box rendered');
+    fireEvent.change(input, { target: { value: '9' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPageChange).toHaveBeenCalledWith(9);
+    expect(input.value).toBe('9');
+  });
+
+  // The scroll clamps on its own, so `currentPage` never moves to a page past the end
+  // and the effect that mirrors it into the box never runs. Only the box can correct.
+  it('writes the page it went to when the typed one is past the end', () => {
+    const { input, onPageChange } = pageBox(3, 14);
+    if (!input) throw new Error('no page box rendered');
+    fireEvent.change(input, { target: { value: '1000' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPageChange).toHaveBeenCalledWith(14);
+    expect(input.value).toBe('14');
+  });
+
+  it('returns to the page in view when the box holds nothing parseable', () => {
+    const { input, onPageChange } = pageBox(3, 14);
+    if (!input) throw new Error('no page box rendered');
+    fireEvent.change(input, { target: { value: '—' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPageChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('3');
   });
 });

@@ -83,7 +83,9 @@ Core, in every import of the shell:
   touch, keyboard paging, optional drag-and-drop to open a file, any percentage from 25 % to 500 %, and
   an `Automatic` mode that fits a landscape page whole and a portrait one by width.
 - **Localisable** — every string in the shell lives in one typed catalog, 134 labels in `0.7`; override
-  the subset you need and the rest keeps its English default.
+  the subset you need and the rest keeps its English default, or take a complete language from
+  `pdfjs-react-reader/locales/de`, `/fr` or `/es` — 2.18 kB gzipped each, and a separate entry so
+  importing the viewer never hands you a language you did not ask for.
 - **Composable** — the shell's state is `useViewerController`, published through `ViewerProvider`, and
   the four parts (`ViewerRoot`, `ViewerToolbar`, `ViewerSidebar`, `ViewerPages`) read it. Write your own
   arrangement without forking anything, and hand the toolbar `{ hide, priorities, order, add }` to
@@ -424,20 +426,21 @@ two, so a path only counts as small if two independent tree-shakers agree.
 
 | What you import | Size | Over core |
 | --- | --- | --- |
-| `PdfViewer`, no features — pages, text, search, ink, thumbnails, chrome | 24.26 kB | — |
-| `+ printFeature` | 26.78 kB | +2.52 kB |
-| `+ downloadFeature` | 25.03 kB | +0.77 kB |
-| `+ formsFeature` | 26.20 kB | +1.94 kB |
-| `+ outlineFeature` | 25.20 kB | +0.94 kB |
-| `+ layersFeature` | 25.45 kB | +1.19 kB |
-| `+ attachmentsFeature` | 25.37 kB | +1.10 kB |
-| `+ annotateFeature` | 26.11 kB | +1.85 kB |
-| `+ editFeature` | 27.86 kB | +3.60 kB |
-| All eight | 36.53 kB | +12.26 kB |
+| `PdfViewer`, no features — pages, text, search, ink, thumbnails, chrome | 24.77 kB | — |
+| `+ printFeature` | 27.28 kB | +2.50 kB |
+| `+ downloadFeature` | 25.55 kB | +0.78 kB |
+| `+ formsFeature` | 26.69 kB | +1.92 kB |
+| `+ outlineFeature` | 25.71 kB | +0.93 kB |
+| `+ layersFeature` | 25.98 kB | +1.21 kB |
+| `+ attachmentsFeature` | 25.88 kB | +1.10 kB |
+| `+ annotateFeature` | 26.64 kB | +1.86 kB |
+| `+ editFeature` | 28.35 kB | +3.58 kB |
+| All eight | 37.03 kB | +12.25 kB |
 | A single headless hook (`usePdfDocument`) | 2.59 kB | — |
+| A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.18 kB | separate entry, not over core |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
-51.91 kB for `index.js` and 26.82 kB for `headless.js`, each with `styles.css`. `edit.js` is its own
+52.61 kB for `index.js` and 27.10 kB for `headless.js`, each with `styles.css`. `edit.js` is its own
 file at 5.39 kB, and it is the only shipped file that imports the writer, so a host that never mounts
 the tier never loads it.
 
@@ -501,7 +504,7 @@ development, against the built `dist` in CI.
 
 ## Status
 
-Version `0.7.0`, built on `dev`. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are committed
+Version `0.8.0`, built on `dev`. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are committed
 locally and publish together with `1.0.0`, which is the shipping rule in
 [`ROADMAP.md`](./ROADMAP.md) §Releases. While the package is pre-1.0 a minor may break the API — `0.4`
 did, with six `PdfViewer` props becoming four feature imports — so pin exactly.

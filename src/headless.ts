@@ -189,6 +189,8 @@ export {
   computeSlots,
   findStartIndex,
   findVisibleRange,
+  meanBox,
+  spreadSample,
   scaledPageSize,
   DEFAULT_PAGE_ESTIMATE,
   type PageDims,

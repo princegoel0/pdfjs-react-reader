@@ -1469,13 +1469,189 @@ leaves `setTextLayer` under a `resolvedScale`-derived viewport (`#139`). So the 
 taken from a session that also produced a React abort, and they stand as timings, not as a clean bill of
 health.
 
-### 0.8.0 — Freeze: hardening* Real-device matrix: iOS Safari 14 and 15, where the `:has()` fallback for container queries is
+## 0.8 so far
+
+**`#138` closed: rows the sweep has not reached are sized by the document's mean box, not
+page 1's.** `usePdfVirtualizer` now fetches twelve pages spread evenly from the second page to the
+last alongside page 1, and the mean of them (`meanBox` in `src/lib/layout.ts`, chosen because mean ×
+count *is* the sum the layout needs) stands in for any row without its own measurement. Re-measured
+on the 1,000-page fixture with the viewer at 1040×820, fit width at 125 %, every feature off:
+
+| | before | after |
+| --- | --- | --- |
+| height once page 1 is known | 809,005 px — **15.2 % short** | 954,010 px — **0.04 % short** |
+| what the document turns out to be | 954,482 px | 954,482 px |
+| commits more than 5 % off | all of them | **one in 42** |
+| height-changing commits | 42 | 42 |
+
+The one sample still far off is the frame before any page has been fetched, where the only thing
+known is `numPages`; no estimate can help it, and holding the first paint to wait for one would trade
+a wrong scrollbar for a blank viewer. What did *not* change is the commit count, and that is the
+finding worth keeping: a chunk's twenty-odd `reportPageDims` calls already land as one render, because
+React batches the updates one synchronous tick makes, so the batching pass this task was written to
+ask for would have bought nothing. Same probe on `page-order-sample.pdf` (20 pages, four landscape):
+0.5 % off after the seed, three commits. Frames during the sweep held at p50 6.9 / p99 13.8 / max
+20.9 ms, so the twelve extra `getPage` calls cost nothing measurable.
+
+**`#139` is not a defect, except for one line of it that is.** The eleven
+`Maximum update depth exceeded` errors were still eleven after the estimate fix above — that A/B was
+measured before the text-layer change landed, and with both in the count is now **zero or two** per the
+same pair of passes, re-run four times: never on the reader-speed pass, occasionally one or two on the
+1,100 px/frame one, which is 135,000 px/s through 615 px pages, about two hundred pages a second. The
+reader-speed pass re-measured the same way came out p50 7 ms, max 14.0–14.1 ms, **zero** frames over
+16.7 — and the whole-document pass, which had been max 20.9 ms at `0.7`, is now max 14.0 with the same
+zero. Whatever the guard was breaking on, it was the work the two fixes removed rather than anything the
+guard was protecting against. And the guard itself is React's own development instrumentation: the string
+exists twice in the installed `react-dom`, in `react-dom-client.development.js` and
+`react-dom-profiling.development.js`, and nowhere else in the package, so no production consumer can be
+shown it. What it aborts is work React would otherwise keep doing at a scroll rate no hand can hold. One
+fix was built and measured against this before the conclusion was accepted — deriving the cleared page
+from state instead of `setPage(null)`, on the theory that every mount was scheduling an update from
+inside the effect flush. Eleven errors before it, eleven after it. The theory was wrong twice over: the
+slots are keyed by page index (`ViewerParts.tsx:249`, `:258`), so a fast scroll remounts a page rather
+than handing it a new number, and on a mount `page` is already null, which React bails out on. The change
+is not kept; the patch is at `.spike/out/pdfpage-derived-page.patch`.
+
+The line of `#139` that *was* a defect: typing a page the document does not have left the typed number
+in the box, because the scroll clamps on its own and `currentPage` therefore never moves to trigger the
+effect that mirrors it. `Toolbar`'s `commitPage` now clamps and writes back what it went to — measured
+in the browser: 5000 typed on the 1,000-page fixture leaves `1000` at scrollTop 953,710 of a scrollable
+953,711, and 0 leaves `1` at the top — with three cases in `Toolbar.test.tsx`.
+
+**`#140` closed: a zoom step re-lays the text layer out instead of rebuilding it.**
+`PdfPage` built its `TextLayer` on `viewport`, which is a new object for a new scale exactly as it is
+for a new page, so every step of a pinch or a zoom select threw the spans away and asked the worker to
+extract the page again. It now builds on `page` and `rotation` and calls `TextLayer.update({viewport})`
+for the scale. At the engine level that is **39.8 ms against 1.0 ms** for the tracemonkey title page's
+163 spans, and 9 ms against 0.2 ms for a two-span page of the thousand-page fixture — which says the
+cost was the round trip, not the text. Through the shell, on a page holding 56 search marks: the fourth
+span tagged before the step is the same node after it, and after a step back to fit width its box is
+byte-identical to where it started; 356 spans and 56 marks before, 356 and 56 after; the mark is still
+inside the layer; the span's width moved 0.90 where the scales say 0.926. What the step no longer does
+is the thing the rebuild did to the reader: clear the layer, re-render it, and let the highlight effect
+wrap the matches a second time, which flashed every highlight off and back on at each step. A *turn*
+still rebuilds, on purpose — pdf.js's `update` re-applies rotation to the layer box, not to spans whose
+positions were computed against the viewport the layer was built with — and the marks re-apply there as
+they always did. `.spike/out/textlayer.json` has both probes, including the one long frame (33.3 ms)
+the canvas repaint still costs, which this change neither touches nor claims to.
+
+**One number measured here that has never been measured before, and is not explained.** Re-running the
+reader-speed pass on the *default* playground document — tracemonkey, 14 pages of dense two-column
+academic text, dpr 1.25, fit width — gives p50 7 ms but **p99 35–49 ms and about 18 frames over 16.7 in
+every 200**, four runs in a row. The same fixture has ~1,100 text spans mounted where the thousand-page
+fixture has two per page, so the likeliest reading is rasterisation of a dense page rather than anything
+the two changes above touched, and every frame figure this project has ever published for a scroll was
+taken on the thin fixture. It is recorded rather than chased: this session did not A/B it against `0.7`,
+so it cannot be called a regression or a non-issue, only unmeasured until now.
+
+**`#137` is answered, and it did not need the fixture it asked for.** The task was written on the
+reading that our XFA packets never bind — the DOM shows a `fieldId` and no `data-id`, so
+`XfaLayer.setupStorage` was taken never to attach, and no edit could reach the storage a save would
+write. `setAttributes` says otherwise: `case "dataId": break;` — the key is read from the layout
+object, used for the binding, and deliberately never written as an attribute. The absence that
+motivated the task is the design working. Asked directly instead, on `xfa-sample.pdf` with the forms
+feature on: **`annotationStorage.size` goes 0 → 1 on a keystroke.** The edit is recorded. It is
+recorded under a key the DOM does not expose — `getRawValue('field46')` is null while `size` says one
+thing is in there — because that key is `dataId`, the worker's own uid for the datasets node the field
+resolved to. And `saveDocument()` then throws `Cannot read properties of null (reading 'toString')`
+from inside pdf.js. The hybrid fixture answers nothing: with `/AcroForm/Fields` present `isPureXfa` is
+false, the AcroForm paints and the XFA layer is cleared, so no XFA widget is even on screen. So: a
+reader's keystroke in a LiveCycle form **can** be recorded and **cannot** be written back — which is
+what makes `usePdfDownload`'s `isPureXfa` guard right, and its comment now says that rather than the
+binding story that was never true. The remaining XFA gap belongs to the writer, and no fixture can
+close it. `.spike/out/xfabind.json`.
+
+**`0.8`'s shipped locale catalogs: `pdfjs-react-reader/locales/{de,es,fr}`.** 134 strings each, every
+one typed as the *complete* `PdfViewerLabels` rather than the partial a host may send, so a key added
+to the English source stops the build in three files until it is answered. `src/locales/locales.test.ts`
+adds what a type cannot: that every catalog has exactly the English key list and no extras, that every
+value is a non-empty trimmed string, that every `{page}`-style slot survives with its name intact —
+the one mistake a catalog can make that nothing else would ever report, since `formatLabel` leaves an
+unfilled slot visible rather than blanking a control's accessible name — and that the catalog
+translates, with four exceptions named in the test because French genuinely writes "Page" and
+"Document". They are separate entry points, not exports of the index: German is **2.17 kB gzipped** and
+importing the viewer must not hand you a language. `core` is unchanged at 24.77 kB; the three files are
+ratcheted as their own shipped paths (`catalog:de/es/fr`). Verified in the browser through the
+playground's "Shipped German catalog" toggle — toolbar names, the page counter and the zoom select all
+read German, and the select is still findable by its German `aria-label` (`Zoomstufe`) — and the docs
+example resolves the same specifier against `dist` as well as `src`, which is what CI builds. The
+wording has not been through a native speaker, and the docs page says so.
+
+**`#136` closed: a card of an XFA page now shows the form.** `PdfThumbnail` painted only the
+canvas, and a page composed from a template has no painted page — measured again here, the
+thumbnail's canvas holds **zero** non-white pixels — so every card of such a document was a blank
+white rectangle with a number under it. The thumbnail now fetches the page's XFA tree and composes it
+with `XfaLayer.render`, the same call and the same `dontFlip` viewport `PdfPage` makes, against the
+document's own annotation storage, into an overlay sized by `--total-scale-factor` set to the card's
+scale. On `xfa-sample.pdf`, sidebar open: the overlay holds 21 elements and the 59 characters the page
+holds (`Painted by the XFA layer, not the canvas … End of the template`), the sheet's transform is
+`matrix(0.196, …)` against a card 100 px wide on a 500 pt page, and the box it draws into — 98×137 at
+29,286 — sits inside the card's own 100×139 at 28,285.
+
+That is a second live copy of a form inside a `<button>`, which is why three things come with it: the
+overlay is `aria-hidden`, it is `inert`, and every field inside it is walked to `tabIndex = -1` for the
+engines that do not honour `inert` — iOS 14 and 15 among them, the versions `0.8` is meant to measure.
+Measured: `inert: true`, both fields unfocusable, and **zero** tabbable controls anywhere inside the
+cards, where the DOM still holds two inputs. A reader who never opens the sidebar hears nothing; a
+reader who tabs through it moves card to card as before. The pointer is kept off the sheet by the
+page's own rule, so a click still turns to the page.
+
+**The 0.8 API-freeze review: what 1.0 would be promising.** Counted, not remembered —
+`.spike/docs-coverage.mjs` reads the three barrels and checks every name against the docs pages and
+examples. `src/index.ts` exports **203** (117 values, 86 types), `src/headless.ts` **158** (89 values,
+69 types), `src/edit.tsx` **9**. Before this review the index barrel had **60 of its 115 values named
+nowhere in the docs** — 13 of them outside `lib/`, among them whole components a host is meant to
+compose (`ViewerLayout`, `ThumbnailList`, `PdfThumbnail`, `OutlineView`, `InkLayer`, `PasswordPrompt`)
+and the seam the shell’s own parts read their words through (`LabelsContext`, `useLabels`). It now has
+**zero**, in both barrels: `docs/src/pages/Api.tsx` names every value export, groups the `lib/` layer by
+module with its names listed verbatim, and says what each part is for. 61 types remain unnamed — the
+per-hook `*Options` and `*Result` shapes, which the page states it describes at the hook rather than
+field by field. That is the residual, recorded rather than papered over.
+
+Five decisions, written down rather than left to the next refactor.
+
+1. **The `lib/` re-exports stay public.** `0.1`'s promise was that the headless layer is enough to
+   build your own viewer, and it is only enough if `computeLayout`, `planPrintPages`, `buildPageText`
+   and the rest can actually be imported — a private-but-reachable module would be a path that breaks
+   on any rename. Freezing them costs nothing that is not already paid.
+2. **Eight of them are plumbing, and the page now says so rather than implying it.**
+   `readEditingParams`, `workerAutoDetectionFailed`, `HIGHLIGHT_COLOR_PARAM`, `strokePathD`,
+   `mergeFeaturePageProps`, `samePublication`, `NO_FEATURES`, `LabelsContext` exist because a shell part
+   needs them, not because a host should. Cutting them would be a breaking change made in the one
+   release whose whole job is to stop making them, so they are named in the table with the reason.
+3. **The exported collections are mutable, and one of them has already bitten.** `INK_COLORS`,
+   `INK_WIDTHS`, `HIGHLIGHT_COLORS`, `ZOOM_LEVELS`, `PRINT_SCALES`, `DEFAULT_PAGE_ESTIMATE` and
+   `DEFAULT_LABELS` are exported as plain arrays and objects, so a host that sorts one or assigns into
+   one changes every viewer on the page — the failure the `0.4` review recorded and left for this one.
+   The fix is `Object.freeze` plus `readonly` types, which is a contract change for anyone currently
+   doing exactly that, so it waits for `1.0`'s breaking window rather than landing mid-freeze; the docs
+   page tells a host to spread instead, which is correct today and after. The three shipped catalogs are
+   frozen *now*, in the same change that adds them, because nothing can be relying on writing to them
+   yet — and `locales.test.ts` asserts it, so the next catalog that forgets fails.
+4. **Two names were added by this release and are already in the table:** `meanBox` and `spreadSample`,
+   the estimator `#138` introduced. A host writing its own windowing needs the same arithmetic the
+   built-in virtualizer now uses, which is the criterion the rest of the library layer is judged by.
+5. **`findFeatureKey` returns `{ feature, binding } | null`.** The `0.4` review asked for the feature
+   alongside the binding; `src/lib/features.ts:200` already does, and the bullet that asked for it was
+   older than the change that satisfied it.
+
+Nothing else in the surface is knowingly wrong. `PdfViewerHandle`, the `controls` shape, the feature
+contract and the authoring hooks were each added against a host that needed them, in the release that
+added them, with an example. What `1.0` is now promising is 203 names, 117 of them reachable values, and
+that number is written here so a later widening is a decision and not a drift.
+
+### 0.8.0 — Freeze: hardening
+
+* Real-device matrix: iOS Safari 14 and 15, where the `:has()` fallback for container queries is
   written but has never been measured on any Safari, plus Android Chrome.
 * The performance bar `PRD.md:22` states: **the fixture and the desktop numbers are done** (see the
   block above — 1,000 pages, sub-100 ms cold render, no dropped frame at reader speed). What is left is
   measuring the same scroll on the devices in the bullet above, which is the only part of the claim still
   unverified.
-* Shipped locale catalog; text layer `TextLayer.update()` instead of a full rebuild.
+* Shipped locale catalog — open. **`#138`, `#139` and `#140` are closed**, each in the block above:
+  the mean box the unmeasured rows are sized from, the update-depth guard read as the development
+  artefact it is (with the page box's clamp, which was a real defect), and the text layer re-laid out
+  by `TextLayer.update()` instead of rebuilt.
 * One docs example per public API, including each tier combination; an upgrade guide; an
   API-freeze review.
 
