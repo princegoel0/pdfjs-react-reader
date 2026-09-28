@@ -102,7 +102,16 @@ const rowButton = (row: number, match: RegExp) => {
     : undefined;
 };
 
-afterEach(() => {
+afterEach(async () => {
+  /*
+   * Let any write still in flight land before the spies are cleared. A handler `void`s the
+   * promise because a click may not await, so a test can end with its own save on its way to
+    * `replaceDocument`; clearing the mocks first hands that call to the next test, which then
+   * sees a write it never asked for — the shape these two files took several rounds to name.
+   */
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  });
   cleanup();
   replaced.mockClear();
   saved.mockClear();
@@ -113,9 +122,10 @@ describe('extract and split', () => {
     render(<Harness shell={makeShell()} />);
     click(rowButton(0, /Move page later/));
     click(byLabel(/^Save these pages as a new file$/));
-    await settle();
-
-    expect(saved).toHaveBeenCalledTimes(1);
+    // Waited for the file rather than for a timer: an extract is a save through the engine
+    // plus a writer pass over twenty pages, and the panel reads that same file to list its
+    // signature boxes, so the two share the window.
+    await waitFor(() => expect(saved).toHaveBeenCalledTimes(1), { timeout: 4000, interval: 25 });
     expect(replaced, 'extract must not replace what the reader is looking at').not.toHaveBeenCalled();
     const [bytes, name] = saved.mock.calls[0]!;
     expect(name).toBe('statement.pdf');
@@ -141,9 +151,7 @@ describe('extract and split', () => {
     const before = kidsOf(order());
 
     click(rowButton(4, /Split the list here/));
-    await settle();
-
-    expect(saved).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(saved).toHaveBeenCalledTimes(2), { timeout: 4000, interval: 25 });
     expect(replaced).not.toHaveBeenCalled();
     const [first, firstPart] = saved.mock.calls[0]!;
     const [second, secondPart] = saved.mock.calls[1]!;

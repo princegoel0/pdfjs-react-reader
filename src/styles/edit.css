@@ -107,3 +107,73 @@
   color: var(--pjsr-muted-fg);
   font-size: 11px;
 }
+
+/*
+ * The signature section. The pad is the only part of the panel a pointer draws on, so
+ * `touch-action: none` is load-bearing: without it a finger that begins a stroke scrolls
+ * the sidebar instead, and the mark comes out as a straight line nobody drew.
+ */
+.pjsr-sign {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.pjsr-sign-heading,
+.pjsr-sign-note,
+.pjsr-sign-label {
+  margin: 0;
+  color: var(--pjsr-muted-fg);
+  font-size: 11px;
+}
+
+/* Stated rather than hidden: a reader who believes they have just signed a document
+   cryptographically needs correcting in the same place they did it. */
+.pjsr-sign-pad {
+  width: 100%;
+  height: 64px;
+  touch-action: none;
+  cursor: crosshair;
+  background: #fff;
+  border: 1px dashed var(--pjsr-border);
+  border-radius: var(--pjsr-radius);
+}
+
+.pjsr-sign-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pjsr-sign-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+}
+
+.pjsr-sign-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pjsr-sign-meta {
+  flex: none;
+  color: var(--pjsr-muted-fg);
+  font-size: 11px;
+  font-variant-numeric: tabular nums;
+}
+
+/* Both of the section's own lines are kept at the status height so the pad does not jump when
+   the answer to "are there boxes?" arrives. */
+.pjsr-sign-status {
+  min-height: 16px;
+  margin: 0;
+  color: var(--pjsr-muted-fg);
+  font-size: 11px;
+}

@@ -127,6 +127,26 @@ export interface PdfViewerLabels {
   pagesSplit: string;
   pagesRestored: string;
   pagesApplyReverted: string;
+  /** The form's signature boxes, as the heading over the list of them. */
+  signatureSection: string;
+  /** The control that writes a drawn mark into one of those boxes. */
+  signHere: string;
+  /** The box already holds an appearance, so signing it replaces something. */
+  signedAlready: string;
+  /** Asked of a reader who has not drawn anything yet. */
+  drawSignature: string;
+  /** One field has the mark in it now. */
+  signaturePlaced: string;
+  /** Nothing was written, so say so rather than reporting a signature that is not there. */
+  signatureFailed: string;
+  /** Stated where the mark is placed, because a reader may believe they signed something else. */
+  signatureNotCryptographic: string;
+  /** The pad takes a pointer or a finger, and nothing else — said rather than hidden. */
+  signatureNeedsPointer: string;
+  /** Shown while the file is read for its boxes, which is a deliberate click's cost, not an open tab's. */
+  signatureScanning: string;
+  /** The answer after a reader has drawn something and the document turns out to hold no box for it. */
+  signatureNone: string;
   expandSection: string;
   collapseSection: string;
   untitledEntry: string;
@@ -283,6 +303,16 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   pagesSplit: 'Saved {files} files: {first} pages, then {second}',
   pagesRestored: 'Page changes discarded',
   pagesApplyReverted: 'Back to the document as it was before the apply',
+  signatureSection: 'Signature fields',
+  signHere: 'Sign',
+  signedAlready: 'Already signed',
+  drawSignature: 'Draw your signature here',
+  signaturePlaced: 'Signature placed on {field}',
+  signatureFailed: 'The signature could not be written',
+  signatureNotCryptographic: 'A drawn mark, not a digital signature',
+  signatureNeedsPointer: 'Drawing needs a mouse, a pen or a finger',
+  signatureScanning: 'Finding signature fields…',
+  signatureNone: 'This document has no signature fields',
   expandSection: 'Expand {title}',
   collapseSection: 'Collapse {title}',
   untitledEntry: '(untitled)',

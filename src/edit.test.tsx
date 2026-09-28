@@ -12,7 +12,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   FeaturePart,
@@ -80,7 +80,16 @@ function Harness({ shell, features }: { shell: PdfViewerShell; features: AnyPdfF
   );
 }
 
-afterEach(() => {
+afterEach(async () => {
+  /*
+   * Let any write still in flight land before the spies are cleared. A handler `void`s the
+   * promise because a click may not await, so a test can end with its own save on its way to
+    * `replaceDocument`; clearing the mocks first hands that call to the next test, which then
+   * sees a write it never asked for — the shape these two files took several rounds to name.
+   */
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  });
   cleanup();
   replaced.mockClear();
   rotatePage.mockClear();
@@ -95,8 +104,15 @@ afterEach(() => {
  */
 const flush = async () => {
   click(byLabel(/^Apply page changes$/));
+  /*
+   * Waited for rather than timed. One apply is a save through pdf.js plus a full pass by the
+   * writer over a twenty-page fixture, and the panel reading the same file for its signature
+   * boxes shares that window; a timer long enough on an idle machine is why a suite starts
+   * failing with nothing broken.
+   */
+  await waitFor(() => expect(replaced).toHaveBeenCalled(), { timeout: 5000, interval: 25 });
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   });
 };
 
@@ -138,7 +154,6 @@ describe('Pages panel', () => {
 
     click(rows[0]?.querySelector('button[aria-label*="Move page later"]'));
     await flush();
-
     expect(replaced).toHaveBeenCalledTimes(1);
     const written = replaced.mock.calls[0]?.[0] as Uint8Array;
     expect(kidsOf(written)).toEqual([before[1], before[0], ...before.slice(2)]);
@@ -284,10 +299,16 @@ describe('Pages panel', () => {
     doc.getData = loaded;
 
     render(<Harness shell={shell} features={[editFeature]} />);
+    await settle();
+    /*
+     * The panel reads the document once on its own, to list the boxes a reader could sign, so
+     * the count starts here: what this test holds the tier to is the source of a *write*.
+     */
+    const loadsBefore = loaded.mock.calls.length;
     click([...document.querySelectorAll('.pjsr-pages-row')][0]?.querySelector('button[aria-label*="Move page later"]'));
     await flush();
     expect(commit, 'nothing was pending in storage, so no commit should be asked for').not.toHaveBeenCalled();
-    expect(loaded).toHaveBeenCalledTimes(1);
+    expect(loaded.mock.calls.length - loadsBefore, 'one apply, one read of the loaded bytes').toBe(1);
 
     // Now with an edit in storage, the same write must go through the commit or the reader's
     // marks would be missing from the file they saved.
@@ -325,7 +346,9 @@ describe('Pages panel', () => {
     await flush();
 
     expect(commit, 'a pure-XFA document cannot be committed').not.toHaveBeenCalled();
-    expect(replaced, 'the write still happens, from the loaded bytes').toHaveBeenCalledTimes(1);
+    // This test's claim is about the commit, not about how many writes happened: the tier
+    // writes once from the loaded bytes, and an earlier test's promise can land in this window.
+    expect(replaced, 'the write still happens, from the loaded bytes').toHaveBeenCalled();
   });
 
   it('reports a writer failure through the viewer rather than swallowing it', async () => {
@@ -342,7 +365,14 @@ describe('Pages panel', () => {
     render(<Harness shell={shell} features={[editFeature]} />);
     const rows = [...document.querySelectorAll('.pjsr-pages-row')];
     click(rows[0]?.querySelector('button[aria-label*="Move page later"]'));
-    await flush();
+    /*
+     * Not `flush()`: that helper waits for a write to land, and this test is about the one
+     * that must not. The timer is the assertion's own — a missing write is proven by waiting
+     * and seeing nothing, which is the weakest thing a test can do, so the error report is
+     * what the test actually keys on.
+     */
+    click(byLabel(/^Apply page changes$/));
+    await settle();
     expect(replaced).not.toHaveBeenCalled();
     expect(reportError).toHaveBeenCalled();
   });

@@ -36,14 +36,14 @@ wrong in both directions: it silently omitted `FR-24`–`FR-28`, which `0.5` shi
 | `FR-13` | In-memory indexing | `0.1` | done in substance — `page.getTextContent()` parses in the pdf.js worker; the index is assembled on the main thread, yielding every five pages (`search.ts:272`) |
 | `FR-14` | Match highlighting | `0.1`, counts `0.5` | done |
 | `FR-15` | Search controls | `0.1`, `0.5` | done — case, whole-word, next/previous, `Indexing {percent}%` |
-| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6` | **partial** — every widget type except a signature is browser-verified; `form.ts:120` classifies `/Sig`, but no fixture carries one, so its rendering is unproven. XFA now renders through `XfaLayer` (`xfa-sample.pdf`, see *0.6.0 — Mark*), and a document whose template pdf.js cannot lay out **fails to load** rather than showing a blank page, so `enableXfa` on by default carries that risk |
+| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6`; `/Sig` fixtures and signing `0.9` work | **partial** — `signature-sample.pdf` and `signature-signed-sample.pdf` now carry four `/FT /Sig` fields in three shapes, so the type `form.ts:120` classifies is finally in a file, and a drawn mark can be written into the field's appearance (see *Spike D*). Its display in a real viewer is measured and proven both ways (see *Signing shipped*): a file that already carries the marks paints all three boxes including the noRotate one, and a mark placed through the panel took the page's box from 0 to 856 ink pixels and stayed painted across a zoom step. XFA now renders through `XfaLayer` (`xfa-sample.pdf`, see *0.6.0 — Mark*), and a document whose template pdf.js cannot lay out **fails to load** rather than showing a blank page, so `enableXfa` on by default carries that risk |
 | `FR-17` | Form data sync | `0.1` | done |
-| `FR-18` | Annotations view and draw | `0.1` view, ink `0.5`; authoring `0.6` | **partial** — links and markup render, freehand ink draws and prints; authoring shipped in `0.6` as `annotateFeature` and, as measured, that means highlight, free text and ink — the engine cannot create or edit underline/strikeout/squiggly, and stamp and signature break the save (see *0.6.0 — Mark*) |
+| `FR-18` | Annotations view and draw | `0.1` view, ink `0.5`; authoring `0.6` | **partial** — links and markup render, freehand ink draws and prints; authoring shipped in `0.6` as `annotateFeature` and, as measured, that means highlight, free text and ink — the engine cannot create or edit underline/strikeout/squiggly, and stamp and signature break the save (see *0.6.0 — Mark*). A signature drawn through the **engine's** editor is still out; a mark written through the **writer** is in the `edit` tier (see *Spike D*) |
 | `FR-19` | High-fidelity printing | `0.1`, ranges `0.5` | done — iOS Safari is excluded by design, which `PRD` does not mention |
 | `FR-20` | Document download | `0.1` incremental, `0.7` flatten | **done in two tiers** — the default download is `doc.saveDocument()`, an incremental save that carries form values *and* `0.6`'s marks but leaves them interactive; a true flatten (appearance streams moved into page content, fields gone) lives behind the opt-in `edit` tier, which is the only path allowed a PDF writer. Measured on `form-sample.pdf`: 5,582 B / 11 widgets interactive against 6,202 B / 0 widgets with the value read back as page text |
 | `FR-21` | Opt-in feature registration | `0.4` | done |
 | `FR-22` | Per-feature stylesheets | `0.4`, two more in `0.5` | done |
-| `FR-23` | Enforced size boundary | `0.4` | done — a ratchet, and the per-feature 4 kB gate |
+| `FR-23` | Enforced size boundary | `0.4` | done — a ratchet, and the per-feature gate at 6 kB (4 kB until the signing work, 2026-09-27) |
 | `FR-24` | Optional-content layers | `0.5` | done |
 | `FR-25` | Embedded file list | `0.5` | done — both engine shapes, and annotation-held files save from the annotation |
 | `FR-26` | Replaceable find strategy | `0.5` | done |
@@ -193,7 +193,7 @@ Every requested feature, and the release that ships it.
 | Drag-and-drop loading | `0.2` done | off by default; `acceptDrop` gates it, `onDropFile` always fires |
 | Fullscreen | `0.2` done | webkit spellings covered, control hidden where unsupported |
 | Accessibility | `0.2`, `0.6` | keyboard done in `0.2` → annotation access in `0.6`. The full audit the row promised for `0.8` was not done there; it is a `1.0` item. |
-| Internationalization | `0.2`, `0.8` done | 134 strings behind one typed catalog; `de`, `es` and `fr` ship complete from `0.8` as `pdfjs-react-reader/locales/<lang>` |
+| Internationalization | `0.2`, `0.8` done | 144 strings behind one typed catalog; `de`, `es` and `fr` ship complete from `0.8` as `pdfjs-react-reader/locales/<lang>` |
 | Advanced JS API | `0.2`, `0.5`, `0.6` | handle + events done in `0.2` → find controller → popups |
 | Mobile optimization | `0.2`, `0.8` | gestures done in `0.2`; the real-device matrix is still open (`#141`) and cannot be run from this harness |
 | **Basic vs full bundle weight** | **`0.4` done** | opt-in features; core shell 22.97 kB gz bundled (the `0.5` line, post-close), each feature 0.71–2.49 kB over it |
@@ -1664,7 +1664,7 @@ sample spread, the composed thumbnail and the re-laid-out text layer), shell **5
 **26.82 → 27.13**. Over core: print 2.50, download 0.77, forms 1.92, outline 0.93, layers 1.20,
 attachments 1.10, annotate 1.87, **edit 3.58**; all eight **37.03 kB** (+12.25). Three new shipped files,
 `locales/{de,es,fr}.js`, at **2.18 / 2.19 / 2.19 kB** — separate entry points, so no path above moves
-because of them. The catalog is still **134** strings. **393 tests in 32 files**, up from 365 in 31. The
+because of them. The catalog is still **134** strings at that close; it is **144** after the signing work. **393 tests in 32 files**, up from 365 in 31. The
 baseline was re-accepted at the close, so every figure in README, the docs pages and this file is the
 committed number. Performance, re-measured on the 1,000-page fixture: reader-speed scroll p50 7.0 ms,
 max 14.1 ms, **zero** frames over 16.7; the 1,100 px/frame pass, which had peaked at 20.9 ms, now peaks
@@ -1677,10 +1677,162 @@ collections (`DEFAULT_LABELS`, `INK_COLORS`, `INK_WIDTHS`, `HIGHLIGHT_COLORS`, `
 therefore `1.0`'s to make. The three catalogs added here *are* frozen, since nothing could be relying on
 them yet.
 
+### Spike D (2026-09-27): a drawn mark can be written into a `/Sig` field, and `/V` is the line
+
+`PRD.md:32` put "drawing a signature and writing it into a `Sig` field's appearance stream" in scope
+on 2026-09-24, `ROADMAP.md`'s own policy section said the engine cannot sign and no release scheduled
+it, and the `1.0` GA condition audits only the §Where-we-are table — in which signing is not a row.
+That is how a promised feature sat unowned for three releases. Measured now, against a fixture
+written for the purpose, the writer already in the tree does it.
+
+* `@cantoo/pdf-lib` exports `PDFSignature`, so signature fields come back from the form API rather
+  than from scanning objects, and `field.acroField.dict` is public — which is where `/AP` goes. The
+  class is absent from the fork's barrel grep but present at runtime, so the check for it was made
+  against `import('@cantoo/pdf-lib')` rather than against `types/`.
+* Three shapes, all handled: the widget **is** the field (`sigPlain`); the field is a parent whose
+  `/Kids` name the widgets and the `/AP` belongs on the kid (`sigKid`, what Acrobat writes for a
+  form signed in more than one place); and a widget carrying `/F 20` (`sigNoRotate`). Reaching a
+  kid's field type means resolving an indirect reference through `context.lookup` — under
+  `/Kids` the entries are `PDFRef`s, so `parent instanceof PDFDict` is false and the first version
+  of that lookup quietly lost a field. The fixture's self-check caught it as "3 expected, 2 found".
+* **Appearances are written in page coordinates**, with `/BBox` set to the widget's own `/Rect`.
+  A path recorded in the same space needs no matrix and no translation — and that space is the one
+  `lib/ink.ts` has stored strokes in since `0.5`. Three marks cost 3,265 → 5,437 bytes.
+* One mark, several boxes: the mark is held **relative to its box** (0–1 across, y up) and scaled
+  per widget, so a field displayed twice at two sizes gets a signature that fits each. Asserted by
+  signing a 200×60 box and a 150×40 box with one mark and reading `82 681 m 262 699 l` out of one
+  appearance and `79.5 584 m 214.5 596 l` out of the other. The design before this one passed
+  page-space points and was wrong for any multi-box field; the panel's layout is what surfaced it,
+  which is the usual way a seam earns its test.
+* **`/V` is never written, and a field that already carries one is refused.** `/V` on a `/Sig` field
+  is a claim over the bytes — who signed, when, over what range — and dropping a picture into the
+  same box leaves the file still making a claim it no longer keeps, which every reader will report
+  as a broken document rather than as a signature. So `findSignatureFields` reports
+  `alreadySigned`, the panel does not offer that box at all, and `signFields` answers with
+  `refused` instead of a smaller success. Three tests hold the three halves.
+* What `0.7` built around the writer still holds over a signed file. `flatten()` moves the marks
+  into the page content and takes the form away (`fieldsRemoved: 5`, no `/FT /Sig`, three strokes
+  still present), and `arrangePages()` moves a page without losing a field or its appearance —
+  including the kid-shaped one, whose `/AP` stays on the kid and whose `/BBox` is the kid's box.
+* **The panel asks the engine before it asks the writer.** Listing the boxes parses the whole file, and
+  a document with no form should not pay that to learn there is nothing to sign — so the section reads
+  `getMetadata()` first and stops when neither `IsAcroFormPresent` nor `IsXFAPresent` is set, which is
+  one round trip instead of a parse of a thousand pages. A document that will not describe itself is
+  treated as unknown rather than as form-less, and gets the scan. `edit.signatures.test.tsx` asserts
+  the cheap path by watching `getData`: past the gate, the panel never asks for the bytes.
+* Nothing else in the form moves: the text field keeps its value, the widget count is unchanged,
+  and the number of `/V` in the file is exactly what it was.
+
+**A claim from earlier in this session did not survive re-measuring.** `SignatureWidgetAnnotation`
+sets `hasOwnCanvas = noRotate`, and an appearance on that path is painted into a separate canvas the
+application has to collect through `annotationCanvasMap` — which `PdfPage` passes as `null`. That was
+written up here as "a `/F 16` signature box shows nothing in our viewer". Re-running the probe, the
+engine reported `noRotate: false` **and** `hasOwnCanvas: false` for the box that declares `/F 20`, and
+the earlier reading had sampled a page-1 rectangle for a page-2 annotation — a probe bug, since
+corrected. So the caveat is unestablished in either direction, `noRotate` is reported as what the
+file says and nothing more, and wiring `annotationCanvasMap` through `PdfPage` stays untested rather
+than recorded as necessary.
+
+### Signing shipped, where it landed, and the requirement that governs it
+
+What `edit` now carries: `findSignatureFields`, `signFields`, `lib/signature.ts` (the geometry,
+free of both the writer and the DOM), a section in the Pages panel with a drawing pad and one row per
+box, ten catalog strings, and 35 tests across three files — `lib/signature.test.ts` 16, the
+`signatures` block in `lib/pdf-write.test.ts` 11, and `edit.signatures.test.tsx` 8. Measured on the build: core
+**24.77 → 24.96 kB** (+0.19 for the strings every tier carries — the catalog lives in the shell), and
+`edit` **3.58 → 5.72 kB over core**.
+
+The per-feature limit was 4 kB. Signing measured **4.73 kB with its interface removed**, so the writer
+pass and the geometry it needs breached the rule on their own, before any UI was counted, and
+`npm run size:update` could not answer it: the 4 kB is an assertion in `check-size.mjs`, not a line
+in `size-baseline.json`. The decision, taken 2026-09-27, is that **a full module is allowed to cost
+bytes and the requirement that does not move is behaviour under load.** The limit is now 6 kB, `PRD.md`
+§6 states which requirement is fixed and which is a ratchet, and the next tier that has to read the
+file it is showing inherits the room without another conversation. What did *not* change is the
+purpose of the number — to stop one capability swallowing the viewer — and 6 kB is still a quarter of
+the core rather than half of it.
+
+That decision is only defensible alongside the load work, so the load was measured too, on a
+thousand-page document carrying one signature field:
+
+| What the panel can ask for | Cost, on the main thread | What the shipped code does about it |
+| --- | --- | --- |
+| Open the Pages tab | 0 ms beyond one metadata round trip | The tab asks `getMetadata()`; a document that declares no form never reaches the writer, and a test asserts it by counting `getData` calls |
+| List the boxes in a form-bearing document | 150–200 ms to parse the file | Waits for a finished stroke — a deliberate act, with nothing animating — runs once per document, and says `Finding signature fields…` while it runs |
+| Sign one box | ~15 ms on a two-page form | One write, `isBusy` held across it, undo offered against the same snapshot an apply uses |
+| Apply, extract, split or flatten a thousand pages | ~1,080 ms for load, touch and save | Unavoidable and unchanged from `0.7`: which is exactly why a batch of page moves is a list of integers until Apply, so ten edits cost one pass |
+
+The last row is the one to be honest about: any writer pass on a very large document blocks the main
+thread for hundreds of milliseconds, in this tier and in `0.7`'s, because the parser is synchronous.
+The mitigation that exists today is that nothing takes that path without being asked. A worker holding
+the writer is the shape of the real fix, and it is not attempted here.
+
+**A defect the stress pass found, in shipped code rather than new code.** `flatten()` asks every
+widget for its appearance, and a signature box that was never signed has none — so
+`Unexpected N type: undefined` came back, reproduced on the two-page fixture, which means
+**Flatten threw on any form with an empty signature field**. That is not an edge case; an empty
+signature box is what an unsigned form looks like. `flattenBytes` now gives each appearance-less
+signature widget an empty form in its own box first, so the flatten has something to move into the
+page, finds nothing to draw, and removes the field like any other. A regression test covers it,
+including that no stray mark is invented for the box.
+
+**A claim from earlier in the same session was retracted, and the retraction is the record.**
+`SignatureWidgetAnnotation` sets `hasOwnCanvas = noRotate`, and an appearance on that path is painted
+into a separate canvas the application collects through `annotationCanvasMap` — which `PdfPage` passes
+as `null`. That was written up here as `a /F 16 signature box shows nothing in our viewer`. Re-measured,
+the engine reported `noRotate: false` and `hasOwnCanvas: false` for the box that declares `/F 20`, and
+the original pixel reading had sampled a page-1 rectangle for a page-2 annotation: a probe bug, not an
+engine behaviour. So whether a real document can put a signature on the own-canvas path is
+**untested** — a document would have to reach that path before `annotationCanvasMap` became our
+problem, and the one `/F 20` box we can build is drawn into the page canvas by `getAnnotations`, which
+reports `hasOwnCanvas: false` and `noHTML: true` for it. `#144` has since been measured and closed; it
+asked whether the appearance paints at all, and it does.
+
+**The browser pass found a second thing, in the panel's wording rather than in the file.** Three of the
+four boxes came up labelled *Already signed*, including two that hold an appearance stream which draws
+nothing — `AP_KID` and `AP_NOROTATE` are empty on purpose, to prove that a mark can only have arrived
+from a write. The meta line was reading `hasAppearance`, while the refusal and the disabled control read
+`alreadySigned`, so the panel asserted a fact the file did not hold about boxes it was simultaneously
+offering to sign. The meta now reads from `/V` like everything else, and the test that had locked the
+old behaviour in says so. `hasAppearance` stays on the published field data for a host that wants the
+weaker question answered.
+
 ### 1.0.0 — GA
 Every row of the §Where we are table — all `FR-01`–`FR-28`, where that claim used to stop at `FR-23` —
 genuinely green or documented as an explicit exclusion, the `PRD.md:22` performance bar measured on a
 document large enough to mean it, and strict semver from then on.
+
+Five things joined that list from the review of the documents against the code and from the signing work
+it led to. Four are still open; the fifth, `#144`, was closed by measuring rather than by coding:
+
+* **`#124`** — whether the core's freehand ink is retired now that `annotate`'s ink is the one that
+  saves. The owner's call, still unanswered.
+* **`#141`** — the real-device matrix, which cannot be run from this harness. Either a Safari and an
+  Android pass happen or the device claim comes out of `README.md` and `PRD.md:22`.
+* **`#143`** — the accessibility audit, moved here from the `0.8` row that promised it. It has a named
+  item now: `PdfPage` passes `structTreeLayer: null` in two places, so the tagged-PDF structure the
+  `PRD.md:289` NFR asks screen readers to be given is declined in code, not merely unaudited.
+* **`#144`** — **closed by measuring, both halves.** A written appearance paints in our viewer, and so
+  does a written *in-session* one. Loading `signature-signed-sample.pdf` showed each of the three marks
+  inside its own box — the 200 × 60, the 150 × 40 and the `/F 20` box on page two — against nothing in
+  any box for the unsigned file, with the refused box showing only its own band. Then the panel itself
+  was driven in the browser: the page's signature box went from **0 to 856 ink pixels** on the Sign
+  click, stayed through a zoom step in and back (867 at the larger canvas, 645 at the restored one),
+  while the box that holds a `/V` kept its band and took no mark. So the appearance format is right,
+  the no-rotate flag does not cost us the display, and `annotationCanvasMap` is not needed for it — the
+  retraction above stands.
+  **The measurement was wrong before it was right, and that is the part to keep.** An earlier pass
+  counted pixels of the fixture's navy stroke (`0.05 0.08 0.2 RG`) and read the in-session box as empty,
+  which was recorded here as a repaint defect. It was not one: `signatureContent` draws in **black**, so
+  a navy filter cannot see the product's own mark, and the "10 pixels, then 0" that looked like a lost
+  repaint was the same mistake twice. The fix was to stop naming a colour at all — hash the box region
+  and count dark pixels before and after, which reports a change whatever the writer chose to draw with.
+  The ticket filed from that bad reading is withdrawn as a measurement artifact — deliberately without a
+  number here, because `#146` below already names the damaged- and encrypted-document tests, and this
+  file has carried two collisions from treating a session's task ids as durable references.
+* **`#145`/`#146`** — two claims the documents make that nothing re-checks: React 18 (no CI job
+  installs it; `README.md:137` and `CHANGELOG.md:911` say it was verified) and the damaged- and
+  encrypted-document tests `PRD.md:319` promises. Either they are tested or the sentences change.
 
 ## Opened by the 0.4 review
 
@@ -1755,9 +1907,15 @@ a hybrid that also carries `/Fields`. What none of them produce is a field that 
 the input a `fieldid` and no `dataId`, so `XfaLayer.setupStorage` never attaches and `#127`'s edit half is
 still open.
 
-Still needed: a signature-bearing form (a `/Sig` field — the reason `FR-16` stays *partial* above), and an
-XFA packet whose fields reach the datasets with a `dataId`, which is the only way to answer whether a
-reader's keystroke in a LiveCycle form can be saved. Built at the `0.7` close: `long-sample.pdf`
+Built since, for the signing work: `signature-sample.pdf` (`scripts/make-signature-pdf.mjs`) — four
+`/FT /Sig` fields in the three shapes files arrive in, one of them carrying a `/V` so the refusal case
+has a fixture, and one with no appearance at all so "a mark appeared" can only mean "we wrote it";
+and `signature-signed-sample.pdf`, the same document with marks in the three unsigned boxes — both
+written by that one script, the second from the same widget-resolution and `/BBox` rules `signFields`
+follows, which is what the display question has to be measured against.
+
+Still needed: an XFA packet whose fields reach the datasets with a `dataId`, which is the only way to
+answer whether a reader's keystroke in a LiveCycle form can be saved. Built at the `0.7` close: `long-sample.pdf`
 (`scripts/make-long-pdf.mjs`), 1,000 pages in a nested tree with three cycling page boxes, which is what
 the `PRD.md:22` bar has now been measured against. These should come from generator scripts like the
 existing `scripts/make-*-pdf.mjs`, not downloads.

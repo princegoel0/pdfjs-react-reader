@@ -19,10 +19,67 @@
  * rule this module obeys: a page move is a permutation of the page tree, never
  * `removePage()` followed by `insertPage()`, because removal deletes the object.
  */
-import { PDFArray, PDFDict, PDFDocument, PDFName, degrees } from '@cantoo/pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFObject, PDFSignature, degrees } from '@cantoo/pdf-lib';
+import { boxToPage, isSignable, signatureContent } from './signature';
+import type { BoxPoint, PageRect, SignatureStyle } from './signature';
 
 /** The bytes the viewer is showing, with whatever the reader has already changed. */
 export type PdfBytes = Uint8Array;
+
+/** One signature field, or one widget of one, as the file declares it. */
+export interface PdfSignatureField {
+  /** The field's name, which is how a mark is addressed back to it. */
+  name: string;
+  /**
+   * Which page holds the widget, 0-based, or `null` when the file lists the widget nowhere
+   * it can be found — a widget with no `/P` and no page that names it, which happens.
+   */
+  page: number | null;
+  /** `/Rect` in PDF user space: `[x0, y0, x1, y1]`, y up. */
+  rect: PageRect;
+  /**
+   * Whether the widget's dictionary carries the spec's `NoRotate` bit, reported as what the
+   * file says and nothing more.
+   *
+   * It was expected to matter: `SignatureWidgetAnnotation` sets `hasOwnCanvas = noRotate`, and
+   * an appearance on that path is rendered into a separate canvas the application has to
+   * collect through `annotationCanvasMap`, which `PdfPage` passes as `null`. Measured against
+   * the box in `signature-sample.pdf` that declares `/F 20`, pdf.js reported both `noRotate`
+   * and `hasOwnCanvas` false and the mark painted like the others — so the own-canvas route
+   * was never reached, and whether it can be is untested. Do not build on either reading.
+   */
+  noRotate: boolean;
+  /** False for a field no one has ever drawn in — which is the usual case. */
+  hasAppearance: boolean;
+  /**
+   * Whether the field holds a `/V`, which on a `/Sig` field is a signature value: the bytes
+   * of who signed, when, and over what range. `signFields` refuses these, because drawing a
+   * mark over one leaves a document that still claims to be cryptographically signed and no
+   * longer is.
+   */
+  alreadySigned: boolean;
+}
+
+/** A mark to write: which field, and the path in that page's user space. */
+export interface PdfSignatureMark {
+  field: string;
+  /**
+   * The mark relative to its box, 0–1 with y up — which is what `padToBox` gives back.
+   *
+   * Relative rather than absolute because a field may be displayed in more than one box, and
+   * each of them gets the same mark scaled to fit it.
+   */
+  points: BoxPoint[];
+  style?: SignatureStyle;
+}
+
+export interface PdfSignResult {
+  bytes: PdfBytes;
+  /** Each widget that received a mark, so a field signed in two places is reported twice. */
+  signed: string[];
+  /** Marks the file holds no field for. Nothing is written for these, and nothing pretends otherwise. */
+  refused: string[];
+}
 
 export interface PdfPageArrangement {
   /**
@@ -71,15 +128,59 @@ export interface PdfFlattenResult {
  * `PDFDocument` loses the `AcroForm`, and flattening the result removes nothing at all.
  */
 export async function flattenBytes(bytes: PdfBytes): Promise<PdfFlattenResult> {
-  const doc = await PDFDocument.load(toArrayBuffer(bytes), { ignoreEncryption: true });
+  const doc = await loadForWriting(bytes);
   const fields = doc.getForm().getFields();
   const fieldsRemoved = fields.length;
   /* An empty form is a real answer, not a failure: a document with no fields has
      nothing to flatten, and the caller deciding "flatten before printing" deserves to
      know the file was already flat rather than getting a silently unchanged copy. */
-  if (fieldsRemoved > 0) doc.getForm().flatten();
+  if (fieldsRemoved > 0) {
+    giveUnsignedSignatureWidgetsAnAppearance(doc);
+    doc.getForm().flatten();
+  }
   const out = await doc.save({ useObjectStreams: false });
   return { bytes: out, fieldsRemoved, hadNoForm: fieldsRemoved === 0 };
+}
+
+/*
+ * A signature box that was never signed has no appearance, and the writer's flatten
+ * asks every widget for one: `findWidgetAppearanceRef` reaches `getNormalAppearance`,
+ * finds no `/N`, and throws `Unexpected N type: undefined`. Measured on
+ * `signature-sample.pdf`, which means **flattening any form with an ordinary empty
+ * signature field fails** — not an edge case, since a blank signature box is what an
+ * unsigned document looks like. Text and choice fields are unaffected because the
+ * writer can compose an appearance for those from the value and the default style.
+ *
+ * So each signature widget that has no `/N` is given one: an empty form in its own box.
+ * The flatten then has something to move into the page, finds nothing to draw, and the
+ * field is removed like any other — which is the right outcome, because an unsigned
+ * box is not content and the reader asked for the interactivity to go.
+ */
+function giveUnsignedSignatureWidgetsAnAppearance(doc: PDFDocument): void {
+  for (const field of doc.getForm().getFields()) {
+    if (!(field instanceof PDFSignature)) continue;
+    for (const widget of signatureWidgets(doc, field)) {
+      if (hasNormalAppearance(doc, widget)) continue;
+      const rect = rectOf(doc, widget) ?? [0, 0, 0, 0];
+      const empty = doc.context.register(
+        doc.context.stream('', {
+          Type: 'XObject',
+          Subtype: 'Form',
+          BBox: doc.context.obj([...rect]),
+          Resources: {},
+        }),
+      );
+      widget.set(PDFName.of('AP'), doc.context.obj({ N: empty }));
+    }
+  }
+}
+
+/**
+ * Every writer pass in this module starts here, so the one flag that decides whether an
+ * encrypted file is readable at all is stated once rather than per function.
+ */
+async function loadForWriting(bytes: PdfBytes): Promise<PDFDocument> {
+  return PDFDocument.load(toArrayBuffer(bytes), { ignoreEncryption: true });
 }
 
 /** `pdf-lib` will not accept a `Uint8Array` view that is offset into a larger buffer. */
@@ -101,7 +202,7 @@ export async function arrangePages(
   bytes: PdfBytes,
   arrangement: PdfPageArrangement,
 ): Promise<PdfArrangeResult> {
-  const doc = await PDFDocument.load(toArrayBuffer(bytes), { ignoreEncryption: true });
+  const doc = await loadForWriting(bytes);
   const total = doc.getPageCount();
   const order = arrangement.order;
   if (order.length === 0) throw new Error('a PDF must keep at least one page');
@@ -181,4 +282,174 @@ function normaliseAngle(angle: number): number {
     throw new Error(`a page rotation must be a multiple of 90 degrees, got ${angle}`);
   }
   return normalised;
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * Signatures
+ * ---------------------------------------------------------------------------
+ *
+ * The PRD's in-scope half of signing is a drawn mark written into a `/Sig` field's
+ * appearance stream, and that is exactly what these two functions do. What they
+ * deliberately do not do is sign anything: no `/V` value is ever written, because a
+ * `/V` on a `/Sig` field is a cryptographic claim, and every reader that sees one
+ * without a matching `/ByteRange` will tell the user the signature is invalid. The
+ * mark is a picture of a signature, in the same sense a stamp is, and the docs say so.
+ *
+ * Two shapes have to be handled because files arrive both ways: the field *is* the
+ * widget annotation, and the field is a parent whose `/Kids` name the widgets. The
+ * second is what Acrobat writes for a form signed in more than one place, and the
+ * appearance belongs on the kid, not on the parent.
+ */
+
+/** Every widget dictionary in the file mapped to the page that lists it in `/Annots`. */
+function annotOwners(doc: PDFDocument): Map<PDFDict, number> {
+  const owners = new Map<PDFDict, number>();
+  doc.getPages().forEach((page, index) => {
+    const raw = page.node.get(PDFName.of('Annots'));
+    if (!raw) return;
+    const list = doc.context.lookup(raw, PDFArray);
+    for (const entry of list?.asArray() ?? []) {
+      const dict = doc.context.lookup(entry, PDFDict);
+      if (dict) owners.set(dict, index);
+    }
+  });
+  return owners;
+}
+
+/** The widget dictionaries of one signature field, in the shape the file uses. */
+function signatureWidgets(doc: PDFDocument, field: PDFSignature): PDFDict[] {
+  const dict = field.acroField.dict;
+  const kids = dict.get(PDFName.of('Kids'));
+  if (!kids) return [dict];
+  const list = doc.context.lookup(kids, PDFArray);
+  const widgets: PDFDict[] = [];
+  for (const entry of list?.asArray() ?? []) {
+    const kid = doc.context.lookup(entry, PDFDict);
+    if (kid) widgets.push(kid);
+  }
+  // A parent whose /Kids resolves to nothing has no box to draw in; the parent itself is
+  // then the annotation, which is the first shape rather than a failure.
+  return widgets.length ? widgets : [dict];
+}
+
+function rectOf(doc: PDFDocument, widget: PDFDict): PageRect | null {
+  const raw = widget.get(PDFName.of('Rect'));
+  const list = raw ? doc.context.lookup(raw, PDFArray) : undefined;
+  if (!list || list.size() < 4) return null;
+  const numbers = list.asArray().map((n) => Number(String(n)));
+  if (numbers.some((n) => !Number.isFinite(n))) return null;
+  return [numbers[0]!, numbers[1]!, numbers[2]!, numbers[3]!];
+}
+
+/** A number a dictionary holds, whether it sits there directly or behind a reference. */
+function numberOf(doc: PDFDocument, raw: PDFObject | undefined): number {
+  if (!raw) return 0;
+  const value = Number(String(doc.context.lookup(raw)));
+  return Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * Whether a signature value is present, on the widget or on the field behind it — the spec
+ * allows `/V` on either, and a file that puts it on one is not obliged to repeat it on the
+ * other.
+ */
+function hasSignatureValue(doc: PDFDocument, field: PDFSignature, widget: PDFDict): boolean {
+  if (widget.get(PDFName.of('V'))) return true;
+  const parent = field.acroField.dict.get(PDFName.of('Parent'));
+  if (parent && doc.context.lookup(parent, PDFDict)?.get(PDFName.of('V'))) return true;
+  return Boolean(field.acroField.dict.get(PDFName.of('V')));
+}
+
+/** Whether the widget already carries the appearance a viewer would paint. */
+function hasNormalAppearance(doc: PDFDocument, widget: PDFDict): boolean {
+  const raw = widget.get(PDFName.of('AP'));
+  if (!raw) return false;
+  // `/N` is a stream for most fields and a dictionary of states for a button; either
+  // counts, because the question this answers is "is there something in this box".
+  return Boolean(doc.context.lookup(raw, PDFDict)?.get(PDFName.of('N')));
+}
+
+/**
+ * Where a reader could sign this document.
+ *
+ * Returned in file order, and once per widget: a field that is signed in two places
+ * appears twice, because those are two boxes the reader has to see and choose between.
+ *
+ * A field with no `/Rect`, or one whose four numbers do not add up, is left out rather than
+ * reported with a zero box: there is no mark that could be placed in it.
+ */
+export async function findSignatureFields(bytes: PdfBytes): Promise<PdfSignatureField[]> {
+  const doc = await loadForWriting(bytes);
+  const owners = annotOwners(doc);
+  const out: PdfSignatureField[] = [];
+  for (const field of doc.getForm().getFields()) {
+    if (!(field instanceof PDFSignature)) continue;
+    const name = field.getName();
+    for (const widget of signatureWidgets(doc, field)) {
+      const rect = rectOf(doc, widget);
+      if (!rect) continue;
+      out.push({
+        name,
+        page: owners.get(widget) ?? null,
+        rect,
+        // The spec's NoRotate bit, and the only annotation flag that changes how this renders.
+        noRotate: (numberOf(doc, widget.get(PDFName.of('F'))) & 0x10) !== 0,
+        hasAppearance: hasNormalAppearance(doc, widget),
+        alreadySigned: hasSignatureValue(doc, field, widget),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Write a drawn mark into the named signature fields and return the new file.
+ *
+ * The appearance is written in page coordinates, with `/BBox` set to the widget's own
+ * `/Rect`, which is what lets a path recorded in the same space be written without any
+ * translation — and it is the same space `lib/ink.ts` already stores strokes in.
+ *
+ * A mark whose field is not in the file is refused rather than dropped quietly, and a
+ * request that writes nothing does not re-save the document: the bytes that come back
+ * are then the bytes that went in.
+ */
+export async function signFields(bytes: PdfBytes, marks: PdfSignatureMark[]): Promise<PdfSignResult> {
+  const wanted = marks.filter((mark) => isSignable(mark.points));
+  const doc = await loadForWriting(bytes);
+  const fields = doc
+    .getForm()
+    .getFields()
+    .filter((field): field is PDFSignature => field instanceof PDFSignature);
+
+  const signed: string[] = [];
+  const written = new Set<string>();
+  for (const mark of wanted) {
+    const field = fields.find((candidate) => candidate.getName() === mark.field);
+    // Refused rather than overwritten: a `/V` is somebody's claim about the document, and a
+    // picture drawn into the same box makes that claim false without saying so.
+    if (!field || hasSignatureValue(doc, field, field.acroField.dict)) continue;
+    written.add(mark.field);
+    for (const widget of signatureWidgets(doc, field)) {
+      const rect = rectOf(doc, widget);
+      if (!rect) continue;
+      const content = signatureContent(boxToPage(mark.points, rect), mark.style);
+      // A box with no area has nowhere to put a mark, and an empty stream would be a
+      // field that looks signed and paints nothing.
+      if (!content) continue;
+      const stream = doc.context.stream(content, {
+        Type: 'XObject',
+        Subtype: 'Form',
+        // Page coordinates, so the mark arrives where the form's author drew the box.
+        BBox: doc.context.obj([...rect]),
+        Resources: {},
+      });
+      widget.set(PDFName.of('AP'), doc.context.obj({ N: doc.context.register(stream) }));
+      signed.push(mark.field);
+    }
+  }
+
+  const refused = marks.filter((mark) => !written.has(mark.field)).map((mark) => mark.field);
+  if (!signed.length) return { bytes, signed, refused };
+  return { bytes: await doc.save({ useObjectStreams: false }), signed, refused };
 }

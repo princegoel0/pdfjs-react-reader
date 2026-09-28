@@ -57,7 +57,7 @@ export function Api() {
               <code>pdfjs-react-reader/locales/&lt;lang&gt;</code>
             </td>
             <td>
-              A complete label catalog: <code>de</code>, <code>es</code>, <code>fr</code>. 2.18 kB gzipped
+              A complete label catalog: <code>de</code>, <code>es</code>, <code>fr</code>. 2.37–2.39 kB gzipped
               each, frozen, and typed as the whole catalog rather than the partial a host may send.
             </td>
           </tr>

@@ -234,21 +234,57 @@ export function Introduction() {
       <p>
         All eight together cost less than their sum, because each is measured against the same core they
         attach to. The two shipped-file paths are what a bundler that cannot tree-shake pays for the
-        whole entry surface: <strong>52.61 kB</strong> for <code>index.js</code> and{' '}
-        <strong>27.10 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
-        <code>edit.js</code> is its own 5.39 kB, and it is the only shipped file that imports the writer.
+        whole entry surface: <strong>52.78 kB</strong> for <code>index.js</code> and{' '}
+        <strong>27.13 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
+        <code>edit.js</code> is its own 8.58 kB, and it is the only shipped file that imports the writer.
         For scale, <code>pdfjs-dist</code> gzips to 128.6 kB on the main thread and 366.5 kB in its
         worker, and <code>@cantoo/pdf-lib</code> to 245.5 kB.
       </p>
       <p>
-        Measured on 0.8.0. CI runs <code>npm run size</code>, which compares every path against the
-        numbers committed in <code>size-baseline.json</code> and fails on growth beyond 2&nbsp;%
-        (+256&nbsp;B of slack for minifier jitter), and fails on its own if any single feature costs
-        more than 4&nbsp;kB over core. It is a ratchet rather than a ceiling: a library that grows
-        with features cannot honestly promise a fixed size, so what the gate protects is the process —
-        accepting growth means running <code>npm run size:update</code>, which puts the new number in
-        the same diff as the code that caused it.
+        Measured on the signing build. CI runs <code>npm run size</code>, which compares every path
+        against the numbers committed in <code>size-baseline.json</code> and fails on growth beyond
+        2&nbsp;% (+256&nbsp;B of slack for minifier jitter), and fails on its own if any single feature
+        costs more than <strong>6&nbsp;kB</strong> over core. Bytes are a ratchet rather than a
+        ceiling: a library that grows with features cannot honestly promise a fixed size, so what the
+        gate protects is the process — accepting growth means running <code>npm run size:update</code>,
+        which puts the new number in the same diff as the code that caused it. That limit was
+        4&nbsp;kB until signing, which measured 4.73&nbsp;kB for the writer pass and its geometry
+        alone, before any interface: the number moved because the requirement that does not move is
+        what a feature costs a reader&rsquo;s machine, not what it weighs.
       </p>
+
+      <h2>Behaviour under load</h2>
+      <p>
+        Size negotiates; this does not. Every figure is measured against{' '}
+        <code>long-sample.pdf</code> — a thousand pages, a nested page tree, three page sizes cycling
+        so no single estimate flatters it — in Chromium on one Windows machine, which is the honest
+        limit of the evidence.
+      </p>
+      <ul>
+        <li>
+          <strong>Scrolling a thousand pages drops no frames:</strong> p50 7.0&nbsp;ms, max 14.1&nbsp;ms,
+          none over 16.7&nbsp;ms at reader speed; a faster 1,100&nbsp;px/frame pass peaks at 14.0&nbsp;ms
+          with the same result. Two to four page canvases are live at any moment, and a row that leaves
+          the viewport has its buffer released.
+        </li>
+        <li>
+          <strong>A cold page paints in 38–55&nbsp;ms</strong> wherever it is in the document, and a zoom
+          step re-lays out the text layer instead of rebuilding it — 39.8&nbsp;ms per page per step became
+          1.0&nbsp;ms.
+        </li>
+        <li>
+          <strong>An expensive question is asked when it is needed, not when it is mounted.</strong>{' '}
+          Reading a document to find its signature fields costs 150–200&nbsp;ms of main thread on a
+          thousand-page file that declares a form, and 0&nbsp;ms on one that does not: the panel asks the
+          engine that cheap question on open, and parses the file only once there is a mark to place.
+          The parse runs once per document and says what it is doing while it runs.
+        </li>
+        <li>
+          <strong>Writes are deliberate, so a batch costs one pass.</strong> Ten page moves are ten edits
+          to a list of integers and one writer pass at Apply — which is also why undo costs nothing
+          until a file is actually written.
+        </li>
+      </ul>
 
       <h2>Accessibility</h2>
       <p>

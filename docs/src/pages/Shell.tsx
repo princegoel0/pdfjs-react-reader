@@ -189,7 +189,7 @@ export function Viewer() {
 
       <h2>Labels</h2>
       <p>
-        Every string in the shell — 134 of them, from <code>aria-label</code>s to the
+        Every string in the shell — 144 of them, from <code>aria-label</code>s to the
         “3 of 416 · p12” counter — lives in one typed catalog with an English default. Pass a partial
         object and only the keys you name change:
       </p>

@@ -29,7 +29,7 @@ export function Compatibility() {
             <td>
               <code>^6.2.108</code>
             </td>
-            <td>6.3.289</td>
+            <td>6.3.289, in CI</td>
             <td>
               The engine. Rendering, text, annotations, editing and printing all go straight to it.
             </td>
@@ -41,7 +41,7 @@ export function Compatibility() {
             <td>
               <code>^18.0.0 || ^19.0.0</code>
             </td>
-            <td>18.3.1, 19.3.0</td>
+            <td>19.3.0, in CI; 18.3.1 verified at 0.1, not re-run</td>
             <td>
               Hooks and JSX runtime. Needs <code>useId</code>, so 18.0 is the floor.
             </td>
@@ -53,7 +53,7 @@ export function Compatibility() {
             <td>
               <code>^18.0.0 || ^19.0.0</code>
             </td>
-            <td>18.3.1, 19.3.0</td>
+            <td>19.3.0, in CI; 18.3.1 verified at 0.1, not re-run</td>
             <td>DOM rendering for the shell and the annotation layer.</td>
           </tr>
           <tr>
@@ -295,62 +295,62 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>24.77 kB</td>
+            <td>24.96 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>27.28 kB</td>
+            <td>27.46 kB</td>
             <td>+2.50 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>25.55 kB</td>
-            <td>+0.78 kB</td>
+            <td>25.72 kB</td>
+            <td>+0.76 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>26.69 kB</td>
-            <td>+1.92 kB</td>
+            <td>26.87 kB</td>
+            <td>+1.91 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>25.71 kB</td>
+            <td>25.89 kB</td>
             <td>+0.93 kB</td>
           </tr>
           <tr>
             <td>Core + layers</td>
-            <td>25.98 kB</td>
-            <td>+1.21 kB</td>
+            <td>26.16 kB</td>
+            <td>+1.20 kB</td>
           </tr>
           <tr>
             <td>Core + attachments</td>
             <td>25.88 kB</td>
-            <td>+1.10 kB</td>
+            <td>+1.08 kB</td>
           </tr>
           <tr>
             <td>Core + annotate</td>
-            <td>26.64 kB</td>
-            <td>+1.86 kB</td>
+            <td>26.82 kB</td>
+            <td>+1.85 kB</td>
           </tr>
           <tr>
             <td>Core + edit</td>
-            <td>28.35 kB</td>
-            <td>+3.58 kB</td>
+            <td>30.68 kB</td>
+            <td>+5.72 kB</td>
           </tr>
           <tr>
             <td>All eight features</td>
-            <td>37.03 kB</td>
-            <td>+12.25 kB</td>
+            <td>39.41 kB</td>
+            <td>+14.44 kB</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>52.61 kB</td>
+            <td>52.78 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>27.10 kB</td>
+            <td>27.13 kB</td>
             <td>—</td>
           </tr>
           <tr>

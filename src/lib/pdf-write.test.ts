@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { arrangePages, flattenBytes } from './pdf-write';
+import { arrangePages, findSignatureFields, flattenBytes, signFields } from './pdf-write';
 
 const fixture = (name: string): Uint8Array =>
   new Uint8Array(readFileSync(fileURLToPath(new URL(`../../playground/fixtures/${name}`, import.meta.url))));
@@ -31,6 +31,16 @@ const dictOf = (hay: string, num: number): string => {
 };
 /** `page-order-sample.pdf` prints its own object number, and this is that mapping. */
 const objectOfPage = (page: number): number => 200 + ((page * 7) % 20);
+
+/*
+ * A mark relative to its box, which is the shape `signFields` takes: one mark, scaled to
+ * whatever box it lands in. In `sigPlain`'s [72 660 272 720] these become `82 681` and
+ * `262 699`, and one test reads those page coordinates back out of the bytes.
+ */
+const MARK = [
+  { x: 0.05, y: 0.35 },
+  { x: 0.95, y: 0.65 },
+];
 const identityOrder = (length: number): number[] => Array.from({ length }, (_, i) => i);
 
 describe('flattenBytes', () => {
@@ -205,3 +215,223 @@ describe('arrangePages', () => {
     expect(kidsOf(out)[0]).toBe(objectOfPage(20));
   });
 });
+
+/*
+ * The signature half of the writer, measured against `signature-sample.pdf` — a form whose
+ * three `/Sig` fields are the three shapes a reader's file arrives in, and which starts with
+ * one of them carrying no appearance at all. That last detail is what makes the second test
+ * below mean something: with no `/AP` in the source file, a mark found afterwards can only
+ * have come from `signFields`.
+ */
+describe('signatures', () => {
+  /** The object that declares a field name, which is where its `/AP` or its `/Kids` lives. */
+  const objectOf = (hay: string, name: string): string => {
+    const at = hay.indexOf(`(${name})`);
+    if (at < 0) return '';
+    const start = hay.lastIndexOf(' obj', at);
+    return hay.slice(start, hay.indexOf('endobj', at));
+  };
+  const objectNumbered = (hay: string, num: number): string => {
+    const start = hay.indexOf(`\n${num} 0 obj`);
+    return start < 0 ? '' : hay.slice(start, hay.indexOf('endobj', start));
+  };
+
+  it('lists every signature widget with the box and the page the file gives it', async () => {
+    const fields = await findSignatureFields(fixture('signature-sample.pdf'));
+    expect(fields.map((f) => f.name)).toEqual([
+      'sigPlain',
+      'sigKid',
+      'sigNoRotate',
+      'sigAlreadySigned',
+    ]);
+    expect(fields.map((f) => f.page)).toEqual([0, 0, 1, 1]);
+    expect(fields.map((f) => f.rect)).toEqual([
+      [72, 660, 272, 720],
+      [72, 570, 222, 610],
+      [72, 660, 272, 720],
+      [72, 560, 272, 620],
+    ]);
+    // The fixture gives only sigPlain an empty start: the other three already carry a /AP.
+    expect(fields.map((f) => f.hasAppearance)).toEqual([false, true, true, true]);
+    expect(fields.map((f) => f.noRotate)).toEqual([false, false, true, false]);
+    // One field arrives with a signature value, and it is the only one that does.
+    expect(fields.map((f) => f.alreadySigned)).toEqual([false, false, false, true]);
+  });
+
+  it('writes the marks and leaves the fields unsigned', async () => {
+    const source = fixture('signature-sample.pdf');
+    const fields = await findSignatureFields(source);
+    const result = await signFields(
+      source,
+      fields.map((field) => ({ field: field.name, points: MARK })),
+    );
+    const out = text(result.bytes);
+
+    expect(result.signed).toEqual(['sigPlain', 'sigKid', 'sigNoRotate']);
+    // Asked for four, written into three: the signed field is the one refused, and the
+    // answer names it rather than reporting a smaller success.
+    expect(result.refused).toEqual(['sigAlreadySigned']);
+    expect(out.startsWith('%PDF-')).toBe(true);
+    expect(count(out, 'S Q')).toBe(3);
+    expect(count(out, '/FT /Sig')).toBe(4);
+    // One mark, two boxes, two different sets of page coordinates — the difference between
+    // storing a mark relative to its box and storing it in one rectangle's space.
+    expect(out).toContain('82 681 m 262 699 l');
+    expect(out).toContain('79.5 584 m 214.5 596 l');
+    // A `/V` on a `/Sig` field is a cryptographic claim, and every reader that sees one
+    // without a matching `/ByteRange` calls the document damaged. So the count of `/V` in
+    // the file has to be exactly what it was: the text field's value, and nothing else.
+    expect(count(out, '/V ')).toBe(count(text(source), '/V '));
+    for (const field of await findSignatureFields(result.bytes)) {
+      expect(field.hasAppearance, field.name).toBe(true);
+    }
+  });
+
+  it('puts the appearance on the widget kid, never on the parent field', async () => {
+    const source = fixture('signature-sample.pdf');
+    const target = (await findSignatureFields(source)).find((f) => f.name === 'sigKid')!;
+    const { bytes } = await signFields(source, [{ field: 'sigKid', points: MARK }]);
+    const out = text(bytes);
+
+    expect(objectOf(out, 'sigKid')).toContain('/Kids');
+    expect(objectOf(out, 'sigKid')).not.toContain('/AP');
+    expect(objectNumbered(out, 13)).toContain('/AP');
+  });
+
+  it('refuses a field the document does not hold and returns the bytes it was given', async () => {
+    const source = fixture('signature-sample.pdf');
+    const result = await signFields(source, [{ field: 'noSuchField', points: MARK }]);
+    expect(result.signed).toEqual([]);
+    expect(result.refused).toEqual(['noSuchField']);
+    expect(result.bytes).toBe(source);
+  });
+
+  /*
+   * The refusal that matters most: a `/V` on a `/Sig` field is a claim over the bytes — who
+    signed, when, over what range. Covering it with a picture leaves the file still claiming
+    to be signed, and nothing in it says the claim is now false.
+   */
+  it('will not draw over a field that already holds a signature value', async () => {
+    const source = fixture('signature-sample.pdf');
+    const fields = await findSignatureFields(source);
+    const signed = fields.find((f) => f.alreadySigned)!;
+    const result = await signFields(source, [{ field: signed.name, points: MARK }]);
+
+    expect(signed.name).toBe('sigAlreadySigned');
+    expect(result.signed).toEqual([]);
+    expect(result.refused).toEqual(['sigAlreadySigned']);
+    expect(result.bytes).toBe(source);
+    // And the claim itself is untouched, so a validator still reads what it did before.
+    expect(objectOf(text(result.bytes), 'sigAlreadySigned')).toContain('/V << /Type /Sig');
+  });
+
+  it('writes nothing for a mark too short to be a signature', async () => {
+    const source = fixture('signature-sample.pdf');
+    const result = await signFields(source, [{ field: 'sigPlain', points: [MARK[0]!] }]);
+    expect(result.signed).toEqual([]);
+    // `refused` means "nothing was written for this", which covers a path with no line in it
+    // as well as a field the file does not hold — one answer, because the caller's action is
+    // the same either way: say so, rather than report a signature that is not in the file.
+    expect(result.refused).toEqual(['sigPlain']);
+    expect(result.bytes).toBe(source);
+  });
+
+  it('tells the truth about a document that cannot be signed anywhere', async () => {
+    const source = fixture('form-sample.pdf');
+    expect(await findSignatureFields(source)).toEqual([]);
+    const result = await signFields(source, [{ field: 'fullName', points: MARK }]);
+    expect(result.refused).toEqual(['fullName']);
+    expect(result.bytes).toBe(source);
+  });
+
+  it('keeps the rest of the form alone while signing', async () => {
+    const source = fixture('signature-sample.pdf');
+    const target = (await findSignatureFields(source))[0]!;
+    const { bytes } = await signFields(source, [
+      { field: 'sigPlain', points: MARK },
+    ]);
+    const out = text(bytes);
+    expect(out).toContain('/V (Q3 report)');
+    expect(count(out, '/Subtype /Widget')).toBe(count(text(source), '/Subtype /Widget'));
+  });
+
+  it('flattens a signed field into the page without losing the mark', async () => {
+    const source = fixture('signature-sample.pdf');
+    const fields = await findSignatureFields(source);
+    const { bytes } = await signFields(
+      source,
+      fields.map((field) => ({ field: field.name, points: MARK })),
+    );
+    const flat = await flattenBytes(bytes);
+    const out = text(flat.bytes);
+
+    // The form is gone — that is what a flatten is — and with it every /Sig field.
+    // Four signature fields and the text field: everything the form held.
+    expect(flat.fieldsRemoved).toBe(5);
+    expect(count(out, '/FT /Sig')).toBe(0);
+    expect(count(out, '/Subtype /Widget')).toBe(0);
+    // And the marks are page content now, which is the answer to "will it still read as
+    // signed in a viewer with no form layer at all".
+    expect(count(out, 'S Q')).toBe(3);
+    // The text field's value is baked into the page as well, but it cannot be read off these
+    // bytes as a string: the writer compresses the content streams it composes, which is why
+    // the mark — written uncompressed, by us — is countable and the value is not. What can
+    // be checked is that the form is really gone, by asking the flatten again.
+    const twice = await flattenBytes(flat.bytes);
+    expect(twice.fieldsRemoved).toBe(0);
+    expect(twice.hadNoForm).toBe(true);
+  });
+
+  /*
+   * The defect the 1,000-page stress pass found, reproduced on a two-page fixture: an
+   * ordinary unsigned form has a signature box with no appearance, the writer's flatten
+   * asks every widget for one, and `Unexpected N type: undefined` came back. So before
+   * this, **Flatten failed on any form with a blank signature field** — which is every
+   * form waiting to be signed.
+   */
+  it('flattens a form whose signature box was never signed', async () => {
+    const unsigned = await flattenBytes(fixture('signature-sample.pdf'));
+    const out = text(unsigned.bytes);
+
+    expect(unsigned.fieldsRemoved).toBe(5);
+    expect(unsigned.hadNoForm).toBe(false);
+    expect(count(out, '/FT /Sig')).toBe(0);
+    expect(count(out, '/Subtype /Widget')).toBe(0);
+    // The blank box contributed nothing to draw, and no stray mark appeared for it.
+    expect(count(out, 'S Q')).toBe(0);
+    const after = await flattenBytes(unsigned.bytes);
+    expect(after.fieldsRemoved).toBe(0);
+    expect(after.hadNoForm).toBe(true);
+  });
+
+  it('carries a signature through a page move', async () => {
+    const source = fixture('signature-sample.pdf');
+    const fields = await findSignatureFields(source);
+    const { bytes } = await signFields(
+      source,
+      fields.map((field) => ({ field: field.name, points: MARK })),
+    );
+    const moved = await arrangePages(bytes, { order: [1, 0] });
+    const after = await findSignatureFields(moved.bytes);
+
+    expect(moved.pages).toBe(2);
+    expect(after.map((f) => f.name)).toEqual([
+      'sigPlain',
+      'sigKid',
+      'sigNoRotate',
+      'sigAlreadySigned',
+    ]);
+    // Both pages' work moved with them: page 1's boxes are page 2's now, and the field
+    // that carries a signature value still carries it.
+    expect(after.map((f) => f.page)).toEqual([1, 1, 0, 0]);
+    expect(after.filter((f) => f.alreadySigned).map((f) => f.name)).toEqual(['sigAlreadySigned']);
+  });
+});
+
+/*
+ * The signature half of the writer, measured against `signature-sample.pdf` — a form whose
+ * three `/Sig` fields are the three shapes a reader's file arrives in, and which starts with
+ * one of them carrying no appearance at all. That last detail is what makes the first test
+ * below mean something: with no `/AP` in the source file, a mark found afterwards can only
+ * have come from `signFields`.
+ */

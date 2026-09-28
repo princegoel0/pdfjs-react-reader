@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -24,12 +24,28 @@ import {
   rotatePlanned,
   withViewRotations,
 } from './lib/page-plan';
-import { arrangePages, flattenBytes } from './lib/pdf-write';
+import {
+  arrangePages,
+  findSignatureFields,
+  flattenBytes,
+  signFields,
+} from './lib/pdf-write';
+import { isSignable, padToBox } from './lib/signature';
 import { EDIT_FEATURE_ID } from './features/ids';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { PdfPoint } from './lib/ink';
 import type { PagePlan } from './lib/page-plan';
-import type { PdfFlattenResult } from './lib/pdf-write';
+import type { PdfFlattenResult, PdfSignatureField } from './lib/pdf-write';
 import type { PdfFeature } from './lib/features';
+import type { BoxPoint, PageRect } from './lib/signature';
+
+/** What a document's own metadata says about its form, which is the cheap question. */
+type FormDeclaration = { IsAcroFormPresent?: boolean; IsXFAPresent?: boolean };
+
+/** The pad's drawing surface in CSS pixels; it maps onto whatever box the field is. */
+const SIGNATURE_PAD = { width: 240, height: 64 };
+
 
 export interface EditFeatureOptions {
   /** Name for the saved file; defaults to the document's own name. */
@@ -46,7 +62,11 @@ export type PageEditNotice =
   | { kind: 'split'; files: number; first: number; second: number }
   | { kind: 'restored' }
   /** The document went back to the snapshot an apply replaced, which is not the same news. */
-  | { kind: 'reverted' };
+  | { kind: 'reverted' }
+  /** A mark landed in `boxes` widget(s) of one field. Counted in widgets because a field
+   *  that is signed in two places is one action with two visible results. */
+  | { kind: 'signed'; field: string; boxes: number }
+  | { kind: 'sign-failed'; field: string };
 
 export interface EditFeatureState {
   /**
@@ -104,6 +124,14 @@ export interface EditFeatureState {
   splitPlanned: (slot: number) => Promise<boolean>;
   /** Put back the document as it was before the last apply. */
   undoApply: () => void;
+  /**
+   * Write a drawn mark into one signature field and show the document that comes back.
+   *
+   * False when nothing was written — a path with no line in it, or a field the file does
+   * not hold after all — which the panel's live region then says out loud rather than
+   * leaving the reader to discover by looking at an unchanged page.
+   */
+  signField: (field: string, points: PdfPoint[]) => Promise<boolean>;
 }
 
 /*
@@ -406,6 +434,38 @@ function EditRunner() {
     return result;
   }, [flatten]);
 
+  const signField = useCallback(async (field: string, points: BoxPoint[]) => {
+    const doc = docRef.current;
+    if (!doc || busy.current || !isSignable(points)) return false;
+    busy.current = true;
+    setBusy(true);
+    try {
+      // The reader's form values and marks ride along, because the bytes signed are the
+      // bytes `saveDocument()` commits — and the file the swap shows is the one with all
+      // three in it.
+      const base = await committedBytes(doc);
+      const result = await signFields(base, [{ field, points }]);
+      if (!result.signed.length) {
+        setNotice({ kind: 'sign-failed', field });
+        return false;
+      }
+      // The same single snapshot an apply takes, so "Undo the last apply" means exactly
+      // what it says after a signature: back to the document as it stood before the write.
+      appliedRef.current = { bytes: base, rotations: viewRotationsRef.current };
+      replaceRef.current(result.bytes);
+      selfSwapRef.current = true;
+      setNotice({ kind: 'signed', field, boxes: result.signed.length });
+      return true;
+    } catch (err) {
+      onErrorRef.current(err instanceof Error ? err : new Error(String(err)));
+      setNotice({ kind: 'sign-failed', field });
+      return false;
+    } finally {
+      busy.current = false;
+      setBusy(false);
+    }
+  }, []);
+
   const dirty = plan !== null && !isPristine(plan, shell.numPages);
   usePdfFeaturePublish<EditFeatureState>({
     flatten: flattenAndSave,
@@ -426,6 +486,7 @@ function EditRunner() {
     extractPlanned,
     splitPlanned,
     undoApply,
+    signField,
   });
   return null;
 }
@@ -471,6 +532,15 @@ function noticeText(labels: PdfViewerLabels, notice: PageEditNotice): string {
       });
     case 'restored':
       return labels.pagesRestored;
+    case 'signed':
+      // Counted in boxes and said plainly: a field displayed in two places takes the mark
+      // twice, and a reader told only that it was placed will look at the second box and
+      // conclude it failed.
+      return notice.boxes > 1
+        ? `${formatLabel(labels.signaturePlaced, { field: notice.field })} · ${notice.boxes}`
+        : formatLabel(labels.signaturePlaced, { field: notice.field });
+    case 'sign-failed':
+      return labels.signatureFailed;
   }
 }
 
@@ -645,12 +715,251 @@ function PagesPanel() {
           {labels.discardPages}
         </button>
       </div>
+      <SignatureSection />
       {/* One live region for the whole panel: a reader who cannot see the list moving has to
           hear it, and only the last action is worth announcing. */}
       <p className="pjsr-pages-status" role="status">
         {announced}
       </p>
     </div>
+  );
+}
+
+/**
+ * The signature boxes, the pad that draws the mark, and the button that puts it there.
+ *
+ * The mark is held relative to its box rather than in the page's coordinates, which is why
+ * one drawing can sign a field displayed in two places at two sizes: the writer scales it to
+ * each widget rather than pasting the same rectangle twice.
+ *
+ * The pad answers a pointer or a finger and nothing else, in common with the ink layer the
+ * shell has shipped since `0.5` — a signature drawn from a keyboard is not a thing, and the
+ * note in the pad's own `title` says so rather than leaving a surface that appears dead.
+ * Everything around it (the list of boxes, which one is signed, Clear) is ordinary controls.
+ */
+function SignatureSection() {
+  const shell = usePdfFeatureShell();
+  const state = usePdfFeatureState<EditFeatureState>();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pointsRef = useRef<PdfPoint[]>([]);
+  const drawingRef = useRef(false);
+  const [hasMark, setHasMark] = useState(false);
+  const labels = shell.labels;
+  const padId = `pad-${useId()}`;
+  /*
+   * Published from the Runner's effect, so a panel's first render sees `{}` — every feature
+   * panel reads through a default for that reason, and a list assumed present takes the whole
+   * sidebar down with it.
+   */
+  const [fields, setFields] = useState<PdfSignatureField[] | null>(null);
+  const [mayHaveBoxes, setMayHaveBoxes] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const scanningRef = useRef(false);
+
+  /*
+   * The cheap question, asked when this section renders: does the document claim a form at all?
+   * One metadata round trip answers it, and it is the only thing read on opening the tab. Listing
+   * the boxes parses the whole file instead — measured at 150–200 ms of main thread on a thousand-page
+   * document holding one signature field, against 0 ms for a document with no form — and a panel
+   * that costs that before the reader has drawn anything is the load behaviour this tier is not
+   * allowed to have. So the parse waits for a finished stroke, and the reading of it is said.
+   *
+   * A document that will not describe itself counts as unknown rather than as form-less: the
+   * section shows, and the scan answers with whatever the file turns out to hold.
+   */
+  useEffect(() => {
+    const doc = shell.doc;
+    setFields(null);
+    scanningRef.current = false;
+    setScanning(false);
+    if (!doc) {
+      setMayHaveBoxes(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      let declares: FormDeclaration | null = null;
+      try {
+        if (typeof doc.getMetadata === 'function') {
+          declares = (await doc.getMetadata()).info as FormDeclaration;
+        }
+      } catch {
+        declares = null;
+      }
+      if (cancelled) return;
+      setMayHaveBoxes(
+        declares === null ||
+          declares.IsAcroFormPresent === true ||
+          declares.IsXFAPresent === true,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shell.doc]);
+
+  /**
+   * Parse the file for its boxes, once per document, at the moment there is something to place.
+   *
+   * The loaded bytes and not `saveDocument()`: asking the engine to commit would turn browsing a
+   * form into an edit, and on a pure-XFA document it fails outright. A file the writer cannot
+   * parse has no boxes to offer, which is the same answer as a document with no signature fields.
+   */
+  const scanForBoxes = useCallback(() => {
+    const doc = shell.doc;
+    if (!doc || fields !== null || scanningRef.current) return;
+    scanningRef.current = true;
+    setScanning(true);
+    void (async () => {
+      try {
+        setFields(await findSignatureFields(new Uint8Array(await doc.getData())));
+      } catch {
+        setFields([]);
+      } finally {
+        scanningRef.current = false;
+        setScanning(false);
+      }
+    })();
+  }, [shell.doc, fields]);
+
+  const paint = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const points = pointsRef.current;
+    if (points.length < 2) return;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#111827';
+    ctx.beginPath();
+    ctx.moveTo(points[0]!.x, points[0]!.y);
+    for (const point of points.slice(1)) ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+  }, []);
+
+  /* A new document means new bytes and new boxes: the mark was drawn for the old ones. */
+  useEffect(() => {
+    drawingRef.current = false;
+    pointsRef.current = [];
+    setHasMark(false);
+    paint();
+  }, [shell.doc, paint]);
+
+  const at = (event: ReactPointerEvent<HTMLCanvasElement>): PdfPoint => {
+    const canvas = event.currentTarget;
+    const box = canvas.getBoundingClientRect();
+    // The pad is laid out by CSS and drawn in its own pixels, so a pointer has to be scaled
+    // across that difference or the mark drifts as the sidebar narrows.
+    return {
+      x: (event.clientX - box.left) * (canvas.width / Math.max(1, box.width)),
+      y: (event.clientY - box.top) * (canvas.height / Math.max(1, box.height)),
+    };
+  };
+
+  const clear = () => {
+    pointsRef.current = [];
+    setHasMark(false);
+    paint();
+  };
+
+  const sign = (field: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const mark = padToBox(pointsRef.current, { width: canvas.width, height: canvas.height });
+    void state.signField(field, mark).then((ok) => {
+      if (ok) clear();
+    });
+  };
+
+  // A document that claims no form never shows this section at all, and that answer costs one
+  // metadata round trip. Whether it claims a form and holds no box is only knowable by
+  // parsing, so that question waits until there is a mark to place — and then it is said.
+  if (!mayHaveBoxes) return null;
+
+  return (
+    <section className="pjsr-sign">
+      <h3 className="pjsr-sign-heading">{labels.signatureSection}</h3>
+      {/* Stated where the mark is placed, because a reader may believe they have just done
+          something no viewer of this file could ever verify. */}
+      <p className="pjsr-sign-note">{labels.signatureNotCryptographic}</p>
+      <label className="pjsr-sign-label" htmlFor={padId}>
+        {labels.drawSignature}
+      </label>
+      <canvas
+        id={padId}
+        ref={canvasRef}
+        className="pjsr-sign-pad"
+        width={SIGNATURE_PAD.width}
+        height={SIGNATURE_PAD.height}
+        role="img"
+        aria-label={labels.drawSignature}
+        title={labels.signatureNeedsPointer}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+          drawingRef.current = true;
+          pointsRef.current = [at(event)];
+        }}
+        onPointerMove={(event) => {
+          if (!drawingRef.current) return;
+          pointsRef.current = [...pointsRef.current, at(event)];
+          paint();
+        }}
+        onPointerUp={() => {
+          drawingRef.current = false;
+          const drawn = isSignable(pointsRef.current);
+          setHasMark(drawn);
+          // The first finished stroke is the moment the boxes are worth looking for: the
+          // parse that answers it costs a tenth of a second on a document large enough to
+          // matter, and nothing else on screen is moving when a pointer lifts.
+          if (drawn) scanForBoxes();
+        }}
+        onPointerCancel={() => {
+          drawingRef.current = false;
+        }}
+      />
+      {fields === null ? (
+        <p className="pjsr-sign-status">{scanning ? labels.signatureScanning : ''}</p>
+      ) : !fields.length ? (
+        <p className="pjsr-sign-status">{labels.signatureNone}</p>
+      ) : (
+        <ul className="pjsr-sign-list">
+          {fields.map((field, index) => (
+            <li key={`${field.name}-${index}`} className="pjsr-sign-row">
+              <span className="pjsr-sign-field">{field.name}</span>
+              <span className="pjsr-sign-meta">
+                {field.page === null ? '' : formatLabel(labels.pageLabel, { page: field.page + 1 })}
+                {/* Read from `/V`, not from `hasAppearance`: a box can carry an appearance that
+                    draws nothing, which is what an unsigned form from several generators looks
+                    like, and calling that "already signed" tells the reader something the file
+                    does not. */}
+                {field.alreadySigned ? ` · ${labels.signedAlready}` : ''}
+              </span>
+              <button
+                type="button"
+                className="pjsr-button pjsr-button--text"
+                // A box that holds a signature value is not offered: the writer refuses those,
+                // and a control that says no when pressed is worse than one that is absent.
+                disabled={!hasMark || state.isBusy || field.alreadySigned}
+                title={field.alreadySigned ? labels.signedAlready : undefined}
+                onClick={() => sign(field.name)}
+              >
+                {labels.signHere}
+              </button>
+            </li>
+          ))}
+      </ul>
+      )}
+      <button
+        type="button"
+        className="pjsr-button pjsr-button--text"
+        disabled={!hasMark}
+        onClick={clear}
+      >
+        {labels.clearLabel}
+      </button>
+    </section>
   );
 }
 
@@ -701,11 +1010,21 @@ export {
   removePlanned,
   rotatePlanned,
 } from './lib/page-plan';
-export { arrangePages, flattenBytes } from './lib/pdf-write';
+export { arrangePages, findSignatureFields, flattenBytes, signFields } from './lib/pdf-write';
+/*
+ * The geometry a signature pad needs, on its own and without the writer: `padToBox` is what
+ * turns pointer positions into a mark, and a host that drives its own pad has no reason to
+ * import the tier's React to get at it.
+ */
+export { boxToPage, isSignable, padToBox, signatureContent } from './lib/signature';
 export type { PagePlan } from './lib/page-plan';
 export type {
   PdfArrangeResult,
   PdfBytes,
   PdfFlattenResult,
   PdfPageArrangement,
+  PdfSignatureField,
+  PdfSignatureMark,
+  PdfSignResult,
 } from './lib/pdf-write';
+export type { BoxPoint, PageRect, PadSize, SignatureStyle } from './lib/signature';

@@ -5,6 +5,125 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Signing, and the requirement that decided where it landed. A reader can now draw a mark and have it
+written into a signature box in the file, which puts signing beside rearranging and flattening as work
+this package does to a document rather than merely to a view of one — through its own writer, not the
+engine's. It is also the first feature that failed the size gate it was measured against, and what
+happened instead of the feature being cut is the more durable result: `PRD.md` had a
+per-tier ceiling of 4 kB, signing measured 4.73 kB with **no interface at all**, and the owner's
+answer was that a full module may cost bytes but must never stop behaving smoothly under load. So
+the ceiling moved to 6 kB, and a new section — *Behaviour Under Load* — became the NFR that governs,
+with figures behind it rather than an adjective.
+
+### Added
+
+- **A Sign section in the Pages tab** (`pdfjs-react-reader/edit`). Draw once in the pad, click the box
+  you want it in, and the mark is written into that field's appearance stream. The document's boxes are
+  listed with the page each is on, one Sign control per box, the pad's pixels arriving as page points
+  scaled to the clicked box rather than stretched to the largest one. Three things a host should not
+  have to trust me to have got right: **a field that already holds a `/V` is refused**, because on a
+  `/Sig` that is somebody's claim over the bytes and not an empty box; **the file is never given a
+  signature value**, so what ships is a picture of a signature and the panel says so in as many words
+  (`signatureNotCryptographic`); and **nothing is written until the reader asks**, the way the rest of
+  the tier already works.
+- **`findSignatureFields` and `signFields`** (`src/lib/pdf-write.ts`), exported from `/edit`, and
+  settled by Spike D in `ROADMAP.md`. The listing walks `/AcroForm/Fields` *and* each field's `/Kids`
+  widgets, since a signature field's box often lives only on the kid; the writing resolves each widget,
+  builds an `/XObject /Form` appearance whose `/BBox` is the widget's own `/Rect`, and registers it
+  through `doc.context.stream` + `context.register`. Verified on all three shapes a real file offers: a
+  self-field, a parent with a `/Kids` widget, and a `/F 20` no-rotate box — a fixture with exactly one
+  signed field in it, `playground/fixtures/signature-sample.pdf`, from `scripts/make-signature-pdf.mjs`.
+  That script writes two files: the empty form the panel and the tests read, and
+  `signature-signed-sample.pdf`, the same document with three deliberately different silhouettes already
+  in the three unsigned boxes — which is the file the browser pass below measured with.
+- **`src/lib/signature.ts`** — the geometry alone, with no writer and no DOM in it: `padToBox`,
+  `boxToPage`, `isSignable`, `signatureContent`. Exported from `/edit` on purpose, so a host writing
+  its own pad gets the axis flip that is otherwise the easiest thing in the feature to get wrong. The
+  seam test is the reason it is separate: a mark drawn in the pad's CSS pixels has to land inside the
+  rectangle of the box that was clicked, in that box's coordinates, and 150 × 40 was chosen for the
+  second box precisely so the wrong scaling reads as different numbers.
+- **`signField(field, points)`** on the feature's published state, resolving false when nothing was
+  written — an empty path, or a name the file does not hold — so a host that wants signing outside the
+  sidebar can place it from there and say so honestly when it did not land. The list of boxes is not
+  published: a host gets it from `findSignatureFields`, which is what the panel itself calls.
+- **Ten labels**, and all three catalogs with them: 134 keys at the `0.8` freeze, **144** now, which is
+  the count a type cannot check and `locales.test.ts` can.
+- **A *Behaviour under load* section** in `README.md` and on the docs Introduction, with `PRD.md` §6 as
+  their source: frame timing on the 1,000-page fixture (p50 7.0 ms, max 14.1 ms, no frame over 16.7),
+  38–55 ms to reach and paint a cold page, the text layer's 39.8 ms → 1.0 ms, the signature listing's
+  150–200 ms on a file that declares a form against 0 ms on one that does not, batched writes, and
+  ceilings that refuse instead of crashing. Every one measured in Chromium on one Windows machine, and
+  said as much.
+
+### Changed
+
+- **The per-feature ceiling moved from 4 kB to 6 kB, in the assertion that enforces it**
+  (`scripts/check-size.mjs`; the decision is recorded in `ROADMAP.md` under *Signing shipped, where it
+  landed*). Worth being exact about why this is a decision and not a relaxation: the gate is a constant
+  in the script, not a line in `size-baseline.json`, so
+  `npm run size:update` cannot lift it — the number had to be argued for. Signing cost 4.73 kB over
+  core before its interface existed, and that is the writer pass plus the geometry, which is what a
+  tier that modifies a file is. Meeting 4 kB would have meant shipping a page-organiser with no
+  signing to a reader who expects one. `edit` now measures **5.72 kB**, and the whole tier set 14.44 kB
+  over a 24.96 kB core.
+- **A document's expensive question is asked when it is needed.** The first cut of the panel listed the
+  boxes when the tier mounted, which put a 150–200 ms main-thread parse behind opening a sidebar tab on
+  any file that had a form. What ships asks the engine's metadata first — one round trip, and a document
+  that declares neither `/AcroForm` nor XFA never reaches the writer at all — and the parse waits until
+  the reader has drawn something to place. A test counts the `getData` calls to keep the ordering, since
+  the regression here is invisible to anything that only checks the result.
+
+### Fixed
+
+- **Flatten threw on any form whose signature box had never been signed** — a defect shipped in `0.7`
+  and found by the signing fixture, not by a reader. `@cantoo/pdf-lib`'s `flatten()` needs each widget's
+  `/N` and reports `Unexpected N type: undefined` when one is missing, which is what an unsigned form
+  looks like: boxes with no appearances at all. `flattenBytes` now gives any such widget an empty
+  appearance in its own box before flattening, so the page it is on
+  flattens as the blank it actually is. Covered in both directions — a form with an unsigned box
+  flattens, and one already signed keeps its appearance through the same pass.
+- **The panel called an empty appearance "Already signed"** — found by running the panel in a browser,
+  not by a test. Three of the fixture's four boxes came up saying it, two of them holding an appearance
+  stream that draws nothing, which is what an unsigned form often carries and what the fixture writes on
+  purpose. The meta line was reading `hasAppearance` while the refusal and the disabled control read
+  `alreadySigned`, so the panel told a reader a box was signed and offered to sign it in the same
+  breath. The meta now reads from `/V`, like every other claim on that row; `hasAppearance` stays on the
+  published field data for a host that wants the weaker question.
+
+### Notes on verification
+
+- **A written mark paints, in the file and in the session.** A browser pass on the playground answered
+  the half of this that `#144` was holding open, and it also corrected a wrong reading taken earlier in
+  the same investigation. Loading `signature-signed-sample.pdf` found all three written marks **inside
+  their own boxes** — the 200 × 60, the 150 × 40, and the `/F 20` box on page two — with nothing in any
+  box for the unsigned file and only its own band in the box that holds a `/V`. Driving the panel
+  instead of a file took page one's `sigPlain` box from **0 to 856 ink pixels** on the Sign click, and
+  the mark stayed painted through a zoom step in and back. So the appearance format is right, a
+  no-rotate flag does not cost us the display, and `annotationCanvasMap` is not needed for either case
+  we can produce.
+- **How the wrong reading happened, because it is easy to repeat.** The first pass counted pixels of the
+  colour the *fixture* strokes with — `0.05 0.08 0.2 RG`, a navy — and found the in-session box empty,
+  which was written up here as a repaint defect and filed as one. The writer draws in **black**:
+  `signatureContent`'s default style. A navy filter cannot see the product's own mark, and the earlier
+  "10 pixels, then 0" was the same mistake at two moments. The corrected method names no colour — hash
+  the box's pixel region and count dark pixels before and after — which reports a change whatever the
+  writer drew with. Two lessons with teeth: **a pixel assertion needs the colour the code under test
+  actually chooses**, and a claimed defect should be re-measured with a method that could have found its
+  opposite before it is written down. The jsdom half still holds: no canvas 2D context there, which is
+  why this needed a browser at all.
+- **A claim made during the spike and then withdrawn.** `ROADMAP.md` recorded that a `/F 16`
+  (no-rotate) signature box paints nothing in our viewer, because pdf.js would not take its own-canvas
+  path. The probe that showed it sampled a page-1 rectangle for a page-2 annotation, and re-measured
+  correctly the engine reported `noRotate: false` for the box I had set `/F 20` on. The claim is
+  retracted in the roadmap and the flag is carried as data (`noRotate` is what the file says, and
+  `findSignatureFields` reports it) rather than as a behaviour.
+
+Tests went 393 → **428** across 34 files, thirty-five of them new and about signing; typecheck, both
+bundles, the docs build and the size gate are clean. Nothing here is released yet: `0.8.0` is still the
+version in `package.json`, and the version bump is a release-close act that stays with the owner.
+
 ## [0.8.0] — 2026-09-27
 
 Hardening, and the freeze review. This release changed no API a host had to act on, added three

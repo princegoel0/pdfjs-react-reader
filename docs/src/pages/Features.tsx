@@ -35,7 +35,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/print.css</code>
             </td>
-            <td>2.52 kB</td>
+            <td>2.50 kB</td>
           </tr>
           <tr>
             <td>
@@ -59,7 +59,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/forms.css</code>
             </td>
-            <td>1.94 kB</td>
+            <td>1.91 kB</td>
           </tr>
           <tr>
             <td>
@@ -71,7 +71,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/outline.css</code>
             </td>
-            <td>0.94 kB</td>
+            <td>0.93 kB</td>
           </tr>
           <tr>
             <td>
@@ -159,10 +159,10 @@ export function Features() {
         Cost is measured, not estimated, and the figures above are the <code>0.7</code> build
         (re-measured at each release close): <code>npm run size</code> bundles one file per
         consumer import with both esbuild and Rollup and reports the larger of the two, so a feature is
-        only &ldquo;small&rdquo; if two independent tree-shakers agree. All eight together cost 12.26 kB
-        over the <code>24.77 kB</code> core — less than their sum, because they share the shell they attach
+        only &ldquo;small&rdquo; if two independent tree-shakers agree. All eight together cost 14.44 kB
+        over the <code>24.96 kB</code> core — less than their sum, because they share the shell they attach
         to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
-        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 52.61 kB, because
+        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 52.78 kB, because
         that entry re-exports every headless hook whether or not you name one — so quote the import,
         not the entry.
       </p>

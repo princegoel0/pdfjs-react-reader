@@ -37,8 +37,9 @@ export function Report() {
 thumbnails, ink, zoom, rotation, layout. Print, save, fillable form widgets, the bookmarks tab, the
 layers tab, the attachments tab and marking up the document are `printFeature`, `downloadFeature`,
 `formsFeature`, `outlineFeature`, `layersFeature`, `attachmentsFeature` and `annotateFeature`. Moving,
-turning, deleting, extracting and splitting whole pages is `editFeature` — the one tier that brings its
-own PDF writer, so it is an optional peer rather than a dependency of everything else.
+turning, deleting, extracting and splitting whole pages is `editFeature`, which also draws a signature into a form's signature field — the one
+tier that brings its own PDF writer, so it is an optional peer rather than a dependency of everything
+else.
 
 ## What it does
 
@@ -82,9 +83,9 @@ Core, in every import of the shell:
 - **Gestures** — Ctrl/Cmd + wheel (which is also how a trackpad pinch arrives), two-finger pinch on
   touch, keyboard paging, optional drag-and-drop to open a file, any percentage from 25 % to 500 %, and
   an `Automatic` mode that fits a landscape page whole and a portrait one by width.
-- **Localisable** — every string in the shell lives in one typed catalog, 134 labels in `0.7`; override
+- **Localisable** — every string in the shell lives in one typed catalog, 144 labels after the signing work; override
   the subset you need and the rest keeps its English default, or take a complete language from
-  `pdfjs-react-reader/locales/de`, `/fr` or `/es` — 2.18 kB gzipped each, and a separate entry so
+  `pdfjs-react-reader/locales/de`, `/fr` or `/es` — 2.37–2.39 kB gzipped each, and a separate entry so
   importing the viewer never hands you a language you did not ask for.
 - **Composable** — the shell's state is `useViewerController`, published through `ViewerProvider`, and
   the four parts (`ViewerRoot`, `ViewerToolbar`, `ViewerSidebar`, `ViewerPages`) read it. Write your own
@@ -96,18 +97,22 @@ Opt-in, one import each:
 
 | Feature | Adds | Cost over core |
 | --- | --- | --- |
-| `features/print` | Print at print intent — all pages, the current one, or a range the reader picks — honouring stored form values and ink, with a memory-budgeted resolution, a cancellable progress loop and `Ctrl/Cmd + P`. | 2.52 kB |
-| `features/download` | Download of the original bytes, or an incremental save carrying the edits — field values and annotation marks both ride the same storage. | 0.77 kB |
-| `features/forms` | AcroForm widgets — text, checkbox, radio, choice, button — wired to pdf.js annotation storage, with `createFormsFeature({ onChange })` and programmatic get/set/reset. | 1.94 kB |
-| `features/outline` | The bookmarks sidebar tab. | 0.94 kB |
-| `features/layers` | A sidebar tab listing the document's optional-content groups, switching one and having every page redraw. | 1.19 kB |
-| `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.10 kB |
+| `features/print` | Print at print intent — all pages, the current one, or a range the reader picks — honouring stored form values and ink, with a memory-budgeted resolution, a cancellable progress loop and `Ctrl/Cmd + P`. | 2.50 kB |
+| `features/download` | Download of the original bytes, or an incremental save carrying the edits — field values and annotation marks both ride the same storage. | 0.76 kB |
+| `features/forms` | AcroForm widgets — text, checkbox, radio, choice, button — wired to pdf.js annotation storage, with `createFormsFeature({ onChange })` and programmatic get/set/reset. | 1.91 kB |
+| `features/outline` | The bookmarks sidebar tab. | 0.93 kB |
+| `features/layers` | A sidebar tab listing the document's optional-content groups, switching one and having every page redraw. | 1.20 kB |
+| `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.08 kB |
 | `features/annotate` | Marking up the document: pdf.js's own editor manager behind three tools — highlight, free text, ink — with a highlight colour from the engine's palette, and a Delete that is live only while a mark is selected. Undo and redo are on the state the feature publishes, so the controls are yours to place. | 1.85 kB |
-| `edit` | Whole pages, and a file that no longer depends on a reader: a **Pages** sidebar tab that moves, turns and removes pages through a plan you can step back before writing anything, then applies it, extracts the planned pages as a new file, or splits the list at any row into two. Plus **Flatten**, which bakes every mark and field value into the page so it survives a viewer with no editor to show it. This is the one tier with its own dependency — `@cantoo/pdf-lib`, an *optional* peer, imported by nothing else. | 3.60 kB |
+| `edit` | Whole pages, and a file that no longer depends on a reader: a **Pages** sidebar tab that moves, turns and removes pages through a plan you can step back before writing anything, then applies it, extracts the planned pages as a new file, or splits the list at any row into two. Plus **Flatten**, which bakes every mark and field value into the page so it survives a viewer with no editor to show it.
+  A **Sign** section appears in that tab when the document has signature fields: draw a mark, choose a box, and it is
+  written into the field's appearance. It is a picture of a signature — the file is never given a signature value, and
+  a box that already holds a real one is refused rather than covered over. This is the one tier with its own dependency — `@cantoo/pdf-lib`, an *optional* peer, imported by nothing else. | 5.72 kB |
 
-All eight together cost 12.26 kB, less than their sum, because they share the shell they attach to.
+All eight together cost 14.44 kB, less than their sum, because they share the shell they attach to.
 They are also the reference for writing your own: the contract and the authoring hooks are public.
-(Those are the `0.7` build's numbers; see [Size](#size) for how they are measured.)
+(Measured on this build; see [Size](#size) for how each row is produced and why a tier that
+parses files is allowed the kilobytes that costs.)
 
 Mounting the last one is the same as mounting any other, and it is the only one that needs a package
 beside this one:
@@ -133,9 +138,9 @@ plan lives: rows move by button or by drag, each carries its own controls, the b
 
 | Package | Required | Tested with |
 | --- | --- | --- |
-| `pdfjs-dist` | `^6.2.108` | 6.3.289 |
-| `react` | `^18.0.0 \|\| ^19.0.0` | 18.3.1, 19.3.0 |
-| `react-dom` | `^18.0.0 \|\| ^19.0.0` | 18.3.1, 19.3.0 |
+| `pdfjs-dist` | `^6.2.108` | 6.3.289, in CI |
+| `react` | `^18.0.0 \|\| ^19.0.0` | 19.3.0, in CI. 18.3.1 was verified once, at `0.1`; no job installs it since |
+| `react-dom` | `^18.0.0 \|\| ^19.0.0` | 19.3.0, in CI. As above |
 | `@cantoo/pdf-lib` | `^2.11.1`, **optional** — only `editFeature` asks for it | 2.11.1 |
 
 Nothing else at runtime — no state library, no date library, no polyfills, no CSS framework. The one
@@ -420,43 +425,77 @@ under `(pointer: coarse)`, 32 px with a mouse.
 
 ## Size
 
-Gzipped, excluding `pdfjs-dist`, React and `@cantoo/pdf-lib` (all peer dependencies). Measured on the
-`0.7` build: each row is one consumer file bundled with esbuild and with Rollup, and the larger of the
-two, so a path only counts as small if two independent tree-shakers agree.
+Gzipped, excluding `pdfjs-dist`, React and `@cantoo/pdf-lib` (all peer dependencies). Each row is one
+consumer file bundled twice — with esbuild and with Rollup — and the larger of the two is what is
+quoted, so a path only counts as small if two independent tree-shakers agree.
 
 | What you import | Size | Over core |
 | --- | --- | --- |
-| `PdfViewer`, no features — pages, text, search, ink, thumbnails, chrome | 24.77 kB | — |
-| `+ printFeature` | 27.28 kB | +2.50 kB |
-| `+ downloadFeature` | 25.55 kB | +0.78 kB |
-| `+ formsFeature` | 26.69 kB | +1.92 kB |
-| `+ outlineFeature` | 25.71 kB | +0.93 kB |
-| `+ layersFeature` | 25.98 kB | +1.21 kB |
-| `+ attachmentsFeature` | 25.88 kB | +1.10 kB |
-| `+ annotateFeature` | 26.64 kB | +1.86 kB |
-| `+ editFeature` | 28.35 kB | +3.58 kB |
-| All eight | 37.03 kB | +12.25 kB |
+| `PdfViewer`, no features — pages, text, search, ink, thumbnails, chrome | 24.96 kB | — |
+| `+ printFeature` | 27.46 kB | +2.50 kB |
+| `+ downloadFeature` | 25.72 kB | +0.76 kB |
+| `+ formsFeature` | 26.87 kB | +1.91 kB |
+| `+ outlineFeature` | 25.89 kB | +0.93 kB |
+| `+ layersFeature` | 26.16 kB | +1.20 kB |
+| `+ attachmentsFeature` | 26.04 kB | +1.08 kB |
+| `+ annotateFeature` | 26.82 kB | +1.85 kB |
+| `+ editFeature` | 30.68 kB | +5.72 kB |
+| All eight | 39.41 kB | +14.44 kB |
 | A single headless hook (`usePdfDocument`) | 2.59 kB | — |
-| A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.18 kB | separate entry, not over core |
+| A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.37–2.39 kB | separate entry, not over core |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
-52.61 kB for `index.js` and 27.10 kB for `headless.js`, each with `styles.css`. `edit.js` is its own
-file at 5.39 kB, and it is the only shipped file that imports the writer, so a host that never mounts
+52.78 kB for `index.js` and 27.13 kB for `headless.js`, each with `styles.css`. `edit.js` is its own
+file at 8.58 kB, and it is the only shipped file that imports the writer, so a host that never mounts
 the tier never loads it.
 
 CI runs `npm run size`, which compares each path against the numbers committed in
 `size-baseline.json` and fails when one grows more than 2 % above them (plus 256 bytes of slack, so
-minifier jitter is not a failure), and separately fails if any single feature exceeds 4 kB over core.
-It is a ratchet rather than a ceiling: a library that grows with features cannot honestly promise a
-fixed size, and `pdfjs-dist` decides a bundle's weight long before this layer does. What the gate
+minifier jitter is not a failure), and separately fails if any single feature exceeds **6 kB** over
+core. It is a ratchet rather than a ceiling: a library that grows with features cannot honestly promise
+a fixed size, and `pdfjs-dist` decides a bundle's weight long before this layer does. What the gate
 guarantees is that bytes never arrive quietly — accepting growth means running `npm run size:update`,
 so the increase lands in the same diff as the code that caused it. Shrinking is always allowed and
 reported.
+
+The 6 kB figure is not the ceiling this project started with: it was 4 kB until the signing work, which
+measured 4.73 kB for the writer pass and the geometry it needs *before* any interface was counted. The
+number moved because the requirement that does not bend is a different one — what a feature does to the
+reader's machine, not what it weighs — and that is written down rather than smoothed over. See
+[Behaviour under load](#behaviour-under-load).
+
 
 For scale, `pdfjs-dist` 6.3.289 gzips to 128.6 kB for the main-thread module and 366.5 kB for its
 worker, and `@cantoo/pdf-lib` to 245.5 kB (each a minified bundle of a consumer that imports it
 directly) — so the engine dominates any viewer bundle regardless of this package, and the `edit` tier
 doubles that weight when a host mounts it and installs the writer.
+
+## Behaviour under load
+
+Size is a ratchet. This is the requirement that is not: the viewer has to stay smooth while it is
+working, on documents big enough to make a mistake visible. Every figure here is measured against
+`long-sample.pdf` — a thousand pages, a nested page tree, three page sizes cycling so no single
+estimate flatters it — in Chromium on one Windows machine, which is the honest limit of what has been
+tested (see [Browser support](#browser-support)).
+
+- **Scrolling a thousand pages drops no frames.** A reader-speed pass measures p50 7.0 ms and a max of
+  14.1 ms per frame, with zero frames over 16.7 ms; a faster 1,100 px/frame pass peaks at 14.0 ms, also
+  with none over. Reaching a page that has never been painted and drawing it takes 38–55 ms.
+- **Only what is on screen is held.** Two to four page canvases are mounted at any moment across the
+  whole pass, and a row that leaves the viewport has its canvas zeroed rather than kept.
+- **A zoom step re-lays out the text layer instead of rebuilding it.** 39.8 ms per page per step became
+  1.0 ms, which is the difference between zooming on a dense page and watching it flicker.
+- **A feature's expensive question is asked when it is needed, not when it is mounted.** Reading a
+  thousand-page document to find its signature fields costs 150–200 ms of main thread, and 0 ms for a
+  document that declares no form — the panel asks the engine that cheap question on open, shows the
+  pad, and parses the file only once there is a mark to place. The parse runs once per document and
+  says what it is doing while it runs.
+- **Writes are deliberate, so a batch costs one pass.** Moving ten pages is ten edits to a list of
+  integers and one writer pass at Apply; the plan is kilobytes and the document is megabytes, which is
+  also why undo costs nothing until a file is actually written.
+
+What that last group buys is the shape of the rule: bytes may grow where a feature genuinely reads and
+writes files, and what is not allowed is work done without being asked for, twice, or in silence.
 
 ## Browser support
 
@@ -491,6 +530,7 @@ node scripts/make-scripted-pdf.mjs   # document-level JavaScript
 node scripts/make-attachments-ocg-pdf.mjs  # 3 attached files + 3 layers, one off by default
 node scripts/make-annotated-pdf.mjs  # highlight, underline, strikeout, squiggly, note, ink, free text
 node scripts/make-page-order-pdf.mjs # 20 pages, each printing its own number, page 5 rotated
+node scripts/make-signature-pdf.mjs  # four /FT /Sig fields in three shapes, one already signed
 node scripts/make-xfa-pdf.mjs        # pure XFA: single-stream /XFA packet, no /Fields
 node scripts/make-xfa-array-pdf.mjs  # the same packet in array form, and an AcroForm hybrid
 node scripts/make-long-pdf.mjs       # 1,000 pages in a nested tree, for the performance bar
@@ -504,7 +544,8 @@ development, against the built `dist` in CI.
 
 ## Status
 
-Version `0.8.0`, built on `dev`. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are committed
+Version `0.8.0`, built on `dev`, with the signing work sitting on top of it uncommitted and unreleased.
+npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are committed
 locally and publish together with `1.0.0`, which is the shipping rule in
 [`ROADMAP.md`](./ROADMAP.md) §Releases. While the package is pre-1.0 a minor may break the API — `0.4`
 did, with six `PdfViewer` props becoming four feature imports — so pin exactly.
