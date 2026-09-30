@@ -66,7 +66,7 @@ export function Compatibility() {
             <td>2.11.1</td>
             <td>
               A PDF writer, and the reason the <code>edit</code> tier can rewrite a page tree at all.
-              Declared optional so a host that never mounts it neither installs it nor pays its 245.5 kB,
+              Declared optional so a host that never mounts it neither installs it nor pays its 251.4 kB,
               and named by exactly one shipped module — <code>pdf-write.ts</code> — so nothing else can
               drag it in. Not installed, importing <code>pdfjs-react-reader/edit</code> fails at build
               rather than at runtime, which is the loud way round.
@@ -197,8 +197,9 @@ export function Compatibility() {
             <td>
               Anything that handles <code>exports</code> maps and <code>import.meta.url</code>:
               Vite 5+, webpack 5+, Rollup 4+, esbuild, Turbopack. <code>import.meta.url</code> is
-              only used for worker resolution, and its failure is caught — the pdf.js fake worker
-              takes over.
+              only used for worker resolution, and its failure is caught — nothing is pinned, and the
+              load then fails naming <code>workerSrc</code> rather than hanging on a URL that could not
+              be built.
             </td>
           </tr>
           <tr>
@@ -277,12 +278,12 @@ export function Compatibility() {
       <h2>Bundle size</h2>
       <p>
         Gzipped, excluding <code>pdfjs-dist</code>, React and the optional{' '}
-        <code>@cantoo/pdf-lib</code>, measured on the 0.7 build. Each row is a real
+        <code>@cantoo/pdf-lib</code>, measured on the <code>0.9</code> build. Each row is a real
         consumer file bundled once with esbuild and once with Rollup, and the larger number is
         reported, so a path only counts as small if two independent tree-shakers agree. CI fails the
         build when a path grows more than 2&nbsp;% above the numbers committed in{' '}
         <code>size-baseline.json</code>, and fails on its own when any single feature costs more than
-        4&nbsp;kB over core, so these are enforced rather than estimated.
+        6&nbsp;kB over core, so these are enforced rather than estimated.
       </p>
       <table className="doc-table">
         <thead>
@@ -295,67 +296,67 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>24.96 kB</td>
+            <td>27.76 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>27.46 kB</td>
-            <td>+2.50 kB</td>
+            <td>30.28 kB</td>
+            <td>+2.52 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>25.72 kB</td>
-            <td>+0.76 kB</td>
+            <td>28.51 kB</td>
+            <td>+0.75 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>26.87 kB</td>
-            <td>+1.91 kB</td>
+            <td>29.78 kB</td>
+            <td>+2.02 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>25.89 kB</td>
-            <td>+0.93 kB</td>
+            <td>28.71 kB</td>
+            <td>+0.94 kB</td>
           </tr>
           <tr>
             <td>Core + layers</td>
-            <td>26.16 kB</td>
-            <td>+1.20 kB</td>
+            <td>28.95 kB</td>
+            <td>+1.19 kB</td>
           </tr>
           <tr>
             <td>Core + attachments</td>
-            <td>25.88 kB</td>
-            <td>+1.08 kB</td>
+            <td>28.84 kB</td>
+            <td>+1.07 kB</td>
           </tr>
           <tr>
             <td>Core + annotate</td>
-            <td>26.82 kB</td>
-            <td>+1.85 kB</td>
+            <td>29.59 kB</td>
+            <td>+1.83 kB</td>
           </tr>
           <tr>
             <td>Core + edit</td>
-            <td>30.68 kB</td>
-            <td>+5.72 kB</td>
+            <td>33.63 kB</td>
+            <td>+5.87 kB</td>
           </tr>
           <tr>
             <td>All eight features</td>
-            <td>39.41 kB</td>
-            <td>+14.44 kB</td>
+            <td>42.53 kB</td>
+            <td>+14.76 kB</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>52.78 kB</td>
+            <td>57.90 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>27.13 kB</td>
+            <td>30.85 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>One headless hook (<code>usePdfDocument</code>)</td>
-            <td>2.59 kB</td>
+            <td>4.06 kB</td>
             <td>—</td>
           </tr>
         </tbody>
@@ -364,7 +365,8 @@ export function Compatibility() {
         The last three rows are measured differently from the feature rows above: they sum the shipped files
         reachable from an entry rather than bundling one import, so they are what a bundler that
         cannot tree-shake pays, and an upper bound for everyone else. Importing a single headless hook
-        costs far less than any entry-wide figure — 2.59&nbsp;kB for <code>usePdfDocument</code> —
+        costs far less than any entry-wide figure — 4.06&nbsp;kB for <code>usePdfDocument</code>, the path
+        that carries the <code>0.9</code> loading options —
         because the package is ESM and tree-shakeable.
       </p>
       <p>
@@ -377,7 +379,7 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.8.0</code>. While it is pre-1.0, minor versions may contain breaking
+        The package is <code>0.9.0</code>. While it is pre-1.0, minor versions may contain breaking
         changes, so pin exactly in an application. The full release entry, the development log and the
         versioning policy live in <code>CHANGELOG.md</code> at the repository root, which GitHub renders
         on the project home page.
@@ -482,6 +484,27 @@ export function Compatibility() {
             </td>
           </tr>
           <tr>
+            <td>0.8 → 0.9</td>
+            <td>
+              The load grew its network options — <code>httpHeaders</code>, <code>withCredentials</code>,{' '}
+              <code>rangeChunkSize</code>, <code>disableRange</code>, <code>disableStream</code> — plus{' '}
+              <code>signal</code> on every asynchronous operation it starts, the published{' '}
+              <code>status</code> unions on the hook and on <code>PdfPage.onStatusChange</code>,{' '}
+              <code>onProgress</code>, and the source helpers (<code>classifySource</code>,{' '}
+              <code>base64ToBytes</code>) as exports. Two behaviours changed: a page box now answers a
+              typed label as well as a number when the document declares <code>/PageLabels</code>, and
+              canvas density follows the display a window is on rather than the one it started on.
+            </td>
+            <td>
+              Nothing for existing code, with one exception worth deciding about: a load that fails
+              transiently now retries — three attempts, full-jitter backoff, and never on a 401, 403 or
+              404. Pass <code>retry: false</code> for the single attempt back. Where you compared{' '}
+              <code>doc</code> against <code>error</code> by hand, <code>status</code> is the same
+              information as one value; and if you style the page box yourself, it becomes a text input on
+              a labelled document, which is what the <code>data-labelled</code> attribute is for.
+            </td>
+          </tr>
+          <tr>
             <td>0.x → 1.0</td>
             <td>
               The version where the surface stops moving. The plan is that 1.0 changes nothing except by
@@ -489,7 +512,7 @@ export function Compatibility() {
               release notes if it turns out otherwise.
             </td>
             <td>
-              If you are on any 0.x, the work to reach 1.0 is the six rows above. Pin the version, and
+              If you are on any 0.x, the work to reach 1.0 is the seven steps above. Pin the version, and
               treat a minor bump as a real upgrade from there on.
             </td>
           </tr>

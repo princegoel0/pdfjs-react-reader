@@ -21,11 +21,13 @@ vi.mock('../headless/usePdfDocument', () => ({
   usePdfDocument: (options: { src: unknown }) => {
     sawSource(options.src);
     return {
+      status: 'loading',
       doc: null,
       numPages: 0,
       isReady: false,
       error: null,
       capabilities: null,
+      passwordRequest: null,
       reload: vi.fn(),
     };
   },

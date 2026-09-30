@@ -54,6 +54,8 @@ Core, in every import of the shell:
   matches. Supply your own `find` object and the bar runs on your answers instead.
 - **Thumbnails, rotation, layout modes** (continuous, single page, two-page spread). Rotation works
   per page as well as globally, and the text and annotation layers turn with it.
+- **Page labels honoured** where the document declares them: the page field shows `iii` or `A-1` and
+  accepts the same back, while an ordinary PDF keeps its plain number box.
 - **Annotations, read or written** — link annotations and markup render as the file says, and
   `annotateFeature` turns that layer into an editor: highlight, free text and ink, a colour chosen from
   the engine's own palette, and a Delete that is live only while a mark is selected. The marks are real
@@ -97,19 +99,19 @@ Opt-in, one import each:
 
 | Feature | Adds | Cost over core |
 | --- | --- | --- |
-| `features/print` | Print at print intent — all pages, the current one, or a range the reader picks — honouring stored form values and ink, with a memory-budgeted resolution, a cancellable progress loop and `Ctrl/Cmd + P`. | 2.50 kB |
-| `features/download` | Download of the original bytes, or an incremental save carrying the edits — field values and annotation marks both ride the same storage. | 0.76 kB |
-| `features/forms` | AcroForm widgets — text, checkbox, radio, choice, button — wired to pdf.js annotation storage, with `createFormsFeature({ onChange })` and programmatic get/set/reset. | 1.91 kB |
-| `features/outline` | The bookmarks sidebar tab. | 0.93 kB |
-| `features/layers` | A sidebar tab listing the document's optional-content groups, switching one and having every page redraw. | 1.20 kB |
-| `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.08 kB |
-| `features/annotate` | Marking up the document: pdf.js's own editor manager behind three tools — highlight, free text, ink — with a highlight colour from the engine's palette, and a Delete that is live only while a mark is selected. Undo and redo are on the state the feature publishes, so the controls are yours to place. | 1.85 kB |
+| `features/print` | Print at print intent — all pages, the current one, or a range the reader picks — honouring stored form values and ink, with a memory-budgeted resolution, a cancellable progress loop and `Ctrl/Cmd + P`. | 2.52 kB |
+| `features/download` | Download of the original bytes, or an incremental save carrying the edits — field values and annotation marks both ride the same storage. | 0.75 kB |
+| `features/forms` | AcroForm widgets — text, checkbox, radio, choice, button — wired to pdf.js annotation storage, with `createFormsFeature({ onChange })` and programmatic get/set/reset. | 2.02 kB |
+| `features/outline` | The bookmarks sidebar tab. | 0.94 kB |
+| `features/layers` | A sidebar tab listing the document's optional-content groups, switching one and having every page redraw. | 1.19 kB |
+| `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.07 kB |
+| `features/annotate` | Marking up the document: pdf.js's own editor manager behind three tools — highlight, free text, ink — with a highlight colour from the engine's palette, and a Delete that is live only while a mark is selected. Undo and redo are on the state the feature publishes, so the controls are yours to place. | 1.83 kB |
 | `edit` | Whole pages, and a file that no longer depends on a reader: a **Pages** sidebar tab that moves, turns and removes pages through a plan you can step back before writing anything, then applies it, extracts the planned pages as a new file, or splits the list at any row into two. Plus **Flatten**, which bakes every mark and field value into the page so it survives a viewer with no editor to show it.
   A **Sign** section appears in that tab when the document has signature fields: draw a mark, choose a box, and it is
   written into the field's appearance. It is a picture of a signature — the file is never given a signature value, and
-  a box that already holds a real one is refused rather than covered over. This is the one tier with its own dependency — `@cantoo/pdf-lib`, an *optional* peer, imported by nothing else. | 5.72 kB |
+  a box that already holds a real one is refused rather than covered over. This is the one tier with its own dependency — `@cantoo/pdf-lib`, an *optional* peer, imported by nothing else. | 5.87 kB |
 
-All eight together cost 14.44 kB, less than their sum, because they share the shell they attach to.
+All eight together cost 14.76 kB, less than their sum, because they share the shell they attach to.
 They are also the reference for writing your own: the contract and the authoring hooks are public.
 (Measured on this build; see [Size](#size) for how each row is produced and why a tier that
 parses files is allowed the kilobytes that costs.)
@@ -138,9 +140,9 @@ plan lives: rows move by button or by drag, each carries its own controls, the b
 
 | Package | Required | Tested with |
 | --- | --- | --- |
-| `pdfjs-dist` | `^6.2.108` | 6.3.289, in CI |
-| `react` | `^18.0.0 \|\| ^19.0.0` | 19.3.0, in CI. 18.3.1 was verified once, at `0.1`; no job installs it since |
-| `react-dom` | `^18.0.0 \|\| ^19.0.0` | 19.3.0, in CI. As above |
+| `pdfjs-dist` | `^6.2.108` | 6.3.289, the version installed here; CI would install it too, but no `0.x` commit has been pushed, so no job has ever run |
+| `react` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, both verified locally. The 18 pass was re-run on 2026-09-29 with `@types/react@18`: `npm run verify` end to end — typecheck, all 449 tests then in the suite, both bundles, the size gate. A `react` matrix job in `ci.yml` installs both majors on every push and is what keeps this true after the next change; it has not run yet |
+| `react-dom` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, swapped in alongside `react` for the same run |
 | `@cantoo/pdf-lib` | `^2.11.1`, **optional** — only `editFeature` asks for it | 2.11.1 |
 
 Nothing else at runtime — no state library, no date library, no polyfills, no CSS framework. The one
@@ -342,17 +344,25 @@ the package looks for the worker inside your own `node_modules`, probing a bundl
 specifier first and a bare one second, and keeps the first URL that actually answers. That covers
 Vite (dev server and build), webpack 5 and Rollup without a line of configuration.
 
-Nothing is assigned when no candidate answers, so pdf.js can still fall back to its main-thread
-worker, and a failed load names `workerSrc` as the fix instead of surfacing a fetch error.
+Nothing is assigned when no candidate answers, which is not a fallback of its own: pdf.js's main-thread
+parser *is* the worker's code, so it has to be reachable without a URL for that to run — as it is in Node,
+where the engine supplies its own default, and as it is for a host that has assigned
+`globalThis.pdfjsWorker` itself. Everywhere else the load fails naming `workerSrc`, the option you own,
+rather than a fetch error for a URL you never wrote. Pinning a plausible-but-dead candidate would overwrite
+the Node default and cause that second, worse failure — which is why the probe checks each URL instead of
+guessing.
 
 ```tsx
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 <PdfViewer src={src} workerSrc={workerUrl} />
 ```
 
-Pin it when you serve the worker from a CDN or copy it into a fixed location. Note that `pdfjs-dist`
-itself needs DOM globals at import time, so this package is client-side only — in Next.js, import it
-from a `"use client"` component and load it dynamically rather than in a server component.
+Pin it when you serve the worker from a CDN or copy it into a fixed location. Importing the package is
+safe anywhere, a server bundle included — every entry point in the export map is imported with no DOM
+present and must not throw, which is a test rather than a hope. *Rendering* is browser-only: the worker
+and the canvas need a real document, so in Next.js the viewer lives in a `'use client'` component, while
+the pure helpers (`classifySource`, `base64ToBytes`, `resolveSourceUrl`, `normalizeSource`) stay usable on
+the server — which is where a source string usually gets decided.
 
 ## Beyond the worker
 
@@ -431,22 +441,22 @@ quoted, so a path only counts as small if two independent tree-shakers agree.
 
 | What you import | Size | Over core |
 | --- | --- | --- |
-| `PdfViewer`, no features — pages, text, search, ink, thumbnails, chrome | 24.96 kB | — |
-| `+ printFeature` | 27.46 kB | +2.50 kB |
-| `+ downloadFeature` | 25.72 kB | +0.76 kB |
-| `+ formsFeature` | 26.87 kB | +1.91 kB |
-| `+ outlineFeature` | 25.89 kB | +0.93 kB |
-| `+ layersFeature` | 26.16 kB | +1.20 kB |
-| `+ attachmentsFeature` | 26.04 kB | +1.08 kB |
-| `+ annotateFeature` | 26.82 kB | +1.85 kB |
-| `+ editFeature` | 30.68 kB | +5.72 kB |
-| All eight | 39.41 kB | +14.44 kB |
-| A single headless hook (`usePdfDocument`) | 2.59 kB | — |
+| `PdfViewer`, no features — pages, text, search, ink, thumbnails, chrome | 27.76 kB | — |
+| `+ printFeature` | 30.28 kB | +2.52 kB |
+| `+ downloadFeature` | 28.51 kB | +0.75 kB |
+| `+ formsFeature` | 29.78 kB | +2.02 kB |
+| `+ outlineFeature` | 28.71 kB | +0.94 kB |
+| `+ layersFeature` | 28.95 kB | +1.19 kB |
+| `+ attachmentsFeature` | 28.84 kB | +1.07 kB |
+| `+ annotateFeature` | 29.59 kB | +1.83 kB |
+| `+ editFeature` | 33.63 kB | +5.87 kB |
+| All eight | 42.53 kB | +14.76 kB |
+| A single headless hook (`usePdfDocument`) | 4.06 kB | — |
 | A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.37–2.39 kB | separate entry, not over core |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
-52.78 kB for `index.js` and 27.13 kB for `headless.js`, each with `styles.css`. `edit.js` is its own
-file at 8.58 kB, and it is the only shipped file that imports the writer, so a host that never mounts
+57.90 kB for `index.js` and 30.85 kB for `headless.js`, each with `styles.css`. `edit.js` is its own
+file at 8.55 kB, and it is the only shipped file that imports the writer, so a host that never mounts
 the tier never loads it.
 
 CI runs `npm run size`, which compares each path against the numbers committed in
@@ -465,10 +475,11 @@ reader's machine, not what it weighs — and that is written down rather than sm
 [Behaviour under load](#behaviour-under-load).
 
 
-For scale, `pdfjs-dist` 6.3.289 gzips to 128.6 kB for the main-thread module and 366.5 kB for its
-worker, and `@cantoo/pdf-lib` to 245.5 kB (each a minified bundle of a consumer that imports it
-directly) — so the engine dominates any viewer bundle regardless of this package, and the `edit` tier
-doubles that weight when a host mounts it and installs the writer.
+For scale, `pdfjs-dist` 6.3.289 gzips to 131.7 kB for the main-thread module (`pdf.min.mjs`) and 375.3 kB
+for its worker, and `@cantoo/pdf-lib` 2.11.1 bundles minified to 251.4 kB for what the `edit` tier
+actually imports — 256.1 kB if a host takes the whole API — each measured the way `scripts/check-size.mjs`
+measures, at gzip level 9. So the engine dominates any viewer bundle regardless of this package, and the
+`edit` tier doubles that weight when a host mounts it and installs the writer.
 
 ## Behaviour under load
 
@@ -514,11 +525,16 @@ If Safari is critical to you, test that first.
   `docs/`, served on :5200 by `npm run docs`, published from `main` by `.github/workflows/docs.yml`.
 - [PRD.md](./PRD.md) — the original requirements (`FR-nn`) and architecture; §2 records what stays
   out of `1.0`.
+- [CODE_REFERENCE.md](./CODE_REFERENCE.md) — what the software **does**, read out of the source rather
+  than out of the documents: every import path, prop, name, constant, feature and failure behaviour, with
+  the file and line each claim came from. Where this and `PRD.md` disagree, the code wins and the
+  disagreement is listed in its final section.
 
 ## Development
 
 ```bash
 npm run dev          # playground on :5199 with the repo's fixture PDFs
+npm run serve:auth   # the same fixtures on :5300, behind `Authorization: Bearer dev-token`
 npm run docs         # documentation site on :5200
 npm run verify       # typecheck + tests + build + size gate (prepublishOnly runs this)
 npm run size:update  # accept new baseline numbers after a deliberate growth
@@ -529,6 +545,7 @@ node scripts/make-cjk-pdf.mjs        # CID-encoded, so the cMap path is exercise
 node scripts/make-scripted-pdf.mjs   # document-level JavaScript
 node scripts/make-attachments-ocg-pdf.mjs  # 3 attached files + 3 layers, one off by default
 node scripts/make-annotated-pdf.mjs  # highlight, underline, strikeout, squiggly, note, ink, free text
+node scripts/make-labelled-pdf.mjs   # /PageLabels: roman front matter, a decimal body, an A- appendix
 node scripts/make-page-order-pdf.mjs # 20 pages, each printing its own number, page 5 rotated
 node scripts/make-signature-pdf.mjs  # four /FT /Sig fields in three shapes, one already signed
 node scripts/make-xfa-pdf.mjs        # pure XFA: single-stream /XFA packet, no /Fields
@@ -539,16 +556,22 @@ node scripts/make-long-pdf.mjs       # 1,000 pages in a nested tree, for the per
 `playground/` exercises the whole surface against generated fixtures (AcroForm, outline with named
 destinations, RC4-encrypted, CID-encoded CJK, document-level JavaScript, embedded files with
 optional-content layers, seven kinds of markup, a 20-page document for page editing, four XFA
-containers). `docs/` is a Vite app that renders the library — against `src` in
+containers). Point it at `npm run serve:auth` and a bearer token to see the network options do their
+work: without the token the viewer reports the 401 and offers a retry, with it the same URL paints.
+
+One limit worth knowing before you trust a green suite: **no test has mounted the real viewer controller
+against a document that had finished loading** — under jsdom that combination hangs, so the shell's page
+path is covered by unit tests around its parts and by browser passes against the playground, not by a
+jsdom render of the whole viewer. Fixing the harness is part of the CI work in `ROADMAP.md`. `docs/` is a Vite app that renders the library — against `src` in
 development, against the built `dist` in CI.
 
 ## Status
 
-Version `0.8.0`, built on `dev`, with the signing work sitting on top of it uncommitted and unreleased.
-npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are committed
-locally and publish together with `1.0.0`, which is the shipping rule in
-[`ROADMAP.md`](./ROADMAP.md) §Releases. While the package is pre-1.0 a minor may break the API — `0.4`
-did, with six `PdfViewer` props becoming four feature imports — so pin exactly.
+Version `0.9.0`, built on `dev` — sixteen commits ahead of `origin/dev` as that version is committed,
+none of them pushed, and nothing published. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are
+committed locally and publish together with `1.0.0`, and `0.10`–`0.12` are planned but not started, which
+is the shipping rule in [`ROADMAP.md`](./ROADMAP.md) §Releases. While the package is pre-1.0 a minor may
+break the API — `0.4` did, with six `PdfViewer` props becoming four feature imports — so pin exactly.
 
 ## Licence
 

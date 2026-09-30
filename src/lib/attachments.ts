@@ -3,9 +3,12 @@
  *
  * `PDFDocumentProxy#getAttachments()` returns a **Map** in pdf.js 6 and a plain
  * object in 5.x, both keyed by the name that `getAttachmentContent(id)` later
- * takes, so one reader has to accept either shape — the peer range allows both.
- * Content is deliberately not read here: fetching every attachment to learn its
- * size would hold a document's whole payload in memory to label a list.
+ * takes, so one reader accepts either shape. The peer range admits 6.x only
+ * (`^6.2.108`) — the 5.x branch is tolerated, not supported: it keeps a host who
+ * forces an older engine from mis-reading the list, and nothing else about that
+ * engine is verified here. Content is deliberately not read here: fetching every
+ * attachment to learn its size would hold a document's whole payload in memory to
+ * label a list.
  */
 
 export interface AttachmentInfo {

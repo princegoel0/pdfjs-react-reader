@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
-import type { PasswordReason } from '../headless/usePdfDocument';
+import type { PasswordReason } from '../lib/status';
 import { useLabels } from './labels-context';
 
 export interface PasswordPromptProps {
@@ -11,8 +11,9 @@ export interface PasswordPromptProps {
 }
 
 /**
- * FR-03's default UI. Loading is parked on the pending password request, so
- * this replaces the page area rather than floating over it.
+ * FR-03's default UI. The load is parked in `password-required` until the request is
+ * answered, so this replaces the page area rather than floating over it — and it
+ * stands down by itself the moment `status` moves on.
  */
 export function PasswordPrompt({ reason, onSubmit, onCancel }: PasswordPromptProps) {
   const labels = useLabels();

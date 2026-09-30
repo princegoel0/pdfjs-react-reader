@@ -20,11 +20,24 @@
  * `removePage()` followed by `insertPage()`, because removal deletes the object.
  */
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFObject, PDFSignature, degrees } from '@cantoo/pdf-lib';
+import { throwIfAborted } from './abort';
 import { boxToPage, isSignable, signatureContent } from './signature';
 import type { BoxPoint, PageRect, SignatureStyle } from './signature';
 
 /** The bytes the viewer is showing, with whatever the reader has already changed. */
 export type PdfBytes = Uint8Array;
+
+/**
+ * What a writer call accepts beyond its own arguments.
+ *
+ * `signal` cancels before the next page is touched and before the bytes are produced, which is the honest
+ * boundary: these loops are synchronous inside the writer, so an abort that arrives mid-pass stops the
+ * *next* step and cannot un-make a page already rearranged. What it always prevents is the output — a
+ * caller that aborts never receives a file, so there is nothing to discard.
+ */
+export interface WriteOptions {
+  signal?: AbortSignal;
+}
 
 /** One signature field, or one widget of one, as the file declares it. */
 export interface PdfSignatureField {
@@ -127,7 +140,11 @@ export interface PdfFlattenResult {
  * Run this on a document that still owns its form. Copying pages into a fresh
  * `PDFDocument` loses the `AcroForm`, and flattening the result removes nothing at all.
  */
-export async function flattenBytes(bytes: PdfBytes): Promise<PdfFlattenResult> {
+export async function flattenBytes(
+  bytes: PdfBytes,
+  options: WriteOptions = {},
+): Promise<PdfFlattenResult> {
+  throwIfAborted(options.signal, 'Flattening was aborted.');
   const doc = await loadForWriting(bytes);
   const fields = doc.getForm().getFields();
   const fieldsRemoved = fields.length;
@@ -136,6 +153,7 @@ export async function flattenBytes(bytes: PdfBytes): Promise<PdfFlattenResult> {
      know the file was already flat rather than getting a silently unchanged copy. */
   if (fieldsRemoved > 0) {
     giveUnsignedSignatureWidgetsAnAppearance(doc);
+    throwIfAborted(options.signal, 'Flattening was aborted.');
     doc.getForm().flatten();
   }
   const out = await doc.save({ useObjectStreams: false });
@@ -201,7 +219,9 @@ function toArrayBuffer(bytes: PdfBytes): ArrayBuffer {
 export async function arrangePages(
   bytes: PdfBytes,
   arrangement: PdfPageArrangement,
+  options: WriteOptions = {},
 ): Promise<PdfArrangeResult> {
+  throwIfAborted(options.signal, 'Rearranging pages was aborted.');
   const doc = await loadForWriting(bytes);
   const total = doc.getPageCount();
   const order = arrangement.order;
@@ -234,6 +254,7 @@ export async function arrangePages(
   let removed = 0;
   for (let index = total - 1; index >= 0; index -= 1) {
     if (kept.has(index)) continue;
+    throwIfAborted(options.signal, 'Rearranging pages was aborted.');
     doc.removePage(index);
     removed += 1;
   }
@@ -241,6 +262,7 @@ export async function arrangePages(
   const survivors = [...kept].sort((a, b) => a - b);
   permutePageTree(doc, order.map((original) => survivors.indexOf(original)));
 
+  throwIfAborted(options.signal, 'Rearranging pages was aborted.');
   const out = await doc.save({ useObjectStreams: false });
   return { bytes: out, pages: order.length, removed };
 }
@@ -379,7 +401,11 @@ function hasNormalAppearance(doc: PDFDocument, widget: PDFDict): boolean {
  * A field with no `/Rect`, or one whose four numbers do not add up, is left out rather than
  * reported with a zero box: there is no mark that could be placed in it.
  */
-export async function findSignatureFields(bytes: PdfBytes): Promise<PdfSignatureField[]> {
+export async function findSignatureFields(
+  bytes: PdfBytes,
+  options: WriteOptions = {},
+): Promise<PdfSignatureField[]> {
+  throwIfAborted(options.signal, 'Locating signature fields was aborted.');
   const doc = await loadForWriting(bytes);
   const owners = annotOwners(doc);
   const out: PdfSignatureField[] = [];
@@ -414,8 +440,13 @@ export async function findSignatureFields(bytes: PdfBytes): Promise<PdfSignature
  * request that writes nothing does not re-save the document: the bytes that come back
  * are then the bytes that went in.
  */
-export async function signFields(bytes: PdfBytes, marks: PdfSignatureMark[]): Promise<PdfSignResult> {
+export async function signFields(
+  bytes: PdfBytes,
+  marks: PdfSignatureMark[],
+  options: WriteOptions = {},
+): Promise<PdfSignResult> {
   const wanted = marks.filter((mark) => isSignable(mark.points));
+  throwIfAborted(options.signal, 'Signing was aborted.');
   const doc = await loadForWriting(bytes);
   const fields = doc
     .getForm()
@@ -425,6 +456,7 @@ export async function signFields(bytes: PdfBytes, marks: PdfSignatureMark[]): Pr
   const signed: string[] = [];
   const written = new Set<string>();
   for (const mark of wanted) {
+    throwIfAborted(options.signal, 'Signing was aborted.');
     const field = fields.find((candidate) => candidate.getName() === mark.field);
     // Refused rather than overwritten: a `/V` is somebody's claim about the document, and a
     // picture drawn into the same box makes that claim false without saying so.
@@ -451,5 +483,6 @@ export async function signFields(bytes: PdfBytes, marks: PdfSignatureMark[]): Pr
 
   const refused = marks.filter((mark) => !written.has(mark.field)).map((mark) => mark.field);
   if (!signed.length) return { bytes, signed, refused };
+  throwIfAborted(options.signal, 'Signing was aborted.');
   return { bytes: await doc.save({ useObjectStreams: false }), signed, refused };
 }

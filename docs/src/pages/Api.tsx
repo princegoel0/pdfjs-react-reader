@@ -50,7 +50,7 @@ export function Api() {
             <td>
               <code>pdfjs-react-reader/edit</code>
             </td>
-            <td>The page-rearranging and flatten tier, and the only module in the package that may reach the optional peer. 9 names.</td>
+            <td>The page-rearranging and flatten tier, the signing half of it, and the only module in the package that may reach the optional peer. 32 names — <code>node scripts/inventory.mjs</code> prints that number from <code>dist/edit.d.ts</code>, so it moves when the surface does.</td>
           </tr>
           <tr>
             <td>

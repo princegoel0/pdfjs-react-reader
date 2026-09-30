@@ -5,20 +5,283 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] — 2026-09-30
 
-Signing, and the requirement that decided where it landed. A reader can now draw a mark and have it
-written into a signature box in the file, which puts signing beside rearranging and flattening as work
-this package does to a document rather than merely to a view of one — through its own writer, not the
-engine's. It is also the first feature that failed the size gate it was measured against, and what
-happened instead of the feature being cut is the more durable result: `PRD.md` had a
-per-tier ceiling of 4 kB, signing measured 4.73 kB with **no interface at all**, and the owner's
-answer was that a full module may cost bytes but must never stop behaving smoothly under load. So
-the ceiling moved to 6 kB, and a new section — *Behaviour Under Load* — became the NFR that governs,
-with figures behind it rather than an adjective.
+Reach. A viewer that cannot open a document from behind a bearer token, a signed URL or a session cookie is
+useless in the deployment that was going to adopt it, and none of that needed new architecture: the engine
+had accepted every one of those options for years and this package never forwarded them (`FR-34`), never
+retried what could heal or refused to retry what could not (`FR-35`), never let a host stop what it had
+asked (`FR-36`), never published the state it kept deriving twice (`FR-37`), and never let a host classify
+a source string before handing it over (`FR-38`). Importing the package on a server, which had always
+worked, became a tested property (`FR-46`).
+
+Riding along from `0.8`: **signing**. A reader can draw a mark and have it written into a signature box in
+the file, which puts signing beside rearranging and flattening as work this package does to a document
+rather than merely to a view of one — through its own writer, not the engine's. It is also the first
+feature that failed the size gate it was measured against, and what happened instead of the feature being
+cut is the more durable result: `PRD.md` had a per-tier ceiling of 4 kB, signing measured 4.73 kB with
+**no interface at all**, and the owner's answer was that a full module may cost bytes but must never stop
+behaving smoothly under load. So the ceiling moved to 6 kB, and a new section — *Behaviour Under Load* —
+became the NFR that governs, with figures behind it rather than an adjective.
+
+Four rows the `PRD.md` rewrite had reopened closed in this release, and three of them moved the
+requirement rather than the code — see the `FR-03`, `FR-08` and `FR-02` entries below.
 
 ### Added
 
+- **The network contract (`FR-34`, the first item of `0.9`).** `httpHeaders`, `withCredentials`,
+  `rangeChunkSize`, `disableRange` and `disableStream` on `UsePdfDocumentOptions` and on `PdfViewerProps`,
+  forwarded to the engine's `getDocument` — for a URL source only, since every one of them is a property of
+  a fetch and passing them beside `data` would be harmless and misleading. This is the capability that
+  decides whether a document behind bearer auth, a signed URL or a session cookie can be opened at all, and
+  the engine has accepted all five for years; the package simply never forwarded them.
+  All five are **ref-read rather than watched**, and that was proven by breaking it on purpose: adding
+  `httpHeaders` to the load effect's dependency array does not restart the load once per render, it loops
+  without bound — **2,666 `getDocument` calls** in the re-render test and **60,417** in the reload test,
+  against the 1 and 2 they assert, because each load sets state, the state re-renders the host, the
+  re-render mints a new object literal, and the literal re-runs the effect. The same reasoning is why
+  `reload()` after rotating a token picks the new one up where a closure captured at effect time would
+  silently reuse the old. Four tests in `src/headless/usePdfDocument.network.test.tsx`; core grew 0.19 kB,
+  inside the size ratchet's 256 B slack, so the baseline did not need re-accepting.
+- **Host-facing cancellation (`FR-36`) on all nine operations the requirement names.** `signal` on
+  `usePdfDocument`, `usePdfSearch`, `usePdfPrint`, `usePdfDownload`, `PdfPage` (the proxy fetch, the canvas
+  render, and the text, annotation and XFA layers), `PdfThumbnail` (both passes), and the four writer
+  functions, plus `PdfViewer` for the load. Exported helpers: `onAbort`, `abortError`, `isAbortError` and
+  `throwIfAborted`. An abort runs the same teardown an unmount or a scroll-out would, so FR-04's rule — a
+  cancellation is not a failure — holds for a stop the host initiated, and nothing reaches `onError`.
+  Two things that only bite when you get them wrong. The load follows a **swapped** signal without
+  restarting it: `signal` in the load effect's dependency array would reload the document for any host that
+  builds a controller per render — the FR-34 trap in different clothes — so the subscription reaches the
+  running teardown through a ref instead. And `AbortSignal.any` is deliberately not used: it is Chrome 116,
+  Safari 17.4 and Firefox 124 against advertised floors of 90, 14 and 90. Nothing in this repository could
+  ever catch that, since every CI job is Node on Linux, so a test strips comments and greps the source as a
+  placeholder until FR-48 puts a real browser in the pipeline.
+- **A requirement corrected and a helper deleted on that pass.** FR-36 said a host signal *composes* with
+  the internal one. It does not, and should not: each effect owns a cancellation of its own lifetime — the
+  page-proxy fetch ends when the page number changes, a canvas render when the scale does — so one merged
+  signal across a component would make a zoom step look like the whole page had been abandoned. The
+  requirement now states what is actually guaranteed (an abort triggers the internal teardown) and names the
+  writer's limit in the same breath: its loop is synchronous inside `@cantoo/pdf-lib`, so an abort stops the
+  next page and always prevents the bytes arriving, but cannot un-make a page already rearranged.
+  `composeAbort` had been written, tested and exported from two entries before that review; nothing in the
+  package needs two signals merged, so it is gone rather than left as surface area its own tests called.
+- **Two limits asserted rather than glossed, and one counterfactual.** The download signal is checked
+  before the file is written, so the worker round trip for the bytes is still paid. A test asserts that a
+  *live* signal still produces a file, so the guard is proven not to be a wall, and that an aborted writer
+  leaves the caller's byte buffer untouched. 46 tests across `abort.test.ts`, `search.abort.test.ts`,
+  `usePdfDocument.abort.test.tsx` and the writer's new block. `extractAllText` had no test of its own before
+  this, so the loop boundary is now covered too — an abort is honoured per page, not checked once before a
+  thousand-page walk.
+- **Bounded retries (`FR-35`), and the classification that makes them safe.** `retry` and
+  `onRetryAttempt` on both `usePdfDocument` and `PdfViewer`: three attempts by default, full-jitter
+  exponential backoff, a configurable ceiling, and `false` to opt out. On by default because the engine
+  performs the fetch, so a host cannot retry it themselves.
+  The part that matters is what is *not* retried. A 401 or 403 is surfaced on the first response with the
+  reason `the server refused our credentials`, because retrying a refused credential turns one denied
+  request into several — which is how a permission problem becomes a rate-limit problem and then an
+  account lockout. A 404, a corrupt file, an encrypted document and our own cancellation are permanent
+  too, and anything not positively identified as transient falls through to no.
+  The engine reports a failed fetch as `ResponseException`, carrying `status` and a `missing` flag; a
+  connection that never got a response arrives as the same class with `status: 0`, which is why 0 is
+  transient for http and missing for `file:`. Errors are matched by `name` rather than `instanceof`,
+  because the name is what survives the worker boundary.
+  **The size ratchet refused this first**, and that is the gate doing its job: +0.91 kB on core against
+  the 755 B the ratchet allows, and +0.82 kB on the headless-only path against 308 B. Rather than accept
+  it immediately, the classifier was simplified — two hand-maintained status sets became the rule they
+  encoded (any 5xx, plus the three 4xx that mean "later"), which is smaller *and* easier to audit, since a
+  list has to be extended by whoever next meets a status it omits. `retry.ts` went from 1,578 B to 1,289 B
+  minified, and the `pdfjs-dist` import went with it. The baseline is re-accepted at core 25.78 kB in the
+  same diff, which is what `npm run size:update` is for. 37 tests across `retry.test.ts` and
+  `usePdfDocument.retry.test.tsx`; the auth tests assert the surfaced error *is* the 401, so "exactly one
+  call" cannot also be satisfied by a mock wired wrong.
+- **The two state models, published (`FR-37`).** `PdfDocumentStatus` (`idle`, `loading`,
+  `password-required`, `ready`, `error`, `destroyed`) and `PdfPageStatus` (`unrequested`, `queued`,
+  `rendering`, `rendered`, `cancelled`, `released`, `error`) are exported from both entries, from
+  `src/lib/status.ts` — a module of types only, so nothing is emitted and neither entry paid for it.
+  The earlier revision of the PRD declined these enums on the grounds that an enum would restate what
+  `doc`, `isReady` and `error` already answer; the target spec asks for them anyway, and the way to have
+  both is to **derive the fields from the state instead of sitting them beside it**. `usePdfDocument` now
+  holds one tagged value, and `status`, `doc`, `isReady` and `error` are read off it, which is what makes
+  the requirement's invariant — never `ready` while the handle is null — structural rather than a rule to
+  police. `passwordRequest: { reason, submit }` joins the result because §5.1's example renders its
+  credential prompt from `status` alone and would otherwise have no way to answer it;
+  `onPasswordRequired` stays as the event channel, and the new field is the same request as a state. Only
+  the **live** request may move the state: a host that kept the first submit in a ref — a modal that
+  outlived its prompt — answering after the engine had re-asked would clear the new prompt and leave the
+  load waiting on a request nothing is showing.
+- **`PdfPage.onStatusChange(pageNumber, status)`, and `rendered` as a join.** §3.5 defines `rendered` as
+  painted *with its overlay layers laid out*, so the canvas resolving is not enough: the page waits on the
+  passes it actually starts — canvas, text layer, annotation layer, XFA — keyed by name so a pure-XFA sheet
+  or a headless host that passes no link service is not left waiting for a layer that cannot arrive. The
+  annotation editor layer is deliberately outside the join, because it has nothing to paint until the
+  reader does something, and gating on it could hold a page at `rendering` forever. `cancelled` fires only
+  when a render was genuinely in flight, which is why a zoom step reads `released → rendering → rendered`
+  with neither a cancellation nor an error: FR-04's "a render cancelled by a zoom step is not reported as a
+  failure", now observable without a browser. `unrequested` is the one state a page never reports — an
+  unmounted page cannot speak, and `virtualSlots` is what names it — and a test asserts that absence rather
+  than leaving the union's honesty to prose. The page number rides along with the status, in the shape
+  `onBaseDimensions` already uses: a host tracking a whole document then holds **one** `useCallback` rather
+  than a closure per page, which is the difference between using this prop and quietly defeating the memo.
+- **Byte progress, because §3.5 says `loading` must carry it.** `onProgress` on `usePdfDocument` and on
+  `PdfViewer`, forwarding the engine's own `PDFDocumentLoadingTask.onProgress`. The one decision worth
+  naming: pdf.js reports `percent` as `NaN` when the response did not say how long the file is — a chunked
+  or gzipped body, which is ordinary for a served PDF — so `PdfLoadProgress.percent` is `number | null` and
+  the `NaN` becomes `null`. A host binding `width: ${percent}%` to the engine's value gets *no bar at all*,
+  which is a worse failure than an empty one. The shell forwards and does not draw a bar; the waiting
+  notice stays as it was.
+- **The shell is the demonstration consumer, and got smaller for it.** `ViewerController` carries
+  `status`, `ViewerPages` picks between prompt, failure and waiting notice from that one value, and the
+  built-in prompt is derived from the load instead of copied into shell state: a `useState`, a
+  `submitPasswordRef` and the effect whose only job was clearing a stale prompt are gone. A resolved load
+  ends the prompt by ceasing to be a request, and a host-supplied `onPasswordRequired` still stands the
+  built-in dialog down.
+- **What this found about our own tests.** `src/components/PdfPage.status.test.tsx` is the first file that
+  ever rendered `PdfPage`, and two of its cases failed on a harness bug before they tested anything: the
+  fake page proxy's `getViewport` returned one shared object, so a scale change left the viewport's
+  identity untouched and the render effect — which keys on exactly that — did not re-run. Nothing was wrong
+  in the component; the fake was lying about the engine, since a real `PageViewport` is a new object per
+  scale. The fake behaves that way now, and the zoom assertions measure the repaint rather than the stub.
+- **Verified in a browser, on both halves.** On the playground: `tracemonkey` reported
+  `1,016,315 of 1,016,315 bytes — 100 %` through `onProgress`; `encrypted-sample.pdf` opened the built-in
+  prompt — which is now a *derived* view of `password-required`, with no shell state of its own — and
+  submitting the right password cleared the prompt by itself and painted page 1 (792 × 1025, 3,567
+  non-white pixels); `damaged-truncated.pdf` produced the alert with the engine's own `Invalid PDF
+  structure.` and a working *Try again*, after its 960 bytes had arrived in full — the parse failed, not the
+  fetch. On the docs site's headless example, scrolling read out
+  `ready → ready · 1 painting → ready`, which is the page model arriving from real `render()` tasks and real
+  layers, not from a mock.
+- 24 tests (10 on the load, 4 on progress, 10 on the page) took the suite to **546 in 46 files**, and core
+  to **26.69 kB gz** — +0.55 kB on its own, inside the ratchet's slack, so FR-37 alone needed no
+  re-accepting; it was FR-38, below, that crossed the line for the pair. Not wired, and said plainly: the
+  shell does not subscribe to page statuses, because it has no per-page progress UI to spend bytes on and
+  the requirement is that a host *can*, not that the shell must.
+- **Deciding what a string is, before loading it (`FR-38`).** `classifySource(src)` answers
+  `{ kind: 'url', url }`, `{ kind: 'bytes', data }` or
+  `{ kind: 'refused', reason, message }` — `reason` being `empty`, `bare-name`, `windows-path` or
+  `bad-base64` — and it never throws, which is the whole point of asking before you load: a host holding a
+  value from an upload widget or a query parameter can branch on it instead of wrapping the loader in a
+  `try`. `base64ToBytes` is exported alongside, validating before it decodes. The part that makes this one
+  rule rather than two is that **`normalizeSource` is now built on `classifySource`**, and the tests assert
+  the agreement rather than asserting two lists of expectations: a refused string throws the very
+  `TypeError` carrying the classifier's `message`, a byte string loads to the byte-identical buffer, a URL
+  loads as that URL. One behaviour change comes with it: a `;base64` data URL is decoded here instead of
+  through `fetch()`, so it works without a network stack, and the old `Failed to resolve data URI` failure
+  is gone — a data URL whose body is not base64 is refused now, which is the case that previously arrived
+  at `atob` and threw a `DOMException` naming nothing. That branch is the single place the classifier has
+  to catch, and it is the place its contract would otherwise break.
+- **Server-side import is a tested property (`FR-46`).** `src/lib/ssr.test.ts` runs in the Node project,
+  asserts first that `document`, `window`, `HTMLCanvasElement` and `Worker` really are absent — a premise
+  nobody checks is a premise that quietly stops being true — and then imports **every JS target in
+  `package.json`'s export map**, thirteen modules today, each mapped from its `dist/…` name back to its
+  `src/…` file. The list is read from the map rather than typed into the test, so a fourteenth entry point
+  is covered the day it is added, or the test fails looking for its source. It also pins the helpers that
+  *reach* for the DOM: `resolveSourceUrl` with no `document.baseURI` returns the input, and
+  `isAllowedSource` keeps refusing a cross-origin URL that a same-origin path entry would otherwise match
+  — the asymmetry that makes the allowlist a security feature, asserted in the one environment where the
+  document it normally consults does not exist. **Two documentation claims were wrong and are corrected:**
+  the README said pdf.js "needs DOM globals at import time, so this package is client-side only", and the
+  Installation page said the library "never touches `window` at module scope" as an unchecked remark. The
+  true and narrower statement is now in both places: importing is safe anywhere, *rendering* is
+  browser-only, so `'use client'` is about the render — and `classifySource` belongs on the server, which
+  is where a source string usually gets decided. Not claimed: server rendering or hydration, and the test
+  imports the sources, not `dist/`, because `npm test` runs before `npm run build`; the shipped bundle's
+  own check is `0.12`'s browser matrix.
+- **The size ratchet refused `FR-38`, and this time the answer was to measure rather than to golf.** The
+  gate compares against the *accepted* baseline, so two features in one release means the second is the one
+  that hits the wall: core stood at 26.69 kB after FR-37 against an accepted 26.14 kB, and `FR-38` pushed
+  the total to 27.00 kB — +0.86 kB against the 0.78 kB the ratchet allows. The added bytes are the reason
+  codes and the sentences that go with them, which *are* the feature, so the growth was attributed instead
+  of trimmed: `src/lib/source.ts` measured 2,055 → 2,926 B minified (971 → 1,308 B gzipped), matching
+  core's +0.31 kB for this feature, and the baseline is re-accepted at **core 27.00 kB** / headless entry
+  30.13 kB / headless-only path 4.05 kB. 56 tests (39 on the source rule, 17 on the server import) take the
+  suite to **602 in 48 files**.
+- **A wrong password re-prompts, and the 60 s of silence turned out to be the measurement, not the engine
+  (`FR-03`).** `FR-03`'s rewritten clause — an incorrect password must produce an *observable* second
+  prompt — is what reopened the row, and `encrypted.test.ts` had closed it with "not covered": neither a
+  resolution nor a second callback arrived within 60 s for this fixture. Re-measured against the real
+  engine, the premise was wrong in both directions. pdf.js re-asks about **1 ms** after a wrong answer, and
+  it re-asks **within the same microtask chain**: `getPassword` → `PasswordRequest` → `loadingTask.onPassword`
+  → answer → re-parse → `PasswordException` → ask again, with nothing in that loop ever yielding to the event
+  loop. Fed from inside the callback, the engine measured **~27,000 asks a second** (239,947 in 8.9 s). A
+  watchdog that has to fire *between* two asks is what never ran — that is the silence that was being read.
+  A prompt waiting for a keystroke cannot loop; an automated retry of a stored credential can, which is why
+  the hazard is now documented on `PdfPasswordRequest.submit` and on `onPasswordRequired` rather than
+  dismissed as obvious. `src/lib/encrypted.reprompt.test.ts` then asserts the requirement at the engine
+  boundary: the asks become `[NEED_PASSWORD, INCORRECT_PASSWORD]`, the second one is *still* parked after
+  50 ms of timers that could have run, and answering it with the right password opens the document. One load
+  per process, for the reason `encrypted.test.ts` already gives — an abandoned encrypted load wedges the
+  Node fake worker. One test added, the suite at **603 in 49 files**, and **core unchanged at 27.00 kB**:
+  everything shipped that touched this was a comment, which is the price a requirement should cost when the
+  behaviour was already there and only the proof was missing.
+- **The device pixel ratio is watched now, not sampled (`FR-07`).** The ratio was always *readable* and that
+  was the whole problem: `PdfPage` asked `window.devicePixelRatio` inside its render effect, so a window
+  dragged to another display changed nothing until the reader zoomed or scrolled. There is no
+  `devicePixelRatio` event, so `src/lib/dpr.ts` uses the one there is — a media query pinned to the current
+  value, `(resolution: 1.25dppx)`, which stops matching the moment the device moves off it. The premise was
+  measured in Chromium before it was written down: at 1.25 the query for `1.25dppx` matches and the ones for
+  `2.5dppx` and `1.55dppx` do not. **`caniuse-lite`'s `css-media-resolution` is what added the second
+  channel:** Chrome, Edge and Firefox are `y` at every floor this package advertises, while Safari and iOS
+  Safari are partial-and-unknown below 16 — inside the floor — and an engine that does not know a media
+  feature evaluates a query for it as never-matching, which is a watcher that silently never fires on
+  exactly the browsers nobody has open. So the feature is detected by asking a question it must answer yes to
+  (`(min-resolution: 0dppx)`, measured beside two controls that answer no: an unknown unit, an unknown
+  feature) and where the answer is no the ratio is re-read on `resize`. Both channels dedupe on the number,
+  so one move is reported once and a `resize` that changed nothing is reported never. One hub per realm,
+  refcounted per *subscription* rather than per callback, because React's StrictMode subscribes and
+  unsubscribes the same function around a double mount and a keyed set would have dropped a live watcher;
+  a long document's pages therefore share one media query instead of one each. `PdfPage`, `PdfThumbnail`
+  and the shell's canvas budget all read `useDevicePixelRatio()`, and a host that passes `devicePixelRatio`
+  explicitly gets a value that cannot move, so a monitor switch does not repaint what it pinned.
+- **`0.3`'s "read the ceiling once" decision is reversed, on purpose and in the comment.** The canvas budget
+  is the screen's pixel count scaled by the density, so a stale ceiling clamps pages a 2× display could have
+  painted; `0.3` kept it steady to avoid re-rendering everything on a hot-plug, and `FR-07` made
+  re-rendering everything the requirement. Measured in the playground on `long-sample.pdf`, with the real
+  code path and only the environment value substituted: a `resize` at an unchanged density produced **0**
+  canvas ops against patched `CanvasRenderingContext2D` counters and left the buffer at 792×1025; one event
+  with the ratio moved 1.25 → 2 produced exactly one repaint (10 `drawImage`, 2 `fillRect`, 9,534 `fillText`)
+  and the buffer went to 1268×1640 while the CSS box stayed 634×820. **What is still not proven, and named
+  as such:** that the media-query channel fires on a real switch — no page can change its own
+  `devicePixelRatio`; overriding it in JavaScript moves the number but not the media feature, which is why
+  the browser run above goes through the `resize` path — and whether every display switch fires `resize` on
+  every engine. Both are `#141`'s. 16 tests (13 hub, 3 page); core 27.00 → **27.39 kB**, inside the
+  ratchet's slack, and the headless entry unmoved.
+- **The page box says what the page is called (`FR-12`).** The requirement's new clause — a reader who sees
+  "xii" should be able to type "xii" — was untestable before this, because nothing in
+  `playground/fixtures/` carried a `/PageLabels` dictionary at all, so `scripts/make-labelled-pdf.mjs` now
+  writes one: roman front matter, a decimal body restarting at 1, an appendix as `/P (A-)` plus a numeral, ten
+  pages, and every page painting the label it expects. Then pdf.js was asked rather than assumed: it answers
+  `i ii iii 1 2 3 4 5 A-1 A-2`, composing the prefix and restarting at each range, and answers **`null`** for
+  a document that declares nothing — which is the case for nearly every PDF there is, so the ordinary path is
+  "no labels", not "labels that happen to be numbers". `src/lib/page-labels.ts` holds both directions and the
+  two decisions in them. **Label first, number second:** page 6 of that fixture is labelled "2", so a reader
+  typing "2" means the fifth page, and the numeric reading would land them on the page whose box says "ii";
+  the display is what they are copying. **Clamping stays, but as the fallback and not the parser:** a whole
+  number that names no label clamps into the document ("999" reaches the last page), and anything else is
+  refused — including "3a", which `Number.parseInt` cheerfully reads as 3 and which a number input used to
+  make unreachable, the box being unable to hold it. That is also why the control's `type` switches:
+  `type="number"` reports "xii" as the empty string, so a label box cannot be a number box, and
+  `labelsDifferFromNumbers` is what decides per document, spinner and numeric keyboard intact otherwise.
+  `usePdfPageLabels(doc, signal)` is the read — once per document handle, `null` on a rejected read, and no
+  round trip at all for a host who has already stopped, which is the rule FR-36 sets for the nine sites it
+  names extended to the tenth that just appeared.
+- **The size gate refused `FR-12`, on the `shell` path, and the answer was the same as last time: attribute,
+  then accept.** Core moved +0.37 kB and `headless-only` +0.01 kB, while the shipped-file sum moved +1.44 kB
+  and broke the ratchet — the same shared-chunk reshuffle `FR-36` recorded (a new chunk appeared, and sums
+  are not sums of deltas). The new modules measure 412 B and 254 B gzipped on their own, next to a code path
+  that touches one input element and one round trip, so the growth is the feature and `size:update` re-accepts
+  at **core 27.76 kB** / shell 57.90 / headless 30.85 / `headless-only` 4.06 — which also folds in the 0.39 kB
+  `FR-07` had left inside the slack. 29 tests in four files take the suite to **654 in 54 files**.
+- **What the browser pass could and could not show, and the harness reason for both.** In the playground with
+  the real engine on the new fixture: the box came up as a text input reading "i", page 1's own text layer
+  saying `page 1 of 10, labelled "i"`, and typing "A-1" scrolled to 5760 px — 8 × (704 + 16), the top of page
+  9 — where the imperative `goToPage(5)` control lands at 2880, so the arithmetic is the same one and the
+  label resolved to the right page. What it could *not* show is the box following the reader back as they
+  scroll, because the in-app tab reports `visibilityState: hidden` and never runs a frame: `requestAnimationFrame`
+  is paused there while timers still fire, and the page in view is frame-driven. A separate finding, and not
+  about labels: no test in this repository has ever mounted the real `useViewerController` against a *ready*
+  document, and trying hangs jsdom outright, so the shell's page path has never been under test at all —
+  filed with the rest of the browser-only evidence for `#141` and `#148`. The page-to-box direction is
+  therefore asserted against a stub controller, where it can be.
 - **A Sign section in the Pages tab** (`pdfjs-react-reader/edit`). Draw once in the pad, click the box
   you want it in, and the mark is written into that field's appearance stream. The document's boxes are
   listed with the page each is on, one Sign control per box, the pad's pixels arriving as page points
@@ -56,9 +319,79 @@ with figures behind it rather than an adjective.
   150–200 ms on a file that declares a form against 0 ms on one that does not, batched writes, and
   ceilings that refuse instead of crashing. Every one measured in Chromium on one Windows machine, and
   said as much.
+- **The failure paths, finally exercised** (`#153`). `PRD.md`'s edge-case list — "damaged files,
+  encrypted documents, rotated pages" — had two of three covered: rotation is tested in eight files, and
+  nothing had ever asked pdf.js to open a broken or protected file. Now: `scripts/make-damaged-pdf.mjs`
+  writes `damaged-truncated.pdf` (cut mid-object) and `damaged-xref.pdf` (whole file, a `startxref` that
+  lies); `damaged.test.ts` loads both through the real engine; `encrypted.test.ts` asks what a protected
+  document does; `PasswordPrompt.test.tsx` is the first test that component ever had; and
+  `ViewerLayout.failure.test.tsx` pins what the reader sees and what the retry button actually re-asks.
+  What measuring turned up, none of it guessable:
+  - **Two kinds of damage behave differently, and both are normal.** A truncated file rejects with
+    `InvalidPDFException: Invalid PDF structure.`; a file whose `startxref` points past the end — same
+    length, intact header — **loads all three pages**, after pdf.js warns that it is re-indexing every
+    object. "Damaged files show an error" was only ever true of one kind, and the tests hold both
+    outcomes open. A single fixture could have been written to look like either.
+  - **An encrypted document does not reject; it parks.** The load waits on a `NEED_PASSWORD` callback,
+    and abandoning it by passing an `Error` — what the prompt's cancel does — rejects with
+    `PasswordException` code 1, `No password given`. The right password opens it (one page). A wrong one
+    produced neither a resolution nor the second `INCORRECT_PASSWORD` callback in a 60-second window, so
+    the re-prompt is recorded as **unproven for this fixture** rather than asserted. **That reading was
+    superseded on 2026-09-30,** and the superseding is the interesting part: the callback does arrive, about
+    1 ms after the wrong answer, inside a microtask chain that never yields — so what the 60-second window
+    was measuring was the harness. See the `FR-03` bullet earlier in this section.
+  - **Sequential encrypted loads wedge Node's fake worker.** A probe running abandon → wrong → right in
+    one process printed only its first line; each case needed its own process, which is how
+    `encrypted.test.ts` is arranged.
+  - A `Buffer` is refused by pdf.js on the call rather than as a rejected promise — and
+    `normalizeSource` passes one through, since a Buffer is a `Uint8Array`. Left alone deliberately, with
+    a test that stops anyone claiming bytes just work: no document promises a Buffer, and copying every
+    byte array to satisfy an engine preference is the owner's call, not a silent side effect.
+- **The worker's four states, asserted (`FR-02`).** `ensureWorker` probes two candidates and writes neither
+  when both fail, and `worker.test.ts` had always proved that much. What `FR-02`'s rewritten clause named —
+  "fall back to a main-thread worker rather than failing when neither resolves" — had never had a document
+  loaded through it, and loading one is what closed the row. `src/lib/worker.fallback.test.ts` and its three
+  siblings hold one state each, in a process of their own, because pdf.js memoises the fake-worker lookup per
+  module instance and a second state in the same process would be measured against the first one's answer.
+  With nothing pinned, a document loads and page 1 produces its operator stream on the main thread — pdf.js
+  writes its own `./pdf.worker.mjs` default under `isNodeJS`, and there is no `Worker` global in Node to
+  construct even if it asked. With the handler on `globalThis.pdfjsWorker`, it paints with **no URL at
+  all**. With neither, the load fails naming `workerSrc`. With a dead URL — precisely what an unprobed
+  candidate would have written — it fails naming a failed import instead, which is the second reason nothing
+  is guessed at. The pixel half cannot be produced in this harness, so it was produced in a browser: a
+  400×518 canvas render of the same fixture painted **1,728 non-white pixels with 0 `Worker` constructed**,
+  against a control that built **1** worker and painted the same page — the control being what makes the
+  zero mean anything. `src/headless/usePdfDocument.worker.test.tsx` adds the host-facing half: the advice
+  this package appends to the engine's sentence is conditional on auto-detection having run and failed, so a
+  reader who pinned a URL themselves is not told to pin the URL they already pinned.
 
 ### Changed
 
+- **`FR-02`'s fallback clause was restated by the same kind of measuring, and this time the limit was the
+  engine's.** The row said the package falls back to a main-thread worker when neither a local module nor a
+  CDN URL resolves. pdf.js's "fake worker" *is* the worker's own parser, so that code has to be reachable
+  without a URL, and there are only two ways it is: pdf.js's `isNodeJS` default, and a host that has assigned
+  `globalThis.pdfjsWorker` itself. An ordinary page with neither does not fall back — it fails, in a browser
+  synchronously from `getDocument` itself. What the package really guarantees is now what the row says:
+  leaving `workerSrc` unset keeps those two states reachable, and the failure names the option the host owns.
+  No behaviour changed — `ensureWorker` already left the field alone, and the dead-URL state measures what
+  pinning a plausible candidate would have cost. Four documents carried the larger claim until this row
+  closed, and all four were corrected: `README.md`, `docs/src/pages/Installation.tsx`, and
+  `docs/src/pages/Compatibility.tsx` — which said "the pdf.js fake worker takes over" about a bundler whose
+  `import.meta.url` cannot be used, when that failure empties the candidate list and a browser page simply
+  fails — plus `CODE_REFERENCE.md` §10 and its §14 failure-path row. `src/lib/worker.ts`'s comment on
+  `ensureWorker` was rewritten to the measured scope, and it is the only shipped file this touched.
+
+- **`FR-08` was restated because a measurement said the requirement was wrong, not the code.** It asked
+  that switching layout mode "does not re-render what is already painted". In the playground, counting
+  canvas ops and tagging canvas nodes for identity: at a fixed 125 % zoom, spread → continuous kept the
+  scale at 1.25, kept the same canvas nodes (so no remount), kept their 956×1237 backing stores and
+  produced **1** op. In a fit mode the same switch moved scale 1.04 → 0.50 and re-rendered every canvas
+  from 792×1025 to 386×499 — correct rather than wasteful, because fitting two pages into one width is a
+  different fit than fitting one. The clause was unsatisfiable as written and now states the invariant the
+  code actually holds: switching regroups rows without remounting a page, and repaints only when the fit
+  target itself moves. The second time in this project a measurement changed a requirement instead of the
+  code, and the reason that row was measured rather than read from source.
 - **The per-feature ceiling moved from 4 kB to 6 kB, in the assertion that enforces it**
   (`scripts/check-size.mjs`; the decision is recorded in `ROADMAP.md` under *Signing shipped, where it
   landed*). Worth being exact about why this is a decision and not a relaxation: the gate is a constant
@@ -74,6 +407,151 @@ with figures behind it rather than an adjective.
   that declares neither `/AcroForm` nor XFA never reaches the writer at all — and the parse waits until
   the reader has drawn something to place. A test counts the `getData` calls to keep the ordering, since
   the regression here is invisible to anything that only checks the result.
+- **`CODE_REFERENCE.md`** — a reference for this package whose source of truth is the code, not `PRD.md`.
+  Twenty-two sections: every export path and the names on it, all 35 `PdfViewer` props, the ten handle
+  methods, the eight features with their control ids and priorities and panels and keys, every constant
+  with its value, the label catalog, the test and toolchain inventory, what is *not* done, and a closing
+  table of each place a document and the code disagree. Written against `dist/*.d.ts` and `src/`, with a
+  §22 of one-liner commands that re-derive every number in it, because a document like this is only worth
+  its length if it can be checked. `scripts/inventory.mjs` (promoted out of the scratch tree) is the
+  generator for the name lists and is tracked for that reason — §22 tells a reader to run it.
+- **`PRD.md` was read line by line against the source, and corrected** (2026-09-29). Eleven findings in
+  the PRD itself, one in the docs API table (`edit` "9 names", where `inventory.mjs` reads 32 — the row
+  predates signing, which added eleven of them) and one in the Requirements rows here ("19.3.0, in CI",
+  when the job that ran on 2026-09-24 installed whatever the lockfile pinned and no job had installed 18).
+  Most of the PRD's were in the 2024 prose
+  that later releases had not revisited: the §3 diagram offered `usePdf` and `usePage`,
+  which were never built, and a `Modal`, which does not exist (`grep Modal src/` → zero files); §3.1
+  claimed three page layers where `PdfPage` stacks six; FR-11 quoted a thumbnail scale of 0.15–0.25 where
+  the component computes `(cardWidth / base.width) × dpr` from a measured grid; FR-16 and FR-18 both
+  called signing an overlay, when the SVG is the in-memory ink layer and a signature is a canvas pad
+  written into `/AP`; FR-19 promised full-resolution printing of the entire document, when the scale is
+  whatever fits 256 MiB and the range is selectable; FR-20 promised a flatten on download, which is
+  `saveEdits` being mis-described — the code comment has said "this is 'save', not a true flatten" since
+  `0.7`; FR-23's acceptance note listed four size markers where the gate configures eight, two of which
+  are not hook names. §4.9 (FR-29–FR-33) was added, because `0.6`–`0.8` shipped an editor, a page writer,
+  a flatten, signing and XFA display with **no requirement for any of them** and §4 still ended at FR-28;
+  §6 gained an Error Handling bullet, because `ViewerLayout.failure.test.tsx` cites "PRD.md's
+  error-handling line" and there wasn't one — the behaviour was shipped, tested and unrequired.
+- **Three claims in my own new reference were found and removed.** §12 of the first draft said search
+  indexes "lazily in viewport order from the current page, stopping at the first match", that `F3` moves
+  between matches, and that print opens an about:blank window. None of the three is in the code —
+  `extractAllText` walks every page in order, `SearchBox` binds `Enter`/`Shift+Enter`/`Escape` and no
+  `F3`, print appends `div.pjsr-print` to the current document — and none was copied from a document
+  either, so they were invented details that happened to sound like the architecture. Recorded in §21 of
+  that file as well as here, since a code-derived reference that fabricates is worse than the stale one it
+  replaced.
+- **`PRD.md` was rewritten as a target specification** (2026-09-29), on the owner's instruction to write
+  the document for the best possible package and reconcile it against the code afterwards rather than
+  letting today's implementation bound the ambition. It now carries **51 requirements**, up from 33.
+  FR-01 – FR-33 keep their ids, their wording and their subsections, so every citation in `ROADMAP.md`,
+  in tests and in `scripts/` still resolves; §4 remains the requirement matrix, §6 the NFRs and §7 the
+  milestones, because `check-size.mjs` cites §6 and `make-damaged-pdf.mjs` cites the Error Handling bullet
+  by name. **FR-34 – FR-51 are new**, and every one of them came out of the second draft or out of the
+  gap review that preceded it: the network contract (`httpHeaders`, credentials, range and streaming
+  controls), bounded retries that never retry a 401, an `AbortSignal` on every asynchronous operation,
+  exported source utilities, published document and page state unions, incremental viewport-prioritised
+  indexing, an injectable external index, dual ESM and CJS output, document merge, structure-tree
+  accessibility, forced-colours rendering, a WCAG 2.2 AA target, an SSR-safe module graph, touch and
+  gesture arbitration, browser and engine verification matrices, a benchmark fixture suite for all four
+  profiles, published API maturity tags, and an edge-case suite.
+- **What the rewrite deliberately does not do is annotate itself.** The previous `PRD.md` carried an
+  inline note on every requirement the code did not yet meet, which kept the document honest and made it
+  unreadable. Rule 2 at the top of the new file moves that answer to one place: `PRD.md` is the
+  requirement, `CODE_REFERENCE.md` is the present state, and the gap between them is the work list. The
+  as-built document — every requirement annotated with whether the code met it, and every figure carrying
+  its provenance — is preserved as **`PRD_as-built_2026-09-29.md`**, banner-marked as a snapshot. It was
+  uncommitted when the rewrite replaced it, so keeping it was the reversible choice rather than a
+  preference.
+- **Nine line-number citations into `PRD.md` were repointed to sections,** in `ROADMAP.md` and
+  `scripts/make-long-pdf.mjs`. A full rewrite moves every line, and `PRD.md:22` had already been cited
+  from four places that all meant the same performance bar; they now say §2.1, which cannot rot the same
+  way. The one in `CHANGELOG.md` was left alone on purpose — a changelog entry describes the state at its
+  date, and rewriting history to fix a pointer is the worse trade. The two under `.spike/` are in a
+  gitignored scratch tree.
+- **The scope question the rewrite opened is answered: `1.0.0` ships all 51 requirements.** For one day
+  `PRD.md` §7 ("1.0 — the lot") and `ROADMAP.md`'s GA gate (`FR-01`–`FR-33`) disagreed, and the
+  disagreement was recorded in both files rather than resolved silently. The owner chose the PRD. So the
+  release sequence no longer ends at `0.8`: **`0.9` Reach** (FR-34 – FR-38, FR-46 — the network contract,
+  retries, cancellation tokens, published state unions, source utilities, SSR-safe import), **`0.10`
+  Access** (FR-43 – FR-45, FR-47 — structure tree, forced colours, WCAG 2.2 AA, gesture arbitration),
+  **`0.11` Index & Assemble** (FR-39, FR-40, FR-42 — incremental and injectable indexing, merge) and
+  **`0.12` Prove** (FR-41, FR-48 – FR-51 — browser and engine matrices, the fixture suite, maturity tags,
+  the edge-case suite, dual module output) are planned in `ROADMAP.md` §Releases, each with a gate. Prove is
+  last on purpose: it certifies everything before it.
+- **Two consequences of that decision are written into the roadmap rather than left to be discovered.**
+  First, **the rewrite tightened requirements that the status table calls done.** FR-01 – FR-33 kept their
+  ids and subsections, but `FR-03` now demands an observable second prompt on a wrong password — which we
+  read at the time as *not* happening within 60 s, and which `0.9` then found had been happening all along,
+  ~1 ms after the wrong answer (`FR-03`'s row, and the bullet above, carry the re-measurement) — `FR-07`
+  now demands the pixel ratio be re-read when it changes, and `FR-12` now demands page labels.
+  `FR-08`, `FR-14` and `FR-17` need checking. Reconciling all 33 rows
+  against the new wording is `0.9`'s task 0, before any feature work, because a plan built on rows that say
+  "done" when the requirement moved has holes in it. Second, **`0.12`'s theme is CI jobs and nothing is
+  pushed until `1.0.0`**, so the first real execution of the browser and engine matrices is the release
+  push itself. The alternative — pushing `dev` before `0.12` starts — breaks the 2026-09-25 shipping rule
+  and is the owner's call.
+- **The two PRDs are now one** (2026-09-29). A second, independently written `PRD_v2.md` was reviewed
+  against the first and against the code, and merged into `PRD.md` rather than kept beside it — two
+  specifications for one package is how a reader ends up building from the wrong one. What the draft
+  contributed was structure the older file lacked: scope tiers split into *ships in `1.0`*, *deliberately
+  after* and *the separate editing capability* (§2.2–§2.4); a module map and the published entry-point
+  table (§3.2); concurrency and state models (§3.3–§3.4); API maturity tags with a change policy per tag
+  (§5.4); and, in §6, an engine-compatibility policy, four named benchmark profiles, a security boundary
+  list, a search-architecture statement, a React/runtime row and licence governance. Its rule that *every
+  code example must compile against the published export map* is now §5's preamble, and it earned its keep
+  immediately, twice over: §5.1 had imported `PdfPage` from `pdfjs-react-reader/headless` in **both**
+  drafts, where that entry exports no React components; and the corrected example still did not type-check,
+  because `PdfPage`'s `doc` prop is `PDFDocumentProxy` and not `PDFDocumentProxy | null`, so the slots have
+  to render behind a `doc &&` guard. Both were found by dropping the example into `docs/src` and running
+  `npm run typecheck` — the scratch file was removed afterwards, and the example in §5.1 is now the one
+  that compiled.
+- **Nine of the draft's statements were contradicted by the code, and each was corrected rather than
+  copied.** A `/features/search` entry that does not exist (search stayed core); `base64ToPdfSource()` as
+  an external utility, where base64 is a first-class source string classified inside `normalizeSource` and
+  the decoder is not exported; an `AbortSignal` on every async operation, where the real mechanism is
+  effect-scoped `cancelled` flags plus `task.cancel()` and `RenderingCancelledException` swallowed by name;
+  two named state unions — `idle → loading → password-required → ready → error → destroyed` and
+  `unrequested → queued → …` — of which neither enum exists, so §3.4 specifies the observable fields and
+  the invariants instead; "both ESM and CJS outputs", where the build is ESM-only and has never emitted a
+  `.cjs`; SSR validated for Next.js, where the package is client-side and `readCanvasEnvironment` exists
+  precisely because it is; `merge` in the editing tier, which is not in `src/edit.tsx` or `dist/edit.d.ts`;
+  pdf.js internals "never exposed as the public extension contract", where `dist/index.d.ts` ships an
+  `annotationEditorUIManager` prop typed with the engine's own class — kept, and §5.4 now names it as the
+  reason the engine policy pins a major; and incremental/lazy search indexing, which re-imported the
+  invention removed from `CODE_REFERENCE.md` the same day. Its `< 55 ms` cold-page target was declined for
+  a related reason: that is the top of our own measured range on one machine, and §6 records why a maximum
+  observed on one device does not become a requirement.
+- **`PRD_v2.md` is banner-marked superseded, not deleted.** It is untracked, so removing it would be
+  unrecoverable, and it is the only record of what the draft proposed. Nothing else in the repository
+  references it.
+- **A false claim in `CODE_REFERENCE.md`, found while re-verifying the above.** §16 said of the CI
+  workflows: "None of it has run." GitHub Actions reports 22 runs, the last green on both `main` and `dev`
+  at `5059bc7` on 2026-09-24, covering `verify`, `docs` and `consumer`. Rewritten to say what actually ran,
+  and to state the two limits that were hiding behind the overclaim — **every job is Node on
+  `ubuntu-latest` and none starts a browser**, so no CI run has ever exercised a rendering path, and the
+  `react` job added the same day has not run at all. The same sentence was corrected in the §21 log and in
+  project memory. `PRD.md` §6's compatibility matrix is written against that: one row tested, six not.
+- **CI now covers the React half of the peer range.** `peerDependencies` has advertised
+  `^18.0.0 || ^19.0.0` since `0.2` while every job installed 19, and the docs said 18 was verified —
+  which had been true once, by hand, at `0.1`. Rather than downgrade the sentence, the claim was tested
+  and then made durable: with `react`, `react-dom` and both `@types/*` swapped to 18.3, `typecheck`, all
+  428 tests and `build` pass (the source uses `useId`, which is 18+, and `forwardRef`; nothing 19-only),
+  and a `react` matrix job in `ci.yml` installs majors 18 and 19 on every push. **The job has not run
+  yet** — no `0.x` commit is pushed — so what is verified today is the local run, and the job is what
+  keeps it verified afterwards. The suite grew underneath that record — it is 449 now, and the first pass
+  was made at 428 — so it was re-run on 2026-09-29 rather than restated: `react`, `react-dom` and both
+  `@types/*` at 18.3, and `npm run verify` end to end (typecheck, **449 tests in 38 files**, both
+  bundles, the size gate at 24.96 kB core / 5.72 kB `edit` / 14.44 kB all) passes on React 18. Then
+  `npm ci` put 19.3.0 back, which is what the lockfile and `package.json` name.
+- **`FR-25` no longer requires an engine this package does not support.** It asked that attachments work
+  on both the 5.x and the 6.x engine shapes, while the peer floor has been `^6.2.108` since `0.6`. The
+  branches the roadmap had also slated for deletion stay, by decision: `ViewerController`'s feature test
+  exists so that an engine without `getAttachmentContent` reads as "nothing to fetch" instead of throwing
+  inside pdf.js's own click handler, and removing a graceful degradation to emphasise a peer constraint is
+  the wrong trade. So the requirement now says what is true — 6.x supported and tested, the 5.x *data
+  shape* tolerated and unit-tested, no other 5.x surface supported — and `attachments.ts`'s header says
+  "tolerated" where it had gone on saying "the peer range allows both" after the floor stopped allowing it.
 
 ### Fixed
 
@@ -120,9 +598,24 @@ with figures behind it rather than an adjective.
   retracted in the roadmap and the flag is carried as data (`noRotate` is what the file says, and
   `findSignatureFields` reports it) rather than as a behaviour.
 
-Tests went 393 → **428** across 34 files, thirty-five of them new and about signing; typecheck, both
-bundles, the docs build and the size gate are clean. Nothing here is released yet: `0.8.0` is still the
-version in `package.json`, and the version bump is a release-close act that stays with the owner.
+- **The gate's bearer-token clause, met at the close rather than restated away.** `scripts/auth-server.mjs`
+  serves `playground/fixtures/` on :5300 and answers 401 to anything without `Authorization:
+  Bearer dev-token`, and the playground grew a token box wired to `httpHeaders`. Without the token the
+  shell read *"Failed to load PDF: Unexpected server response (401) while retrieving PDF
+  …/outline-sample.pdf"* with **0 canvases** and a working **Try again**, and the server logged **exactly
+  one** request for that load — `FR-35`'s never-retry-a-401, observed rather than asserted. With the token
+  the same URL gave **3 canvases**, page 1's 792×1025 buffer holding **5,117 non-white pixels**, a text
+  layer reading "Page 1: Introduction", and "of 3" in the bar. Retyping the token to a wrong value without
+  re-opening the URL reached the server **zero** times and left the document on screen: the
+  read-at-load-start rule, in a browser rather than in a mock.
+
+Tests went 393 → **449** across 38 files through the signing and failure-path work, and 449 → **661**
+across **59 files** through `0.9` itself: 268 added, the largest shares on the network contract, the retry
+verdicts, the host signals and the ten sites that had to accept one, the published state unions, and the
+four worker states. Typecheck, both bundles, the docs build and the size gate are clean, every size path
+sits at +0.00 against the baseline re-accepted at `FR-12`, and `0.9.0` is now the version in
+`package.json` — committed on local `dev`, nothing pushed and nothing published, because the `0.2`–`0.9`
+sequence goes out together as `1.0.0`.
 
 ## [0.8.0] — 2026-09-27
 

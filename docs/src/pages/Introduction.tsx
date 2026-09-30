@@ -158,75 +158,75 @@ export function Introduction() {
             <td>
               <code>PdfViewer</code> alone — pages, text, search, ink, thumbnails, chrome
             </td>
-            <td>24.77 kB</td>
+            <td>27.76 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>
               <code>+ printFeature</code>
             </td>
-            <td>27.28 kB</td>
-            <td>+2.50 kB</td>
+            <td>30.28 kB</td>
+            <td>+2.52 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ downloadFeature</code>
             </td>
-            <td>25.55 kB</td>
-            <td>+0.78 kB</td>
+            <td>28.51 kB</td>
+            <td>+0.75 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ formsFeature</code>
             </td>
-            <td>26.69 kB</td>
-            <td>+1.92 kB</td>
+            <td>29.78 kB</td>
+            <td>+2.02 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ outlineFeature</code>
             </td>
-            <td>25.71 kB</td>
-            <td>+0.93 kB</td>
+            <td>28.71 kB</td>
+            <td>+0.94 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ layersFeature</code>
             </td>
-            <td>25.98 kB</td>
-            <td>+1.21 kB</td>
+            <td>28.95 kB</td>
+            <td>+1.19 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ attachmentsFeature</code>
             </td>
-            <td>25.88 kB</td>
-            <td>+1.10 kB</td>
+            <td>28.84 kB</td>
+            <td>+1.07 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ annotateFeature</code>
             </td>
-            <td>26.64 kB</td>
-            <td>+1.86 kB</td>
+            <td>29.59 kB</td>
+            <td>+1.83 kB</td>
           </tr>
           <tr>
             <td>
-              <code>+ editFeature</code> — pages and flatten
+              <code>+ editFeature</code> — pages, flatten and signing
             </td>
-            <td>28.35 kB</td>
-            <td>+3.58 kB</td>
+            <td>33.63 kB</td>
+            <td>+5.87 kB</td>
           </tr>
           <tr>
             <td>All eight</td>
-            <td>37.03 kB</td>
-            <td>+12.25 kB</td>
+            <td>42.53 kB</td>
+            <td>+14.76 kB</td>
           </tr>
           <tr>
             <td>
               One headless hook (<code>usePdfDocument</code>)
             </td>
-            <td>2.59 kB</td>
+            <td>4.06 kB</td>
             <td>—</td>
           </tr>
         </tbody>
@@ -234,11 +234,12 @@ export function Introduction() {
       <p>
         All eight together cost less than their sum, because each is measured against the same core they
         attach to. The two shipped-file paths are what a bundler that cannot tree-shake pays for the
-        whole entry surface: <strong>52.78 kB</strong> for <code>index.js</code> and{' '}
-        <strong>27.13 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
-        <code>edit.js</code> is its own 8.58 kB, and it is the only shipped file that imports the writer.
-        For scale, <code>pdfjs-dist</code> gzips to 128.6 kB on the main thread and 366.5 kB in its
-        worker, and <code>@cantoo/pdf-lib</code> to 245.5 kB.
+        whole entry surface: <strong>57.90 kB</strong> for <code>index.js</code> and{' '}
+        <strong>30.85 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
+        <code>edit.js</code> is its own 8.55 kB, and it is the only shipped file that imports the writer.
+        For scale, <code>pdfjs-dist</code> 6.3 gzips to 131.7 kB on the main thread and 375.3 kB in its
+        worker, and <code>@cantoo/pdf-lib</code> to 251.5 kB — measured the same way the size gate
+        measures, so the ratio between our layer and the engine is the point rather than the digits.
       </p>
       <p>
         Measured on the signing build. CI runs <code>npm run size</code>, which compares every path

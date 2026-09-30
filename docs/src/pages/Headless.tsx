@@ -2,8 +2,8 @@ import { HeadlessExample } from '../examples/HeadlessExample';
 
 const HOOKS: [string, string][] = [
   [
-    'usePdfDocument({ src, workerSrc?, assetUrl?, cMapUrl?, standardFontUrl?, allowedSources?, enableXfa?, onPasswordRequired? })',
-    'Loads the file. Returns { doc, numPages, isReady, error, capabilities, reload }.',
+    'usePdfDocument({ src, workerSrc?, assetUrl?, cMapUrl?, standardFontUrl?, allowedSources?, httpHeaders?, withCredentials?, rangeChunkSize?, disableRange?, disableStream?, retry?, onRetryAttempt?, onProgress?, signal?, enableXfa?, onPasswordRequired? })',
+    'Loads the file. Returns { status, doc, numPages, isReady, error, passwordRequest, capabilities, reload }. `status` is the published document model — idle, loading, password-required, ready, error, destroyed — and every other field is read off it, so `ready` never arrives without a handle and a cancelled load reports `destroyed` rather than an error. The network options apply to a URL source only; `retry` defaults to three attempts with full-jitter backoff and never retries a 401, a 403, a 404 or a corrupt file; `onProgress` reports `{ loaded, total, percent }` as bytes arrive, with `percent` null when the response did not state a length; `signal` cancels the load exactly as an unmount would and reports no error.',
   ],
   [
     'usePdfVirtualizer({ doc, numPages, scale, gap?, rotation?, pageRotations?, overscan?, layout? })',
@@ -24,6 +24,10 @@ const HOOKS: [string, string][] = [
   [
     'usePdfOutline({ doc })',
     'The bookmark tree, with destinations resolved to 0-based page indexes. Returns { entries, loading } — `entries` is null while loading.',
+  ],
+  [
+    'usePdfPageLabels({ doc, signal? })',
+    'What the pages are called — the document’s /PageLabels table, or null when it declares none, which is the ordinary answer and not a failure. Read once per document handle and republished when the handle changes, so a replaced document gets its own numbering; an already-aborted signal means the round trip is never made. Pair it with `resolvePageInput` and `formatPageLabel` to build a page box that takes "iii" back from the reader.',
   ],
   [
     'usePdfFormValues({ doc, onError? })',
@@ -118,6 +122,60 @@ export function Headless() {
         <code>annotateFeature</code> publish through their <code>pageProps</code>.
       </p>
 
+      <h2>Two state models, so the branches are yours</h2>
+      <p>
+        The load and the page each have a named state, exported as{' '}
+        <code>PdfDocumentStatus</code> and <code>PdfPageStatus</code>. Every other field on the result is
+        read off the document&apos;s state, which is what makes the pair impossible to catch
+        disagreeing: <code>status</code> is never <code>ready</code> with a null <code>doc</code>, and a
+        load the host cancelled lands on <code>destroyed</code> having never passed through{' '}
+        <code>error</code>.
+      </p>
+      <pre>
+        <code>{`// usePdfDocument
+'idle' → 'loading' → 'password-required' → 'ready' → 'error' | 'destroyed'
+
+const { status, doc, error, passwordRequest, reload } = usePdfDocument({ src });
+
+{status === 'password-required' && passwordRequest && (
+  <MyPrompt
+    onSubmit={(value) => passwordRequest.submit(value)}
+    // An Error is how a dismissed prompt fails the load instead of hanging it.
+    onCancel={() => passwordRequest.submit(new Error('No password provided.'))}
+  />
+)}
+{status === 'error' && error && <MyFailure message={error.message} onRetry={reload} />}
+
+// PdfPage, one page at a time
+'queued' → 'rendering' → 'rendered' → 'released', with 'cancelled' and 'error' off the middle
+
+// The page number travels with the status, so one stable handler tracks the whole document and the
+// memo on PdfPage keeps working — a closure per page would defeat it.
+const [pageStates, setPageStates] = useState<Record<number, PdfPageStatus>>({});
+const onPageStatus = useCallback((pageNumber: number, state: PdfPageStatus) => {
+  setPageStates((was) => ({ ...was, [pageNumber]: state }));
+}, []);
+
+<PdfPage pageNumber={i + 1} doc={doc} scale={scale} onStatusChange={onPageStatus} />`}
+</code>
+      </pre>
+      <p>
+        A wrong password does not fail the load. The engine re-asks within about a millisecond and the hook
+        publishes that as a fresh <code>password-required</code> with <code>reason:
+        &apos;incorrect-password&apos;</code>, so the prompt above comes back with its own message and needs
+        no second state. One way to spend that contract badly is worth naming, because it is invisible until
+        it happens: answering <em>from inside the callback</em> — an automatic retry of a stored credential
+        rather than a decision a person made — loops, since the re-ask is chained in the same microtask and
+        nothing ever yields. Measured at roughly 27,000 asks a second, and stated on{' '}
+        <code>PdfPasswordRequest.submit</code> as well as here.
+      </p>
+      <p>
+        A page that has not been asked for is <code>unrequested</code>, and it is the one state a page
+        never reports — a page the virtualizer has not mounted is not there to say so, which is exactly
+        what <code>virtualSlots</code> describe. A zoom reads <code>released → rendering → rendered</code>{' '}
+        and produces no <code>cancelled</code>: nothing was in flight when the buffer was handed back.
+      </p>
+
       <h2>Two rules that matter</h2>
       <div className="doc-callout">
         <strong>Give <code>PdfPage</code> stable props.</strong> It is memoised, because it is the most
@@ -125,8 +183,8 @@ export function Headless() {
         search bar changes no page prop. A fresh inline arrow or a new object each render defeats that
         and re-renders every visible page. Separately, the callbacks that appear in a layer's
         dependency list (<code>onError</code>, <code>onBaseDimensions</code>,{' '}
-        <code>onFormChange</code>) are read through refs, because a layer rebuild clears its container,
-        drops text selection and flashes the page; the shell does the same.
+        <code>onFormChange</code>, <code>onStatusChange</code>) are read through refs, because a layer
+        rebuild clears its container, drops text selection and flashes the page; the shell does the same.
       </div>
       <div className="doc-callout">
         <strong>Give the viewport element a height and let it scroll.</strong> The virtualizer
@@ -145,7 +203,7 @@ export function Headless() {
   type PdfCapabilities,
 } from 'pdfjs-react-reader/headless';
 
-const { doc, numPages, isReady, error, capabilities, reload } = usePdfDocument({
+const { status, doc, numPages, isReady, error, capabilities, reload } = usePdfDocument({
   src,
   // Where the file may come from. Byte sources are always allowed.
   allowedSources: ['/uploads/', 'https://cdn.example.com'],
@@ -171,10 +229,12 @@ if (capabilities?.form === 'xfa' && !capabilities.renderedFromXfa) {
       </p>
       <p>
         Page canvases are capped too — pass <code>maxRenderPixels</code> and{' '}
-        <code>devicePixelRatio</code> to <code>PdfPage</code>, or leave them unset and let{' '}
-        <code>maxRenderPixelsFor(readCanvasEnvironment())</code> pick the limit the engine uses. An
-        uncapped page at deep zoom asks for more pixels than a browser will allocate, and the failure
-        is a blank rectangle, not an exception.
+        <code>devicePixelRatio</code> to <code>PdfPage</code>, or leave them unset: the ceiling then comes
+        from <code>maxRenderPixelsFor(readCanvasEnvironment())</code>, the limit the engine uses, and the
+        density from the watched <code>window.devicePixelRatio</code>, which re-reads itself when the window
+        moves to another display — a <code>devicePixelRatio</code> you pass is a number that does not move,
+        and the pages stop answering the environment. An uncapped page at deep zoom asks for more pixels than
+        a browser will allocate, and the failure is a blank rectangle, not an exception.
       </p>
 
       <h2>Search without the shell</h2>
@@ -192,6 +252,57 @@ search.nextMatch();
 <PdfPage doc={doc} pageNumber={i + 1} scale={scale} highlights={byPage.get(i)} />`}</code>
       </pre>
 
+      <h2>Deciding what a string is, before loading it</h2>
+      <p>
+        A source that arrives from an upload widget, a query parameter or a JSON payload is a string whose
+        kind nothing has checked yet, and the loader has a rule about it that a host cannot guess: a long
+        pure-base64 run is bytes, anything else with a slash or a <code>.pdf</code> suffix is a path, and a
+        bare word is refused rather than fetched — because fetching <code>report</code> hands the parser
+        whatever this origin serves there, which arrives as a corrupt-document error with nothing pointing
+        at the typo. <code>classifySource</code> is that rule, asked out loud. It never throws, and it is
+        the same code <code>normalizeSource</code> runs, so a prediction and an outcome cannot disagree —
+        the refusal even carries the sentence the loader would have thrown.
+      </p>
+      <pre>
+        <code>{`import { base64ToBytes, classifySource } from 'pdfjs-react-reader/headless';
+
+const classified = classifySource(requested);
+// { kind: 'url',    url }    — the engine fetches it
+// { kind: 'bytes',  data }   — the string is the file: long base64, or a ;base64 data URL
+// { kind: 'refused', reason, message }   'empty' | 'bare-name' | 'windows-path' | 'bad-base64'
+
+if (classified.kind === 'refused') {
+  // reason is the branch a form message keys off; message is a sentence already worth showing.
+  showProblem(classified.message);
+}
+
+// A base64 document held as text, turned into bytes to hash, wrap in a File, or post elsewhere.
+// Passing the string straight to \`src\` does this decode for you; this is for the step before.
+const bytes = base64ToBytes(payload.fileBase64);`}</code>
+      </pre>
+
+      <h2>What the pages are called</h2>
+      <p>
+        A document may number itself however it likes — <code>i, ii, iii</code> for the front matter,{' '}
+        <code>1, 2, 3</code> from there, <code>A-1</code> for an appendix — and a reader looking at{' '}
+        <code>iii</code> means that when they type it. The shell’s page box already does this: it shows the
+        name, and it becomes a text input only when the names differ from the numbers. For a bar of your
+        own, <code>usePdfPageLabels</code> asks the document — answering <code>null</code> when it declares
+        nothing, which is the ordinary case, not a failure — and two pure functions carry both directions.
+      </p>
+      <pre>
+        <code>{`import { formatPageLabel, resolvePageInput, usePdfPageLabels } from 'pdfjs-react-reader/headless';
+
+const labels = usePdfPageLabels(doc);            // ['i','ii','iii','1',…] or null
+const shown = formatPageLabel(labels, index);    // 'iii' — the name this page wears
+
+// Label first, because that is what the reader copied: on that document "2" is the fifth page,
+// not the second. A whole number naming no label clamps into the document; '3a' and 'xiv' are
+// refused, so a box never jumps somewhere the reader did not ask for.
+const target = resolvePageInput(typed, labels, doc.numPages);   // 1-based, or null
+if (target !== null) scrollToPage(target);`}</code>
+      </pre>
+
       <h2>Pure helpers</h2>
       <p>
         Everything the hooks are built from is exported too, so you can unit-test your own logic
@@ -202,7 +313,9 @@ search.nextMatch();
         <code>collectWidgets</code>, <code>readFormValues</code>, <code>resolveRenderScale</code>,{' '}
         <code>maxRenderPixelsFor</code>, <code>pdfAssetUrls</code>, <code>isAllowedSource</code>,{' '}
         <code>flattenOptionalContent</code>, <code>normalizeAttachments</code>,{' '}
-        <code>automaticFitMode</code>, <code>normalizeSource</code>, <code>readEditingState</code>,{' '}
+        <code>automaticFitMode</code>, <code>normalizeSource</code>, <code>classifySource</code>,{' '}
+        <code>base64ToBytes</code>, <code>formatPageLabel</code>, <code>resolvePageInput</code>,{' '}
+        <code>readEditingState</code>,{' '}
         <code>readEditingParams</code>, <code>HIGHLIGHT_COLORS</code>,{' '}
         <code>HIGHLIGHT_PALETTE_STRING</code>. The three a replaceable find
         strategy needs — <code>planFind</code>, <code>findPageMatches</code>, <code>countPerPage</code>{' '}

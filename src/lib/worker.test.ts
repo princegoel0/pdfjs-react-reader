@@ -193,6 +193,25 @@ describe('Trusted Types', () => {
     expect(mocks.workers).toHaveLength(0);
   });
 
+  /*
+   * The branch `FR-02`'s fallback rests on, and the one the test above cannot reach: a policy exists and a
+   * `Worker` constructor is available, so nothing but the missing URL can stop the load owning a worker.
+   * Returning null here is what leaves pdf.js free to use its own main-thread worker — see
+   * `worker.fallback.test.ts` for what the engine then does with an unset `workerSrc`.
+   */
+  it('builds no worker of any kind when no candidate resolved', async () => {
+    stubTrustedTypes();
+    configureTrustedTypes('app#worker');
+    const probed = stubFetch([404]);
+    stubWorker();
+
+    expect(await createPdfWorker()).toBeNull();
+    expect(probed).toHaveLength(2);
+    expect(mocks.workers).toHaveLength(0);
+    expect(mocks.constructed).toHaveLength(0);
+    expect(mocks.workerOptions.workerSrc).toBe('');
+  });
+
   it('signs the worker URL and owns the worker it constructs', async () => {
     stubTrustedTypes();
     configureTrustedTypes('app#worker');

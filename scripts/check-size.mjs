@@ -5,7 +5,7 @@
  * **The ratchet.** Every number is compared against `size-baseline.json`, and
  * growth of more than 2 % (plus 256 bytes of minifier noise) fails. A library
  * that grows with features cannot honestly promise a fixed size — `pdfjs-dist`
- * alone is 128.6 kB gzipped on the main thread and 366.5 kB in its worker — so
+ * alone is 131.7 kB gzipped on the main thread and 375.3 kB in its worker — so
  * what is promised instead is that bytes never
  * arrive quietly: accepting growth means running `npm run size:update`, which
  * changes a committed file in the same diff as the code that caused it.

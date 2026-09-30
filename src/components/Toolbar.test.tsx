@@ -73,13 +73,14 @@ describe('Toolbar labels', () => {
   });
 });
 
-function pageBox(currentPage: number, numPages: number) {
+function pageBox(currentPage: number, numPages: number, pageLabels: readonly string[] | null = null) {
   const onPageChange = vi.fn();
   const { container } = render(
     <LabelsContext.Provider value={DEFAULT_LABELS}>
       <Toolbar
         currentPage={currentPage}
         numPages={numPages}
+        pageLabels={pageLabels}
         scaleMode="fit-width"
         resolvedScale={1}
         onPageChange={onPageChange}
@@ -89,6 +90,80 @@ function pageBox(currentPage: number, numPages: number) {
   );
   return { input: container.querySelector<HTMLInputElement>('.pjsr-page-input'), onPageChange };
 }
+
+/** What `playground/fixtures/labelled-sample.pdf` reports from `doc.getPageLabels()`. */
+const LABELLED = ['i', 'ii', 'iii', '1', '2', '3', '4', '5', 'A-1', 'A-2'];
+
+describe('Toolbar page box with labels (FR-12)', () => {
+  it('shows the label of the page in view rather than its index', () => {
+    const { input } = pageBox(3, 10, LABELLED);
+    expect(input?.value).toBe('iii');
+  });
+
+  /*
+   * `type="number"` reads "xii" as the empty string, so a labelled document has to be given a text box —
+   * and an ordinary one must keep its spinner and its numeric keyboard, which is why the control follows the
+   * document instead of being text always. The identity table is the test of that: it is a real
+   * `/PageLabels` answer, and it changes nothing.
+   */
+  it('changes the control only when the labels differ from the numbers', () => {
+    const labelled = pageBox(3, 10, LABELLED);
+    expect(labelled.input?.type).toBe('text');
+    expect(labelled.input?.getAttribute('data-labelled')).toBe('true');
+    expect(labelled.input?.getAttribute('max')).toBeNull();
+
+    const ordinary = pageBox(3, 14, Array.from({ length: 14 }, (_, i) => String(i + 1)));
+    expect(ordinary.input?.type).toBe('number');
+    expect(ordinary.input?.getAttribute('data-labelled')).toBeNull();
+    expect(ordinary.input?.getAttribute('max')).toBe('14');
+    expect(ordinary.input?.value).toBe('3');
+  });
+
+  it('navigates by the label a reader types, including the one that looks like a number', () => {
+    const typed = (value: string) => {
+      const box = pageBox(1, 10, LABELLED);
+      if (!box.input) throw new Error('no page box rendered');
+      fireEvent.change(box.input, { target: { value } });
+      fireEvent.keyDown(box.input, { key: 'Enter' });
+      return box;
+    };
+
+    expect(typed('ii').onPageChange).toHaveBeenCalledWith(2);
+    expect(typed('A-1').onPageChange).toHaveBeenCalledWith(9);
+    // Page 6 of this document is labelled "2", so "2" means the fifth page — what the reader was looking at.
+    const two = typed('2');
+    expect(two.onPageChange).toHaveBeenCalledWith(5);
+    expect(two.input?.value).toBe('2');
+  });
+
+  it('writes the label of the page it clamped to', () => {
+    const { input, onPageChange } = pageBox(3, 10, LABELLED);
+    if (!input) throw new Error('no page box rendered');
+    fireEvent.change(input, { target: { value: '999' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPageChange).toHaveBeenCalledWith(10);
+    expect(input.value).toBe('A-2');
+  });
+
+  it('puts the page in view back when the box names no page', () => {
+    const { input, onPageChange } = pageBox(3, 10, LABELLED);
+    if (!input) throw new Error('no page box rendered');
+    // "xii" is a plausible label and this document has no fourth front-matter page.
+    fireEvent.change(input, { target: { value: 'xii' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPageChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('iii');
+  });
+
+  it('keeps a document that labels nothing on the rule it has always had', () => {
+    const { input, onPageChange } = pageBox(3, 14, null);
+    if (!input) throw new Error('no page box rendered');
+    fireEvent.change(input, { target: { value: '9' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPageChange).toHaveBeenCalledWith(9);
+    expect(input.value).toBe('9');
+  });
+});
 
 describe('Toolbar page box', () => {
   it('asks for a page the document has', () => {

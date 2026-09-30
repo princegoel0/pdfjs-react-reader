@@ -96,6 +96,57 @@ jobs:
           path: docs/dist/
           retention-days: 7
 
+  # The other peer axis. `peerDependencies` advertises `^18.0.0 || ^19.0.0`, and
+  # `verify` runs on 19 alone because that is what devDependencies pin — so until
+  # this job existed, the 18 half of the advertised range was a sentence nothing
+  # re-checked. Same rule as the `consumer` engine matrix: a peer range we cannot
+  # actually build against is the mistake that shipped 0.1.0.
+  #
+  # Measured locally on 2026-09-28 before adding this: with react/react-dom and
+  # @types/* swapped to 18.3, `npm run typecheck`, `npm test` (428 tests) and
+  # `npm run build` all pass — the source uses `useId` (18+) and `forwardRef`,
+  # nothing 19-only. The job is here so that stays true rather than because it
+  # was doubtful today.
+  react:
+    name: React ${{ matrix.react }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Majors, not ranges: each is passed to `npm i` for both the runtime and
+        # its types, and @types/react carries the same major as react.
+        react: ['18', '19']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # `--no-save` keeps `package.json` and the lockfile out of the diff: this
+      # job proves the peer range, it does not redefine the development pin.
+      - name: Swap in React ${{ matrix.react }}
+        run: |
+          set -euo pipefail
+          npm i --no-save --no-package-lock \
+            "react@${{ matrix.react }}" "react-dom@${{ matrix.react }}" \
+            "@types/react@${{ matrix.react }}" "@types/react-dom@${{ matrix.react }}"
+          node -e "console.log('react', require('react/package.json').version)"
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
   consumer:
     name: Consumer build (Vite, pdfjs-dist ${{ matrix.engine }})
     runs-on: ubuntu-latest

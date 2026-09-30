@@ -1,11 +1,17 @@
 export {
   usePdfDocument,
   type PdfCapabilities,
+  type PdfLoadProgress,
   type UsePdfDocumentOptions,
   type UsePdfDocumentResult,
+} from './headless/usePdfDocument';
+export {
   type PasswordReason,
   type PasswordSubmit,
-} from './headless/usePdfDocument';
+  type PdfDocumentStatus,
+  type PdfPageStatus,
+  type PdfPasswordRequest,
+} from './lib/status';
 export {
   usePdfVirtualizer,
   type PdfViewportRef,
@@ -45,6 +51,7 @@ export {
   type UsePdfDownloadResult,
   type PdfDownloadOptions,
 } from './headless/usePdfDownload';
+export { usePdfPageLabels } from './headless/usePdfPageLabels';
 export {
   usePdfOptionalContent,
   type OcStateAction,
@@ -156,12 +163,24 @@ export {
   workerAutoDetectionFailed,
 } from './lib/worker';
 export {
+  base64ToBytes,
+  classifySource,
   isAllowedSource,
   normalizeSource,
   resolveSourceUrl,
-  type PdfSource,
   type NormalizedSource,
+  type PdfSource,
+  type PdfSourceClassification,
+  type PdfSourceRefusal,
 } from './lib/source';
+export { abortError, isAbortError, onAbort, throwIfAborted } from './lib/abort';
+export {
+  classifyLoadError,
+  DEFAULT_RETRY_POLICY,
+  type RetryAttemptInfo,
+  type RetryPolicy,
+  type RetryVerdict,
+} from './lib/retry';
 export {
   CDN_ASSET_ROOT,
   pdfAssetUrls,
@@ -199,3 +218,10 @@ export {
   type LayoutResult,
   type VisibleRange,
 } from './lib/layout';
+export {
+  formatPageLabel,
+  labelsDifferFromNumbers,
+  pageLabelForIndex,
+  resolvePageInput,
+  type PdfPageLabels,
+} from './lib/page-labels';

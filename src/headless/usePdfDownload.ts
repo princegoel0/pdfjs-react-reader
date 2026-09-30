@@ -7,6 +7,12 @@ export interface UsePdfDownloadOptions {
   /** Name for the saved file, with or without the extension. */
   fileName?: string;
   onError?: (error: Error) => void;
+  /**
+   * Abandon a download in progress. Collecting the bytes of a large document is a round trip to the worker
+   * that can take seconds, and until now the only way out was to unmount. An abort writes no file and
+   * reports no error — the host asked to stop, which is not a failure.
+   */
+  signal?: AbortSignal;
 }
 
 export interface PdfDownloadOptions {
@@ -43,6 +49,7 @@ export function usePdfDownload({
   doc,
   fileName,
   onError,
+  signal,
 }: UsePdfDownloadOptions): UsePdfDownloadResult {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -53,6 +60,8 @@ export function usePdfDownload({
   fileNameRef.current = fileName;
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const signalRef = useRef(signal);
+  signalRef.current = signal;
   const busyRef = useRef(false);
 
   const download = useCallback(async (options: PdfDownloadOptions = {}) => {
@@ -76,6 +85,9 @@ export function usePdfDownload({
        */
       const commits = options.saveEdits && current.isPureXfa !== true;
       const bytes = commits ? await current.saveDocument() : await current.getData();
+      // Checked after the await and before the write: the point of aborting a download is to not produce
+      // a file, and by here the bytes have already arrived.
+      if (signalRef.current?.aborted) return;
       downloadBytes(bytes, pdfFileName(fileNameRef.current));
     } catch (err) {
       const next = err instanceof Error ? err : new Error(String(err));

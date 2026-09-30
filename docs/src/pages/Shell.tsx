@@ -9,6 +9,15 @@ const PROPS: [string, string, string][] = [
   ['workerSrc', 'string', 'Pins the pdf.js worker location. Auto-detected when omitted.'],
   ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
   ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
+  ['httpHeaders', 'Record<string, string>', 'Request headers for a URL src — an `Authorization` bearer, a signed-URL token, a tenant id. Forwarded to the engine’s fetch verbatim, never logged and never echoed into an error. Read when a load starts, so an inline literal does not reload the document; reopen the URL to apply new ones.'],
+  ['withCredentials', 'boolean', 'Send cookies and HTTP auth for a cross-origin URL src.'],
+  ['rangeChunkSize', 'number', 'Bytes per range request; the engine’s default applies when omitted.'],
+  ['disableRange', 'boolean', 'Fetch the whole file in one request instead of by byte range.'],
+  ['disableStream', 'boolean', 'Turn off progressive streaming as the file arrives. Together with the row above, this is how a host on a metered or high-latency connection chooses whole-file download over progressive display.'],
+  ['retry', 'RetryPolicy | false', 'Bounded retries for a load failure that can heal: three attempts, a 250 ms first interval with full jitter, a 5 s ceiling. `false` fails on the first error. A 401, a 403, a 404, a corrupt file and an encrypted document are never retried — resubmitting the same credentials is not a recovery.'],
+  ['onRetryAttempt', '(info) => void', 'Fires before each wait with the attempt, the total, the delay and the status, so the UI can say “retrying (2 of 3)” instead of spinning.'],
+  ['onProgress', '(report) => void', 'Bytes as they arrive. `percent` is null when the response did not say how long the file is — a chunked or gzipped body — rather than the `NaN` the engine reports. The shell draws no bar; this is the host’s channel.'],
+  ['signal', 'AbortSignal', 'Stop the load from outside. Aborting runs exactly what an unmount would — the task is destroyed, the worker released, nothing reported as an error. Swapping the signal moves which signal we follow; it does not restart a load in progress.'],
   ['enableXfa', 'boolean', 'Render XFA forms. Defaults to true, which is what a dynamic XFA needs to have any content at all: the page is then painted from its own template by `XfaLayer` and the text layer steps aside, and a search marks that text like any other. Saving one back is not offered, and `Versions & compatibility` says exactly which half of that was measured.'],
   ['defaultScale', 'number | "fit-width" | "fit-page" | "automatic"', 'Initial zoom. 1 = 100%; any percentage from 25 to 500 is accepted, not just the presets. "automatic" fits a landscape page whole and a portrait one by width.'],
   ['defaultLayout', '"continuous" | "single" | "spread"', 'Row grouping.'],
@@ -17,7 +26,7 @@ const PROPS: [string, string, string][] = [
   ['defaultSidebarOpen', 'boolean', 'Show the sidebar on first render, on its first tab.'],
   ['gap', 'number', 'Vertical gap between pages in CSS pixels.'],
   ['maxRenderPixels', 'number', 'Area ceiling per page canvas in device pixels. Defaults to pdf.js’s own limit, tightened for mobile — over it a browser paints a blank page rather than failing.'],
-  ['devicePixelRatio', 'number', 'Device pixels per CSS pixel for page canvases. Defaults to window.devicePixelRatio.'],
+  ['devicePixelRatio', 'number', 'Device pixels per CSS pixel for page canvases. Unset, this is the live window.devicePixelRatio, re-read when the display changes; passing a number pins it and a monitor switch then repaints nothing.'],
   ['enableWheelZoom', 'boolean', 'Ctrl/Cmd + wheel, which is also how browsers report trackpad pinch. Defaults to true.'],
   ['enablePinchZoom', 'boolean', 'Two-finger pinch through the engine’s touch manager. Defaults to true.'],
   ['enableFullscreen', 'boolean', 'Show the fullscreen control, and only where the platform supports it. Defaults to true.'],
@@ -224,7 +233,7 @@ import { DE_LABELS } from 'pdfjs-react-reader/locales/de';
       <p>
         Each is typed as the whole <code>PdfViewerLabels</code> rather than the partial a host may
         send, so a string added to the English source stops that catalog building until it is
-        answered too. They are separate entry points on purpose: German is 2.17 kB gzipped, and
+        answered too. They are separate entry points on purpose: German is 2.38 kB gzipped, and
         importing the viewer must not hand you a language you did not ask for. Replace one word of
         a shipped catalog the way you would override a default — <code>{`{ ...DE_LABELS, outlineTab: 'Inhaltsverzeichnis' }`}</code>.
       </p>
@@ -334,6 +343,16 @@ import { DE_LABELS } from 'pdfjs-react-reader/locales/de';
         Control <em>size</em> follows the input device instead of the width: 44 px targets under{' '}
         <code>(pointer: coarse)</code>, 32 px on a mouse. A narrow desktop window therefore keeps
         the dense layout, and a landscape tablet gets finger-sized targets.
+      </p>
+      <p>
+        The page field shows what the page is <em>called</em>, which is not always its number. A document
+        that declares a numbering — roman front matter, a body restarting at 1, an appendix prefixed{' '}
+        <code>A-</code> — gets a text field holding that label, and accepts one back: typing{' '}
+        <code>iii</code> goes to the third page, and a number that names no label still clamps to the
+        document. An ordinary PDF sees none of this: the field stays a number input with its spinner,
+        because <code>getPageLabels()</code> answered <code>null</code>. (This is the document’s own
+        numbering, and has nothing to do with the <em>Labels</em> section above, which is the words the
+        chrome is drawn in.)
       </p>
 
       <h2>Shaping the bar</h2>
@@ -480,6 +499,17 @@ export const ReadingView = forwardRef<PdfViewerHandle, PdfViewerProps>(function 
         a document its props do not describe. That is what lets Apply put a reordered file on the screen
         without a remount, and it is there for any host with bytes of its own — a merge, a server-side
         edit, a decryption step.
+      </p>
+      <p>
+        The controller also carries <code>status</code>, which is the same published document model the
+        headless hooks return — <code>idle</code>, <code>loading</code>, <code>password-required</code>,{' '}
+        <code>ready</code>, <code>error</code>, <code>destroyed</code>. The built-in page region reads it
+        to choose between its prompt, its failure message and its waiting notice, and a host-written{' '}
+        <code>ViewerPages</code> replacement reads the same value rather than inferring a state from{' '}
+        <code>doc</code> and <code>error</code>. <code>passwordPrompt</code> and <code>isReady</code> are
+        still there, both derived from it. The shell forwards <code>onProgress</code>, <code>retry</code>,{' '}
+        <code>signal</code> and the network options to the same hook, and draws nothing of its own from the
+        first two.
       </p>
       <p>
         Two routes, deliberately. The parts above read the viewer around them;{' '}

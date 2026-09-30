@@ -1,5 +1,5 @@
 // Generates playground/fixtures/long-sample.pdf — one thousand pages, for the
-// performance bar `PRD.md:22` states and `0.8` has to measure:
+// performance bar `PRD.md` §2.1 states and §6 measures against (benchmark profile A):
 //   * a **nested page tree** (leaves of ten, a level of groups, one root), because
 //     that is what a real producer writes for a document this size and what a flat
 //     `/Kids` of a thousand entries would let the engine off the hook for —

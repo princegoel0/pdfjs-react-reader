@@ -10,12 +10,19 @@ import {
   type ResolvedSearchOptions,
   type SearchOptions,
 } from '../lib/search';
+import { isCancellation } from '../lib/abort';
 
 export type SearchStatus = 'idle' | 'indexing' | 'ready' | 'error';
 
 export interface UsePdfSearchOptions {
   doc: PDFDocumentProxy | null;
   onError?: (error: Error) => void;
+  /**
+   * Stop an in-flight index. Indexing is the longest thing this package does on the main thread, and until
+   * now the only way to stop it was to unmount. Aborting returns the hook to `idle` and reports no error:
+   * a cancellation is not a failure (FR-04), and a caller that cancelled has already stopped caring.
+   */
+  signal?: AbortSignal;
 }
 
 export interface UsePdfSearchResult {
@@ -71,7 +78,11 @@ const DEFAULT_OPTIONS: ResolvedSearchOptions = {
 export type PdfFindController = UsePdfSearchResult;
 
 export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
-  const { doc, onError } = options;
+  const { doc, onError, signal } = options;
+  // Ref-read like the other callbacks: `search` is memoised on `[doc]`, so a host holding a fresh
+  // controller per render must not get a new `search` — and must not get a restart either.
+  const signalRef = useRef(signal);
+  signalRef.current = signal;
   const [status, setStatus] = useState<SearchStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [query, setQuery] = useState('');
@@ -141,9 +152,13 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
             return;
           }
 
-          const pages = await extractAllText(doc, (fraction) => {
-            if (runIdRef.current === runId) setProgress(fraction);
-          });
+          const pages = await extractAllText(
+            doc,
+            (fraction) => {
+              if (runIdRef.current === runId) setProgress(fraction);
+            },
+            signalRef.current,
+          );
           if (runIdRef.current !== runId) return;
 
           const flat: PageMatch[] = [];
@@ -160,6 +175,14 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
           setActiveSeq((s) => s + 1);
         } catch (err) {
           if (runIdRef.current !== runId) return;
+          // A host that cancelled is not a host that hit a fault: back to idle, no error surfaced, no
+          // onError. This is FR-04's rule applied to the one operation whose cancellation takes seconds
+          // rather than frames.
+          if (isCancellation(err)) {
+            setStatus('idle');
+            setProgress(0);
+            return;
+          }
           setStatus('error');
           setResults([]);
           setCounts([]);

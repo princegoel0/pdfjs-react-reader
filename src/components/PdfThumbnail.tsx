@@ -8,7 +8,9 @@ import {
   type RenderTask,
 } from 'pdfjs-dist';
 import { formatLabel } from '../lib/labels';
+import { onAbort } from '../lib/abort';
 import { useLabels } from './labels-context';
+import { useDevicePixelRatio } from './useDevicePixelRatio';
 
 /** What `page.getXfa()` hands back: the template's tree, already merged with the datasets. */
 type XfaTree = NonNullable<Awaited<ReturnType<PDFPageProxy['getXfa']>>>;
@@ -23,6 +25,12 @@ export interface PdfThumbnailProps {
   rotation?: number;
   active?: boolean;
   onSelect?: (pageNumber: number) => void;
+  /**
+   * Cancel this card's work — the proxy fetch, the canvas render and the form composition. A sidebar of
+   * forty thumbnails is where an abort saves the most, and an abort runs exactly what scrolling the card
+   * out of view runs.
+   */
+  signal?: AbortSignal;
 }
 
 export function PdfThumbnail({
@@ -32,8 +40,15 @@ export function PdfThumbnail({
   rotation = 0,
   active = false,
   onSelect,
+  signal,
 }: PdfThumbnailProps) {
   const labels = useLabels();
+  // The card's buffer is sized by the display density too, so a window moving to another screen re-paints
+  // it at the new one rather than leaving a 1× thumbnail on a 2× panel (FR-07).
+  const pixelRatio = useDevicePixelRatio();
+  // Read by ref so a host rebuilding its controller cannot re-run the render effects.
+  const signalRef = useRef(signal);
+  signalRef.current = signal;
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const xfaRef = useRef<HTMLDivElement | null>(null);
@@ -80,8 +95,7 @@ export function PdfThumbnail({
         const next = base.height / base.width;
         return prev !== next ? next : prev;
       });
-      const dpr = window.devicePixelRatio ?? 1;
-      const scale = (width / base.width) * dpr;
+      const scale = (width / base.width) * pixelRatio;
       const viewport = page.getViewport({ scale, rotation: intrinsicRotation });
       // The layer is DOM, so it is sized in CSS pixels: the device ratio that grows the
       // canvas buffer to keep the bitmap crisp would only blow the form out of the card.
@@ -102,14 +116,20 @@ export function PdfThumbnail({
       // A failed thumbnail must not break the sidebar.
     });
 
-    return () => {
+    const stop = () => {
       cancelled = true;
       task?.cancel();
       canvas.width = 0;
       canvas.height = 0;
       setXfa(null);
     };
-  }, [visible, doc, pageNumber, width, rotation]);
+    const offAbort = onAbort(signalRef.current, stop);
+
+    return () => {
+      offAbort();
+      stop();
+    };
+  }, [visible, doc, pageNumber, width, rotation, pixelRatio]);
 
   // The form itself, composed over the blank canvas the loop above painted. What the
   // page shows is what the thumbnail shows, at the thumbnail's scale — which is the same
@@ -153,9 +173,15 @@ export function PdfThumbnail({
       // A thumbnail that cannot compose its form leaves the card blank, as it was.
     });
 
-    return () => {
+    const stop = () => {
       cancelled = true;
       xfaRef.current?.replaceChildren();
+    };
+    const offAbort = onAbort(signalRef.current, stop);
+
+    return () => {
+      offAbort();
+      stop();
     };
   }, [xfa, doc, pageNumber, rotation]);
 

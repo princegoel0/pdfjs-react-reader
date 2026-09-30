@@ -94,7 +94,13 @@ import { editFeature } from 'pdfjs-react-reader/edit';
       <ol>
         <li>
           An explicit <code>workerSrc</code> you pass to <code>PdfViewer</code> or{' '}
-          <code>usePdfDocument</code> always wins — use this for a CDN or a copied asset.
+          <code>usePdfDocument</code> always wins — use this for a CDN or a copied asset. It wins
+          <em> globally</em>, though: pdf.js keeps this on <code>GlobalWorkerOptions</code>, so a second
+          viewer that passes its own <code>workerSrc</code> changes what every <strong>later</strong>
+          load on the page resolves to, while documents already open keep the worker they were given.
+          Auto-detection probes once per page, however many documents load — <code>worker.test.ts</code>{' '}
+          pins that. Hosts who need two workers on one page pass an explicit <code>workerSrc</code> to
+          each, or let the first resolve and the rest inherit it.
         </li>
         <li>
           Otherwise it probes two specifiers for the worker and keeps the first URL that answers: a
@@ -105,9 +111,14 @@ import { editFeature } from 'pdfjs-react-reader/edit';
           needed in a normal Vite, webpack 5 or Rollup app.
         </li>
         <li>
-          If nothing answers, <code>workerSrc</code> is left unset so pdf.js can still fall back to
-          its main-thread "fake worker", and a failed load tells you to pass <code>workerSrc</code>
-          instead of surfacing a bare fetch error.
+          If nothing answers, <code>workerSrc</code> is left unset. That is not a fallback of its own —
+          pdf.js&apos;s main-thread parser <em>is</em> the worker&apos;s code, so it has to be reachable
+          without a URL: Node supplies its own default, and a browser can render on the main thread only if
+          you have assigned <code>globalThis.pdfjsWorker = {'{ WorkerMessageHandler }'}</code> yourself.
+          Otherwise the load fails telling you to pass <code>workerSrc</code>, instead of a fetch error for a
+          URL you never wrote — which is the second reason nothing is guessed at.
+          <code>worker.fallback.test.ts</code> and its three sibling files measure every one of these
+          states.
         </li>
       </ol>
       <pre>
@@ -122,10 +133,31 @@ export function Report() {
 }`}</code>
       </pre>
       <div className="doc-callout">
-        With Next.js, render the viewer in a client component (
-        <code>'use client'</code>). The library never touches <code>window</code> at module scope,
-        but the worker resolution and canvas rendering are browser-only by nature.
+        With Next.js, render the viewer in a client component (<code>&#39;use client&#39;</code>).
+        Importing the package is safe on the server — every entry point is imported without a DOM in the
+        test suite and none of them throws — but the worker resolution and the canvas are browser-only by
+        nature, so it is the <em>render</em> that needs the boundary, not the import.
       </div>
+      <pre>
+        <code>{`// app/report/[id]/page.tsx — a server component. No viewer here, but deciding what
+// the source string *is* needs no DOM, and this is where it is cheapest to do it.
+import { classifySource } from 'pdfjs-react-reader/headless';
+
+export default async function ReportPage({ params }: { params: { id: string } }) {
+  const record = await loadReport(params.id);
+  const source = classifySource(record.fileRef); // never throws: url | bytes | refused
+  if (source.kind === 'refused') throw new Error(source.message);
+  return <ReportViewer src={record.fileRef} />;
+}
+
+// components/report-viewer.tsx — the boundary is one line, and it is about rendering.
+'use client';
+import { PdfViewer } from 'pdfjs-react-reader';
+
+export function ReportViewer({ src }: { src: string }) {
+  return <PdfViewer src={src} />;
+}`}</code>
+      </pre>
 
       <h2>Support assets</h2>
       <p>

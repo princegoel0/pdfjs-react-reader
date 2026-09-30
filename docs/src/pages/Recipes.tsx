@@ -214,7 +214,8 @@ node scripts/make-encrypted-pdf.mjs  # RC4-40 encrypted, password "secret"
 node scripts/make-cjk-pdf.mjs        # CID-encoded, so the cMap path is exercised
 node scripts/make-scripted-pdf.mjs   # document-level JavaScript
 node scripts/make-attachments-ocg-pdf.mjs  # 3 attached files + 3 layers, one off by default
-node scripts/make-annotated-pdf.mjs  # highlight, underline, strikeout, squiggly, note, ink, free text`}</code>
+node scripts/make-annotated-pdf.mjs  # highlight, underline, strikeout, squiggly, note, ink, free text
+node scripts/make-labelled-pdf.mjs   # /PageLabels: roman front matter, a decimal body, an A- appendix`}</code>
       </pre>
     </>
   );

@@ -55,6 +55,9 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
   const [appliedUrl, setAppliedUrl] = useState('');
+  // Typed into `httpHeaders` below. Read when a load starts and never mid-load, so a
+  // new token needs the URL re-opened — which is the behaviour, not an oversight.
+  const [token, setToken] = useState('');
   const [german, setGerman] = useState(false);
   // The shipped catalog, imported the way an application imports it. The partial
   // override above is the different case: it exists to prove that a catalog which
@@ -65,6 +68,9 @@ export default function App() {
   const [restrict, setRestrict] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, FormValue> | null>(null);
   const [log, setLog] = useState<string[]>([]);
+  // The last byte report the load made, kept out of the event log on purpose: progress arrives per chunk,
+  // and eight lines of it would push every real event off the panel.
+  const [bytes, setBytes] = useState('');
   // All four on, so the first thing a visitor sees is what the old default
   // looked like — and unchecking one is how you watch a control leave the bar.
   const [withPrint, setWithPrint] = useState(true);
@@ -111,10 +117,16 @@ export default function App() {
     src,
     assetUrl: assetMode || undefined,
     allowedSources: restrict ? ['/fixtures/'] : undefined,
+    // A fresh object literal on every render, which is exactly the shape FR-34 had to
+    // survive: the load reads it at start and does not re-read it, so retyping the token
+    // does not reload the document underneath the reader.
+    httpHeaders: token ? { Authorization: `Bearer ${token}` } : undefined,
     labels: germanCatalog ? DE_LABELS : german ? GERMAN : undefined,
     features,
     find: hostFind ? hostFindController : undefined,
     onError: (err) => console.error('[playground] viewer error', err),
+    onProgress: (p) =>
+      setBytes(`${p.loaded} of ${p.total || '?'} bytes — ${p.percent ?? 'unknown'} %`),
     onPageChange: (page) => note(`onPageChange ${page}`),
     onScaleChange: (scale) => note(`onScaleChange ${scale.toFixed(2)}`),
     onLayoutChange: (layout) => note(`onLayoutChange ${layout}`),
@@ -165,6 +177,16 @@ export default function App() {
             onChange={(e) => setUrl(e.target.value)}
           />
         </form>
+        <label>
+          Bearer token:&nbsp;
+          <input
+            type="text"
+            spellCheck={false}
+            placeholder="for http://localhost:5300/…"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+          />
+        </label>
         {file && (
           <button type="button" onClick={() => setFile(null)}>
             Back to default
@@ -298,6 +320,9 @@ export default function App() {
         </div>
         <aside className="app-panel">
           <h3>Imperative handle</h3>
+          <p className="app-load" role="status">
+            {bytes || 'no byte report yet'}
+          </p>
           <div className="app-actions">
             <button type="button" onClick={() => viewer.current?.goToPage(5)}>
               goToPage(5)

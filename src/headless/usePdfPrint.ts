@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AnnotationMode,
   RenderingCancelledException,
@@ -7,6 +7,7 @@ import {
   type RenderTask,
 } from 'pdfjs-dist';
 import type { InkStroke } from '../lib/ink';
+import { onAbort } from '../lib/abort';
 import { drawInkStrokes } from '../lib/ink';
 import {
   PRINT_MEMORY_BUDGET,
@@ -31,6 +32,11 @@ export interface UsePdfPrintOptions {
    */
   getInkStrokes?: (pageIndex: number) => InkStroke[];
   onError?: (error: Error) => void;
+  /**
+   * Stop an in-flight job. Aborting runs the same `cancel()` the returned handle exposes, so a host can
+   * stop from its own controller rather than by unmounting. Cancelling is not an error and reports none.
+   */
+  signal?: AbortSignal;
 }
 
 export interface PrintOptions {
@@ -92,6 +98,7 @@ export function usePdfPrint({
   rotation = 0,
   getInkStrokes,
   onError,
+  signal,
 }: UsePdfPrintOptions): UsePdfPrintResult {
   const [isPrinting, setIsPrinting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -117,6 +124,17 @@ export function usePdfPrint({
     cancelledRef.current = true;
     taskRef.current?.cancel();
   }, []);
+
+  // Follow the host's signal without restarting anything: an abort is exactly the call a host would make
+  // through the returned `cancel`, from a controller it owns instead of from an unmount.
+  useEffect(() => {
+    if (!signal) return undefined;
+    if (signal.aborted) {
+      cancel();
+      return undefined;
+    }
+    return onAbort(signal, cancel);
+  }, [signal, cancel]);
 
   const print = useCallback(
     async (options: PrintOptions = {}) => {

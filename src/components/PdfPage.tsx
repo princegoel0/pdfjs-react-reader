@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { onAbort } from '../lib/abort';
 import {
   AnnotationEditorLayer,
   AnnotationLayer,
@@ -16,6 +17,7 @@ import { formatLabel } from '../lib/labels';
 import { resolveRenderScale } from '../lib/canvas';
 import { useLabels } from './labels-context';
 import { InkLayer } from './InkLayer';
+import { useDevicePixelRatio } from './useDevicePixelRatio';
 import { applyHighlights, unwrapMarks } from '../lib/highlight';
 import { attachmentMimeType } from '../lib/attachments';
 import { downloadBytes } from '../lib/download';
@@ -25,6 +27,7 @@ import type { InkSettings, InkStroke, PdfPoint } from '../lib/ink';
 import type { PageDims } from '../lib/layout';
 import type { PdfLinkService } from '../lib/link-service';
 import type { PageMatch } from '../lib/search';
+import type { PdfPageStatus } from '../lib/status';
 
 /** `RenderParameters` is not exported, and the OC promise's type is only named there. */
 type RenderParams = Parameters<PDFPageProxy['render']>[0];
@@ -47,7 +50,10 @@ export interface PdfPageProps {
   scale: number;
   /** User-applied rotation in degrees, added to the page's intrinsic rotation. */
   rotation?: number;
-  /** Overrides window.devicePixelRatio for canvas resolution. */
+  /**
+   * Overrides the watched `window.devicePixelRatio` for canvas resolution. Set it and this page stops
+   * responding to the display changing; leave it and a monitor switch repaints at the new density.
+   */
   devicePixelRatio?: number;
   /** Device-pixel area ceiling for this page's canvas. Defaults to the pdf.js desktop limit. */
   maxRenderPixels?: number;
@@ -111,6 +117,96 @@ export interface PdfPageProps {
   /** Called once the page's intrinsic (scale-1) dimensions are known. */
   onBaseDimensions?: (index: number, dims: PageDims) => void;
   onError?: (error: Error) => void;
+  /**
+   * Cancel this page's work from outside — the proxy fetch, the canvas render, and each overlay layer.
+   * Aborting runs exactly what scrolling the row out runs, and reports nothing: a cancellation is not a
+   * failure (FR-04). Held by identity, so swapping controllers on a re-render does not refetch the page.
+   */
+  signal?: AbortSignal;
+  /**
+   * Reports one page's place in the `PRD.md` §3.5 page model as it changes, as `(pageNumber, status)` —
+   * the shape `onBaseDimensions` already uses, so one handler can serve every page of a document.
+   *
+   * `queued` while the page proxy is fetched, `rendering` while the canvas paints, `rendered` once the
+   * canvas and every overlay layer this page builds have settled, `cancelled` and then `released` when a
+   * render in flight is stopped, `error` when a failure reaches the page.
+   *
+   * `unrequested` is the one state a page never reports, because a page the virtualizer has not asked for
+   * is not mounted to say so — `usePdfVirtualizer`'s `virtualSlots` are what name it.
+   *
+   * A zoom step reads `released → rendering → rendered`, and a cancellation is never an error: FR-04's rule
+   * restated as states rather than as a callback contract. Read by identity and never watched, so a host
+   * passing a fresh arrow does not re-render the page — and because the page number travels with the
+   * status, a host tracking a whole document needs one `useCallback`, not a closure per page, and keeps the
+   * memo working.
+   */
+  onStatusChange?: (pageNumber: number, status: PdfPageStatus) => void;
+}
+
+/** A pass whose completion the `rendered` state waits for. */
+type PagePass = 'canvas' | 'text' | 'annotations' | 'xfa';
+
+/**
+ * The §3.5 page states, as observed from inside one mounted page.
+ *
+ * `rendered` means painted *with its overlay layers laid out*, which is a join over the passes this page
+ * actually starts. Keyed by pass rather than counted, because a page that builds no text layer — a
+ * pure-XFA sheet — or no annotation layer — a headless host that passes no link service — must not wait on
+ * one that can never arrive. The editor layer is deliberately outside the join: it has nothing to paint
+ * until the user does something, so gating on it could hold a page at `rendering` forever.
+ */
+function usePageProgress(
+  onStatusChange: PdfPageProps['onStatusChange'],
+  pageNumber: number,
+) {
+  const reportRef = useRef(onStatusChange);
+  reportRef.current = onStatusChange;
+  // Read through a ref rather than closed over, so `report` keeps one identity for the whole life of the
+  // component and the effects that list it can stay stable across a page change.
+  const pageNumberRef = useRef(pageNumber);
+  pageNumberRef.current = pageNumber;
+  const lastRef = useRef<PdfPageStatus | null>(null);
+  const passesRef = useRef(new Set<PagePass>());
+  const paintedRef = useRef(false);
+  /*
+   * Once a pass has failed for this paint cycle, `rendered` may not arrive afterwards and contradict it.
+   * Cleared when the canvas starts again, because that is a page being painted afresh.
+   */
+  const failedRef = useRef(false);
+
+  const report = useCallback((status: PdfPageStatus) => {
+    if (status === 'error') failedRef.current = true;
+    if (lastRef.current === status) return;
+    lastRef.current = status;
+    reportRef.current?.(pageNumberRef.current, status);
+  }, []);
+
+  const begin = useCallback((pass: PagePass) => {
+    passesRef.current.add(pass);
+    if (pass === 'canvas') {
+      paintedRef.current = false;
+      failedRef.current = false;
+    }
+  }, []);
+
+  const end = useCallback(
+    (pass: PagePass) => {
+      passesRef.current.delete(pass);
+      if (pass === 'canvas') paintedRef.current = true;
+      if (paintedRef.current && !failedRef.current && passesRef.current.size === 0) {
+        report('rendered');
+      }
+    },
+    [report],
+  );
+
+  /** A pass that was torn down rather than completed: it stops the page waiting, and earns no `rendered`. */
+  const drop = useCallback((pass: PagePass) => {
+    passesRef.current.delete(pass);
+    if (pass === 'canvas') paintedRef.current = false;
+  }, []);
+
+  return { report, begin, end, drop };
 }
 
 /**
@@ -173,8 +269,25 @@ export const PdfPage = memo(function PdfPage({
   onInkCommit,
   onBaseDimensions,
   onError,
+  onStatusChange,
+  signal,
 }: PdfPageProps) {
   const labels = useLabels();
+  const { report, begin, end, drop } = usePageProgress(onStatusChange, pageNumber);
+  /*
+   * The density this page paints at. The hook is called unconditionally — a `??` on the call itself would
+   * make the hook count depend on a prop, which is the rules-of-hooks violation the memo cannot hide — and
+   * the watched value is discarded when a host owns the number. That is the point: a host passing
+   * `devicePixelRatio` gets a `pixelRatio` that cannot move, so a monitor switch repaints nothing it pinned,
+   * while a host passing nothing gets the live ratio, which is what FR-07 asks for.
+   */
+  const observedPixelRatio = useDevicePixelRatio();
+  const pixelRatio = devicePixelRatio ?? observedPixelRatio;
+  // Read through a ref so a host rebuilding its controller on each render cannot re-run any of the
+  // effects below — the same rule `doc` and the callbacks already follow, and the whole reason the memo
+  // on this component is safe to rely on.
+  const signalRef = useRef(signal);
+  signalRef.current = signal;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
@@ -216,9 +329,15 @@ export const PdfPage = memo(function PdfPage({
   const onFormChangeRef = useRef(onFormChange);
   onFormChangeRef.current = onFormChange;
 
-  const reportError = useCallback((err: unknown) => {
-    onErrorRef.current?.(err instanceof Error ? err : new Error(String(err)));
-  }, []);
+  const reportError = useCallback(
+    (err: unknown) => {
+      // §3.5: a failure that reached the page is a state, not only an event. Reported before the callback
+      // so a host watching both sees them in the order they happened.
+      report('error');
+      onErrorRef.current?.(err instanceof Error ? err : new Error(String(err)));
+    },
+    [report],
+  );
 
   const handleFormEvent = useCallback(() => {
     onFormChangeRef.current?.();
@@ -236,6 +355,11 @@ export const PdfPage = memo(function PdfPage({
 
   useEffect(() => {
     let cancelled = false;
+    const offAbort = onAbort(signalRef.current, () => {
+      cancelled = true;
+    });
+    // The virtualizer has asked for this page and its proxy is being fetched: `queued`.
+    report('queued');
     setPage(null);
     doc
       .getPage(pageNumber)
@@ -249,9 +373,10 @@ export const PdfPage = memo(function PdfPage({
         if (!cancelled) reportError(err);
       });
     return () => {
+      offAbort();
       cancelled = true;
     };
-  }, [doc, pageNumber, reportError]);
+  }, [doc, pageNumber, report, reportError]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -262,7 +387,7 @@ export const PdfPage = memo(function PdfPage({
     const { scale: dpr } = resolveRenderScale({
       width: viewport.width,
       height: viewport.height,
-      devicePixelRatio: devicePixelRatio ?? window.devicePixelRatio ?? 1,
+      devicePixelRatio: pixelRatio,
       maxPixels: maxRenderPixels,
       maxSide: maxRenderSide,
     });
@@ -295,29 +420,61 @@ export const PdfPage = memo(function PdfPage({
         : undefined,
     });
     taskRef.current = task;
+    begin('canvas');
+    report('rendering');
 
-    task.promise.catch((err: unknown) => {
-      if (err instanceof RenderingCancelledException) return;
-      reportError(err);
-    });
+    // Whether this task reached a terminal state on its own. A teardown that finds it had not is stopping
+    // a render in flight, which is `cancelled`; one that finds it had is only taking the buffer back.
+    let settled = false;
+    // A render that finishes *after* the row was scrolled out must not report a page that is gone, so the
+    // late arrival is dropped rather than joined. `task.destroy()`-style resolutions do happen after
+    // cleanup, and the promise alone cannot tell a finished paint from one that landed too late.
+    let stopped = false;
+    task.promise
+      .then(() => {
+        if (stopped) return;
+        settled = true;
+        end('canvas');
+      })
+      .catch((err: unknown) => {
+        if (stopped || err instanceof RenderingCancelledException) return;
+        settled = true;
+        reportError(err);
+      });
 
-    return () => {
+    // The whole scroll-out teardown, not just `task.cancel()`: a host that aborts is saying "this page is
+    // no longer wanted", which is the same instruction, and the pixel buffer has to go either way.
+    const stop = () => {
+      stopped = true;
+      if (!settled) report('cancelled');
       taskRef.current = null;
       task.cancel();
       // Release the backing pixel buffer immediately — mobile Safari crashes
       // when too many detached canvases stay alive.
       canvas.width = 0;
       canvas.height = 0;
+      drop('canvas');
+      report('released');
+    };
+    const offAbort = onAbort(signalRef.current, stop);
+
+    return () => {
+      offAbort();
+      stop();
     };
   }, [
     page,
     viewport,
-    devicePixelRatio,
+    pixelRatio,
     maxRenderPixels,
     maxRenderSide,
     contentVersion,
     optionalContentConfig,
     editingOnThisPage,
+    report,
+    begin,
+    end,
+    drop,
     reportError,
   ]);
 
@@ -349,25 +506,36 @@ export const PdfPage = memo(function PdfPage({
       container,
       viewport: at,
     });
+    begin('text');
 
     layer
       .render()
       .then(() => {
-        if (!cancelled) setTextLayer(layer);
+        if (cancelled) return;
+        setTextLayer(layer);
+        end('text');
       })
       .catch((err: unknown) => {
         // Expected when the layer is cancelled mid-render (unmount, page change).
         if (cancelled || (err instanceof Error && err.name === 'AbortException')) return;
+        drop('text');
         reportError(err);
       });
 
-    return () => {
+    const stop = () => {
       cancelled = true;
       setTextLayer(null);
       layer.cancel();
       container.replaceChildren();
+      drop('text');
     };
-  }, [page, rotation, reportError]);
+    const offAbort = onAbort(signalRef.current, stop);
+
+    return () => {
+      offAbort();
+      stop();
+    };
+  }, [page, rotation, begin, end, drop, reportError]);
 
   // The spans pdf.js lays out are positioned in percentages and sized from
   // `--total-scale-factor`, so a scale change needs only `--scale-x` recomputed for
@@ -412,6 +580,7 @@ export const PdfPage = memo(function PdfPage({
     annotationLayerRef.current = layer;
 
     let cancelled = false;
+    begin('annotations');
     (async () => {
       const annotations = await page.getAnnotations({ intent: 'display' });
       if (cancelled) return;
@@ -432,17 +601,26 @@ export const PdfPage = memo(function PdfPage({
         renderForms,
         enableScripting: false,
       } as unknown as Parameters<AnnotationLayer['render']>[0]);
+      if (!cancelled) end('annotations');
     })().catch((err: unknown) => {
       if (cancelled) return;
+      drop('annotations');
       reportError(err);
     });
 
-    return () => {
+    const stop = () => {
       cancelled = true;
       if (annotationLayerRef.current === layer) {
         annotationLayerRef.current = null;
       }
       container.replaceChildren();
+      drop('annotations');
+    };
+    const offAbort = onAbort(signalRef.current, stop);
+
+    return () => {
+      offAbort();
+      stop();
     };
   }, [
     page,
@@ -452,6 +630,9 @@ export const PdfPage = memo(function PdfPage({
     annotationEditorUIManager,
     renderForms,
     formVersion,
+    begin,
+    end,
+    drop,
     reportError,
   ]);
 
@@ -487,9 +668,15 @@ export const PdfPage = memo(function PdfPage({
     if (!viewport) return;
 
     let cancelled = false;
+    begin('xfa');
     (async () => {
       const xfaHtml = await page.getXfa();
-      if (cancelled || !xfaHtml) return;
+      if (cancelled) return;
+      if (!xfaHtml) {
+        // Nothing to compose: the pass is over, it just did not produce a layer.
+        drop('xfa');
+        return;
+      }
       // Kept across viewport changes: `XfaLayer.render` *appends* a whole tree to the
       // container it is given, so rendering twice into one div doubles the page
       // (measured 20 elements then 40). `update` is the re-render path — it re-applies
@@ -515,15 +702,24 @@ export const PdfPage = memo(function PdfPage({
         const rendered = XfaLayer.render(params) as unknown as { textDivs?: Node[] };
         setXfaDivs(wrapXfaText(rendered?.textDivs));
       }
+      if (!cancelled) end('xfa');
     })().catch((err: unknown) => {
       if (cancelled) return;
+      drop('xfa');
       reportError(err);
     });
 
-    return () => {
+    const stop = () => {
       cancelled = true;
+      drop('xfa');
     };
-  }, [page, viewport, annotationStorage, linkService, reportError]);
+    const offAbort = onAbort(signalRef.current, stop);
+
+    return () => {
+      offAbort();
+      stop();
+    };
+  }, [page, viewport, annotationStorage, linkService, begin, end, drop, reportError]);
 
   // Annotation editors, when a feature has published a manager. The manager is
   // document-wide and the feature owns it; the draw layer and the editor layer are

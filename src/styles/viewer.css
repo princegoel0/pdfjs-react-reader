@@ -171,6 +171,15 @@
   margin: 0;
 }
 
+/*
+ * A document that names its pages "iii" or "A-12" needs a wider box than one that names them "3", and the
+ * bar's folding planner measures this node rather than a constant, so the breakpoint moves with it. The
+ * attribute is only set when the labels differ from the numbers; the common box keeps its 52 px.
+ */
+.pjsr-page-input[data-labelled='true'] {
+  width: 84px;
+}
+
 .pjsr-page-input:focus,
 .pjsr-zoom-select:focus,
 .pjsr-button:focus-visible {

@@ -1,4 +1,5 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { abortError } from './abort';
 
 export interface SearchOptions {
   caseSensitive?: boolean;
@@ -263,10 +264,14 @@ export async function extractPageText(
 export async function extractAllText(
   doc: PDFDocumentProxy,
   onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
 ): Promise<PageTextIndex[]> {
   const numPages = doc.numPages;
   const out: PageTextIndex[] = new Array(numPages);
   for (let i = 0; i < numPages; i++) {
+    // Checked per page rather than up front: this loop is the longest thing the package does on the main
+    // thread, and a host that cancels a thousand-page index should wait at most one page, not the file.
+    if (signal?.aborted) throw abortError('Text indexing was aborted.');
     out[i] = await extractPageText(doc, i);
     onProgress?.((i + 1) / numPages);
     if (i % 5 === 4) await new Promise((resolve) => setTimeout(resolve, 0));

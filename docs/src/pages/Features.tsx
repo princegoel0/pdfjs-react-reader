@@ -6,10 +6,12 @@ export function Features() {
         Eight things a viewer can do to a document — print it, save it, fill it in, show its outline,
         switch its layers, hand over its attachments, mark it up, rearrange its pages — are values you
         import. The reason is
-        arithmetic: measured against <code>0.3</code>,{' '}
-        <code>PdfViewer</code> with every feature prop switched off cost <strong>24.09 kB</strong> gzipped
-        against <strong>24.07 kB</strong> with them all on. A prop turns a control off. Only an import
-        decides what your bundle contains.
+        arithmetic: measured on the <code>0.9</code> build,{' '}
+        <code>PdfViewer</code> with every switch off — wheel, pinch, fullscreen, keys, drop, and{' '}
+        <code>controls.hide</code> over the whole bar — costs <strong>27.86 kB</strong> gzipped against{' '}
+        <strong>27.81 kB</strong> with them all on, and <strong>27.76 kB</strong> for the plain{' '}
+        <code>src</code> alone. Turning controls off costs a little more than leaving them on, because
+        saying &ldquo;hide&rdquo; is itself code. Only an import decides what your bundle contains.
       </p>
 
       <h2>The eight built-ins</h2>
@@ -35,7 +37,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/print.css</code>
             </td>
-            <td>2.50 kB</td>
+            <td>2.52 kB</td>
           </tr>
           <tr>
             <td>
@@ -46,7 +48,7 @@ export function Features() {
               edited — an incremental <code>saveDocument()</code> that keeps the fields interactive.
             </td>
             <td>none needed</td>
-            <td>0.77 kB</td>
+            <td>0.75 kB</td>
           </tr>
           <tr>
             <td>
@@ -59,7 +61,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/forms.css</code>
             </td>
-            <td>1.91 kB</td>
+            <td>2.02 kB</td>
           </tr>
           <tr>
             <td>
@@ -71,7 +73,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/outline.css</code>
             </td>
-            <td>0.93 kB</td>
+            <td>0.94 kB</td>
           </tr>
           <tr>
             <td>
@@ -103,7 +105,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/attachments.css</code>
             </td>
-            <td>1.10 kB</td>
+            <td>1.07 kB</td>
           </tr>
           <tr>
             <td>
@@ -120,7 +122,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/annotate.css</code>
             </td>
-            <td>1.85 kB</td>
+            <td>1.83 kB</td>
           </tr>
           <tr>
             <td>
@@ -140,7 +142,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/edit.css</code>
             </td>
-            <td>3.60 kB</td>
+            <td>5.87 kB</td>
           </tr>
         </tbody>
       </table>
@@ -151,18 +153,18 @@ export function Features() {
         cannot resolve the module — it fails at build, on the machine that made the choice. Not
         installing it and importing <em>anything else</em> is fine, including <code>tsc</code>: no shipped
         declaration file names the writer, because every value crossing that boundary is bytes and plain
-        objects. The 245.5 kB the peer gzips to is therefore a decision you make once, at install, for the
+        objects. The 251.4 kB the peer gzips to is therefore a decision you make once, at install, for the
         one capability that needs it.
       </p>
 
       <p>
-        Cost is measured, not estimated, and the figures above are the <code>0.7</code> build
+        Cost is measured, not estimated, and the figures above are the <code>0.9</code> build
         (re-measured at each release close): <code>npm run size</code> bundles one file per
         consumer import with both esbuild and Rollup and reports the larger of the two, so a feature is
-        only &ldquo;small&rdquo; if two independent tree-shakers agree. All eight together cost 14.44 kB
-        over the <code>24.96 kB</code> core — less than their sum, because they share the shell they attach
+        only &ldquo;small&rdquo; if two independent tree-shakers agree. All eight together cost 14.76 kB
+        over the <code>27.76 kB</code> core — less than their sum, because they share the shell they attach
         to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
-        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 52.78 kB, because
+        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 57.90 kB, because
         that entry re-exports every headless hook whether or not you name one — so quote the import,
         not the entry.
       </p>

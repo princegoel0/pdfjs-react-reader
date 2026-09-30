@@ -1,12 +1,21 @@
 # Roadmap
 
-Version plan from the current `0.1.0` baseline to a `1.0.0` that ships the full feature set. Each
-release carries one theme so the version number means something beyond "several things changed".
+Version plan from the `0.1.0` baseline to a `1.0.0` that ships **all 51 requirements**. Each release
+carries one theme so the version number means something beyond "several things changed".
+
+**The plan grew on 2026-09-29, and this is the consequence.** `PRD.md` was rewritten as a *target*
+specification — the package we want, not a description of the one we have — and went from 33 requirements
+to 51. The owner's decision is that **`1.0.0` ships all 51**, so the sequence no longer ends at `0.8`:
+four more releases are planned below (`0.9` Reach, `0.10` Access, `0.11` Index & Assemble, `0.12` Prove)
+before GA. The rule from `PRD.md` still holds in the other direction — FR-01…FR-33 kept their ids, wording
+and subsections, so nothing already recorded here stopped being true.
 
 * Feature requirements are `FR-nn` in `PRD.md` §4; the versioning policy is in `CHANGELOG.md`.
 * File and line references were verified against `src/` on 2026-09-24, and re-checked against `src/`
   on 2026-09-25 after `0.4` moved code out of the shell.
-* Engine facts were verified against the installed `pdfjs-dist@5.7.284` type declarations.
+* Engine facts were verified against the installed `pdfjs-dist` type declarations — `5.7.284` when the
+  early releases were planned, **`6.3.289` since the peer floor moved to `^6.2.108` at `0.6`**. A fact
+  recorded against 5.x is marked where it matters.
 * The measurements in "The tier decision" come from a purpose-built prototype library and from the
   real `dist/`, bundled with both esbuild and Rollup. The "before" figures were taken against `0.3`'s
   `dist/` and the "after" figures against `0.4`'s; the per-path numbers each release accepts are the
@@ -17,29 +26,32 @@ release carries one theme so the version number means something beyond "several 
 Every requirement, its release, and whether it is actually met. This table replaces the range
 sentence this section used to carry (`FR-01`–`FR-19` and `FR-21`–`FR-23` are implemented), which was
 wrong in both directions: it silently omitted `FR-24`–`FR-28`, which `0.5` shipped, and it claimed
-`FR-16` and `FR-18` whole when each has a half scheduled for `0.6`. A range is not a status.
+`FR-16` and `FR-18` whole when each has a half scheduled for `0.6`. A range is not a status. The
+`FR-29`–`FR-33` rows were written on 2026-09-29, because a line-by-line read of `PRD.md` against the
+source found that `0.6`, `0.7` and the signing work had shipped four capabilities and no requirement for
+any of them — `PRD.md` §4 stopped at FR-28 and nobody had added a row since `0.5`.
 
 | FR | Requirement | Release | Status |
 | --- | --- | --- | --- |
 | `FR-01` | Input flexibility (URL, bytes, base64, `File`/`Blob`) | `0.1` | done |
-| `FR-02` | Worker configuration | `0.1`, fixed in `0.1.1` | done |
-| `FR-03` | Password protection | `0.1` hook, `0.7` prompt | done — wrong *and* right passwords exercised |
+| `FR-02` | Worker configuration | `0.1`, fixed in `0.1.1`, settled `0.9` | **done, and the requirement was the thing that moved.** Local and CDN configuration were built and probed, and the end-to-end half is now asserted: with nothing pinned, a document loads and its first page produces its paint stream, on the main thread (`src/lib/worker.fallback.test.ts`, with the three sibling files that hold the other states — pdf.js memoises its worker lookup per module instance, so one state per process is the only way to test more than one). What the measuring found is that the clause "fall back to a main-thread worker rather than failing when neither resolves" describes something pdf.js cannot do from an empty configuration: the fake worker is the worker's own parser, so it needs the worker *code* from somewhere, and there are exactly two somewheres — pdf.js's own Node default, and a host that has put the handler on `globalThis.pdfjsWorker`. An ordinary browser with neither fails. Verified in a real browser across the four states, including the pixel half this harness cannot reach: an unset source with the handler on the page painted **1,728 non-white pixels** on a 400×518 canvas with **0** `Worker` constructed, against the control's **1** worker and the same page painted; an unset source with nothing on the page throws `No "GlobalWorkerOptions.workerSrc" specified.` from the call itself, and a dead URL — which is what an unprobed candidate would have written — fails with a message about a fetch instead. So leaving `workerSrc` unset is still the right call, but as the choice that keeps two reachable states reachable and keeps the failure actionable, not as a fallback of its own; `PRD.md`'s `FR-02` is restated to that, and `README.md`, the docs pages and `CODE_REFERENCE.md` carried the older, larger claim until this row closed. |
+| `FR-03` | Password protection | `0.1` hook, `0.7` prompt, settled `0.9` | **done, including the clause that reopened it.** The prompt, the reason codes and the cancel-submits-an-error path were already built; the new clause — a *wrong* password must produce an observable second prompt — is now asserted against the real engine in `src/lib/encrypted.reprompt.test.ts`: the asks become `NEED_PASSWORD` then `INCORRECT_PASSWORD`, the second one is still parked 50 ms later, and answering it correctly opens the document. **The 2026-09-28 "silence for 60 s" reading was an artifact of the measurement, and the re-measurement says so in both directions.** pdf.js re-asks about 1 ms after a wrong answer, inside the same microtask chain (`getPassword` → `PasswordRequest` → `onPassword` → answer → re-parse → `PasswordException` → ask again) that never yields to the event loop — so a watchdog waiting to fire between two asks never does, and a callback that answers its own question loops at a measured **~27,000 asks a second** (239,947 in 8.9 s). Nothing in our wiring was swallowing the second call. One load per process, as `encrypted.test.ts` documents: an abandoned encrypted load wedges the Node fake worker. What the row now carries beyond the test is the hazard, documented on `PdfPasswordRequest.submit` and `onPasswordRequired` — a prompt waiting for a keystroke cannot loop, an automated retry of a stored credential can |
 | `FR-04` | Cancellation safety | `0.1` | done |
 | `FR-05` | Viewport virtualization | `0.1`, ceilings `0.3` | done — see the unmeasured bar below |
 | `FR-06` | Responsive zoom modes | `0.2` percentages, `0.5` `automatic` | done — 25–500 %, width, page, automatic |
-| `FR-07` | High-DPI adaptation | `0.3` | done |
-| `FR-08` | Page layouts | `0.1` | done |
+| `FR-07` | High-DPI adaptation | `0.3`, settled `0.9` | **done, including the clause that reopened it.** Density scaling and the canvas ceilings were already built; what was missing was that the ratio was *sampled* — read at render time, an effect dependency nobody re-runs — so a window moving to another display changed nothing until the reader zoomed or scrolled. Now `src/lib/dpr.ts` watches it: one hub per realm, refcounted so a long document's pages share a single watcher, feeding `PdfPage`, `PdfThumbnail` and the shell's canvas budget through `useDevicePixelRatio()` (`useSyncExternalStore`, so the value a page paints with is the live one, not the one a subscription noticed). **The mechanism is a media query pinned to the current value** — `matchMedia('(resolution: 1.25dppx)')` stops matching the moment the device moves, which is the only event-shaped thing a ratio change offers — and it was measured in Chromium before being written down: at 1.25 the query for `1.25dppx` matches while `2.5dppx` and `1.55dppx` do not. **`caniuse-lite`'s `css-media-resolution` is why there is a second channel:** Chrome, Edge and Firefox are `y` at every floor this package advertises, but Safari and iOS Safari are partial-and-unknown below 16 — inside the advertised floor — and an engine that does not know a media feature evaluates a query for it as *never matching*, which is a watcher that silently never fires. So the feature is detected by asking a question it must answer yes to (`(min-resolution: 0dppx)`; measured beside two controls that answer no: an unknown unit, an unknown feature) and where the answer is no the ratio is re-read on `resize`. Both channels dedupe on the number, so a move is reported once and a `resize` that changed nothing is reported never. Measured in the playground on `long-sample.pdf` with the real code path and a substituted environment value: a `resize` at an unchanged density produced **0** canvas ops on the patched `CanvasRenderingContext2D` counters and left the buffer at 792×1025; one event with the ratio moved 1.25 → 2 produced exactly one repaint (10 `drawImage`, 2 `fillRect`, 9,534 `fillText`) and the buffer went to 1268×1640 while the CSS box stayed 634×820 — FR-07's two halves, painted and not-painted, in a browser. **What is *not* proven here, and is `#141`'s:** that the query channel fires on a real monitor switch (no page can change its own `devicePixelRatio`; overriding it in JS moves the number but not the media feature, which is why the playground run goes through the `resize` channel), and whether every display switch fires `resize` on every engine. 13 tests in `src/lib/dpr.test.ts` plus 3 in `PdfPage.status.test.tsx`, one of them the counterfactual that disconnecting the watcher fails the paint assertion. `0.3`'s "read the ceiling once, a hot-plug must not re-render everything" is reversed on purpose: `FR-07` made re-rendering them the requirement. Cost: core 27.00 → **27.39 kB** (+0.39 kB, inside the ratchet's slack), and the headless entry unchanged |
+| `FR-08` | Page layouts | `0.1` | done — **measured 2026-09-29, and the requirement was the thing that was wrong.** Canvas op counting plus node-identity tagging in the playground: at a fixed 125 %, spread → continuous kept the scale at 1.25 (no `onScaleChange`), kept the same canvas nodes (identity tags survived, so no remount), kept their 956×1237 backing stores, and produced **1** canvas op. In a fit mode the same switch moved scale 1.04 → 0.50 and re-rendered every canvas from 792×1025 to 386×499 — which is not waste, because fitting two pages into one width is a different fit. `FR-08`'s clause "switching does not re-render what is already painted" was therefore unsatisfiable as written and has been restated to the invariant the code actually holds |
 | `FR-09` | Rotation, per page and global | `0.1`, `0.2` | done |
 | `FR-10` | Outline | `0.1` | done |
-| `FR-11` | Thumbnails sidebar | `0.1`, fluid grid in phase 6b | done — `PRD` states "scale 0.15–0.25"; the code sizes from the column width and `devicePixelRatio` (`PdfThumbnail.tsx:64`), so that figure is not the rule |
-| `FR-12` | Jump-to-page with clamping | `0.1` | done |
-| `FR-13` | In-memory indexing | `0.1` | done in substance — `page.getTextContent()` parses in the pdf.js worker; the index is assembled on the main thread, yielding every five pages (`search.ts:272`) |
+| `FR-11` | Thumbnails sidebar | `0.1`, fluid grid in phase 6b | done — the code sizes from the column width and `devicePixelRatio` (`PdfThumbnail`'s `scale = (width / base.width) * pixelRatio`); `PRD` FR-11 said "scale 0.15–0.25" until that was restated against the component on 2026-09-29 |
+| `FR-12` | Jump-to-page with clamping | `0.1`, settled `0.9` | **done, including the clause that reopened it.** Numeric navigation with clamping was built; what was missing was any way to test the label half, since no fixture in `playground/fixtures/` declared a `/PageLabels` — so `scripts/make-labelled-pdf.mjs` writes one (roman front matter, a decimal body restarting at 1, an appendix with a `/P (A-)` prefix, ten pages, each painting the label it claims), and pdf.js was then asked instead of assumed: `i ii iii 1 2 3 4 5 A-1 A-2`, and **`null`** for a document that declares nothing, which is the ordinary case. `src/lib/page-labels.ts` resolves both directions with two written-down decisions: **label before number** (page 6 of that fixture is labelled "2", so "2" means the fifth page — the display is what the reader is copying), and **clamping as the fallback, not the parser** (a whole number that names no label clamps in; "3a" is refused, which matters now because `Number.parseInt` reads it as 3 and the box used to be a number input that could not hold it). The box's `type` follows the document because `type="number"` reports "xii" as the empty string, and `labelsDifferFromNumbers` keeps an ordinary PDF on its spinner. `usePdfPageLabels(doc, signal)` does the read — once per handle, `null` on a rejected read, no round trip at all for an already-stopped host — published on the controller and handed to the bar. **Verified in the playground:** the box came up reading "i" as a text input, and typing "A-1" scrolled to 5760 px = 8 × (704 + 16), page 9's top, where the `goToPage(5)` control lands at 2880, so the resolution is real and the offset arithmetic is the existing one. **Two things left open, deliberately said:** the box following the reader *back* as they scroll cannot be observed in this harness at all (`visibilityState: hidden`, so no frame runs), and — a separate finding, unexplained and nothing to do with labels — no test here has ever mounted the real controller on a *ready* document, because that hangs jsdom outright; both belong to `#141` and `#148`, and the page-to-box direction is asserted against a stub controller instead. The other gap is honest scope: the pages themselves still announce "Page 6" while the bar says "2", and carrying the table into the announcements is a `FR-45` accessibility decision with a prop of its own, not this one. 29 tests in four files; the size gate refused the `shell` path at +1.44 kB (a new shared chunk moving the sums while core moved +0.37 kB and `headless-only` +0.01 kB), attributed as `FR-36`'s was, and the baseline is re-accepted at core **27.76 kB** |
+| `FR-13` | In-memory indexing | `0.1` | done in substance — `page.getTextContent()` parses in the pdf.js worker; the index is assembled on the main thread, yielding every five pages (`extractAllText`'s `i % 5 === 4` yield) |
 | `FR-14` | Match highlighting | `0.1`, counts `0.5` | done |
 | `FR-15` | Search controls | `0.1`, `0.5` | done — case, whole-word, next/previous, `Indexing {percent}%` |
-| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6`; `/Sig` fixtures and signing `0.9` work | **partial** — `signature-sample.pdf` and `signature-signed-sample.pdf` now carry four `/FT /Sig` fields in three shapes, so the type `form.ts:120` classifies is finally in a file, and a drawn mark can be written into the field's appearance (see *Spike D*). Its display in a real viewer is measured and proven both ways (see *Signing shipped*): a file that already carries the marks paints all three boxes including the noRotate one, and a mark placed through the panel took the page's box from 0 to 856 ink pixels and stayed painted across a zoom step. XFA now renders through `XfaLayer` (`xfa-sample.pdf`, see *0.6.0 — Mark*), and a document whose template pdf.js cannot lay out **fails to load** rather than showing a blank page, so `enableXfa` on by default carries that risk |
+| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6`; `/Sig` fixtures and signing, post-`0.8` and unreleased | **partial** — `signature-sample.pdf` and `signature-signed-sample.pdf` now carry four `/FT /Sig` fields in three shapes, so the type `describeWidget`'s `Sig` arm classifies is finally in a file, and a drawn mark can be written into the field's appearance (see *Spike D*). Its display in a real viewer is measured and proven both ways (see *Signing shipped*): a file that already carries the marks paints all three boxes including the noRotate one, and a mark placed through the panel took the page's box from 0 to 856 ink pixels and stayed painted across a zoom step. XFA now renders through `XfaLayer` (`xfa-sample.pdf`, see *0.6.0 — Mark*), and a document whose template pdf.js cannot lay out **fails to load** rather than showing a blank page, so `enableXfa` on by default carries that risk |
 | `FR-17` | Form data sync | `0.1` | done |
 | `FR-18` | Annotations view and draw | `0.1` view, ink `0.5`; authoring `0.6` | **partial** — links and markup render, freehand ink draws and prints; authoring shipped in `0.6` as `annotateFeature` and, as measured, that means highlight, free text and ink — the engine cannot create or edit underline/strikeout/squiggly, and stamp and signature break the save (see *0.6.0 — Mark*). A signature drawn through the **engine's** editor is still out; a mark written through the **writer** is in the `edit` tier (see *Spike D*) |
-| `FR-19` | High-fidelity printing | `0.1`, ranges `0.5` | done — iOS Safari is excluded by design, which `PRD` does not mention |
+| `FR-19` | High-fidelity printing | `0.1`, ranges `0.5` | done — iOS Safari is excluded by design, and `PRD` FR-19 now says so, alongside the scale ladder and the 256 MiB budget it never used to state |
 | `FR-20` | Document download | `0.1` incremental, `0.7` flatten | **done in two tiers** — the default download is `doc.saveDocument()`, an incremental save that carries form values *and* `0.6`'s marks but leaves them interactive; a true flatten (appearance streams moved into page content, fields gone) lives behind the opt-in `edit` tier, which is the only path allowed a PDF writer. Measured on `form-sample.pdf`: 5,582 B / 11 widgets interactive against 6,202 B / 0 widgets with the value read back as page text |
 | `FR-21` | Opt-in feature registration | `0.4` | done |
 | `FR-22` | Per-feature stylesheets | `0.4`, two more in `0.5` | done |
@@ -49,16 +61,39 @@ wrong in both directions: it silently omitted `FR-24`–`FR-28`, which `0.5` shi
 | `FR-26` | Replaceable find strategy | `0.5` | done |
 | `FR-27` | Search depth | `0.5` | done |
 | `FR-28` | Composed shell | `0.5` | done |
+| `FR-29` | Annotation authoring | `0.6` | done — highlight, free text and ink; stamp and the engine's signature editor are out because each breaks the save, and underline/strikeout/squiggly because the engine exposes no subtype for them |
+| `FR-30` | Page authoring | `0.7` | done — reorder, delete, rotate, extract, split (two files, not N), undo at both the plan and the apply level |
+| `FR-31` | True flattening | `0.7` | done — and the signing fixture found the defect: an unsigned `/Sig` box has no `/N`, and `flatten()` threw on it until every appearance-less widget was given an empty form in its own box first |
+| `FR-32` | Signing | post-`0.8`, unreleased (ships in `1.0.0`) | done — `/AP` only, `/V` refused, boxes listed once per document and only when there is something to place (`#144` measured both the file-borne and the in-session paint) |
+| `FR-33` | XFA display, save refused | `0.6`, marks and thumbnails `0.7`–`0.8` | done as far as it goes — `XfaLayer` renders, marks wrap its text runs, thumbnails draw the tree, and a save is refused rather than attempted; **persisting XFA stays a non-goal** (§2, added 2026-09-24) |
+| `FR-34` | Network contract — headers, credentials, range and streaming controls | `0.9` | **built 2026-09-29.** `httpHeaders`, `withCredentials`, `rangeChunkSize`, `disableRange` and `disableStream` on `UsePdfDocumentOptions` and `PdfViewerProps`, forwarded to `getDocument` for a URL source only — passing them beside `data` would be harmless and misleading. All five are ref-read rather than watched, and that decision was proven by breaking it: putting `httpHeaders` in the load effect's dependency array does not reload once per render, it **loops without bound** — 2,666 `getDocument` calls in one test and 60,417 in another, against the 1 and 2 asserted, because each load sets state, the state re-renders, the re-render mints a new literal and the literal re-runs the effect. `reload()` after rotating a token picks the new one up, which a closure captured at effect time would not. Four tests in `usePdfDocument.network.test.tsx`; core grew 0.19 kB, inside the ratchet's slack. **Browser-verified at the close**, which the release gate asked for and nothing had done until then: `scripts/auth-server.mjs` serves the fixtures on :5300 and answers 401 to anything without `Authorization: Bearer dev-token`, the playground grew a token box wired to `httpHeaders`, and the same URL produced a `role="alert"` reading *"Unexpected server response (401) while retrieving PDF"* with zero canvases and a working **Try again** without the token, then **3 canvases, 5,117 non-white pixels on page 1's 792×1025 buffer, a text layer and "of 3"** with it — one request to the server for the 401, which is `FR-35`'s never-retry-a-401 rule observed rather than asserted. Retyping the token afterwards, with no re-open, changed nothing on screen and sent no request: the read-at-load-start rule, in the browser |
+| `FR-35` | Bounded retries | `0.9` | **built 2026-09-29.** `src/lib/retry.ts` classifies a load failure and `usePdfDocument` loops on the verdict, with `retry` and `onRetryAttempt` on both the hook and the shell. The engine reports a failed fetch as `ResponseException`, which carries `status` and a `missing` flag — and a connection that never got a response arrives as the same class with `status: 0`, which is why 0 is transient for http and missing for `file:`. Classification is a rule, not two lists: any 5xx and the three 4xx that mean "later" (408, 425, 429) are retried, every other 4xx is not, and anything unclassified falls through to no. Errors are matched by `name` rather than `instanceof`, because the name is what survives the worker boundary. 401 and 403 are refused on the first response with the reason `the server refused our credentials`. Default is three attempts with full jitter — on by default because the engine does the fetch, so a host cannot retry it themselves. 37 tests; **the growth was refused by the size ratchet first** (+0.91 kB core against 755 B allowed), which is the gate working, and the classifier was then simplified from two status sets to the rule they encoded, taking the module from 1,578 B to 1,289 B minified before the baseline was re-accepted at core 25.78 kB |
+| `FR-36` | Cancellation tokens on every async operation | `0.9` | **built 2026-09-29 — all nine sites `PRD.md` names.** `signal` on `usePdfDocument`, `usePdfSearch`, `usePdfPrint`, `usePdfDownload`, `PdfPage` (proxy fetch, canvas render, text layer, annotation layer, XFA), `PdfThumbnail` (both passes) and the four writer functions, plus `PdfViewer` for the load. An abort runs the *same* teardown an unmount or a scroll-out runs, so FR-04's rule holds for a host-initiated stop. Two details that only bite when you get them wrong: the load follows a **swapped** signal without restarting (the FR-34 trap again — `signal` in the load effect's deps would reload the document for a host building a controller per render), and **`AbortSignal.any` is deliberately unused**, being Chrome 116 / Safari 17.4 / Firefox 124 against floors of 90/14/90 — guarded by a test that strips comments and greps the source, since no job we run opens a browser. The requirement's wording was corrected on this pass: it said a host signal *composes* with the internal one, but each effect owns a cancellation of its own lifetime (a proxy fetch ends when the page number changes, a render when the scale does), so merging them would make a zoom step look like an abandonment. `composeAbort` was written, tested, exported twice — and then deleted, because nothing in the package needs two signals merged and a helper only its own tests call is surface area. Writer passes are the honest exception and say so in the requirement: the loop is synchronous inside `@cantoo/pdf-lib`, so an abort stops the next page and always prevents the bytes arriving, but cannot un-make a page already rearranged. 46 tests across `abort.test.ts`, `search.abort.test.ts`, `usePdfDocument.abort.test.tsx` and the writer's block, including the counterfactual that a *live* signal still produces a file — the guard is not a wall |
+| `FR-37` | Published document and page state unions | `0.9` | **built 2026-09-30.** `PdfDocumentStatus` and `PdfPageStatus` are published from `src/lib/status.ts` — a types-only module, so the models cost no bytes on either entry. The shape decision was the whole task: instead of adding a `status` field beside `doc`, `isReady` and `error`, those three are now *derived from* one tagged value (`PdfDocumentLoad`), which is what makes "never `ready` with a null handle" structural rather than a rule to police. `passwordRequest: { reason, submit }` joins it, because §5.1's example renders a credential prompt from `status` alone and would otherwise have no way to answer — `onPasswordRequired` stays as the event channel and the field is the state channel, and **only the live request may move the state**: a submit a host kept from the first ask, answered after the engine had re-asked, would otherwise clear the new prompt and leave the load waiting on a request nothing is showing. On the page side `PdfPage` gained `onStatusChange`, and `rendered` is a **join over the passes that page actually starts** (canvas, text, annotations, XFA), since §3.5 defines it as painted *with its overlay layers laid out*: keyed by name, so a pure-XFA sheet or a page with no link service never waits on a layer it will not build, and the editor layer deliberately stays out of the join because it has nothing to paint until the user does. `unrequested` is the one state a page never reports — an unmounted page cannot speak, and `virtualSlots` is what names it, which is asserted rather than assumed. **The page number rides with the status**, `onStatusChange(pageNumber, status)` in the shape `onBaseDimensions` already uses, because a host tracking a document then holds one `useCallback` instead of a closure per page — and a closure per page quietly defeats the memo. `cancelled` fires only when a render was in flight, so a zoom reads `released → rendering → rendered` with no cancellation and no error, which is FR-04's rule made observable without a browser. §3.5's other clause — `loading` says "Progress is reportable" — is met by `onProgress` on the hook and on `PdfViewer`, forwarding the engine's `PDFDocumentLoadingTask.onProgress`; `PdfLoadProgress.percent` is `number | null` because pdf.js hands back `NaN` when the response did not state a length, and a host binding `width: ${percent}%` to a NaN gets no bar at all rather than an empty one. The shell is the demonstration consumer: `ViewerController` gained `status`, `ViewerPages` branches on it, and the prompt is derived from the load, which deleted a `useState`, a `submitPasswordRef` and the effect that cleared a stale prompt; the shell forwards progress but draws no bar. 24 tests (10 load, 4 progress, 10 page) — the page ones are the **first tests `PdfPage` ever had**, and two of them failed on a harness bug before they tested the component: a fake `getViewport` that returns one shared object leaves the viewport identity unchanged across a scale step, so the render effect — which keys on exactly that — does not re-run. Nothing was wrong in the component; the fake was lying about the engine, since a real `PageViewport` is a new object per scale. Browser-verified on both halves: the playground reported `1,016,315 of 1,016,315 bytes — 100 %`, `encrypted-sample.pdf` painted page 1 (792×1025, 3,567 non-white pixels) after the derived prompt took the password with no shell state clearing it, `damaged-truncated.pdf` gave the alert with the engine's message and a working retry, and the docs example read `ready → ready · 1 painting → ready` while scrolling. Suite 546 / 46 files; core 26.69 kB, +0.55 kB, inside the ratchet's slack, so the baseline needed no re-accept. **Not wired:** the shell does not subscribe to page statuses — it has no per-page progress UI to spend bytes on, and the requirement is that a host *can*, not that the shell must |
+| `FR-38` | Exported source utilities | `0.9` | **built 2026-09-30.** `classifySource(src)` answers `url` / `bytes` / `refused` and never throws, and the refusal carries a code — `empty`, `bare-name`, `windows-path`, `bad-base64` — *and* the sentence `normalizeSource` goes on to throw. That last part is the requirement's teeth: `normalizeSource` is now **built on** `classifySource` rather than owning the rule, so a host that checked first and a host that only passed `src` through are told the same thing by the same code, and the tests assert exactly that (same `TypeError`, byte-identical decode, same url). `base64ToBytes` is public and validates before `atob`, because a host calling it directly meets strings our own heuristic never lets through and `atob`'s `DOMException` says nothing about which. One behaviour change follows: a `;base64` data URL is now decoded here instead of through `fetch()`, which is faster, works on a server, and retires the `Failed to resolve data URI` path — a malformed one is refused instead. **The one place the classifier has to catch** is that data-URL branch: `atob` throws, and a function whose entire contract is "ask without wrapping it in a try/catch" cannot throw, so a bad body becomes `reason: 'bad-base64'`. 39 tests. **The size ratchet refused this** — it measures against the *accepted* baseline, so two features in one release means the second one hits the wall: core +0.86 kB cumulative across FR-37 and FR-38 against an allowance of 0.78 kB. Rather than golf the prose (the reason strings *are* the feature), the delta was attributed: `src/lib/source.ts` went 2,055 → 2,926 B minified, +337 B gzipped, which matches core's +0.31 kB for this feature, and the baseline is re-accepted at core **27.00 kB**, headless path 30.13 kB, `headless-only` 4.05 kB — figures `FR-12`'s acceptance then moved to 27.76 / 30.85 / 4.06 |
+| `FR-39` | Incremental, viewport-prioritised indexing | `0.11` | **not started, and currently the opposite.** `extractAllText` walks every page in page order, yielding every five. A partial index answering a query must also say it was partial |
+| `FR-40` | Injectable external index | `0.11` | **not started.** `FR-26`'s controller seam is the hook this hangs off, and it is built |
+| `FR-41` | Dual ESM and CJS output | `0.12` | **not started, and a build change.** `"type": "module"`, no `.cjs` emitted, `main` and `module` both point at `dist/index.js` |
+| `FR-42` | Document merge | `0.11` | **not started.** No `merge` in `src/edit.tsx` or `dist/edit.d.ts`. Needs a second document lifecycle in a tier that writes the one it is showing |
+| `FR-43` | Structure-tree integration | `0.10` | **not started — this is `#154`.** `PdfPage` passes `structTreeLayer: null` at two call sites. Spike required before committing: `StructTreeLayerBuilder` is **not** in the engine's public entry, it lives at `pdfjs-dist/web/struct_tree_layer_builder.js`, and its `.d.ts` carries the same positional-vs-object constructor ambiguity that broke `AnnotationEditorUIManager` across 5.x. If it lands it must be opt-in, or every consumer pays for it |
+| `FR-44` | Forced colours and high contrast | `0.10` | **not started.** No `forced-colors` block in any stylesheet. Part of it is not CSS: a mark conveyed by colour alone has to also be conveyed by shape, outline or text |
+| `FR-45` | WCAG 2.2 AA conformance | `0.10` | **partly built, unasserted.** A valid ARIA tree, instance-scoped keys, `useId`, visible focus, 44 px targets, page announcements and `prefers-reduced-motion` all shipped in phases 6/6b and are tested. What is missing is the *conformance claim* — an automated audit in CI rather than a list of things someone remembered to do |
+| `FR-46` | SSR-safe module graph | `0.9` | **built 2026-09-30, as a test rather than a claim.** `src/lib/ssr.test.ts` runs in the node project and asserts the premise first — `document`, `window`, `HTMLCanvasElement` and `Worker` are each `typeof … === 'undefined'`, stated as its own test because a premise nobody checks is a premise that quietly stops being true when a config changes — then imports **every JS target in `package.json`'s export map** (13 modules today), each resolved from `dist/…` back to its `src/…` file. The list is read from the map rather than typed out, so the day a fourteenth entry is added it is covered by the same loop or the loop fails to find its source and says so. It also proves the helpers that *reach* for the DOM degrade instead of crashing: `resolveSourceUrl` with no `document.baseURI`, `isAllowedSource` where a path entry has no origin to bind to (a relative string still matches as text, and a cross-origin absolute does not — both pinned, because that asymmetry is the security property), and `classifySource` / `base64ToBytes` running server-side. 17 tests. **Two claims corrected on the way:** `README.md` said pdf.js "needs DOM globals at import time, so this package is client-side only" — false, and now contradicted by a passing test; and the Installation callout said the library "never touches `window` at module scope" without ever having been checked. Both now say the true, narrower thing: **importing is safe anywhere, rendering is browser-only**, so `'use client'` is about the render, and the pure helpers belong on the server where a source string actually gets decided. What is *not* claimed: SSR rendering or hydration, and `dist/` is not what the test imports (`npm test` runs before `npm run build`), so the property is proven at source level and the `0.12` browser matrix is where the shipped bundle gets its own check |
+| `FR-47` | Touch and gesture arbitration | `0.10` | **partly built, unverifiable here.** Wheel zoom, pinch zoom and drag-and-drop shipped in `0.2`. Gesture *isolation* — pinch without also scrolling the host page — cannot be tested without the devices `#141` is blocked on |
+| `FR-48` | Browser and engine verification matrices | `0.12` | **not started.** `ci.yml` has four jobs, all Node on `ubuntu-latest`, none of which starts a browser. The `react` matrix is the pattern to copy; the engine matrix is the one `PRD.md` §6's compatibility policy promises |
+| `FR-49` | Benchmark fixture suite, profiles A–D | `0.12` | **A only.** `long-sample.pdf` exists from `scripts/make-long-pdf.mjs` and is measured. There is no image-heavy fixture, no vector-heavy fixture, and no low-memory harness |
+| `FR-50` | Published API maturity tags | `0.12` | **not started.** No name in `dist/*.d.ts` carries a maturity tag, so nothing distinguishes a stable prop from one we would still change |
+| `FR-51` | Edge-case suite | `0.12` | **built, unconsolidated.** `damaged.test.ts`, `encrypted.test.ts`, `PasswordPrompt.test.tsx` and `ViewerLayout.failure.test.tsx` landed on 2026-09-28 with `make-damaged-pdf.mjs`, and rotated pages were already covered. The one case those tests could not assert — a wrong password producing *neither* a rejection nor a second callback, which `FR-03` requires to be observable — closed on 2026-09-30 in `encrypted.reprompt.test.ts`, and the re-measurement found the 60 s silence to be the harness rather than the engine. So no case on `FR-51`'s list is now missing for a reason; what remains is the shape: one named suite rather than six files, plus `FR-48`'s browser half |
 
 **`FR-20` in full**, because it is the item whose answer is now split across two tiers. The default
 download offers the original bytes or pdf.js's incremental save, and `usePdfDownload`'s options say so:
 that branch is "save", not a true flatten, because flattening "needs a PDF writer" — and they now point at
 `pdfjs-react-reader/edit` for it. That tier is what `0.7` adds, with the writer as an **optional peer**, so
-the sentence stays true of the core — a host who imports only the viewer never bundles a 245.5 kB gzip
+the sentence stays true of the core — a host who imports only the viewer never bundles a 251.4 kB gzip
 parser — and the limit becomes a choice. See *0.7.0 — Edit* for the measured difference between the two
 files.
 
-**One bar, now measured.** `PRD.md:22` promises "60 FPS scrolling on 1,000+ page documents with
+**One bar, now measured.** `PRD.md` §2.1 promises "60 FPS scrolling on 1,000+ page documents with
 sub-100ms viewport render times". Until `0.7` closed, every frame-timing measurement in this project's
 history had been made on documents of 3–14 pages. `scripts/make-long-pdf.mjs` now writes a 1,000-page
 fixture with a nested page tree and three cycling page boxes, and against it in Chromium the bar is
@@ -69,7 +104,58 @@ exists. `0.8` closed with the desktop side done and that half still owed (`#141`
 condition rather than a `0.8` task. See *0.7.0 — closed* for the whole table.
 
 `FR-21`–`FR-23` were added on 2026-09-24 alongside the tier decision below; `FR-24`–`FR-28` were
-added with `0.5` on 2026-09-26.
+added with `0.5` on 2026-09-26; `FR-29`–`FR-33` were written backwards onto the paper on 2026-09-29, for
+work that had already shipped; `FR-34`–`FR-51` were added the same day by the PRD rewrite, for work that
+has not started.
+
+**The rewrite also tightened some of the older rows, so all 33 were reconciled against the new wording on
+2026-09-29 — before any `0.9` feature work, because a plan built on rows that say "done" when the
+requirement moved is a plan with holes in it.** The method was a diff of every FR row between the as-built
+snapshot and the rewrite, then a code check on each row whose obligation had grown rather than whose prose
+had merely been polished. All 33 rows differ textually; only a handful differ in what they ask for. The
+result:
+
+* **27 rows confirmed still done.** Including four whose new clause I expected to fail and which the code
+  answered: `FR-06`'s "a zoom step updates existing overlay layers in place" — the text layer through
+  `textLayer.update({ viewport })` in `PdfPage`'s text effect, XFA through `XfaLayer.update` in its own
+  effect, and the annotation layer through the `--total-scale-factor` custom property rather than a
+  rebuild; `FR-09`'s "every overlay layer staying registered" under rotation — covered for the text and
+  annotation layers by the `.pjsr-text-layer, .pjsr-annotation-layer [data-main-rotation]` rules in
+  `viewer.css` *and* the editor layer by the matching `.pjsr-editor-layer[data-main-rotation]` block in
+  `annotate.css`; `FR-14`'s "scroll the active match into view" — the `scrollIntoView({ block: 'center' })`
+  on the active mark in `PdfPage`; and `FR-17`'s "initial-value reset and dirty tracking" —
+  `readInitialValues`, `clearFormValues` and `isDirty` on both the forms and edit features.
+* **3 rows reopened as `0.9` work.** `FR-03` (a wrong password must produce an observable second prompt),
+  `FR-07` (re-evaluate the pixel ratio when it *changes*; nothing observes it) and `FR-12` (honour page
+  labels; no `getPageLabels` call existed). Each is annotated in the table above with the evidence, not just
+  the verdict. **All three have since closed, and one closure is a finding about the measurement rather than
+  the code.** `FR-03`: the second prompt was never silent — it arrives about 1 ms after a wrong answer, inside
+  a microtask chain that never yields, so a watchdog waiting to fire *between* two asks is what the 60 s
+  window was actually measuring. `FR-07`: the ratio is watched now rather than sampled, on a media-query
+  channel with a feature-detected `resize` fallback. `FR-12`: the label table is read from the document, and
+  a fixture that carries one exists to test it against. What is left of the reopened work is nothing, and
+  what is left of `0.9` is the release close.
+* **1 row was settled by measuring, and the requirement lost.** `FR-08` asked that switching layout not
+  re-render what is already painted. In the playground, with canvas op counting and node-identity tagging:
+  at a fixed 125 % the switch kept the scale, kept the same canvas nodes and their 956×1237 backing stores,
+  and produced **1** op — the invariant holds. In a fit mode the same switch moved scale 1.04 → 0.50 and
+  re-rendered every canvas, because fitting two pages into one width *is* a different fit. So the clause was
+  unsatisfiable as written and has been restated to what the code actually guarantees. This is the second
+  time a measurement changed a requirement rather than the code, and it is why the row was measured instead
+  of read.
+* **1 row read as done but untested, and the requirement lost too.** `FR-02`'s main-thread fallback was
+  deliberate and documented on `ensureWorker`, but nothing had loaded a document without a worker. It now
+  has, and the clause "fall back to a main-thread worker rather than failing when neither resolves" turned
+  out to move the requirement rather than the code — the same shape as `FR-08` above, and for the same kind
+  of reason: pdf.js's fake worker is the worker's own parser
+  and needs the worker code reachable without a URL, which is true of Node's own default and of a host that
+  assigns `globalThis.pdfjsWorker`, and of no ordinary browser page. The behaviour we keep is the smaller
+  and truer one — leave `workerSrc` unset so those two states stay reachable, and let the failure name the
+  option — now restated in `PRD.md` and asserted in `src/lib/worker.fallback.test.ts` and its siblings.
+
+Two of the four findings are the kind that only a diff would surface: `FR-06` and `FR-14` read like new
+obligations and turned out to be old behaviour described better, while `FR-02` read like settled work and
+turned out to have a hole. Neither assumption was worth keeping.
 
 ## What the engine gives us for free
 
@@ -91,9 +177,10 @@ the save — and an existing `/Underline`, `/StrikeOut`, `/Squiggly`, `/Text` or
 all. See *Spike A, second pass*.
 
 **Engine bytes are fixed.** Every class above already sits inside the single `pdf.min.mjs`
-(168 kB gz) plus `pdf.worker.min.mjs` (364 kB gz). Enabling annotation editing adds no engine
-weight, and no feature gating can reduce it. Our own shell measured 45.45 kB gz against that 532 kB
-baseline in `0.3`; after `0.4` the same entry sums to 44.01 kB, and one consumer import of
+(131.7 kB gz on `6.3.289`, measured at gzip level 9) plus `pdf.worker.min.mjs` (375.3 kB gz) — about
+507 kB before this package contributes anything. Enabling annotation editing adds no engine
+weight, and no feature gating can reduce it. Our own shell measured 45.45 kB gz against the 532 kB
+figure then in use back in `0.3`; after `0.4` the same entry sums to 44.01 kB, and one consumer import of
 `PdfViewer` bundles to 20.61 kB. That gap is the point of the release, and it is what the `0.6`
 editors and the `0.7` writer will attach to rather than add to.
 
@@ -209,13 +296,20 @@ Every requested feature, and the release that ships it.
 
 ## Releases
 
-**How these ship (decided 2026-09-25).** `0.2`–`0.8` — the planned sequence, which has no `0.9` — are
-committed on `dev` and kept **local**; nothing
-is pushed, merged to `main` or published along the way. When the sequence is done we push `dev`, tag
-`1.0.0`, merge to `main`, and publish that one version. `0.1.2` is therefore never published — it is
-tagged on GitHub but npm goes `0.1.1` → `1.0.0`. The accepted cost: Actions do not run on `0.2`–`0.8`
-work, so `npm run verify` locally is the only gate, and the Pages docs site stays on 0.1.x content
-until the final merge.
+**How these ship (decided 2026-09-25, extended 2026-09-29).** Every release from `0.2` to `0.12` is
+committed on `dev` and kept **local**; nothing is pushed, merged to `main` or published along the way.
+When the sequence is done we push `dev`, tag `1.0.0`, merge to `main`, and publish that one version.
+`0.1.2` is therefore never published — it is tagged on GitHub but npm goes `0.1.1` → `1.0.0`. The
+accepted cost: Actions do not run on any of this work, so `npm run verify` locally is the only gate, and
+the Pages docs site stays on 0.1.x content until the final merge.
+
+That cost is now larger than it was, and worth restating rather than letting it hide: the sequence was
+seven releases when the rule was made and is **eleven** now. `0.12`'s whole theme is automated
+verification — browser and engine matrices, the fixture suite, published maturity tags — and none of it
+can run until something is pushed. So the plan is to land the CI work as code on `dev`, prove it locally
+where a job can be proven locally, and accept that the first real run of any of it is the `1.0.0` push.
+`FR-48`'s browser matrix is the sharpest case: it is the requirement that makes `PRD.md` §8's compatibility
+table true, and a table whose evidence has never executed is the exact defect `#141` was opened for.
 
 ### 0.1.0 — baseline publish ✅ published 2026-09-24 (`0.1.0`, then `0.1.1` the same day)
 Publish what exists. Housekeeping first: `npm login` then `npm publish`, a `main` branch ruleset
@@ -1100,7 +1194,7 @@ catching is the writer arriving in a bundle that never asked for it, and the che
   page object and survive a rebuild of `/Kids`.
 * **A named outline destination reaches the reader, and only because our code resolves it.**
   `getOutline()` returns the bare string `"middle"` for `/Dest /middle`, and `resolveDestinationPageIndex`
-  returns `null` for it — `usePdfOutline.ts:26-33` is what turns the name into an array through
+  returns `null` for it — `buildTree` in `usePdfOutline` is what turns the name into an array through
   `doc.getDestination()` first. Clicking that row in the shell moved the reader 1 → 10 → 20 → 10, so FR-10
   holds; but a host using the headless resolver directly gets `null`, which the docs should say. Note also
   that `doc.resolveDestination` **does not exist** in 6.3 — a probe that reached for it threw, and the
@@ -1120,7 +1214,7 @@ catching is the writer arriving in a bundle that never asked for it, and the che
   `isPureXfa` is false, the box is the MediaBox's 612x792, the canvas marker sentence paints, and the AcroForm
   widget answers with its own `/V` ("Canvas value, not the XFA one") — the datasets island is never consulted.
   Our shell then leaves an empty `.pjsr-xfa-layer` host, which is the designed behaviour
-  (`PdfPage.tsx:411-414` clears it rather than rendering into it). The mistake worth keeping: **XFA field
+  (the XFA effect in `PdfPage` clears it rather than rendering into it, on its `isPureXfa !== true` guard). The mistake worth keeping: **XFA field
   values do not appear in `getTextContent()`** — the bound name was absent from the text tree for the control
   fixture too, so "did the packet bind?" is only answerable from the rendered inputs. A text-layer probe
   reports "not bound" for a document that bound perfectly, and the same absence is why search cannot find a
@@ -1140,7 +1234,7 @@ catching is the writer arriving in a bundle that never asked for it, and the che
   reference**, so a page's destinations travel with its object and survive a rebuilt `/Kids`.
 * **A named outline destination resolves, and not in the place you would look.** `getOutline()` returns the
   bare string `"middle"` for `/Dest /middle`, and `resolveDestinationPageIndex` answers `null` for it; what
-  makes the row followable is `usePdfOutline.ts:26-33`, which resolves the name through
+  makes the row followable is `usePdfOutline`’s `buildTree`, which resolves the name through
   `doc.getDestination(name)` first. Measured by clicking: page 1 → the name row → 10, and the reference rows
   → 20. Two names that are not what they seem: **`doc.resolveDestination` does not exist** in 6.3 (the
   method is `getDestination`), and neither does `doc.destroy()` (the loading task owns the worker). A host
@@ -1159,8 +1253,8 @@ catching is the writer arriving in a bundle that never asked for it, and the che
 * **The hybrid is the predicted no-show, and it corrected an oracle.** With `/Fields` present alongside the
   array, `isPureXfa` is false, the box is the MediaBox's 612x792, the canvas marker sentence paints, and the
   AcroForm widget answers from its own `/V` — the datasets island is never consulted. Our shell leaves an
-  empty `.pjsr-xfa-layer` host in that case by design (`PdfPage.tsx:411-414` clears it), and it also skips the
-  text layer for pure-XFA pages (`PdfPage.tsx:285`), which is the shape of `#128`. The mistake worth
+  empty `.pjsr-xfa-layer` host in that case by design (the XFA effect’s `isPureXfa !== true` guard clears it), and it also skips the
+  text layer for pure-XFA pages (the same guard at the top of the text effect), which is the shape of `#128`. The mistake worth
   keeping: **XFA field values do not appear in `getTextContent()`** — absent for the known-good control as
   well as for the arrays — so "did the packet bind?" is answerable only from the rendered inputs, and a
   text-layer probe reports "not bound" for a document that bound perfectly. The same absence is why search
@@ -1407,6 +1501,15 @@ bumps because nothing recomputed it — the reminder being that a *for scale* nu
 a claim nobody re-measures quietly becomes the thing the docs defend rather than the thing the engine
 does.
 
+**Which is what happened to this very paragraph.** Re-measured 2026-09-28 on the same `6.3.289` it names,
+`pdf.min.mjs` gzips to 131.7 kB and `pdf.worker.min.mjs` to 375.3 kB — 507.0 kB together, not the
+495.1 kB implied above — and `@cantoo/pdf-lib` 2.11.1 bundles minified to 251.4 kB for what `edit`
+imports, 256.1 kB for the whole API. The README, the docs pages, `PRD.md` §6 and `check-size.mjs`'s
+header have been restated to those, measured the way the gate measures (gzip level 9, `zlib`). The
+figures above are left as what was recorded at the time, because the paragraph's point is the practice,
+and the practice is the one that caught it: **a *for scale* number needs a method named next to it, or it
+rots the same way the number it was written to correct did.**
+
 **What the close pass found: one real defect, and it was in the surface that already worked.** The Pages
 panel announced every edit while the reader made it and said nothing on Apply — three causes deep, each
 caught only by sampling the live region over time, and each invisible to a test that asserted the notice
@@ -1422,7 +1525,7 @@ tested: the save is measured across every container we can generate and the edit
 packets bind no `dataId` (`#137`). And that an XFA page has a thumbnail — it paints zero operators, so
 the sidebar shows an empty 132×185 buffer (`#136`).
 
-**`#114`'s other half, closed the same day: the 1,000-page fixture exists, and the `PRD.md:22` bar
+**`#114`'s other half, closed the same day: the 1,000-page fixture exists, and the `PRD.md` §2.1 bar
 it was built for is now measured.** `scripts/make-long-pdf.mjs` writes 1,000 pages into a **nested page
 tree** — 100 leaves of ten pages, ten groups, one root, four levels from catalog to page — because that
 is what a real producer writes at this size and a flat `/Kids` would let the engine off the hook for
@@ -1447,7 +1550,7 @@ Chromium, Windows, the playground's shell, the surface visible:
 | Cold jump to page 250 / 500 / 750 / 1000, timed to ink | **55 / 55 / 38 / 46 ms** |
 | Canvases mounted at any moment across all of it | **2 to 4** |
 
-So `PRD.md:22`'s two claims hold on the only machine this project can measure: sub-100 ms viewport
+So `PRD.md` §2.1's two claims hold on the only machine this project can measure: sub-100 ms viewport
 render is met at 38–55 ms, and 60 FPS scrolling is met with every frame of a reader-speed pass inside
 the 16.7 ms budget. **Three things the numbers do not say.** rAF here ran at about 140 Hz (p50 7 ms), so
 the budget was met on a machine that is not the target — no real device has been measured, and the
@@ -1509,7 +1612,7 @@ shown it. What it aborts is work React would otherwise keep doing at a scroll ra
 fix was built and measured against this before the conclusion was accepted — deriving the cleared page
 from state instead of `setPage(null)`, on the theory that every mount was scheduling an update from
 inside the effect flush. Eleven errors before it, eleven after it. The theory was wrong twice over: the
-slots are keyed by page index (`ViewerParts.tsx:249`, `:258`), so a fast scroll remounts a page rather
+slots are keyed by page index (`key={slot.indices[0]}` on the slot, `key={index}` on each page inside it), so a fast scroll remounts a page rather
 than handing it a new number, and on a mount `page` is already null, which React bails out on. The change
 is not kept; the patch is at `.spike/out/pdfpage-derived-page.patch`.
 
@@ -1633,7 +1736,7 @@ Five decisions, written down rather than left to the next refactor.
    the estimator `#138` introduced. A host writing its own windowing needs the same arithmetic the
    built-in virtualizer now uses, which is the criterion the rest of the library layer is judged by.
 5. **`findFeatureKey` returns `{ feature, binding } | null`.** The `0.4` review asked for the feature
-   alongside the binding; `src/lib/features.ts:200` already does, and the bullet that asked for it was
+   alongside the binding; `findFeatureKey` already does, and the bullet that asked for it was
    older than the change that satisfied it.
 
 Nothing else in the surface is knowingly wrong. `PdfViewerHandle`, the `controls` shape, the feature
@@ -1679,7 +1782,7 @@ them yet.
 
 ### Spike D (2026-09-27): a drawn mark can be written into a `/Sig` field, and `/V` is the line
 
-`PRD.md:32` put "drawing a signature and writing it into a `Sig` field's appearance stream" in scope
+`PRD.md` §2.5 put "drawing a signature and writing it into a `Sig` field's appearance stream" in scope
 on 2026-09-24, `ROADMAP.md`'s own policy section said the engine cannot sign and no release scheduled
 it, and the `1.0` GA condition audits only the §Where-we-are table — in which signing is not a row.
 That is how a promised feature sat unowned for three releases. Measured now, against a fixture
@@ -1797,21 +1900,299 @@ offering to sign. The meta now reads from `/V` like everything else, and the tes
 old behaviour in says so. `hasAppearance` stays on the published field data for a host that wants the
 weaker question answered.
 
+### The failure paths, finally exercised (2026-09-28)
+
+`PRD.md` has listed "damaged files, encrypted documents, rotated pages" as the standard edge-case suite
+since the first draft. Rotation is covered across eight test files. The other two had never been
+attempted: the fixtures existed, the UI states were written, and no test had ever asked pdf.js to open a
+file it might refuse. Twenty-one tests now do, and three of the four things they found were not
+guessable from the code:
+
+| Question | Measured answer |
+| --- | --- |
+| Does a damaged file show an error? | Only one kind does. A file cut mid-object rejects `InvalidPDFException: Invalid PDF structure.`; a file whose `startxref` points past the end — identical length, intact header — **loads all three pages** after pdf.js re-indexes every object and warns about it. So two fixtures ship, `damaged-truncated.pdf` and `damaged-xref.pdf`, and the tests pin both outcomes; one fixture could have been made to demonstrate either story. |
+| Does an encrypted file reject? | No — it **parks**. The load waits on a `NEED_PASSWORD` callback. Abandoning it by passing an `Error`, which is what the prompt's cancel does, rejects with `PasswordException` code 1, `No password given`. The right password opens it: one page. |
+| Does a wrong password re-prompt? | **Yes, about 1 ms later** — measured on 2026-09-30 in `encrypted.reprompt.test.ts`, which asserts the asks become `NEED_PASSWORD` then `INCORRECT_PASSWORD`, that the second one stays parked until answered, and that the right password then opens the file. The first reading of this row, on 2026-09-28, was *silence for 60 s*, and that was the harness rather than the engine: the re-ask happens inside a microtask chain that never yields, so a timer waiting to fire between two asks never does. Answered synchronously from the callback instead, the same contract loops at a measured ~27,000 asks a second — which is why the hazard is documented on `submit`, not assumed away. |
+| Can Node load several encrypted files? | Not in one process. The abandon → wrong → right probe printed its first line and nothing after: an abandoned encrypted load wedges the fake worker. Hence one load per test in `encrypted.test.ts`. |
+
+One more, from the same work: **pdf.js refuses a `Buffer` on the call, not as a rejected promise**, and
+`normalizeSource` passes one straight through because a `Buffer` *is* a `Uint8Array`. Left unfixed on
+purpose — no document promises a Buffer, and copying every byte array to suit an engine preference is a
+host-facing decision for the owner — but now tested, so nobody can write "any bytes work" without that
+test disagreeing.
+
+### The PRD, read line by line against the code (2026-09-29)
+
+`#145` closed six claims one at a time. This was the same exercise done wholesale: `PRD.md` from §1 to §7,
+each factual sentence checked against the source it describes. Twelve corrections followed — the record is
+in `CODE_REFERENCE.md` §21, and the interesting part is not the list but how the drift happened.
+
+Every one of the stale sentences was written in 2024 and none was *wrong* when written; each described a
+design the later releases then changed without re-reading the requirements. So the §3 diagram still
+advertised `usePdf` and `usePage`, hooks nobody ever built, beside a `Modal` that does not exist
+(`grep Modal src/` → zero files). §3.1 still said three page layers where `PdfPage` now stacks six, two of
+them conditional. FR-11 still quoted a thumbnail scale of 0.15–0.25 while the component computes
+`(cardWidth / base.width) × dpr` from a measured grid. FR-16 and FR-18 still called signing an overlay, and
+FR-19 still promised full-resolution printing of the whole document, and FR-20 still promised a flatten on
+download — a sentence `usePdfDownload`'s own comment has contradicted since `0.7` with "this is 'save', not
+a true flatten". FR-23's acceptance note still listed four size markers where the gate configures eight,
+two of which are not hook names.
+
+Two findings are worth more than the corrections they produced:
+
+* **§4 stopped at FR-28 while the product had moved past it.** `0.6` shipped an annotation editor, `0.7` a
+  page writer and a true flatten, `0.8` signing and XFA display — and not one of them has a requirement,
+  because the matrix is where the requirements live and nothing had added a row since `0.5`. §4.9
+  (FR-29–FR-33) closes that, and the rule it implies is that a release which adds a capability owes a row
+  in §4, not just a CHANGELOG entry.
+* **A test comment can cite a requirement that does not exist.** `ViewerLayout.failure.test.tsx` opens by
+  citing "`PRD.md`'s error-handling line", and there was no such line: the behaviour was shipped, tested,
+  and unrequired. §6 now has one, including the deliberate exception in it — `RenderingCancelledException`
+  stays silent, because cancelling a render is the mechanism and a fast scroller would otherwise hear an
+  error per frame.
+
+The React-18 claim was re-measured rather than restated: the record in this file said 428 tests and the
+suite was 449 as at that date, so the pass was run again on 18.3.1 — typecheck, those 449 tests, both
+bundles, the size gate, all
+green — and 19.3.0 put back afterwards with `--no-save`, leaving `package.json` and the lockfile
+untouched. Which surfaced a claim in `README.md` that had been true in no tense: "19.3.0, **in CI**".
+GitHub Actions has run — 22 times, last green on `main` and `dev` at `5059bc7` on 2026-09-24 — but not on
+any of this work: no `0.x` commit since has been pushed, the job that installed 18 did not exist yet, and
+every green gate on the `0.2`–`0.9` range is a local one. Nor does any job start a browser, so none of
+them has ever exercised a rendering path. The Requirements table now says so.
+
+**And then the two PRDs became one.** A second, independently written `PRD_v2.md` was reviewed against the
+first and against the code on the same day, and merged into `PRD.md` instead of being kept beside it: two
+specifications for one package is how someone builds from the wrong one. The draft's *structures* were
+better and were taken — scope tiers split into what ships in `1.0`, what is deliberately after it, and the
+separate editing capability; a module map and the published entry-point table; concurrency and state
+models; API maturity tags with a change policy per tag; an engine-compatibility policy; four named
+benchmark profiles; a security boundary list; licence governance; and the rule that every example in the
+document must compile against the export map. Its *facts* were checked one at a time first, and eleven of
+them did not survive — a `/features/search` entry that does not exist, a `base64ToPdfSource()` utility that
+was never written, an `AbortSignal` on every async operation where the real mechanism is effect-scoped
+cancellation, two named state unions that exist in no type, CJS output the build has never emitted, SSR
+validation nobody has run, a `merge` the edit tier does not have, "pdf.js internals are never public" while
+`annotationEditorUIManager` is a prop on `PdfPage`, lazy search indexing (the same invention §12 of
+`CODE_REFERENCE.md` was corrected for hours earlier), a `< 55 ms` target that is the top of our own
+measured range, and a compatibility matrix marking all six browsers "Tested (CI): Yes". Each is recorded
+with its resolution in `CODE_REFERENCE.md` §21, and the draft itself is banner-marked superseded rather
+than deleted, because it is untracked and deletion would be unrecoverable.
+
+The compile rule paid for itself before the ink was dry: §5.1's example imported `PdfPage` from
+`pdfjs-react-reader/headless` in **both** drafts, and that entry exports no React components. Nothing
+type-checks a PRD, which is exactly why the rule is now in §5's preamble.
+
+### 0.9.0 — Reach: load what a real deployment serves (FR-34 – FR-38, FR-46, and the rows the rewrite reopened) ✅ built and closed 2026-09-30 (local `dev`; pushed and published with 1.0.0)
+
+The first of the four releases the PRD rewrite added, and the one with the highest ratio of adopters
+unlocked to code written. A viewer that cannot load a document from behind bearer auth, a signed URL or a
+session cookie is not usable in the deployment that was going to pick it, and none of that needs new
+architecture — the engine already accepts every one of these options and we do not forward them.
+
+**Task 0, before any feature work: reconcile FR-01 – FR-33 against the rewritten wording.** The rewrite
+kept every id and every subsection but grew clauses on several rows, and three are known to have become
+harder rather than staying the same — `FR-03` (a wrong password must produce an observable second prompt,
+where we had measured silence — a reading `0.9` later found to be the harness, and the row is closed),
+`FR-07` (re-read the pixel ratio when it changes — closed the same release, by watching the value rather
+than sampling it) and `FR-12` (honour page labels — closed the same release, with a fixture written to make
+the claim testable). `FR-08`, `FR-14` and
+`FR-17` need checking rather than assuming. The §Where we are table says
+"done" on rows whose requirement moved, and a plan built on those rows has holes in it. This task either
+confirms the rows or reopens them as tickets in this release. **A fourth row moved after it was measured
+rather than before:** `FR-02`'s "fall back to a main-thread worker rather than failing when neither
+resolves" was read as describing behaviour we already had, and loading a document with no worker at all
+found that pdf.js can only do it where the worker code is reachable without a URL. The row is closed with
+the requirement restated, not the code changed.
+
+* **`FR-34` network contract.** `httpHeaders`, `withCredentials`, `rangeChunkSize`, `disableRange`,
+  `disableStream` forwarded to `getDocument`. All five verified present in `DocumentInitParameters` on
+  `6.3.289`. The trap, found by reading the hook rather than by hitting it: the load effect's deps are
+  `[workerSrc, assetUrl, cMapUrl, standardFontUrl, nonce]` and `src` is held in a ref **specifically so an
+  inline object cannot restart the load every render** — a `httpHeaders={{ Authorization: … }}` literal has
+  exactly that shape, so it must be ref-read too, and there must be a test that renders twice and counts
+  loads. Credentials are not logged and not echoed into error messages (`PRD.md` §6, Security).
+* **`FR-35` bounded retries.** Exponential backoff with jitter, configurable attempt count and ceiling,
+  retrying only genuinely transient failures. The clause that makes it safe: **a 401 or 403 is surfaced on
+  the first response and never retried**, because retrying a permission failure turns it into a rate-limit
+  problem and hides the real one. Every attempt is reportable.
+* **`FR-36` cancellation tokens.** A consumer-supplied `AbortSignal` on load, render, extraction, indexing,
+  thumbnail, print and download, composing with the internal one. Note what this is *not*: the invalidation
+  invariants already hold through effect-scoped `cancelled` flags and `task.cancel()`, so this is about
+  giving a host the handle, not about fixing cancellation.
+* **`FR-37` published state unions.** The document and page status enums of `PRD.md` §3.5, kept consistent
+  with the underlying fields — a status must never read `ready` while the document handle is null — with
+  reportable transitions. This is the one item here that changes public types rather than adding to them,
+  so it carries the release's only real API-design risk.
+* **`FR-38` source utilities.** Export the base64 decoder and the classification result, including the
+  refusal reason, so a host with an upload widget does not reimplement the heuristic.
+* **`FR-46` SSR-safe import.** Measured already true — `dist/index.js` imports under bare Node 24 with only
+  pdf.js's own legacy-build warning — so this is a test that keeps it true plus a documented client
+  boundary. Cheap, and it converts an accident into a property.
+
+**Gate: met, all three clauses.** *A document behind a bearer token loads in the playground* — the last
+thing `0.9` needed, and the one its own row could not show until the close: `scripts/auth-server.mjs`
+answers `GET /*.pdf` from `playground/fixtures/` only to `Authorization: Bearer dev-token`, the playground
+grew a token box wired to `httpHeaders`, and the same URL gave a `role="alert"` naming the 401 with no
+canvas at all, then **3 canvases and 5,117 inked pixels on page 1** with it. *A second render with a fresh
+headers literal does not reload it* — `usePdfDocument.network.test.tsx`, which counts the loads and names
+the loop a dependency array would produce at 2,666 calls. *A wrong password produces a second prompt* —
+met on 2026-09-30 by `encrypted.reprompt.test.ts`, against the engine rather than a description of it.
+
+### 0.9.0 — closed 2026-09-30
+
+Cumulative measured cost across the release, gzipped, worst of esbuild and Rollup — the "before" column is
+the figure the `0.8` close left in the documents, which the signing commits then moved: core
+**24.96 → 27.76 kB** (+2.80 for `0.9`'s own work; that close left 24.77 and the signing commits added the
+0.19 between), shell **52.78 →
+57.90**, headless **27.13 → 30.85**, the single-hook `headless-only` path **4.06** (where the loading
+options live), all eight features **39.41 → 42.53** (+14.76 over core). Over core at the close: print
+2.52, download 0.75, forms 2.02, outline 0.94, layers 1.19, attachments 1.07, annotate 1.83, **edit
+5.87** — the first reporting of the eight against the 6 kB ceiling rather than the 4 kB one, and the
+widest leaves **131 B**. The catalog is **144** strings, unchanged by this release; `locales/{de,es,fr}`
+hold at **2.37 / 2.37 / 2.39 kB**. **661 tests in 59 files**, from 393 in 32 at the `0.8` close — the
+signing work and `0.9` together account for the 268, and the size baseline was re-accepted once, at
+`FR-12`, with every path at +0.00 after it.
+
+What the release was actually for, in one line each: a document behind bearer auth, a signed URL or a
+session cookie can be opened at all (`FR-34`); a transient failure heals and a permission failure does not
+come back (`FR-35`); a host can stop anything the package started, as a cancellation rather than an error
+(`FR-36`); the state a host branches on is one published value rather than three correlated fields
+(`FR-37`); a source string can be classified before it is loaded (`FR-38`); and importing the package on a
+server is a tested property rather than an accident (`FR-46`).
+
+Three rows the rewrite reopened closed with the requirement moving rather than the code: `FR-03` (the
+second prompt was never silent — the 60 s was a watchdog that cannot fire inside the engine's microtask
+chain), `FR-08` (a fit mode *is* a different fit, so "no re-render" was unsatisfiable as written) and
+`FR-02` (pdf.js's main-thread parser is the worker's own code, so an unset `workerSrc` paints only where
+that code is reachable without a URL). `FR-07` and `FR-12` closed the other way, by building the thing the
+clause asked for.
+
+Still open after this close, all of it by decision rather than by running out of the release: the
+structure-tree spike and the device matrix, both gated on hardware this machine is not; the core freehand
+ink question, which is `1.0`'s owner decision; freezing the mutable exported collections, which is a
+contract change and therefore `1.0`'s; and the jsdom harness that cannot mount the shell against a loaded
+document, which belongs with `0.12`'s CI work rather than with any feature.
+
+### 0.10.0 — Access: the reader is not a desktop mouse user (FR-43 – FR-45, FR-47)
+
+Accessibility and touch, together, because both are about a reader whose input or assistive technology is
+not the one the shell was first drawn for — and because both are blocked on the same missing thing, real
+devices (`#141`).
+
+* **`FR-43` structure tree — `#154`, and it needs a spike before it needs a decision.** `PdfPage` passes
+  `structTreeLayer: null` at two call sites. The builder is `StructTreeLayerBuilder`, which is **not** in
+  the engine's public entry: it lives at `pdfjs-dist/web/struct_tree_layer_builder.js`, inside the viewer
+  bundle, and its `.d.ts` declares a constructor of `(pdfPage, rawDims)` while its options type says
+  `{ pdfPage, rawDims }` — the same positional-versus-object ambiguity that broke `AnnotationEditorUIManager`
+  across 5.x. So the spike measures three things before any of it is promised: does importing from `web/`
+  pull the viewer bundle into every consumer's graph, does the constructor signature hold across the
+  supported engine range, and what does it cost per page. **If it lands it is opt-in**, because a tagged-PDF
+  feature that costs bytes for everyone is the exact trade `FR-23` exists to prevent. If the spike says the
+  boundary is not crossable, `FR-43` moves to `PRD.md` §2.3 as a documented exclusion — which is a
+  legitimate outcome and a better one than a fragile import.
+* **`FR-44` forced colours and high contrast.** No stylesheet has a `forced-colors` block today. Part of
+  this is not CSS: a search match, the active match and an annotation highlight are all distinguished by
+  colour alone right now, so each needs a second channel — shape, outline or text.
+* **`FR-45` WCAG 2.2 AA conformance.** Most of the substance shipped in phases 6 and 6b and is tested:
+  valid ARIA tree, instance-scoped keys, `useId`, visible focus, 44 px targets, page announcements,
+  `prefers-reduced-motion`. What is missing is the *claim* — an automated audit in CI, so conformance is a
+  failing job rather than a list of things someone remembered to do.
+* **`FR-47` gesture arbitration.** Wheel zoom, pinch zoom and drag-and-drop shipped in `0.2`; isolation —
+  a pinch that does not also scroll the host page — cannot be verified without devices, so this item is
+  gated on the same hardware as `#141` and may land as a documented exclusion if that hardware never
+  appears.
+
+**Gate:** the spike has a written answer; the audit runs and passes; and either a device pass happened or
+`PRD.md` §8's mobile rows say what they are.
+
+### 0.11.0 — Index & Assemble: beyond one page, and beyond one document (FR-39, FR-40, FR-42)
+
+The reader-facing depth work. Two of these three are search, and the third is the one capability the
+editing tier is missing.
+
+* **`FR-39` incremental, viewport-prioritised indexing.** Today `extractAllText` walks every page in page
+  order, yielding to the event loop every five — which is why a 1,000-page document stays responsive but
+  also why the first query waits for the whole file. Indexing the visible range first, then outward, with a
+  result count that says it is still growing. The clause that makes it honest: **a partial answer must
+  announce that it is partial**, never present itself as final. Re-indexing after a page edit invalidates
+  only what changed.
+* **`FR-40` injectable external index.** `FR-26`'s controller seam is built and is the hook this hangs off;
+  what is new is a published index shape a host can construct server-side.
+* **`FR-42` merge.** The only genuinely new capability in the four releases, and the most expensive: a
+  second document lifecycle in a tier that writes the one it is showing. Page-level selection from each
+  source, a preview of the resulting order, and the invariant that matters — **merge produces a new file
+  and leaves both sources untouched**, so a reader cannot destroy a document by experimenting.
+
+**Gate:** a first query on `long-sample.pdf` answers before the whole document is indexed and says it was
+partial; a host-supplied index drives the marks; and merging two fixtures produces a third file with both
+sources byte-identical afterwards.
+
+### 0.12.0 — Prove: the evidence, automated (FR-41, FR-48 – FR-51)
+
+Last, and deliberately so: this release certifies everything before it, and a matrix written before the
+features exist is a table of intentions.
+
+* **`FR-48` browser and engine matrices.** At minimum Chromium, Firefox and WebKit, plus a mobile-emulated
+  pass, plus an engine matrix across the supported `pdfjs-dist` range. The `react` job is the pattern to
+  copy and the `consumer` job is the pattern for the tarball half. **This is the requirement that makes
+  `PRD.md` §8's compatibility table true** — until it runs, six of that table's rows are support claims
+  with no evidence behind them, which is precisely the defect `#141` was opened for.
+* **`FR-49` benchmark fixture suite.** Profile A exists (`long-sample.pdf`) and is measured. B
+  (image-heavy) and C (vector-heavy) need generator scripts following the `make-*-pdf.mjs` pattern, and D
+  needs a low-memory harness. B is the one most likely to find a real defect, because it is the profile the
+  canvas area and side caps exist for and no actual high-DPI scan has ever hit them.
+* **`FR-50` published maturity tags.** Every exported name tagged stable / experimental / internal /
+  deprecated, enforced by a build check so an exported-and-untagged name fails. `scripts/inventory.mjs`
+  already reads `dist/*.d.ts` and is the natural place to assert it.
+* **`FR-51` edge-case suite.** Each of the six ways `FR-51` says a document can be wrong now has a committed
+  test: the two damaged shapes in `damaged.test.ts`, the encrypted document in `encrypted.test.ts`, the
+  wrong password in `encrypted.reprompt.test.ts`, rotation as before, and the over-large page in
+  `canvas.test.ts`. The last of those closed with `FR-03` in `0.9`, and closing it also retired the earlier
+  reading that the second prompt never arrives. What is left here is consolidation — one suite with one name
+  rather than six files a reader has to know to look for — and the browser half of `FR-48`.
+* **`FR-41` dual ESM and CJS output.** Placed here rather than in `0.9` because it is a build and packaging
+  concern, and the `consumer` job is what proves it — a CJS artifact that does not resolve from a packed
+  tarball is worse than no CJS artifact, since it fails in a toolchain we cannot see.
+
+**Known hole, recorded now rather than discovered at GA:** every job this release adds is a CI job, and
+nothing is pushed until `1.0.0`. So the matrices get written and proven locally where a job can be proven
+locally, and their first real execution is the release push. If that is not acceptable, the alternative is
+to push `dev` before `0.12` starts — which breaks the 2026-09-25 shipping rule, and is the owner's call.
+
 ### 1.0.0 — GA
-Every row of the §Where we are table — all `FR-01`–`FR-28`, where that claim used to stop at `FR-23` —
-genuinely green or documented as an explicit exclusion, the `PRD.md:22` performance bar measured on a
+Every row of the §Where we are table — all `FR-01`–`FR-33`, where that claim used to stop at `FR-23` —
+genuinely green or documented as an explicit exclusion, the performance bar in `PRD.md` §2.1 measured on a
 document large enough to mean it, and strict semver from then on.
 
+**The gate is now all 51 requirements (owner's decision, 2026-09-29).** The PRD rewrite took the target
+from 33 requirements to 51, and `PRD.md` §7 ends with "1.0 — the lot". For one day this file disagreed
+with it and said so; the disagreement is resolved in the PRD's favour. `1.0.0` ships FR-01 … FR-51, which
+means four more releases before GA — `0.9` Reach, `0.10` Access, `0.11` Index & Assemble, `0.12` Prove —
+planned below. The sentence this section opened with still holds for the rows it was written about: every
+one of FR-01 – FR-33 is genuinely green or documented as an explicit exclusion, and the §Where we are
+table is what says which.
+
+Two consequences of the decision, stated rather than absorbed silently. **The release is further away than
+it was this morning**, and most of the distance is verification infrastructure — matrices, fixtures,
+audits, maturity tags — rather than reader-facing behaviour. And **`0.12` cannot be proven where it is
+built**: its whole theme is CI jobs, and nothing is pushed until `1.0.0`, so the first real run of the
+browser and engine matrices is the release push itself. That is a known hole in the plan and it is recorded
+here rather than discovered later.
+
 Five things joined that list from the review of the documents against the code and from the signing work
-it led to. Four are still open; the fifth, `#144`, was closed by measuring rather than by coding:
+it led to. Three are still open — `#124`, `#141` and `#143`, each one a decision or a device rather than
+a piece of code. The other two, `#144` and the `#145`/`#146` pair, were **closed by measuring rather than
+by coding**, which is worth saying plainly because neither was resolved by writing the feature someone
+had asked for:
 
 * **`#124`** — whether the core's freehand ink is retired now that `annotate`'s ink is the one that
   saves. The owner's call, still unanswered.
 * **`#141`** — the real-device matrix, which cannot be run from this harness. Either a Safari and an
-  Android pass happen or the device claim comes out of `README.md` and `PRD.md:22`.
+  Android pass happen or the device claim comes out of `README.md` and `PRD.md` §8.
 * **`#143`** — the accessibility audit, moved here from the `0.8` row that promised it. It has a named
   item now: `PdfPage` passes `structTreeLayer: null` in two places, so the tagged-PDF structure the
-  `PRD.md:289` NFR asks screen readers to be given is declined in code, not merely unaudited.
+  `PRD.md` §6's Accessibility NFR asks screen readers to be given is declined in code, not merely unaudited.
 * **`#144`** — **closed by measuring, both halves.** A written appearance paints in our viewer, and so
   does a written *in-session* one. Loading `signature-signed-sample.pdf` showed each of the three marks
   inside its own box — the 200 × 60, the 150 × 40 and the `/F 20` box on page two — against nothing in
@@ -1832,7 +2213,21 @@ it led to. Four are still open; the fifth, `#144`, was closed by measuring rathe
   file has carried two collisions from treating a session's task ids as durable references.
 * **`#145`/`#146`** — two claims the documents make that nothing re-checks: React 18 (no CI job
   installs it; `README.md:137` and `CHANGELOG.md:911` say it was verified) and the damaged- and
-  encrypted-document tests `PRD.md:319` promises. Either they are tested or the sentences change.
+  encrypted-document tests `PRD.md`'s edge-case list promises. Either they are tested or the sentences change.
+  **React 18: closed by testing, on 2026-09-28.** With `react`, `react-dom` and both `@types/*` at 18.3,
+  `typecheck`, all 428 tests and `build` pass — the source asks for `useId` (18+) and `forwardRef` and
+  nothing 19-only — so the claim was true, merely unkept since `0.1`'s one hand-check. A `react` matrix
+  job in `ci.yml` now installs majors 18 and 19 on every push, mirroring the peer range the same way the
+  `consumer` job mirrors the engine range. It has not run, because no `0.x` commit is pushed; until it
+  does the honest statement is "verified locally today, covered in CI from the next push".
+  **Damaged and encrypted documents: closed the same way**, by running the engine rather than reasoning
+  about it — see *The failure paths, finally exercised*. The headline is that the promise was half wrong:
+  a truncated file does show the error the PRD describes, but a file with a lying `startxref` **loads
+  fine**, and an encrypted file does not reject at all — it parks on a `NEED_PASSWORD` callback that the
+  shell answers or abandons. Both fixtures, both outcomes, and the wrong-password re-prompt left
+  explicitly unproven — which `0.9` closed on 2026-09-30, finding the silence to have been the harness: the
+  re-ask arrives about 1 ms after the wrong answer. `#145`'s six claims are now all closed: one (`#146`) was the retry path, which is
+  tested; the rest were wording, a CI gap, or a missing fixture.
 
 ## Opened by the 0.4 review
 
@@ -1845,7 +2240,7 @@ what `0.4` shipped; each is recorded so the later releases inherit the list rath
 * **`findFeatureKey` returns the winning binding but not the feature it came from.** Harmless today;
   `0.6`'s editor layer will want both, to say which feature refused a chord. A return-shape change, so
   it has to happen before the API freeze. **Already satisfied** — checked while designing `0.6`: the
-  signature in `src/lib/features.ts:200` is `{ feature, binding } | null` and the loop returns both. This
+  return type of `findFeatureKey` is `{ feature, binding } | null` and the loop returns both. This
   bullet outlived the change that fixed it, which is what a review of the review is for.
 * **`INK_COLORS` and `INK_WIDTHS` are exported mutable arrays**, so a consumer that sorts one in place
   changes every viewer on the page. Freezing them is an API-surface change and belongs with the same
@@ -1917,7 +2312,7 @@ follows, which is what the display question has to be measured against.
 Still needed: an XFA packet whose fields reach the datasets with a `dataId`, which is the only way to
 answer whether a reader's keystroke in a LiveCycle form can be saved. Built at the `0.7` close: `long-sample.pdf`
 (`scripts/make-long-pdf.mjs`), 1,000 pages in a nested tree with three cycling page boxes, which is what
-the `PRD.md:22` bar has now been measured against. These should come from generator scripts like the
+the `PRD.md` §2.1 bar has now been measured against. These should come from generator scripts like the
 existing `scripts/make-*-pdf.mjs`, not downloads.
 
 ## Policy conflicts to resolve
@@ -1946,6 +2341,16 @@ existing `scripts/make-*-pdf.mjs`, not downloads.
   `content`, the `getAttachmentContent` feature test, the legacy `order`/`groups` fallbacks) become dead
   code to remove as part of `0.6`'s seam work, announced as the breaking peer change the CHANGELOG policy
   requires.
+  **That last half did not happen, and re-reading it says it should not.** The branches are still in, by
+  decision (2026-09-28): `FR-25` is restated as 6.x-supported with the 5.x *data shape* tolerated, and
+  `attachments.ts`'s header now says tolerated-rather-than-admitted instead of "the peer range allows
+  both", which stopped being true when the floor moved. The reason to keep them is the failure mode:
+  `ViewerController`'s feature test exists so that an engine without `getAttachmentContent` reads as
+  "nothing to fetch" rather than throwing inside pdf.js's own click handler. Removing a graceful
+  degradation to make a peer constraint more emphatic is the wrong trade — npm already warns — so the
+  choice is to keep two small defensive reads, test both shapes in `attachments.test.ts`, and be exact in
+  the docs that no *other* 5.x surface is supported or verified. What the bullet got right stands: the
+  `consumer` matrix collapsed to one engine, and v5 is not advertised.
 * **v6 runtime coverage.** `0.1.2` verified 6.3.289 by hand in a browser and the CI `consumer` job now
   builds the packed tarball against `^5` and `^6.2.108`. That coverage must be kept: every later
   release should pass on both, and `0.7`'s writer work should be measured on 6.x, not 5.7.284.
@@ -1955,7 +2360,7 @@ existing `scripts/make-*-pdf.mjs`, not downloads.
 * **Changing the unpkg default in `0.3`** is a behavior change. `CHANGELOG.md` counts only API, CSS
   token and supported-major changes as breaking, so a default flip is arguably a minor — decide it
   deliberately rather than by accident.
-* **FR-18 asks for "freehand drawing/signatures"; the engine cannot sign.** `PRD.md:122` names signatures
+* **FR-18 asks for "freehand drawing/signatures"; the engine cannot sign.** `PRD.md` FR-18 names signatures
   alongside freehand drawing, and Spike A measured that pdf.js 6.3 will not do it: a signature editor needs
   a `SignatureManager`, which is not among the 62 names the package root exports, and while an editor with
   no signature data sits in the annotation storage `saveDocument()` throws — so offering the tool would put

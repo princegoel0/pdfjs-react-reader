@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { PdfPage, usePdfDocument, usePdfVirtualizer, type ScaleMode } from 'pdfjs-react-reader';
+import {
+  PdfPage,
+  usePdfDocument,
+  usePdfVirtualizer,
+  type PdfPageStatus,
+  type ScaleMode,
+} from 'pdfjs-react-reader';
 import { Example } from '../components/Example';
 import { OUTLINE_SAMPLE } from '../fixtures';
 import source from './HeadlessExample.tsx?raw';
@@ -38,8 +44,20 @@ const SCALES = ['fit-width', '1', '1.25', '1.5', '2'];
  * with a dark control bar that belongs entirely to the host.
  */
 export function HeadlessExample() {
-  const { doc, numPages, error } = usePdfDocument({ src: OUTLINE_SAMPLE });
+  const { doc, numPages, status, error } = usePdfDocument({ src: OUTLINE_SAMPLE });
   const [scale, setScale] = useState<ScaleMode>('fit-width');
+  /*
+   * The page model used the way a host would use it: one stable handler for every page, keyed by the page
+   * number that arrives with the status. A closure per page would give `PdfPage` a new prop each render and
+   * defeat its memo, which is the one thing this component is careful about.
+   */
+  const working = useRef(new Set<number>());
+  const [painting, setPainting] = useState(0);
+  const onPageStatus = useCallback((pageNumber: number, state: PdfPageStatus) => {
+    if (state === 'queued' || state === 'rendering') working.current.add(pageNumber);
+    else working.current.delete(pageNumber);
+    setPainting(working.current.size);
+  }, []);
   const {
     containerRef,
     virtualSlots,
@@ -84,6 +102,11 @@ export function HeadlessExample() {
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>
             {Math.round(resolvedScale * 100)}%
           </span>
+          {/* The two published states, side by side: the load's and the pages'. */}
+          <span style={{ fontVariantNumeric: 'tabular-nums', marginLeft: 8 }}>
+            {status}
+            {painting > 0 ? ` · ${painting} painting` : ''}
+          </span>
         </div>
         <div
           ref={containerRef}
@@ -111,6 +134,7 @@ export function HeadlessExample() {
                         pageNumber={index + 1}
                         scale={resolvedScale}
                         onBaseDimensions={reportPageDims}
+                        onStatusChange={onPageStatus}
                       />
                     </div>
                   ))}

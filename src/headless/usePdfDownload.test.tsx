@@ -84,3 +84,58 @@ describe('usePdfDownload with saveEdits', () => {
     expect(current.getData).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('usePdfDownload with an aborted signal (FR-36)', () => {
+  it('writes no file, and reports no error, because the caller asked to stop', async () => {
+    const onError = vi.fn();
+    const current = doc();
+    const controller = new AbortController();
+    controller.abort();
+    const { result } = renderHook(() =>
+      usePdfDownload({ doc: current, fileName: 'a', onError, signal: controller.signal }),
+    );
+
+    await act(async () => {
+      await result.current.download();
+    });
+
+    expect(saved, 'a cancelled download must not produce a file').not.toHaveBeenCalled();
+    expect(result.current.error).toBeNull();
+    expect(onError).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.isBusy).toBe(false));
+  });
+
+  it('still pays the worker round trip for the bytes, which is the honest boundary here', async () => {
+    // Recording the limit rather than the feature: the signal is checked before the write, so an abort
+    // costs the caller nothing observable but does not interrupt a `getData` already in flight. Making
+    // that interruptible is the engine's fetch to cancel, not this one's, and FR-36 is satisfied by
+    // never producing the file — not by pretending the round trip can be recalled.
+    const current = doc();
+    const controller = new AbortController();
+    controller.abort();
+    const { result } = renderHook(() =>
+      usePdfDownload({ doc: current, fileName: 'a', signal: controller.signal }),
+    );
+
+    await act(async () => {
+      await result.current.download();
+    });
+
+    expect(current.getData).toHaveBeenCalledTimes(1);
+    expect(saved).not.toHaveBeenCalled();
+  });
+
+  it('writes the file when nothing aborted it, so the guard is not simply blocking everything', async () => {
+    const current = doc();
+    const { result } = renderHook(() =>
+      usePdfDownload({ doc: current, fileName: 'a', signal: new AbortController().signal }),
+    );
+
+    await act(async () => {
+      await result.current.download();
+    });
+
+    expect(saved).toHaveBeenCalledTimes(1);
+    expect(bytes()).toEqual(ONE);
+  });
+});

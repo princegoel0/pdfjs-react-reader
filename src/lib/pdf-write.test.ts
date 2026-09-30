@@ -435,3 +435,72 @@ describe('signatures', () => {
  * below mean something: with no `/AP` in the source file, a mark found afterwards can only
  * have come from `signFields`.
  */
+
+/*
+ * FR-36 on the writer. These loops are synchronous inside `@cantoo/pdf-lib`, so the honest contract is
+ * narrower than "cancel a write": an abort stops the *next* step and always prevents the bytes arriving.
+ * The last case below is the one that matters most — proving the guard is a guard and not a wall.
+ */
+describe('the writer honours an abort signal', () => {
+  const aborted = () => {
+    const controller = new AbortController();
+    controller.abort();
+    return controller.signal;
+  };
+  const isAbort = (error: unknown) =>
+    error instanceof Error && error.name === 'AbortError' ? true : false;
+
+  it('refuses to parse at all for arrangePages', async () => {
+    await expect(
+      arrangePages(fixture('page-order-sample.pdf'), { order: [2, 0, 1] }, { signal: aborted() }),
+    ).rejects.toSatisfy(isAbort);
+  });
+
+  it('refuses to parse at all for findSignatureFields', async () => {
+    await expect(
+      findSignatureFields(fixture('signature-sample.pdf'), { signal: aborted() }),
+    ).rejects.toSatisfy(isAbort);
+  });
+
+  it('refuses to parse at all for signFields', async () => {
+    await expect(
+      signFields(
+        fixture('signature-sample.pdf'),
+        [{ field: 'sigPlain', points: MARK }],
+        { signal: aborted() },
+      ),
+    ).rejects.toSatisfy(isAbort);
+  });
+
+  it('refuses to flatten', async () => {
+    await expect(flattenBytes(fixture('form-sample.pdf'), { signal: aborted() })).rejects.toSatisfy(
+      isAbort,
+    );
+  });
+
+  it('still does the work when nobody aborted, so the guard is not simply refusing everything', async () => {
+    const controller = new AbortController();
+    const result = await arrangePages(
+      fixture('page-order-sample.pdf'),
+      { order: [2, 0, 1] },
+      { signal: controller.signal },
+    );
+    expect(result.bytes.length, 'a live signal must not stop the write').toBeGreaterThan(0);
+    expect(result.pages).toBe(3);
+  });
+
+  it('leaves the source bytes untouched when it aborts, which is the whole point', async () => {
+    const source = fixture('signature-sample.pdf');
+    const before = source.slice();
+    await expect(
+      signFields(
+        source,
+        [{ field: 'sigPlain', points: MARK }],
+        { signal: aborted() },
+      ),
+    ).rejects.toSatisfy(isAbort);
+    // The caller's buffer is never mutated in place, aborted or not — a cancel that had already
+    // half-written into the document would be worse than no cancellation at all.
+    expect(source).toEqual(before);
+  });
+});

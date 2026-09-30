@@ -47,11 +47,13 @@ export function workerAutoDetectionFailed(): boolean {
 }
 
 /**
- * Points pdf.js at its worker before the first document load. Each candidate is
- * probed because a bundler that cannot rewrite the specifier still hands back a
- * plausible-looking URL; assigning that would break pdf.js's own fake-worker
- * fallback, which fetches the same URL. When every candidate fails we leave
- * `workerSrc` unset rather than pointing it at something known to be wrong.
+ * Points pdf.js at its worker before the first document load. Each candidate is probed because a bundler
+ * that cannot rewrite the specifier still hands back a plausible-looking URL, and writing that in would
+ * cost more than leaving the field alone: it overwrites pdf.js's own Node default, which is the one
+ * fallback that needs no configuration at all, and in a browser it turns "no `workerSrc` specified" —
+ * which names the option the host owns — into a failed fetch of a URL nobody recognises. An unset value
+ * never buys a main-thread render by itself; the worker code has to be reachable some other way, and
+ * `worker.fallback.test.ts` with its three siblings measure which states that is.
  */
 export function ensureWorker(workerSrc?: string): Promise<void> {
   if (workerSrc) {

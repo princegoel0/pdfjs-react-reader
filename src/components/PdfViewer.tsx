@@ -4,11 +4,13 @@ import type { AssetUrl } from '../lib/assets';
 import type { PdfViewerLabelsOverride } from '../lib/labels';
 import type { PdfAnnotationState } from '../lib/editing-state';
 import type { PageLayout, ScaleMode } from '../lib/layout';
-import type { PdfCapabilities, PasswordReason, PasswordSubmit } from '../headless/usePdfDocument';
+import type { PdfCapabilities, UsePdfDocumentOptions } from '../headless/usePdfDocument';
+import type { PasswordReason, PasswordSubmit } from '../lib/status';
 import type { PdfFindController } from '../headless/usePdfSearch';
 import type { SearchOptions } from '../lib/search';
 import type { AnyPdfFeature } from '../lib/features';
 import type { PdfSource } from '../lib/source';
+import type { RetryAttemptInfo, RetryPolicy } from '../lib/retry';
 import type { SidebarTab } from './Sidebar';
 import type { ToolbarControls } from './Toolbar';
 import { useViewerController } from './ViewerController';
@@ -37,6 +39,36 @@ export interface PdfViewerProps {
    * opens an address a visitor typed.
    */
   allowedSources?: readonly string[];
+  /**
+   * Request headers for a URL `src` — an `Authorization` bearer, a signed-URL
+   * token, a tenant id. Forwarded to the engine's fetch verbatim, never logged
+   * and never echoed into an error. Read when a load starts, so an inline
+   * literal does not restart the load on every render; reload to apply new ones.
+   */
+  httpHeaders?: Record<string, string>;
+  /** Send cookies and HTTP auth for a cross-origin URL `src`. */
+  withCredentials?: boolean;
+  /** Bytes per range request; the engine's default applies when omitted. */
+  rangeChunkSize?: number;
+  /** Fetch the whole file in one request instead of by byte range. */
+  disableRange?: boolean;
+  /** Turn off progressive streaming as the file arrives. */
+  disableStream?: boolean;
+  /**
+   * Bounded retries for a load failure that can heal — three attempts with full-jitter backoff by
+   * default, `false` to fail on the first error. A 401, a 403, a 404, a corrupt file and an encrypted
+   * document are never retried.
+   */
+  retry?: RetryPolicy | false;
+  /** Called before each retry wait, so the UI can say "retrying (2 of 3)" instead of spinning. */
+  onRetryAttempt?: (info: RetryAttemptInfo) => void;
+  /**
+   * Bytes as they arrive, for a bar that says how far. The shell does not draw one — this is the host's
+   * channel, and it forwards to the same option on `usePdfDocument`.
+   */
+  onProgress?: UsePdfDocumentOptions['onProgress'];
+  /** Stop the load from outside. Aborting is an unmount's exact equivalent and reports no error. */
+  signal?: AbortSignal;
   /** Render XFA forms. Defaults to true; without it a dynamic XFA is a blank page. */
   enableXfa?: boolean;
   defaultScale?: ScaleMode;
@@ -57,7 +89,11 @@ export interface PdfViewerProps {
    * thumbnails and rotation, and nothing that can print, save or edit.
    */
   features?: readonly AnyPdfFeature[];
-  /** Device pixels per CSS pixel for page canvases. Defaults to `window.devicePixelRatio`. */
+  /**
+   * Device pixels per CSS pixel for page canvases. Unset, this is the live
+   * `window.devicePixelRatio`, re-read when the display changes; passing a number
+   * pins it, and a monitor switch then repaints nothing here.
+   */
   devicePixelRatio?: number;
   /**
    * Area ceiling per page canvas, in device pixels. Defaults to the limit pdf.js's

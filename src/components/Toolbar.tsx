@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { PageLayout, ScaleMode } from '../lib/layout';
 import type { InkSettings } from '../lib/ink';
@@ -15,6 +15,7 @@ import {
   ZOOM_LEVELS,
 } from '../lib/zoom';
 import { formatLabel, type PdfViewerLabels } from '../lib/labels';
+import { formatPageLabel, labelsDifferFromNumbers, resolvePageInput } from '../lib/page-labels';
 import { useLabels } from './labels-context';
 import {
   ChevronLeftIcon,
@@ -52,6 +53,11 @@ export const INK_WIDTHS: { value: number; labelKey: keyof PdfViewerLabels }[] = 
 export interface ToolbarProps {
   currentPage: number;
   numPages: number;
+  /**
+   * What the pages are called, from `doc.getPageLabels()`. Absent or plain-numbered, the page box stays a
+   * number input; anything else makes it a text box that shows the label and accepts one back (FR-12).
+   */
+  pageLabels?: readonly string[] | null;
   scaleMode: ScaleMode;
   resolvedScale: number;
   onPageChange: (page: number) => void;
@@ -152,6 +158,7 @@ function sameWidths(a: Record<string, number>, b: Record<string, number>): boole
 export function Toolbar({
   currentPage,
   numPages,
+  pageLabels = null,
   scaleMode,
   resolvedScale,
   onPageChange,
@@ -180,7 +187,15 @@ export function Toolbar({
   onRotatePage,
 }: ToolbarProps) {
   const labels = useLabels();
-  const [pageInput, setPageInput] = useState(String(currentPage));
+  /*
+   * Whether this document calls its pages something other than their numbers. Memoised because the check
+   * walks the table, and a thousand-page labelled document re-renders this bar on every page the reader
+   * turns — the answer only changes with the document.
+   */
+  const labelled = useMemo(() => labelsDifferFromNumbers(pageLabels, numPages), [pageLabels, numPages]);
+  // The box holds the page's *name*, which is its label when the document has one (FR-12).
+  const boxValue = () => (labelled ? formatPageLabel(pageLabels, currentPage - 1) : String(currentPage));
+  const [pageInput, setPageInput] = useState(boxValue);
   const [menuOpen, setMenuOpen] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
@@ -189,8 +204,8 @@ export function Toolbar({
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    setPageInput(String(currentPage));
-  }, [currentPage]);
+    setPageInput(boxValue());
+  }, [currentPage, labelled]);
 
   // Mirrors pageInput: kept in sync with the scale actually on screen, so a fit
   // mode or a pinch gesture updates the box rather than leaving a stale number.
@@ -235,14 +250,18 @@ export function Toolbar({
   // changes and the sync effect never runs — so the box has to be corrected here,
   // or it keeps showing a page that does not exist.
   const commitPage = () => {
-    const parsed = Number.parseInt(pageInput, 10);
-    if (!Number.isFinite(parsed)) {
-      setPageInput(String(currentPage));
+    const target = resolvePageInput(pageInput, pageLabels, numPages);
+    if (target === null) {
+      // Names no page and is not a whole number: the box goes back to what is on screen rather than to
+      // wherever the digits inside the string pointed.
+      setPageInput(boxValue());
       return;
     }
-    const target = Math.min(Math.max(parsed, 1), numPages || 1);
-    if (target !== parsed) setPageInput(String(target));
-    onPageChange(target);
+    // Write the resolved page back, because a value clamped into the document has to be corrected here
+    // even though the scroll lands where it lands: `currentPage` does not change when the reader was
+    // already on the last page, so nothing else would put the box right.
+    setPageInput(labelled ? formatPageLabel(pageLabels, target - 1) : String(target));
+    if (target !== currentPage) onPageChange(target);
   };
 
   const selectValue = typeof scaleMode === 'number' ? String(scaleMode) : scaleMode;
@@ -293,11 +312,18 @@ export function Toolbar({
       label: labels.overflowGoToPage,
       node: (
         <input
-          type="number"
+          /*
+           * The control follows the document. A labelled page box has to hold "xii", and `type="number"`
+           * reads such a value as the empty string, so the browser would erase what the reader typed before
+           * it ever reached `commitPage`. An ordinary PDF keeps its spinner and its numeric keyboard, which
+           * is the case nine hundred and ninety-nine documents in a thousand are.
+           */
+          type={labelled ? 'text' : 'number'}
           className="pjsr-page-input"
+          data-labelled={labelled ? 'true' : undefined}
+          spellCheck={false}
           aria-label={labels.pageNumber}
-          min={1}
-          max={numPages || 1}
+          {...(labelled ? null : { min: 1, max: numPages || 1 })}
           value={pageInput}
           onChange={(e) => setPageInput(e.target.value)}
           onBlur={commitPage}

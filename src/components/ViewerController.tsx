@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, CSSProperties, DragEvent, KeyboardEvent } from 'react';
 import { TouchManager } from 'pdfjs-dist';
 import { usePdfDocument } from '../headless/usePdfDocument';
-import type { PasswordReason, PasswordSubmit } from '../headless/usePdfDocument';
+import type { PasswordReason } from '../lib/status';
 import { usePdfInk } from '../headless/usePdfInk';
+import { usePdfPageLabels } from '../headless/usePdfPageLabels';
 import { usePdfSearch } from '../headless/usePdfSearch';
 import { usePdfVirtualizer } from '../headless/usePdfVirtualizer';
 import { applyRotation, type PageLayout, type ScaleMode } from '../lib/layout';
@@ -21,6 +22,7 @@ import {
 import { withReplacedControls } from '../lib/toolbar';
 import { FeaturePart, useFeatureStore } from './FeatureHost';
 import type { FeatureStore } from './FeatureHost';
+import { useDevicePixelRatio } from './useDevicePixelRatio';
 import type { PdfViewerHandle, PdfViewerProps } from './PdfViewer';
 import type { SidebarTab, SidebarTabSpec } from './Sidebar';
 import type { ToolbarControls, ToolbarItem } from './Toolbar';
@@ -77,6 +79,8 @@ function useChangeSignal<T>(value: T, fire: (value: T) => void): void {
 export interface ViewerController {
   // ---- the document --------------------------------------------------------
   doc: ReturnType<typeof usePdfDocument>['doc'];
+  /** The §3.5 lifecycle, so a host writing its own page region branches on one value. */
+  status: ReturnType<typeof usePdfDocument>['status'];
   numPages: number;
   isReady: boolean;
   error: Error | null;
@@ -90,6 +94,12 @@ export interface ViewerController {
   virtualSlots: ReturnType<typeof usePdfVirtualizer>['virtualSlots'];
   totalHeight: number;
   currentPage: number;
+  /**
+   * What the pages are called, when the document labels them at all (FR-12). `null` for the ordinary case;
+   * `formatPageLabel(pageLabels, currentPage - 1)` is the name to show, whatever a host-written layout
+   * decides to do with it.
+   */
+  pageLabels: readonly string[] | null;
   resolvedScale: number;
   scaleMode: ScaleMode;
   setScaleMode: (mode: ScaleMode) => void;
@@ -150,6 +160,7 @@ export interface ViewerController {
   ActivePanel: ComponentType | undefined;
 
   // ---- encrypted documents -------------------------------------------------
+  /** Why `status` is `password-required`, or null when it is not — read off the load, not stored twice. */
   passwordPrompt: PasswordReason | null;
   submitPassword: (password: string | Error) => void;
 
@@ -176,6 +187,15 @@ export function useViewerController({
   workerSrc,
   assetUrl,
   allowedSources,
+  httpHeaders,
+  withCredentials,
+  rangeChunkSize,
+  disableRange,
+  disableStream,
+  retry,
+  onRetryAttempt,
+  onProgress,
+  signal,
   enableXfa,
   defaultScale = 'fit-width',
   gap = 16,
@@ -212,10 +232,17 @@ export function useViewerController({
   // consumer would otherwise give the context a new value every render and
   // re-render every consumer of it, including each page.
   const resolvedLabels = useMemo(() => ({ ...DEFAULT_LABELS, ...labels }), [labels]);
-  // Read once: the ceiling is a property of the device, and re-reading `screen`
-  // per page would change canvas resolution mid-session when a monitor is
-  // hot-plugged, re-rendering every visible page.
-  const autoRenderPixels = useMemo(() => maxRenderPixelsFor(readCanvasEnvironment()), []);
+  /*
+   * The canvas ceiling moves with the display, because the budget is the screen's own pixel count scaled by
+   * the density: a window going from 1× to 2× can afford four times the pixels, and a stale ceiling would
+   * clamp pages the new display could have painted crisply. `0.3` read this once on purpose — a hot-plug
+   * should not re-render every visible page — and `FR-07`'s rewritten clause made re-rendering them the
+   * point. Keyed on the live ratio rather than read per render, so the shell holds one number and a `resize`
+   * that changed nothing repaints nothing; a screen that changes size while keeping its density still
+   * matches the `0.3` reading, and stays as it was.
+   */
+  const pixelRatio = useDevicePixelRatio();
+  const autoRenderPixels = useMemo(() => maxRenderPixelsFor(readCanvasEnvironment()), [pixelRatio]);
   const renderPixels = maxRenderPixels ?? autoRenderPixels;
   const [scaleMode, setScaleMode] = useState<ScaleMode>(defaultScale);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -236,8 +263,6 @@ export function useViewerController({
   // given one, so a mutation anywhere else is invisible to the page it was meant for.
   const [optionalContentConfig, setOptionalContentConfig] =
     useState<OptionalContentConfigHandle | null>(null);
-  const [passwordPrompt, setPasswordPrompt] = useState<PasswordReason | null>(null);
-  const submitPasswordRef = useRef<PasswordSubmit | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [pageRotations, setPageRotations] = useState<Record<number, number>>(
@@ -262,39 +287,47 @@ export function useViewerController({
     setEditedFile(null);
   }, [src]);
 
-  // The built-in prompt stands down when the host renders its own, so an
-  // encrypted document never gets two competing dialogs.
-  const handlePasswordRequired = useCallback(
-    (submit: PasswordSubmit, reason: PasswordReason) => {
-      submitPasswordRef.current = submit;
-      if (onPasswordRequired) {
-        onPasswordRequired(submit, reason);
-        return;
-      }
-      setPasswordPrompt(reason);
-    },
-    [onPasswordRequired],
-  );
-
-  const { doc, numPages, isReady, error, capabilities, reload } = usePdfDocument({
+  const {
+    doc,
+    status,
+    numPages,
+    isReady,
+    error,
+    capabilities,
+    passwordRequest,
+    reload,
+  } = usePdfDocument({
     src: effectiveSrc,
     workerSrc,
     assetUrl,
     allowedSources,
+    httpHeaders,
+    withCredentials,
+    rangeChunkSize,
+    disableRange,
+    disableStream,
+    retry,
+    onRetryAttempt,
+    onProgress,
+    signal,
     enableXfa,
-    onPasswordRequired: handlePasswordRequired,
+    onPasswordRequired,
   });
+
+  /*
+   * The prompt the shell paints is the load's own state, not a copy of it: `passwordRequest` is non-null
+   * exactly while `status` is `password-required`, so a wrong password that asks again re-prompts without
+   * anything here remembering that it asked, and a resolved or rejected load ends the prompt by ceasing to
+   * be one. The built-in dialog stands down when the host renders its own, so an encrypted document never
+   * ends up with two prompts competing for the same page area.
+   */
+  const passwordPrompt = onPasswordRequired ? null : (passwordRequest?.reason ?? null);
 
   // `usePdfDocument` deliberately ignores prop changes — tracking them would
   // restart the load whenever a consumer passes an inline `{ data }` object —
   // so the shell asks for the reload itself when the source really does change,
   // whether that is the host's `src` or a dropped file.
   useChangeSignal(effectiveSrc, () => reload());
-
-  useEffect(() => {
-    // A resolved or rejected load ends the request; drop a stale prompt.
-    if (doc || error) setPasswordPrompt(null);
-  }, [doc, error]);
 
   // `onError` lives in a ref: consumers pass inline arrows, and a changing
   // identity here would re-run every page's text/annotation effects (pdf.js
@@ -394,6 +427,14 @@ export function useViewerController({
     scrollToPageRef.current(match.pageIndex + 1);
     setNavigateToActiveAt(Date.now());
   }, [search.activeSeq, search.activeIndex, search.results]);
+
+  // ---- page labels ---------------------------------------------------------
+  /*
+   * Read through the hook rather than here, because a host writing their own page box needs the same table
+   * and the same cancellation, and the shell is the demonstration consumer — one round trip per document,
+   * republished when the bytes on screen change.
+   */
+  const pageLabels = usePdfPageLabels(doc, signal);
 
   // ---- features ------------------------------------------------------------
   // Human-readable document name. `File` carries a name; a bare Blob or data URL
@@ -877,13 +918,13 @@ export function useViewerController({
     [],
   );
 
-  const submitPassword = useCallback((password: string | Error) => {
-    submitPasswordRef.current?.(password);
-    setPasswordPrompt(null);
-  }, []);
+  // Answers the engine's request through the load's own submit, which puts the document back to `loading`.
+  // A cancel submits an `Error`, which is how a dismissed prompt fails the load instead of hanging it.
+  const submitPassword = (password: string | Error) => passwordRequest?.submit(password);
 
   return {
     doc,
+    status,
     numPages,
     isReady,
     error,
@@ -893,6 +934,7 @@ export function useViewerController({
     virtualSlots,
     totalHeight,
     currentPage,
+    pageLabels,
     resolvedScale,
     scaleMode,
     setScaleMode,

@@ -66,6 +66,7 @@ export function ViewerToolbar() {
   const {
     currentPage,
     numPages,
+    pageLabels,
     scaleMode,
     resolvedScale,
     scrollToPage,
@@ -93,6 +94,7 @@ export function ViewerToolbar() {
     <Toolbar
       currentPage={currentPage}
       numPages={numPages}
+      pageLabels={pageLabels}
       scaleMode={scaleMode}
       resolvedScale={resolvedScale}
       onPageChange={(page) => scrollToPage(page)}
@@ -182,8 +184,8 @@ export function ViewerSidebar() {
 export function ViewerPages() {
   const {
     doc,
+    status,
     numPages,
-    isReady,
     error,
     reload,
     labels,
@@ -222,20 +224,26 @@ export function ViewerPages() {
       aria-label={labels.pagesRegion}
       tabIndex={0}
     >
+      {/*
+       * One value from the §3.5 model drives this region: prompt while a credential is asked for, the
+       * engine's own message plus a retry when the load did not survive, the waiting notice until there is
+       * a document, and only then the pages. `!doc` is not a second check on `status` — it is TypeScript
+       * narrowing the handle for `PdfPage`, whose prop is non-nullable.
+       */}
       {passwordPrompt ? (
         <PasswordPrompt
           reason={passwordPrompt}
           onSubmit={submitPassword}
           onCancel={() => submitPassword(new Error('No password provided.'))}
         />
-      ) : error ? (
+      ) : status === 'error' && error ? (
         <div className="pjsr-status" role="alert">
           <span>{formatLabel(labels.loadFailed, { message: error.message })}</span>
           <button type="button" className="pjsr-button pjsr-status-action" onClick={() => reload()}>
             {labels.retry}
           </button>
         </div>
-      ) : !isReady || !doc ? (
+      ) : status !== 'ready' || !doc ? (
         <div className="pjsr-status" role="status">
           {labels.loadingDocument}
         </div>
