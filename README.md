@@ -567,8 +567,9 @@ development, against the built `dist` in CI.
 
 ## Status
 
-Version `0.9.0`, built on `dev` — sixteen commits ahead of `origin/dev` as that version is committed,
-none of them pushed, and nothing published. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are
+Version `0.9.0`, built on `dev` and **not pushed**: the `0.2`–`0.9` sequence lives on this machine
+only — `git rev-list --count origin/dev..dev` is where to read that number, rather than from a sentence
+that goes stale one commit later. Nothing is published. npm has `0.1.0` and `0.1.1`; the `0.2`–`0.9` releases are
 committed locally and publish together with `1.0.0`, and `0.10`–`0.12` are planned but not started, which
 is the shipping rule in [`ROADMAP.md`](./ROADMAP.md) §Releases. While the package is pre-1.0 a minor may
 break the API — `0.4` did, with six `PdfViewer` props becoming four feature imports — so pin exactly.

@@ -694,7 +694,7 @@ Two limits on that evidence, and they are the ones that matter. First, **every j
 `ubuntu-latest`; none of them starts a browser**, so no CI run has ever exercised a rendering path, a
 Safari, or a touch device — the compatibility matrix in the README is a support claim, not a tested one.
 Second, `react` was added locally on 2026-09-29 and **has not run**, and none of the four jobs has seen any
-of the 16 local `0.2`–`0.9` commits. So the React-18 evidence is local: re-run on 2026-09-29 with `react`,
+of the local `0.2`–`0.9` commits (`git rev-list --count origin/dev..dev`). So the React-18 evidence is local: re-run on 2026-09-29 with `react`,
 `react-dom` and both `@types/*` at 18.3.1, then `npm run verify` end to end — typecheck, the 449 tests in
 38 files that made up the suite on that date, both bundles, the size gate — and 19.3.0 was put back
 afterwards, with `--no-save` both ways, which
@@ -709,7 +709,7 @@ default branch. Nothing in the `0.2`–`0.9` range is pushed; the sequence publi
 Since 2026-09-29 the sequence does not stop at `0.8`: `PRD.md` became a target specification of **51**
 requirements and the owner decided `1.0.0` ships all of them, so `0.9` Reach, `0.10` Access, `0.11` Index
 & Assemble and `0.12` Prove are planned in `ROADMAP.md` §Releases and none is started. Consequences
-accepted: CI has not run on any of the 16 local commits, and the published docs site still shows `0.1.x`
+accepted: CI has not run on any of the local commits, and the published docs site still shows `0.1.x`
 content. `0.1.2` is committed and deliberately never published.
 
 ---
