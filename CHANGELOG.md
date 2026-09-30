@@ -610,11 +610,12 @@ requirement rather than the code — see the `FR-03`, `FR-08` and `FR-02` entrie
   read-at-load-start rule, in a browser rather than in a mock.
 
 Tests went 393 → **449** across 38 files through the signing and failure-path work, and 449 → **661**
-across **59 files** through `0.9` itself: 268 added, the largest shares on the network contract, the retry
-verdicts, the host signals and the ten sites that had to accept one, the published state unions, and the
-four worker states. Typecheck, both bundles, the docs build and the size gate are clean, every size path
-sits at +0.00 against the baseline re-accepted at `FR-12`, and `0.9.0` is now the version in
-`package.json` — committed on local `dev`, nothing pushed and nothing published, because the `0.2`–`0.9`
+across **59 files** through `0.9` itself — 268 since the `0.8` close, the largest shares on the network
+contract, the retry verdicts, the host signals and the ten sites that had to accept one, the published
+state unions, and the four worker states. Typecheck, both bundles, the docs build and the size gate are
+clean, every size path sits at +0.00 against the baseline re-accepted at `FR-12`, and `0.9.0` is now the
+version in `package.json` — committed on local `dev`, nothing pushed and nothing published, because the
+`0.2`–`0.9`
 sequence goes out together as `1.0.0`.
 
 ## [0.8.0] — 2026-09-27
