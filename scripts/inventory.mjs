@@ -10,6 +10,7 @@ const entries = {
   'pdfjs-react-reader': 'dist/index.d.ts',
   'pdfjs-react-reader/headless': 'dist/headless.d.ts',
   'pdfjs-react-reader/edit': 'dist/edit.d.ts',
+  'pdfjs-react-reader/merge': 'dist/merge.d.ts',
   'pdfjs-react-reader/features/print': 'dist/features/print.d.ts',
   'pdfjs-react-reader/features/download': 'dist/features/download.d.ts',
   'pdfjs-react-reader/features/forms': 'dist/features/forms.d.ts',

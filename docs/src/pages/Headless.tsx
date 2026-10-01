@@ -10,8 +10,8 @@ const HOOKS: [string, string][] = [
     'The scroll engine. Returns { containerRef, virtualSlots, totalHeight, currentPage, pageEstimate, resolvedScale, viewportWidth, viewportHeight, scrollToPage, reportPageDims }.',
   ],
   [
-    'usePdfSearch({ doc, onError? })',
-    'Whole-document search with a 200 ms debounce and cancellation of stale runs. `search(query, { caseSensitive?, wholeWord?, regex? })` — several words mean a page holding all of them, `regex` treats the query as an expression. Returns { status, progress, query, options, results, total, counts, pagesWithMatches, patternError, activeIndex, activeSeq, search, setActiveIndex, nextMatch, prevMatch, clear }.',
+    'usePdfSearch({ doc, onError?, signal?, focusPage?, index? })',
+    'Search with a 200 ms debounce in the shell and cancellation of stale runs. `search(query, { caseSensitive?, wholeWord?, regex? })` — several words mean a page holding all of them, `regex` treats the query as an expression. Indexing is incremental and starts from `focusPage`, walking outward, so a first answer arrives before the document is finished; `index` takes a prebuilt `{version: 1, pages: [{text, itemEnds}]}` instead of extracting. Returns { status, progress, query, options, results, total, counts, pagesWithMatches, patternError, activeIndex, activeSeq, complete, pagesIndexed, pagesTotal, indexError, search, setActiveIndex, nextMatch, prevMatch, clear, invalidatePages }.',
   ],
   [
     'usePdfOptionalContent({ doc, config?, revision?, onChanged?, onError? })',
@@ -44,6 +44,10 @@ const HOOKS: [string, string][] = [
   [
     'usePdfDownload({ doc, fileName?, onError? })',
     'Saves the file. Returns { download, isBusy, error }; `download()` takes { saveEdits? }, which writes an incremental save carrying what is in the annotation storage — field values and annotation marks both — instead of the bytes the document was loaded from.',
+  ],
+  [
+    'usePdfMerge({ sources, onError?, signal? })   // from pdfjs-react-reader/merge, not /headless',
+    'The state behind a merge picker: { available, order, taken, add, remove, move, clear, merge, busy }. `merge()` writes a NEW file out of the pages the plan names and resolves null for an empty plan or a stopped caller; no source is ever written. Its own entry because it is the second half of the optional peer, and a viewer that only displays PDFs should not be able to pull a page-copying writer in by naming the wrong hook.',
   ],
 ];
 
@@ -239,18 +243,76 @@ if (capabilities?.form === 'xfa' && !capabilities.renderedFromXfa) {
 
       <h2>Search without the shell</h2>
       <pre>
-        <code>{`const search = usePdfSearch({ doc });
+        <code>{`const search = usePdfSearch({ doc, focusPage: page - 1 });
 
 search.search('speculation', { caseSensitive: false, wholeWord: true });
 // search.results    -> PageMatch[] with pageIndex and a rect per hit
 // search.total      -> how many, which is how 'no matches' reads differently from 'still working'
 // search.status     -> 'idle' | 'indexing' | 'ready' | 'error' (indexing the text, not the query)
+// search.complete   -> false while the index is still growing, and search.pagesIndexed / pagesTotal say how far
 // search.activeIndex, search.nextMatch(), search.prevMatch(), search.clear()
 search.nextMatch();
 
 // Pass each page its slice of matches to highlight in the text layer:
 <PdfPage doc={doc} pageNumber={i + 1} scale={scale} highlights={byPage.get(i)} />`}</code>
       </pre>
+      <p>
+        Indexing starts at <code>focusPage</code> and walks outward — the page in view, then +1, −1, +2, −2 —
+        publishing every 25 pages or 120 ms, so a query on a thousand-page document answers against what the
+        reader can see instead of waiting for the file. A partial answer says so: a host drawing its own
+        counter should branch on <code>search.complete</code> between &ldquo;3 of 17&rdquo; and
+        &ldquo;3 of 17 so far&rdquo;. To supply an index built elsewhere — by a server that has already read
+        the corpus — pass <code>index</code>:
+      </p>
+      <pre>
+        <code>{`import { buildTextIndex, usePdfSearch } from 'pdfjs-react-reader/headless';
+
+// On the server, per page: const items = (await page.getTextContent()).items;
+const index = buildTextIndex(pagesOfItems);        // {version: 1, pages: [{text, itemEnds}]}
+await fetch('/publish', { body: JSON.stringify(index) });
+
+// Here:
+const search = usePdfSearch({ doc, index });
+// A page the index leaves as null is read from the document, and only that page.
+// An index for a different revision is refused by its page count, reported in
+// search.indexError, and the document is searched anyway.`}</code>
+      </pre>
+      <p>
+        A host using the shell instead of these hooks reaches the same place through <code>find</code>: the
+        index only has to become a controller, and <code>PdfViewer</code> will draw its own bar, marks and
+        page counts from it — which is what <code>playground/src/HostFind.tsx</code> demonstrates.
+      </p>
+      <p>
+        What the index holds is the page&apos;s <em>content stream</em>, and the limit is worth knowing before
+        you build a UI on it: <code>getTextContent()</code> reports a form field&apos;s label rather than the
+        value a reader typed, and an annotation&apos;s text not at all — measured against the shipped fixtures
+        in <code>src/lib/search.parity.test.ts</code>. So nothing typed in this session becomes searchable, in
+        this viewer or any other built on these hooks; <code>search.invalidatePages([7])</code> is the cheap
+        way to say a page&apos;s text is no longer what was indexed, not a way to follow an edit.
+      </p>
+
+      <h2>Merging documents</h2>
+      <p>
+        On its own entry point, because a viewer that only displays PDFs has no reason to carry a writer:
+      </p>
+      <pre>
+        <code>{`import { usePdfMerge, type MergeSource } from 'pdfjs-react-reader/merge';
+
+const merge = usePdfMerge({ sources });          // MergeSource[] = [{ bytes, name }]
+// merge.available  -> pages per source, null until read
+// merge.order      -> the plan: [{ source, page }] in output order; a page may appear twice
+// merge.add(at, page) · merge.remove(position) · merge.move(from, to) · merge.clear()
+
+const result = await merge.merge();              // null if the plan was empty or it was stopped
+downloadBytes(result.bytes, 'merged.pdf');       // result.pages, result.taken, result.available`}</code>
+      </pre>
+      <p>
+        The bytes you pass in come back out unchanged — every source is loaded from a copy, and the test suite
+        hashes both sides of a merge to prove it — so a reader can experiment with a merge without being able
+        to lose a document by trying one. What a merge does not carry across is the interactive form: a page
+        arrives with its widget annotations but not the <code>AcroForm</code> that binds them, so on a merged
+        file the values are visible and the fields are not live.
+      </p>
 
       <h2>Deciding what a string is, before loading it</h2>
       <p>

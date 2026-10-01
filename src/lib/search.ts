@@ -234,9 +234,103 @@ export function countPerPage(matches: readonly PageMatch[], numPages: number): n
   return counts;
 }
 
+/* ------------------------------------------------------------------ *
+ * An index somebody else built (FR-40).
+ * ------------------------------------------------------------------ */
+
+/**
+ * One page of a published index: the concatenated text, and where each text item ends inside it.
+ *
+ * `itemEnds` is the part a host cannot skip or summarise. A match is reported as a span of *text items*,
+ * because that is what the viewer paints a mark into, and the boundaries between items are exactly these
+ * offsets. They come from the same `getTextContent()` call the viewer would have made, in the same order,
+ * with the items that carry no text of their own left out — which is what `buildTextIndex` does, and why a
+ * hand-rolled index that splits paragraphs differently marks the wrong words.
+ */
+export interface ExternalPageText {
+  text: string;
+  itemEnds: number[];
+}
+
+/** The published shape. `version` is checked, not read: a v2 index must fail loudly, not half-work. */
+export interface ExternalTextIndex {
+  version: 1;
+  pages: ExternalPageText[];
+}
+
+/**
+ * Turns text items into the published shape — the same walk `buildPageText` does for a live page, so an
+ * index built with this on a server and a document read in a browser agree by construction rather than by
+ * two implementations being kept in step.
+ */
+export function buildTextIndex(pages: ReadonlyArray<ReadonlyArray<TextItemLike>>): ExternalTextIndex {
+  return {
+    version: 1,
+    pages: pages.map((items) => {
+      const { text, itemEnds } = buildPageText(items);
+      return { text, itemEnds };
+    }),
+  };
+}
+
+/**
+ * Why an index cannot be trusted, or `null` when it can.
+ *
+ * The whole page count is the one thing that cannot be papered over: an index for a different revision of
+ * a document has the right shape and the wrong pages, and every mark it produces would land on words that
+ * are not there. A page that is merely missing is not an error — that page is read from the document.
+ */
+export function validateTextIndex(
+  index: unknown,
+  numPages: number,
+): { error: string } | { error: null; index: ExternalTextIndex } {
+  if (index === null || typeof index !== 'object') return { error: 'The index is not an object.' };
+  const candidate = index as Partial<ExternalTextIndex>;
+  if (candidate.version !== 1) return { error: `Unsupported index version ${String(candidate.version)}.` };
+  if (!Array.isArray(candidate.pages)) return { error: 'The index has no page list.' };
+  if (candidate.pages.length !== numPages) {
+    return { error: `The index describes ${candidate.pages.length} pages; the document has ${numPages}.` };
+  }
+  for (const [at, page] of candidate.pages.entries()) {
+    if (page === null || typeof page !== 'object') continue; // a missing page is read from the document
+    const { text, itemEnds } = page as Partial<ExternalPageText>;
+    if (typeof text !== 'string' || !Array.isArray(itemEnds)) {
+      return { error: `Page ${at + 1} of the index is not a text/itemEnds pair.` };
+    }
+    let previous = 0;
+    for (const end of itemEnds) {
+      if (!Number.isInteger(end) || end < previous || end > text.length) {
+        return { error: `Page ${at + 1} of the index has item boundaries that do not walk its text.` };
+      }
+      previous = end;
+    }
+  }
+  return { error: null, index: candidate as ExternalTextIndex };
+}
+
 // ---- document-level extraction with a per-document cache ----
 
 const pageTextCache = new WeakMap<PDFDocumentProxy, Array<PageTextIndex | undefined>>();
+
+/**
+ * The order a document is read in when the answer must start before the file is finished (FR-39).
+ *
+ * Nearest-first from the page the reader is looking at, forward before backward at an equal distance —
+ * a reader who searches from page 40 expects the next hit to be ahead of them, and a hit 300 pages back
+ * is worth less than one 300 pages on. Not sorted by page number: the whole point is that the pages
+ * arrive out of order so the first one can arrive first, and `usePdfSearch` re-sorts the matches into
+ * reading order when it publishes them.
+ */
+export function outwardPageOrder(numPages: number, focus = 0): number[] {
+  if (numPages <= 0) return [];
+  const start = Math.min(Math.max(0, Math.trunc(focus)), numPages - 1);
+  const order: number[] = [start];
+  for (let step = 1; step < numPages; step++) {
+    if (start + step < numPages) order.push(start + step);
+    if (start - step >= 0) order.push(start - step);
+  }
+  return order;
+}
 
 /** Extracts (or returns cached) text for a single 0-based page. */
 export async function extractPageText(
@@ -255,6 +349,31 @@ export async function extractPageText(
   }
   cache[pageIndex] = index;
   return index;
+}
+
+/**
+ * Drops the cached text for the given pages, or the whole document when called with no argument.
+ *
+ * FR-39's second clause is that a re-index invalidates only what changed, and this is the half of that which
+ * lives in the cache: on a thousand-page document throwing away every page is the longest thing the package
+ * does, and one page is a frame.
+ *
+ * What counts as "changed" is narrower than it sounds, and the measurement is in `search.parity.test.ts`:
+ * `getTextContent()` reads the page's content stream, so a form field's typed value (the fixture reports its
+ * labels, never its values) and an annotation's text are not in what comes back — before an edit or after
+ * one. Invalidation is for a host that knows a page's *text* is no longer the text it indexed, not for making
+ * an edit searchable.
+ */
+export function invalidatePageText(doc: PDFDocumentProxy, pages?: readonly number[]): void {
+  const cache = pageTextCache.get(doc);
+  if (!cache) return;
+  if (pages === undefined) {
+    pageTextCache.set(doc, []);
+    return;
+  }
+  for (const page of pages) {
+    if (page >= 0 && page < cache.length) cache[page] = undefined;
+  }
 }
 
 /**

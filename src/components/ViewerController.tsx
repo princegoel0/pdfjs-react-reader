@@ -5,7 +5,7 @@ import { usePdfDocument } from '../headless/usePdfDocument';
 import type { PasswordReason } from '../lib/status';
 import { usePdfInk } from '../headless/usePdfInk';
 import { usePdfPageLabels } from '../headless/usePdfPageLabels';
-import { usePdfSearch } from '../headless/usePdfSearch';
+import { usePdfSearch, type PdfFindController } from '../headless/usePdfSearch';
 import { usePdfVirtualizer } from '../headless/usePdfVirtualizer';
 import { applyRotation, type PageLayout, type ScaleMode } from '../lib/layout';
 import { maxRenderPixelsFor, readCanvasEnvironment } from '../lib/canvas';
@@ -116,7 +116,7 @@ export interface ViewerController {
   linkService: ReturnType<typeof createPdfLinkService>;
 
   // ---- search --------------------------------------------------------------
-  search: ReturnType<typeof usePdfSearch>;
+  search: PdfFindController;
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
   matchesByPage: Map<number, PageMatch[]>;
@@ -351,8 +351,6 @@ export function useViewerController({
 
   // Always called, even when a host supplies its own: hooks cannot be conditional,
   // and an unused built-in stays idle because nothing here calls its `search`.
-  const builtInSearch = usePdfSearch({ doc, onError: handlePageError });
-  const search = find ?? builtInSearch;
   const ink = usePdfInk({ resetKey: effectiveSrc });
 
   // One commit handler per page, kept for the life of the viewer. PdfPage is
@@ -390,6 +388,19 @@ export function useViewerController({
     pageRotations,
     layout: pageLayout,
   });
+
+  /*
+   * After the virtualizer, because FR-39 wants to know where the reader is: indexing starts on the page
+   * in view and walks outward, so the first answer comes from the part of the document they can see.
+   * `focusPage` is read when a search starts and never watched — a search that restarted on every scroll
+   * would never finish on the documents this is for.
+   */
+  const builtInSearch = usePdfSearch({
+    doc,
+    onError: handlePageError,
+    focusPage: currentPage - 1,
+  });
+  const search = find ?? builtInSearch;
 
   const matchesByPage = useMemo(() => {
     const map = new Map<number, PageMatch[]>();

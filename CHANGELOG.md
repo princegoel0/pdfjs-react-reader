@@ -7,7 +7,106 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet. `0.11` Index & Assemble (FR-39, FR-40, FR-42) is next.
+Nothing yet. `0.12` Prove (FR-41, FR-48–FR-51) is next.
+
+## [0.11.0] — 2026-10-01
+
+Index & Assemble. Three requirements, one new entry point, and one claim withdrawn. `FR-39` turned the
+search index into something that arrives — on a 1,000-page document, from the page the reader is looking at,
+the first answer came **56 ms** after the query and the complete answer **1,176 ms** later, with the counter
+saying *so far* in between because a growing number presented as final is a lie about the document. `FR-40`
+let somebody else build the index. `FR-42` merged two documents into a third, which is the only genuinely new
+capability across `0.9`–`0.12`, and it shipped as a writer, a hook and a recipe rather than a component. And
+the requirement that read "re-indexing after a page edit invalidates only what changed" was measured before it
+was documented, found not to mean what it sounds like, and the wiring built on that reading was taken back
+out.
+
+### Added
+
+- **`FR-39`: incremental, viewport-prioritised indexing.** `usePdfSearch` no longer reads the file front to
+  back before it answers anything. It reads outward from the page the reader is on — `outwardPageOrder(n,
+  focus)` is focus, +1, −1, +2, −2, forward before backward at an equal distance, because a reader who
+  searches from page 40 expects the next hit ahead of them — and publishes on whichever of 25 pages or
+  120 ms comes first, always publishing the first page immediately so a query is never held behind a batch.
+  Results are re-sorted into document order on the way out, and the active match is carried **by identity**
+  across a publish, so the reader's position does not jump as the index grows. The shell hands the hook
+  `currentPage - 1`, read when a search starts and never watched; a search that restarted on every scroll
+  would never finish on the documents this is for.
+- **A partial answer says it is partial.** `complete`, `pagesIndexed` and `pagesTotal` are on the controller,
+  and the find bar's counter switches to one of two new labels — `{current} of {total} so far`, and the
+  per-page variant — which takes the catalog from 144 to 146 strings in all four languages. This is the
+  requirement's actual teeth: the timing is an optimisation, but a count that is still growing and reads as
+  final is wrong information, and `SearchBox.counter.test.tsx` holds both wordings.
+- **`FR-40`: an index built elsewhere.** `usePdfSearch` takes an `index`, the published shape is
+  `{version: 1, pages: [{text, itemEnds}]}`, and `buildTextIndex(items)` makes one out of the same
+  `getTextContent()` items the viewer would have read — so a server that has already extracted a corpus's
+  text can hand the result over and keep our find bar, our marks and our page counts. What it is checked
+  against is the page count, not a checksum: a well-formed index is indistinguishable from a stale one, and
+  a mark from a stale index lands on words the reader can see are not what was matched. Refusal is reported
+  in `indexError` **and the document is searched anyway** — refusing an index is not refusing a search — and
+  a page the index leaves out (`null`) is read from the document, and only that page, which is asserted as
+  the list of `getPage` calls rather than as a hope.
+- **The parity proof, on real files.** `src/lib/search.parity.test.ts` builds an index from a fixture,
+  round-trips it through JSON, and asserts match-for-match identical `PageMatch` arrays against the viewer's
+  own extraction for nine queries over two fixtures, including the empty-string items both files are full of.
+  It also proves the format does not depend on whether the host asked for marked content — boundary objects
+  carry no `str` and are skipped, so publishing them changes nothing — and holds the counterfactual in the
+  same test: a host that coerces those boundaries to empty strings keeps the text byte-identical and moves
+  every item index, which is a mark on the wrong span.
+- **`FR-42`: merging documents, on its own entry point.** `pdfjs-react-reader/merge` (the 25th subpath, 9
+  names) exports `mergeDocuments`, `describeMergeSources`, `usePdfMerge` and the plan types. It is a separate
+  entry because a viewer that only displays PDFs has no reason to carry a page-copying writer, and the
+  merge-only consumer path measures **0.78 kB**. The property every other decision serves is that **the
+  output is always a new file**: every source is loaded from a copy of the caller's buffer, and
+  `pdf-merge.test.ts` asserts it by hashing the sources before and after, because a reader experimenting
+  with a merge must not be able to destroy a document by trying it. A page may be taken twice, which
+  `arrangePages` refuses — inside one document a page is an object to be permuted, across documents it is a
+  thing to be copied — and the plan is validated in full before anything is copied, so a bad page number
+  fails before it has built a document rather than part-way through one. What a merge does not carry is the
+  interactive form: `copyPages` brings a page's widget annotations across but not the `AcroForm` that binds
+  them, so on a merged file the values are visible and the fields are not live.
+- **`usePdfMerge`, and the recipe that proves the shape is enough.** A hook and no component, for the same
+  reason `enableDrop` hands a dropped file back rather than opening it: which documents may be merged, where
+  they come from and what happens to the result are the host's business. The hook owns the part a host should
+  not have to get right — page counts as they arrive, the plan as data, a merge that cannot touch a source —
+  and `playground/src/MergeDemo.tsx` is what a host then writes, which is the honest test of that decision.
+  Verified in Chromium: 20 and 2 pages read from two fixtures, three pages added and one moved earlier with
+  the per-source *taken* counts following, a repeated page accepted, **wrote 4 pages: 3 + 1**, and the
+  the resulting 5,134-byte file reopened in the reader with its pages in plan order, portrait and landscape
+  sheets keeping their own boxes on the same zoom (a 792×1025 canvas and a 1025×792 one), because copying a
+  page carries its `/MediaBox` with it.
+- **`signal` on the merge**, checked before each page and before the save, so a caller that stops never
+  receives bytes it did not ask for; `merge()` resolves `null` rather than throwing on its own cancel.
+
+### Changed
+
+- `PdfFindController` is now a published interface with the five incremental members optional
+  (`complete`, `pagesIndexed`, `pagesTotal`, `invalidatePages`, `indexError`), so a host standing in for the
+  engine's find does not have to implement progress it does not have. The playground's host-side controller
+  is unchanged and still answers with pages and offsets only.
+
+### Removed
+
+- **The shell's form-change → index invalidation, which was built on a reading the engine does not support.**
+  `FR-39`'s last clause says a re-index invalidates only what changed, and the wiring wrote that as "a typed
+  form value enters the index". Measured, it does not: `getTextContent()` on `form-sample.pdf` returns the
+  field *labels* (`Full name:`, `Notes:`), takes no `annotationStorage` at all, and returns no annotation
+  text either — a sticky note's `/Contents` and a `/FreeText`'s value are drawn in a layer, not set in the
+  page. So the call cleared a page's cache and re-read the same content stream, which is a small performance
+  bug wearing a feature's clothes. `invalidatePages` stays on the controller as the host-facing operation it
+  is — the cheap half of "only what changed", for a host that knows a page's text is no longer what it
+  indexed — with the measured limit stated where the API is, in `usePdfSearch`, in `invalidatePageText`, and
+  as two tests in `search.parity.test.ts` under *what the index cannot see*. Whether an XFA document's
+  extraction moves when a field is edited has **not** been measured and is not claimed.
+
+### Numbers
+
+Suite **759 tests in 74 files**; source **80 files, 15,629 lines** outside tests; **25 subpaths**, 234 names
+on the root entry, 187 on `/headless`, 32 on `/edit`, 9 on `/merge`. Core **29.09 kB** gzipped (from 28.01),
+`all nine` 44.06, the shipped root path 60.75, `/headless` path 32.53, `merge-only` 0.78. The core figure
+moved more than this release's shell code explains: a new tsup entry reshuffles the shared chunks every path
+is built from, which is the same effect `0.10` recorded when the structure tier was added. Per-feature costs
+are unchanged within a few bytes, and `edit` remains the largest at 5.89 kB over core.
 
 ## [0.10.0] — 2026-10-01
 

@@ -135,6 +135,60 @@ const { bytes, pages, removed } = await arrangePages(original, plan);`}</code>
         is still filling in.
       </p>
 
+      <h2>Merge two documents into a third</h2>
+      <pre>
+        <code>{`import { describeMergeSources, mergeDocuments } from 'pdfjs-react-reader/merge';
+
+const sources = [
+  { bytes: await fetch('/fixtures/report.pdf').then((r) => r.arrayBuffer()), name: 'report' },
+  { bytes: coverPageBytes, name: 'cover' },
+];
+
+const [{ pages: reportPages }, { pages: coverPages }] = await describeMergeSources(sources);
+
+const result = await mergeDocuments(
+  {
+    sources,
+    order: [
+      { source: 1, page: 0 },            // the cover, first
+      { source: 0, page: 2 },            // page 3 of the report
+      { source: 0, page: 3 },
+      { source: 1, page: 0 },            // and the cover again at the back
+    ],
+  },
+  { signal: controller.signal },
+);
+// result.bytes is a NEW document. reportPages stays 12; both sources are byte-identical.
+// result.taken is [2, 2] — how many pages came from each, in the order they were offered.`}</code>
+      </pre>
+      <p>
+        The whole of what the package ships for a merge is the writer above and{' '}
+        <code>usePdfMerge</code>, which is the same thing plus the counts and the plan as state. There is no
+        component, and that is a decision rather than an omission: which documents may be merged, where their
+        bytes come from and what happens to the result are the host&apos;s business, in the same way a dropped
+        file is handed back rather than opened. <code>playground/src/MergeDemo.tsx</code> is what a host then
+        writes — two pickers, an ordered list with earlier/later/remove on each row, and one button — and it is
+        the honest test of the seam, because if the demo is awkward the awkwardness is a bug report against the
+        hook.
+      </p>
+      <p>
+        Four things are worth knowing before you build on it. <strong>The output is always a new file</strong>,
+        and every source is read from a copy of your buffer, so nothing you pass in can be damaged by trying a
+        merge. <strong>The same page may be taken twice</strong>, which the page-plan API above refuses: inside
+        one document a page is an object to be permuted, across documents it is one to be copied.{' '}
+        <strong>The plan is validated before anything is copied</strong>, so a page number that does not exist
+        fails on the first line rather than halfway through a document you then have to discard. And{' '}
+        <strong>the interactive form does not come across</strong>: a page arrives with its widget annotations
+        but not the <code>AcroForm</code> that binds them, so on a merged file the values are visible and the
+        fields are not live — the same rule flattening documents from the other direction.
+      </p>
+      <p>
+        To show a merged result, hand the bytes to the viewer the way you would any other document — a{' '}
+        <code>Uint8Array</code> passed as <code>src</code>, or{' '}
+        <code>replaceDocument(result.bytes, 'merged.pdf')</code> from{' '}
+        <code>useViewer()</code> if you are inside the shell.
+      </p>
+
       <h2>Read and write forms programmatically</h2>
       <pre>
         <code>{`const form = usePdfFormValues({ doc });

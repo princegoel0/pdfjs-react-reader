@@ -46,20 +46,20 @@ React DOM, `pdfjs-dist`, and one optional writer.
 
 | Thing | Number | Where it comes from |
 | --- | --- | --- |
-| Version in `package.json` | `0.10.0` — **not published**; npm only has `0.1.0`, `0.1.1`, and `0.2`–`0.10` go out together as `1.0.0` | `package.json:2` |
+| Version in `package.json` | `0.11.0` — **not published**; npm only has `0.1.0`, `0.1.1`, and `0.2`–`0.11` go out together as `1.0.0` | `package.json:2` |
 | Module system | ESM only (`"type": "module"`, tsup builds no CommonJS) | `package.json:4` |
 | Runtime dependencies | **none** | `package.json` `dependencies` |
 | Peer dependencies | `pdfjs-dist ^6.2.108`, `react ^18 \|\| ^19`, `react-dom ^18 \|\| ^19`, `@cantoo/pdf-lib ^2.11.1` (optional) | `package.json` `peerDependencies` |
 | `engines` field | `node >= 20` — the only engine statement the package makes | `package.json` `engines` |
 | Files published | `["dist"]` only — no `src/`, no playground, no docs | `package.json` `files` |
-| Importable subpaths | **24** (11 JS entries + 3 languages + 9 stylesheets + `package.json`) | `package.json` `exports` |
-| Names on the main entry | **228** | `node scripts/inventory.mjs`, over `dist/index.d.ts` |
-| Names on `/headless` | **181** | the same, over `dist/headless.d.ts` |
-| Names on `/edit` | **32** | `dist/edit.d.ts` |
-| Source files (non-test) | **77**, 14,950 lines | `src/**` |
-| Test files / tests | **67 files / 718 tests**, in two projects (`node`, `dom`) | `npm run test` |
+| Importable subpaths | **25** (12 JS entries + 3 languages + 9 stylesheets + `package.json`) | `package.json` `exports` |
+| Names on the main entry | **234** | `node scripts/inventory.mjs`, over `dist/index.d.ts` |
+| Names on `/headless` | **187** | the same, over `dist/headless.d.ts` |
+| Names on `/edit` | **32**, on `/merge` **9** | `dist/edit.d.ts`, `dist/merge.d.ts` |
+| Source files (non-test) | **80**, 15,629 lines | `src/**` |
+| Test files / tests | **74 files / 759 tests**, in two projects (`node`, `dom`) | `npm run test` |
 | Stylesheets | 9, from 24 to 1,372 lines | `src/styles/` |
-| Fixtures | 19 PDFs, produced by 15 generator scripts — **18 of the 19 tracked; `tagged-sample.pdf` is not yet**, and `src/lib/tagged.test.ts` reads it from disk, so a fresh clone's `npm test` fails until it is added. That is the same mistake the `0.9` close had to fix for three others (`damaged-truncated`, `damaged-xref`, `labelled-sample`), which is why the check is in §22 and not in a resolution to remember. `tagged-sample.pdf` is the only fixture that declares a structure tree | `playground/fixtures/`, `scripts/make-*.mjs` |
+| Fixtures | 19 PDFs, produced by 15 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree | `playground/fixtures/`, `scripts/make-*.mjs` |
 | CI | 4 jobs in `ci.yml` (one of them a named axe audit step), 1 deploy workflow in `docs.yml` | `.github/workflows/` |
 
 ### Bundle size, gzipped, per what you import
@@ -69,36 +69,40 @@ reports the worse of the two. Decimal kB. Reproduced by `npm run size`.
 
 | What you import | Size | Over core |
 | --- | --- | --- |
-| `core` — `<PdfViewer>` alone: pages, text, search, ink, thumbnails, layout, toolbar, sidebar, virtualisation, worker | **28.01 kB** | — |
-| `+ printFeature` | 30.56 | +2.55 |
-| `+ downloadFeature` | 28.79 | +0.78 |
-| `+ formsFeature` | 30.07 | +2.06 |
-| `+ outlineFeature` | 28.97 | +0.96 |
-| `+ layersFeature` | 29.22 | +1.21 |
-| `+ attachmentsFeature` | 29.09 | +1.09 |
-| `+ annotateFeature` | 29.86 | +1.85 |
-| `+ structureFeature` | 28.38 | **+0.37** |
-| `+ editFeature` (pages, flatten, signing) | 33.90 | **+5.89** |
-| **all nine** | **43.05** | +15.04 |
+| `core` — `<PdfViewer>` alone: pages, text, search, ink, thumbnails, layout, toolbar, sidebar, virtualisation, worker | **29.09 kB** | — |
+| `+ printFeature` | 31.63 | +2.54 |
+| `+ downloadFeature` | 29.88 | +0.79 |
+| `+ formsFeature` | 31.10 | +2.00 |
+| `+ outlineFeature` | 30.08 | +0.98 |
+| `+ layersFeature` | 30.30 | +1.21 |
+| `+ attachmentsFeature` | 30.19 | +1.10 |
+| `+ annotateFeature` | 30.95 | +1.86 |
+| `+ structureFeature` | 29.47 | **+0.38** |
+| `+ editFeature` (pages, flatten, signing) | 34.98 | **+5.89** |
+| **all nine** | **44.06** | +14.97 |
 | `headless` entry alone (no shell, no shaking) | 4.06 | — |
-| shipped `index.js` path (whole entry, no shaking) | 59.14 | — |
-| shipped `headless.js` path | 31.02 | — |
-| `dist/edit.js` on its own | 8.64 | — |
-| one language file (`de` / `es` / `fr`) | 2.38 / 2.37 / 2.39 | — |
+| `merge` alone (writer and hook, no shell) | **0.78** | — |
+| shipped `index.js` path (whole entry, no shaking) | 60.75 | — |
+| shipped `headless.js` path | 32.53 | — |
+| `dist/edit.js` on its own | 6.16 | — |
+| `dist/merge.js` on its own | 1.60 | — |
+| one language file (`de` / `es` / `fr`) | 2.40 / 2.39 / 2.42 | — |
 
-**The baseline was re-accepted at the `0.10` close, so every number above equals `npm run size` today.**
-What each step of the release paid for: `FR-43` took core **+0.17 kB** (27.76 → 27.93) for two page props
-and the effect that mounts a structure tree, and the `shell` path **+0.84 kB** (57.90 → 58.74) — more than
-core moved, because an eleventh entry changes how tsup splits the shared chunks, which is the same
-attribution `FR-12` had to make for the same reason. `FR-44` and `FR-47` then took core **+0.08 kB**
-(27.93 → 28.01) — the two `TouchManager` callbacks, the drawing ref, and one attribute on a mark — and the
-`shell` path **+0.40 kB** (58.74 → 59.14), most of which is `styles.css`: the shipped-path figures sum the
-whole entry including its sheet, and the forced-colours pass grew that sheet from 17,490 B to 18,465 B
-minified. `structure` itself is 0.37 kB over core: the `MarkInfo` gate, the lazy `import()`, and the
-published class. **What this table cannot see is the point of the design**: the ≈50 kB of
-`pdfjs-dist/web/pdf_viewer.mjs` that import fetches at runtime is a peer's bytes, external to every path
-measured here, so the tier looks nearly free and is only free *to the bundle*. §20 carries that as a
-documentation duty, not a measurement.
+**The baseline was re-accepted at the `0.11` close, so every number above equals `npm run size` today.**
+Core moved **+1.08 kB** since `0.10` (28.01 → 29.09) and the root `index.js` path **+1.61** (59.14 → 60.75),
+which is more than a release whose shell changes are two search labels and a partial-answer counter should
+cost. The column that explains it is *Over core*: every feature's cost is within a few tens of bytes of what
+`0.10` recorded (`print` 2.55 → 2.54, `forms` 2.06 → 2.00, `all nine` +15.04 → +14.97), which is only possible
+if the base itself moved for a reason that has nothing to do with the features. It does: `src/merge.ts` is a
+twelfth tsup entry, and a new entry reshuffles the shared chunks every consumer path is built from — the same
+attribution `0.10` had to make for its eleventh. **So read *Over core* as what a consumer pays and the `core`
+row as what this repository's chunking currently costs**, and note that the one path with nothing to share,
+`merge` alone, is 0.78 kB. `headless` gained the incremental and index-building search (`usePdfSearch.ts`,
+`buildTextIndex`, `validateTextIndex`) and the merge hook; `index.js` gained the same search plus two labels
+in each catalog and the counter's partial wording. **What this table cannot see is still the point of the
+design**: the ≈50 kB of `pdfjs-dist/web/pdf_viewer.mjs` that `structureFeature` fetches at runtime is a
+peer's bytes, external to every path measured here, so the tier looks nearly free and is only free *to the
+bundle*. §20 carries that as a documentation duty, not a measurement.
 
 For scale, measured the same way (gzip level 9): `pdf.min.mjs` **131.70 kB**, `pdf.worker.min.mjs`
 **375.25 kB**, and `@cantoo/pdf-lib` **251.41 kB** for what our writer imports (256.05 kB for its whole
@@ -117,15 +121,16 @@ number above.
 
 ---
 
-## 3. Every way in — the 24 import paths
+## 3. Every way in — the 25 import paths
 
 `package.json` → `exports`. Every JS path ships a `.js` and a matching `.d.ts`.
 
 | You write | You get |
 | --- | --- |
-| `pdfjs-react-reader` | Everything: the shell, the toolbar, the hooks, the library layer (228 names) |
-| `pdfjs-react-reader/headless` | Hooks + pure logic, no shell (181 names) |
-| `pdfjs-react-reader/edit` | The page-editing / flatten / signing tier (32 names) — the only file that imports the writer |
+| `pdfjs-react-reader` | Everything: the shell, the toolbar, the hooks, the library layer (234 names) |
+| `pdfjs-react-reader/headless` | Hooks + pure logic, no shell (187 names) |
+| `pdfjs-react-reader/edit` | The page-editing / flatten / signing tier (32 names) |
+| `pdfjs-react-reader/merge` | The multi-document tier (9 names): `mergeDocuments`, `describeMergeSources`, `usePdfMerge` and the plan types — **a separate entry because a viewer that only displays PDFs has no reason to carry a page-copying writer. `edit` and `merge` are the only two modules that import `@cantoo/pdf-lib`, and neither the root entry nor `/headless` re-exports either of them.** |
 | `pdfjs-react-reader/features/print` | `printFeature`, `createPrintFeature`, `PrintScope`, 2 types |
 | `pdfjs-react-reader/features/download` | `downloadFeature`, `createDownloadFeature`, 2 types |
 | `pdfjs-react-reader/features/forms` | `formsFeature`, `createFormsFeature`, 2 types |
@@ -146,10 +151,11 @@ number above.
 ## 4. Every name you can import, grouped
 
 The full name list from the built `.d.ts` files, grouped by what it is for, and **current through the
-`FR-43` work**: 228 names on this entry, 181 on `/headless`, 32 on `/edit` (§2 has the same three figures
-from a different measurement). The two `FR-43` added are `PdfStructTreeLayer` and
-`PdfStructTreeLayerBuilder`: a prop a host cannot name is a prop a host cannot fill in, so the types behind
-`FeaturePageProps.structTreeLayerBuilder` are exports rather than anonymous members of another interface. `T` below marks a type-only export, and each hook's option/result pair is
+`0.11` work**: 234 names on this entry, 187 on `/headless`, 32 on `/edit`, 9 on `/merge` (§2 has the same
+figures from a different measurement). The names `FR-40` and `FR-42` added are the index pair
+(`ExternalTextIndex`, `ExternalPageText`, `TextItemLike`, `buildTextIndex`, `validateTextIndex`,
+`outwardPageOrder`) and the merge plan quartet (`MergeSource`, `MergePageRef`, `MergePlan`, `MergeResult`);
+`T` below marks a type-only export, and each hook's option/result pair is
 written once rather than twenty times. `node scripts/inventory.mjs` prints the flat list per entry, so a
 disagreement between this section and the build is a fact about this section.
 
@@ -198,8 +204,12 @@ a module of types only, so neither entry pays bytes for them
 `MAX_RENDER_PIXELS` `MAX_RENDER_PIXELS_MOBILE` `MAX_RENDER_SIDE` `CAP_AREA_FACTOR` `BYTES_PER_PIXEL`
 
 *Text & search:* `extractPageText` `extractAllText` `buildPageText` `findPageMatches` `convertMatches`
-`convertMatchRanges` `countPerPage` `planFind` `findStartIndex` `escapeRegExp` `T PageTextIndex`
+`convertMatchRanges` `countPerPage` `planFind` `findStartIndex` `escapeRegExp` `invalidatePageText`
+`outwardPageOrder` **`buildTextIndex`** **`validateTextIndex`** `T PageTextIndex`
 `T PageMatch` `T TextItemLike` `T SearchOptions` `T ResolvedSearchOptions` `T SearchStatus` `T FindPlan`
+**`T ExternalTextIndex`** **`T ExternalPageText`** — the last four additions are `FR-40`: the published shape,
+the builder a host uses to make one, the validator that decides whether to trust it, and `outwardPageOrder`,
+which is `FR-39`'s reading order as a pure function so it can be tested without a document
 
 *Forms:* `collectWidgets` `groupWidgets` `describeWidget` `readFormValues` `readInitialValues`
 `writeFormValues` `clearFormValues` `formValuesDiffer` `AnnotationValueStore` `T FormField`
@@ -239,6 +249,15 @@ a module of types only, so neither entry pays bytes for them
 *Fullscreen:* `T FullscreenState`-level helpers via `useFullscreen` internals
 
 *Labels:* `DEFAULT_LABELS` `formatLabel` `T PdfViewerLabels` `T PdfViewerLabelsOverride`
+
+### The `/merge` tier's 9 names
+Values: `mergeDocuments` `describeMergeSources` `usePdfMerge`
+Types: `T MergeSource` `T MergePageRef` `T MergePlan` `T MergeResult` `T UsePdfMergeOptions`
+`T UsePdfMergeResult`
+
+Nothing here is re-exported from the root entry or from `/headless`, and that is the point: the root entry
+must not reach `@cantoo/pdf-lib`, so a host that never imports `/merge` cannot pull the writer in by naming
+the wrong symbol.
 
 ### The `/edit` tier's 32 names
 Values: `editFeature` `createEditFeature` `arrangePages` `flattenBytes` `findSignatureFields`
@@ -527,15 +546,30 @@ after Chrome commits to its own pan is a device question, and stays with `#141`.
 **Search.** Options: `caseSensitive`, `wholeWord`, `regex` (three modes, and a pattern that doesn't
 compile is reported, not swallowed — the expression is compiled *before* any page is read, so a typo
 costs nothing). Outside regex mode the query splits on whitespace and a page counts only when **every**
-word appears on it, which is the rule pdf.js's own viewer uses. Indexing is **whole-document**: every
-page's text is extracted in page order, progress reported as a 0–1 fraction, with a yield to the event
-loop every fifth page so the progress bar can paint. Results are a flat list of matches in document
-order, navigated match by match: `Enter` steps forward, `Shift+Enter` back, `Escape` closes the bar;
-the summary reads "15 of 27" and, once past the first hit, names the page it is on. Per-page counts
-(`counts`, zeros included) and `pagesWithMatches` come for free. `PdfViewer`'s `find` prop accepts any
-`PdfFindController` — `usePdfSearch` returns exactly that shape, structurally — so a host with its own
-matching strategy (server-side index, fuzzy, synonyms) keeps the built-in find bar, marks and counts
-instead of forking the shell.
+word appears on it, which is the rule pdf.js's own viewer uses. Indexing is **incremental and
+viewport-first** (`FR-39`): `outwardPageOrder(numPages, focus)` reads the page the reader is on, then
++1, −1, +2, −2 — forward before backward at an equal distance — and results go out on the first page, then
+at whichever of 25 pages or 120 ms comes first, with `progress`, `pagesIndexed` and `pagesTotal` on the way.
+Matches are re-sorted into document order when each batch is published, and the active match is carried by
+**identity** across a publish rather than by index, so the reader does not lose their place as the index
+grows. A partial answer says so: the counter switches to *"3 of 17 so far"* while `complete` is false, which
+is the requirement's honesty clause and two labels in every catalog. Measured cold in Chromium on
+`long-sample.pdf` from page 900: first answer 56 ms after the query, complete at 1,176 ms.
+`PdfFindController` is the published shape (`FR-26`), now with the five incremental members optional so a
+host standing in for the engine's find need not implement progress it does not have.
+
+**An index somebody else built (`FR-40`).** `usePdfSearch({ index })` takes
+`{version: 1, pages: [{text, itemEnds}]}` and searches that instead of extracting; `buildTextIndex(items)`
+makes one from `getTextContent()` items, and it is the same `buildPageText` walk the viewer runs, so the two
+sides cannot drift. `validateTextIndex` refuses a wrong version, a non-array page list, a page count that is
+not the document's, and boundaries that do not walk their own text — the page count being the one check a
+stale index cannot paper over. A refusal is reported in `indexError` and the document is then searched
+anyway; a page the index leaves as `null` is read from the document, and only that page. What the format
+*is* sufficient for is measured rather than asserted: `src/lib/search.parity.test.ts` builds an index from a
+fixture, sends it through JSON, and gets match-for-match identical `PageMatch` arrays against the viewer's own
+extraction. Same file, same measurement, the limit: **text extraction is the content stream**, so a form
+field's typed value and an annotation's text are not in the index and cannot be put there by calling
+`invalidatePages`.
 
 **Print.** No new window: the pages are drawn into a hidden `div.pjsr-print` **inside the current
 document**, `<body>` gets the `pjsr-printing` class, and `@media print` hides everything that is not
@@ -608,6 +642,36 @@ Two engine facts worth remembering if you touch this code: the writer's output a
 and the mark paints in the viewer whether it came from disk or from the panel — measured, 0 → 856 ink
 pixels in the box on a Sign click, surviving a zoom step. The shipped stroke is **black**
 (`signatureContent`'s default), not the fixture's navy.
+
+### Merging documents — `pdfjs-react-reader/merge`
+
+A second writer tier, in its own entry (`src/lib/pdf-merge.ts`, `src/headless/usePdfMerge.ts`,
+`src/merge.ts`) because a viewer that only displays PDFs has no reason to carry a page-copying writer: the
+merge-only consumer path measures **0.78 kB**.
+
+* **The output is always a third file, and that is the requirement.** Every source is loaded from a copy of
+  the caller's buffer, and `pdf-merge.test.ts` asserts the property by hashing both sources before and after
+  the merge — a reader experimenting with a merge must not be able to lose a document by trying it.
+* **Across a document boundary a page is copied, not permuted, and that is why the same page may be asked for
+  twice.** `arrangePages` refuses a repeated index; here it is how a cover ends up at the back. Each page is
+  one `copyPages` call into a document that started empty.
+* **The whole plan is validated before anything is copied.** A plan that runs out at page nine of ten fails
+  before it has built a document, not part-way through one the caller then has to throw away.
+* **What a merge does not carry is the interactive form.** `copyPages` brings a page's widget annotations
+  across but not the `AcroForm` that binds them — the same rule `flattenBytes` documents from the other
+  direction — so on a merged file the values are visible and the fields are not live. Stated in the module
+  header because a reader who merges two tax forms would otherwise discover it by typing into one.
+* **`usePdfMerge` is a hook with no component, and the playground is the test of that choice.** It owns the
+  parts a host should not have to get right — page counts as they arrive, the plan as data, a merge that
+  cannot touch a source, `null` rather than a throw on its own cancel — and `playground/src/MergeDemo.tsx` is
+  the picker a host writes. Its page-count effect keys on a `${name}:${byteLength}` signature per source, not
+  on the array: a host passing `sources: [a, b]` inline mints a new array every render, and an effect that
+  restarts on that counts the pages forever (the `0.9` `httpHeaders` trap, arriving through a different door;
+  the counterfactual was run and hung the harness in React's 50-update guard).
+* **Verified in Chromium**, not only in jsdom: 20 and 2 pages read from two fixtures, pages added, one moved
+  to the front, one repeated, `wrote 4 pages: 3 + 1`, and the resulting 5,134-byte file reopened in the reader
+  with its pages in plan order — a portrait sheet and a landscape one, each keeping its own box at the same
+  zoom, because copying a page carries its `/MediaBox`.
 
 ---
 
@@ -703,7 +767,7 @@ for a high-contrast theme — and they survive one, because a width and a shape 
 
 ---
 
-## 17. Tests: 67 files, 718 tests, two projects
+## 17. Tests: 74 files, 759 tests, two projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
 from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library). Parenthesised counts are the
@@ -713,7 +777,7 @@ files this section has ever itemised; the rest are named, not counted, so a stal
   `ink` `keyboard` `labels` `layout` `link-service` `optional-content` `outline` `page-plan`
   `pdf-write` (30) `print` `search` (35) `signature` `source` (17) `toolbar` `worker` `zoom` `locales`
   (16) — plus `abort` (14) `retry` (29) `search.abort` (4) and **`source.classify` (39)**, the rule that
-  `classifySource` and `normalizeSource` are the same heuristic, **`ssr` (18)**, which imports every
+  `classifySource` and `normalizeSource` are the same heuristic, **`ssr` (19)**, which imports every
   entry point in the export map with no DOM (FR-46; the eighteenth case is `features/structure`, which the
   loop picked up by reading the map rather than by anyone adding it), **`dpr` (13)** — the ratio hub,
   driven by a stubbed
@@ -759,6 +823,22 @@ files this section has ever itemised; the rest are named, not counted, so a stal
   **`features/structure` (10)** — the gate counted by reads of the peer class (zero for an untagged file,
   one for a tagged one), both `MarkInfo` shapes, the document changing under it, and the merged page props
   carrying the class rather than only the switch
+* Search's three new files, and the merge tier: **`usePdfSearch.incremental` (7)** — the outward order, the
+  first page publishing before the batching window, the active match surviving a publish *by identity*, a
+  stopped caller landing on `idle` with no error, and `invalidatePages` re-scanning one page and no other;
+  **`usePdfSearch.index` (8)** — a host index answering without `getPage` being called at all (not "called
+  less": never), a stale index reported in `indexError` **and the document searched anyway**, and the pages the
+  index left out being the only ones read; **`search.parity` (6)** — an index built from a real fixture,
+  round-tripped through JSON, returning match-for-match identical `PageMatch` arrays, the marked-content
+  variant collapsing to the same coordinates with the naive-flatten counterfactual beside it, and a second
+  block that measures what the index *cannot* see (a typed form value, an annotation's text);
+  **`pdf-merge` (7)** — sources byte-identical after a merge, asserted by hash, plus the repeated page, the
+  plan refused before anything is copied, and no bytes for a caller that stopped; **`usePdfMerge` (6)** — the
+  counts arriving, the plan as data, and the signature key that stops an inline `sources` array from counting
+  the pages forever; **`ViewerController.search` (2)** — `currentPage - 1` handed to the index at the moment a
+  search starts, and following the reader down the document instead of latching at mount;
+  **`SearchBox.counter` (4)** — both partial-answer wordings, and the case a growing count must never be shown
+  as final
 * Interaction, driven by hand: **`ViewerController.gestures` (9)** — the table in §11 asserted one row at a
   time, including the pan that has to move the scroll container and the drawing layer that has to keep the
   finger, plus the two declarations the browser reads first
@@ -928,8 +1008,8 @@ before the section it belonged to was accepted:
 | "Every async operation requires an `AbortSignal`" | Invalidation is effect-scoped `cancelled` flags, `task.cancel()`, and `RenderingCancelledException` swallowed by name. `AbortController` appears twice, both a real fetch | §3.3, with the invariants stated instead of the mechanism invented |
 | Two named state unions (document and page) | Neither enum existed; the surface was `doc`/`isReady`/`error`/`capabilities` and `page: PDFPageProxy \| null` | §3.4 specified the observable fields plus the invariants, and said why the enums were declined — **overtaken 2026-09-30**: the target spec asks for them anyway, and `FR-37` published both, derived from one tagged value so the fields and the status still cannot disagree |
 | "Both ESM and CJS outputs" | `"type": "module"`, no `.cjs` in `dist`, never has been | §6 React & Runtime |
-| "Validated for SSR (Next.js)" | Client-side only; `readCanvasEnvironment` exists because it is | §6 React & Runtime. **Half of it is now the other way, on purpose:** `FR-46`'s test imports all thirteen entry points with no DOM and none throws, so *importing* is server-safe while *rendering* stays client-only — which is what the README and the Installation page said before they were checked, in the stronger and wrong form ("pdf.js needs DOM globals at import time, so this package is client-side only") |
-| Page manipulation includes **merge** | No `merge` in `src/edit.tsx` or `dist/edit.d.ts` | §2.4, named as not shipped so nobody files against a promise |
+| "Validated for SSR (Next.js)" | Client-side only; `readCanvasEnvironment` exists because it is | §6 React & Runtime. **Half of it is now the other way, on purpose:** `FR-46`'s test imports **every JS target in the export map** with no DOM and none throws — the list is read from `package.json` rather than written out, so it was fifteen files at the `0.11` close and grew by `features/structure` and `/merge` without anyone editing the test — and importing is server-safe while *rendering* stays client-only, which is what the README and the Installation page said before they were checked, in the stronger and wrong form ("pdf.js needs DOM globals at import time, so this package is client-side only") |
+| Page manipulation includes **merge** | No `merge` in `src/edit.tsx` or `dist/edit.d.ts` | §2.4, named as not shipped so nobody files against a promise — **overtaken 2026-10-01**: `FR-42` shipped, on its own `/merge` entry rather than inside `edit`, and §13 now says what a merge carries and what it leaves behind |
 | pdf.js internals "never exposed as the public extension contract" | `dist/index.d.ts` ships `annotationEditorUIManager?: AnnotationEditorUIManager \| null` | Kept as a deliberate trade, and §5.4 names it as why the engine policy pins a major |
 | "Incremental page text extraction", lazy indexing | `extractAllText` walks every page, yielding every five — the same invention §12 was corrected for hours earlier | §6 Search Architecture |
 | Cold page render "< 55 ms" as a target | 55 ms is the **top of our own measured range** on one machine | Declined; the bar stays sub-100 ms with the range recorded beside it |
@@ -963,7 +1043,7 @@ Nothing here should be taken on trust. Each of these re-derives a number above:
 ```bash
 node -e "const p=require('./package.json');console.log(Object.keys(p.exports).length, p.version)"
 grep -rc "" src/**/*.ts src/**/*.tsx            # file inventory (§2)
-npm run test                                    # 718 tests in 67 files (§2, §17)
+npm run test                                    # 759 tests in 74 files (§2, §17)
 npm run a11y                                    # the axe audit on its own (FR-45); it also runs inside the line above
 npx vitest run src/styles/forced-colors.test.ts # §16's stylesheet rules, read from src/styles rather than from a list
 node -e "const u=require('caniuse-lite/dist/unpacker/feature'),f=require('caniuse-lite/dist/unpacker/features').features;const s=u(f['css-media-resolution']).stats;console.log(s.safari['14'],s.safari['16.0'],s.chrome['90'],s.firefox['90'])"   # the §11 `resolution` support flags (caniuse-lite is transitive, via the toolchain, not a declared dependency)
@@ -982,12 +1062,13 @@ npm run serve:auth &  curl -s -o /dev/null -w '%{http_code}\n' http://localhost:
 # path: bundle two consumer files that import `PdfViewer` from `dist/index.js` — one passing every
 # `enable*` as false plus a `controls.hide` over the whole bar, one at defaults — through esbuild and
 # Rollup exactly as `scripts/check-size.mjs` does, gzip the minified output at level 9, take the larger,
-# and divide by 1000 (the gate's `KB` is decimal). The plain `src` fixture measures 28.01 kB by the same
+# and divide by 1000 (the gate's `KB` is decimal). The plain `src` fixture measured 28.01 kB by the same
 # route, which is the anchor that says the method was reproduced rather than approximated — and it is also
 # the "defaults" number, because a `PdfViewer` at its defaults *is* the plain import, byte for byte.
 git ls-files playground/fixtures | wc -l   # must equal `ls playground/fixtures/*.pdf | wc -l`: a generated
 #                                           # fixture that is not tracked fails a fresh clone's `npm test`,
-#                                           # which has happened twice. `tagged-sample.pdf` is untracked now.
+#                                           # which has happened four times. All 19 fixtures are tracked, as the
+#                                           # `0.11` close re-checked.
 git log --oneline -1 && git status --porcelain | wc -l   # what is and isn't committed
 ```
 

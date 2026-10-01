@@ -65,10 +65,11 @@ export function Compatibility() {
             </td>
             <td>2.11.1</td>
             <td>
-              A PDF writer, and the reason the <code>edit</code> tier can rewrite a page tree at all.
-              Declared optional so a host that never mounts it neither installs it nor pays its 251.4 kB,
-              and named by exactly one shipped module — <code>pdf-write.ts</code> — so nothing else can
-              drag it in. Not installed, importing <code>pdfjs-react-reader/edit</code> fails at build
+              A PDF writer, and the reason the <code>edit</code> and <code>merge</code> tiers can rewrite a
+              page tree or copy pages between documents at all. Declared optional so a host that never mounts
+              either neither installs it nor pays its 251.4 kB, and named by exactly two shipped modules —{' '}
+              <code>pdf-write.ts</code> and <code>pdf-merge.ts</code> — so nothing else can drag it in. Not
+              installed, importing <code>pdfjs-react-reader/edit</code> or <code>/merge</code> fails at build
               rather than at runtime, which is the loud way round.
             </td>
           </tr>
@@ -297,67 +298,74 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>28.01 kB</td>
+            <td>29.09 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>30.47 kB</td>
-            <td>+2.55 kB</td>
+            <td>31.63 kB</td>
+            <td>+2.54 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>28.69 kB</td>
-            <td>+0.78 kB</td>
+            <td>29.88 kB</td>
+            <td>+0.79 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>29.97 kB</td>
-            <td>+2.06 kB</td>
+            <td>31.10 kB</td>
+            <td>+2.00 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>28.90 kB</td>
-            <td>+0.96 kB</td>
+            <td>30.08 kB</td>
+            <td>+0.98 kB</td>
           </tr>
           <tr>
             <td>Core + layers</td>
-            <td>29.13 kB</td>
+            <td>30.30 kB</td>
             <td>+1.21 kB</td>
           </tr>
           <tr>
             <td>Core + attachments</td>
-            <td>29.00 kB</td>
-            <td>+1.09 kB</td>
+            <td>30.19 kB</td>
+            <td>+1.10 kB</td>
           </tr>
           <tr>
             <td>Core + annotate</td>
-            <td>29.77 kB</td>
-            <td>+1.85 kB</td>
+            <td>30.95 kB</td>
+            <td>+1.86 kB</td>
           </tr>
           <tr>
             <td>Core + structure</td>
-            <td>28.38 kB</td>
-            <td>+0.37 kB</td>
+            <td>29.47 kB</td>
+            <td>+0.38 kB</td>
           </tr>
           <tr>
             <td>Core + edit</td>
-            <td>33.82 kB</td>
+            <td>34.98 kB</td>
             <td>+5.89 kB</td>
           </tr>
           <tr>
             <td>All nine features</td>
-            <td>43.05 kB</td>
-            <td>+15.04 kB</td>
+            <td>44.06 kB</td>
+            <td>+14.97 kB</td>
+          </tr>
+          <tr>
+            <td>
+              <code>/merge</code> alone (writer and hook, no shell)
+            </td>
+            <td>0.78 kB</td>
+            <td>separate entry</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>59.14 kB</td>
+            <td>60.75 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>31.02 kB</td>
+            <td>32.53 kB</td>
             <td>—</td>
           </tr>
           <tr>

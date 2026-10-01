@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { UsePdfSearchResult } from '../headless/usePdfSearch';
+import type { PdfFindController } from '../headless/usePdfSearch';
 import { formatLabel } from '../lib/labels';
 import { useLabels } from './labels-context';
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from './icons';
 
 export interface SearchBoxProps {
-  state: UsePdfSearchResult;
+  state: PdfFindController;
   onClose?: () => void;
 }
 
@@ -44,15 +44,18 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
     state.search(input, { caseSensitive, wholeWord, regex });
   };
 
-  const { status, progress, total, activeIndex, results, patternError } = state;
+  const { status, progress, total, activeIndex, results, patternError, complete } = state;
   const activePage = activeIndex >= 0 ? results[activeIndex]?.pageIndex : undefined;
+  // A host-written controller predates this member and says nothing about partiality, which is correct:
+  // such a controller answers in one go. Only `false` means "still reading".
+  const partial = complete === false;
   // Derived once as a state name rather than inline in three places: the
   // counter's colour used to be chosen by comparing the rendered text against
   // 'No results', which silently mis-styled the empty state under any
   // translation of that string.
   const counterKind = !input
     ? 'idle'
-    : status === 'indexing'
+    : status === 'indexing' && total === 0
       ? 'indexing'
       : patternError
         ? 'invalid'
@@ -73,12 +76,18 @@ export function SearchBox({ state, onClose }: SearchBoxProps) {
             : counterKind === 'empty'
               ? labels.searchNoResults
               : activePage === undefined
-                ? formatLabel(labels.searchMatchSummary, { current: activeIndex + 1, total })
-                : formatLabel(labels.searchMatchOnPage, {
-                    current: activeIndex + 1,
-                    total,
-                    page: activePage + 1,
-                  });
+                ? formatLabel(
+                    partial ? labels.searchMatchSummaryPartial : labels.searchMatchSummary,
+                    { current: activeIndex + 1, total },
+                  )
+                : formatLabel(
+                    partial ? labels.searchMatchOnPagePartial : labels.searchMatchOnPage,
+                    {
+                      current: activeIndex + 1,
+                      total,
+                      page: activePage + 1,
+                    },
+                  );
   // Zero matches is an empty state, not a failure: only a real error gets the
   // danger colour. A pattern that will not compile is a mistake in the box, so it
   // is reported as one rather than as "no results", which would be a lie about

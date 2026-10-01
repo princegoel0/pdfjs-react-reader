@@ -154,6 +154,12 @@ const consumerPaths = [
   })),
   { label: 'all', fixture: 'all.mjs' },
   { label: 'headless-only', fixture: 'headless.mjs' },
+  /*
+   * Merge is measured alone rather than as `core+merge`, because it is not a feature: nothing mounts it
+   * on a viewer, and a host that only assembles files never loads the shell. The number that matters for
+   * it is the cost of the entry, which is what the writer costs when nothing else is asked for.
+   */
+  { label: 'merge-only', fixture: 'merge.mjs' },
 ];
 
 async function bundleEsbuild(entry, minify) {
@@ -278,7 +284,9 @@ console.log('\nbundled per consumer import, worst of esbuild and Rollup');
 for (const path of consumerPaths) {
   const bytes = measuredConsumer.get(path.label);
   const increment =
-    path.label === 'core' || path.label === 'headless-only'
+    // A standalone entry is not a core plus something, so there is no increment to state: `headless`
+    // and `merge` are each their own bundle, and the number a reader wants from them is the whole figure.
+    path.label === 'core' || path.label === 'headless-only' || path.label === 'merge-only'
       ? ''
       : `(${((bytes - coreSize) / KB).toFixed(2)} kB over core)`;
   report(path.label, bytes, path.fixture.replace(/\.mjs$/, ' · ') + increment);

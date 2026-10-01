@@ -194,10 +194,12 @@ function giveUnsignedSignatureWidgetsAnAppearance(doc: PDFDocument): void {
 }
 
 /**
- * Every writer pass in this module starts here, so the one flag that decides whether an
- * encrypted file is readable at all is stated once rather than per function.
+ * Every writer pass in this package starts here, so the one flag that decides whether an encrypted file is
+ * readable at all is stated once rather than per function. Shared with `pdf-merge`, which is the other
+ * place bytes become a document — and which is why this is exported at all: it is internal to the package,
+ * on no entry point.
  */
-async function loadForWriting(bytes: PdfBytes): Promise<PDFDocument> {
+export async function loadForWriting(bytes: PdfBytes): Promise<PDFDocument> {
   return PDFDocument.load(toArrayBuffer(bytes), { ignoreEncryption: true });
 }
 

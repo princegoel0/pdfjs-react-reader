@@ -28,7 +28,7 @@ export function Api() {
             <td>
               <code>pdfjs-react-reader</code>
             </td>
-            <td>The viewer, its parts, the controller, the eight hooks the stock chrome needs, the feature contract and the library layer beneath them. 228 names.</td>
+            <td>The viewer, its parts, the controller, the eight hooks the stock chrome needs, the feature contract and the library layer beneath them. 234 names.</td>
           </tr>
           <tr>
             <td>
@@ -37,7 +37,7 @@ export function Api() {
             <td>
               Every hook — those eight plus <code>usePdfOptionalContent</code> and{' '}
               <code>usePdfAttachments</code> — and every library function, with no React components. For a
-              host writing its own viewer. 181 names.
+              host writing its own viewer. 187 names.
             </td>
           </tr>
           <tr>
@@ -50,14 +50,26 @@ export function Api() {
             <td>
               <code>pdfjs-react-reader/edit</code>
             </td>
-            <td>The page-rearranging and flatten tier, the signing half of it, and the only module in the package that may reach the optional peer. 32 names — <code>node scripts/inventory.mjs</code> prints that number from <code>dist/edit.d.ts</code>, so it moves when the surface does.</td>
+            <td>The page-rearranging and flatten tier, the signing half of it, and one of the two modules in the package that may reach the optional peer. 32 names — <code>node scripts/inventory.mjs</code> prints that number from <code>dist/edit.d.ts</code>, so it moves when the surface does.</td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/merge</code>
+            </td>
+            <td>
+              Two documents, one new file: <code>mergeDocuments</code>, <code>describeMergeSources</code>,{' '}
+              <code>usePdfMerge</code> and the plan types — 9 names. The tier&apos;s other half is the picker,
+              and it is deliberately not here: which documents may be merged, where they come from and what
+              happens to the bytes are the host&apos;s business, so the package ships the writer, the state and
+              <a href="#/recipes"> a recipe</a>. The output is always a third file; a source is never written.
+            </td>
           </tr>
           <tr>
             <td>
               <code>pdfjs-react-reader/locales/&lt;lang&gt;</code>
             </td>
             <td>
-              A complete label catalog: <code>de</code>, <code>es</code>, <code>fr</code>. 2.37–2.39 kB gzipped
+              A complete label catalog: <code>de</code>, <code>es</code>, <code>fr</code>. 2.39–2.42 kB gzipped
               each, frozen, and typed as the whole catalog rather than the partial a host may send.
             </td>
           </tr>
@@ -244,7 +256,19 @@ export function Api() {
             <td>
               <code>usePdfSearch</code>
             </td>
-            <td>The text index, the matches, the active one, and the depth options. Any object shaped like its result can replace it through <code>find</code>.</td>
+            <td>The text index, the matches, the active one, and the depth options. Indexing is incremental and starts from the page in view (<code>focusPage</code>), so a first answer arrives while the rest of the document is still being read and the counter says <em>so far</em> until it is not; <code>index</code> accepts a prebuilt <code>{'{version: 1, pages: [{text, itemEnds}]}'}</code> from a server instead of extracting at all, and <code>indexError</code> says so if it does not describe this document. Any object shaped like its result can replace it through <code>find</code>.</td>
+          </tr>
+          <tr>
+            <td>
+              <code>usePdfMerge</code>
+            </td>
+            <td>
+              The state behind a merge picker on <code>pdfjs-react-reader/merge</code>: how many pages each
+              source has, the ordered plan (<code>add</code>, <code>remove</code>, <code>move</code> and{' '}
+              <code>clear</code>), how many have been taken from each, and <code>merge()</code>, which writes a
+              new file and resolves <code>null</code> for an empty plan or a caller that stopped caring. No
+              component, because the preview is the host&apos;s design decision.
+            </td>
           </tr>
           <tr>
             <td>

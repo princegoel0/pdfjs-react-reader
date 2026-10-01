@@ -9,6 +9,7 @@ import {
 } from 'pdfjs-react-reader';
 import { CustomLayoutViewer, progressControl } from './CustomLayout';
 import { useHostIndexFind } from './HostFind';
+import { MergeDemo } from './MergeDemo';
 import { downloadFeature } from 'pdfjs-react-reader/features/download';
 import { createFormsFeature } from 'pdfjs-react-reader/features/forms';
 import { annotateFeature } from 'pdfjs-react-reader/features/annotate';
@@ -95,6 +96,7 @@ export default function App() {
   const [compound, setCompound] = useState(false);
   // Find results come from playground/src/HostFind.tsx instead of the engine's text.
   const [hostFind, setHostFind] = useState(false);
+  const [mergeDemo, setMergeDemo] = useState(false);
   const hostFindController = useHostIndexFind();
   // Drop two controls, move one, add a host control — the bar's own configuration.
   const [trim, setTrim] = useState(false);
@@ -324,10 +326,20 @@ export default function App() {
           <input type="checkbox" checked={trim} onChange={(e) => setTrim(e.target.checked)} />
           &nbsp;trim the bar
         </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={mergeDemo}
+            onChange={(e) => setMergeDemo(e.target.checked)}
+          />
+          &nbsp;merge demo
+        </label>
       </header>
       <div className="app-main">
         <div className="app-viewer">
-          {compound ? (
+          {mergeDemo ? (
+            <MergeDemo />
+          ) : compound ? (
             <CustomLayoutViewer ref={viewer} {...viewerProps} />
           ) : (
             <PdfViewer ref={viewer} {...viewerProps} />

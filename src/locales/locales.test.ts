@@ -74,7 +74,7 @@ describe.each(Object.entries(CATALOGS))('%s catalog', (code, catalog) => {
 });
 
 it('has a key list the catalogs were written against', () => {
-  // 123 in `0.6`, 131 in `0.7`, 134 at the `0.8` freeze, and 144 with the signature panel:
-  // a catalog cannot gain a string that three language files then fail to carry.
-  expect(KEYS.length).toBe(144);
+  // 123 in `0.6`, 131 in `0.7`, 134 at the `0.8` freeze, 144 with the signature panel, and 146 with the
+  // partial search counter: a catalog cannot gain a string that three language files then fail to carry.
+  expect(KEYS.length).toBe(146);
 });

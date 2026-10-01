@@ -16,7 +16,7 @@ export function Installation() {
 pnpm add pdfjs-react-reader pdfjs-dist
 yarn add pdfjs-react-reader pdfjs-dist
 
-# and only if you mount pdfjs-react-reader/edit:
+# and only if you mount pdfjs-react-reader/edit or /merge:
 npm install @cantoo/pdf-lib`}</code>
       </pre>
       <p>
@@ -27,11 +27,13 @@ npm install @cantoo/pdf-lib`}</code>
         (<code>"type": "module"</code>) with generated TypeScript declarations.
       </p>
       <p>
-        <code>@cantoo/pdf-lib</code> is an <em>optional</em> peer, and the only thing that asks for it
-        is the <code>edit</code> tier — the writer is what reorders pages and flattens marks, and the
-        core keeps its zero-dependency rule by not having one. Nothing is installed for you: without
-        it, importing <code>pdfjs-react-reader/edit</code> fails at build, and importing anything else
-        in the package works, typechecks and runs.
+        <code>@cantoo/pdf-lib</code> is an <em>optional</em> peer, and the only things that ask for it are
+        the two writer tiers: <code>edit</code>, which reorders pages and flattens marks, and{' '}
+        <code>merge</code>, which copies pages between documents into a third file. The core keeps its
+        zero-dependency rule by not having one. Nothing is installed for you: without it, importing{' '}
+        <code>pdfjs-react-reader/edit</code> or <code>pdfjs-react-reader/merge</code> fails at build, and
+        importing anything else in the package — including the root entry and <code>/headless</code>, which
+        do not re-export either — works, typechecks and runs.
       </p>
 
       <h2>Import the theme</h2>

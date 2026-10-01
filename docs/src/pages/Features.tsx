@@ -6,13 +6,15 @@ export function Features() {
         Nine things a viewer can do to a document — print it, save it, fill it in, show its outline,
         switch its layers, hand over its attachments, mark it up, rearrange its pages, read its structure
         to a screen reader — are values you import. The reason is
-        arithmetic: measured on this build,{' '}
+        arithmetic: measured on the build where the comparison was made,{' '}
         <code>PdfViewer</code> with every switch off — wheel, pinch, fullscreen, keys, drop, and{' '}
-        <code>controls.hide</code> over the whole bar — costs <strong>28.10 kB</strong> gzipped against{' '}
+        <code>controls.hide</code> over the whole bar — cost <strong>28.10 kB</strong> gzipped against{' '}
         <strong>28.01 kB</strong> for the same viewer left at its defaults, which is byte-for-byte the
-        plain <code>src</code> import. Turning controls off costs a little more than leaving them on,
+        plain <code>src</code> import. Turning controls off cost a little more than leaving them on,
         because saying &ldquo;hide&rdquo; is itself code. Only an import decides what your bundle
-        contains.
+        contains. That pair is measured by hand rather than by <code>npm run size</code>, so read the
+        finding as the direction and <a href="#/compatibility">Versions &amp; compatibility</a> for the
+        figures this build produced.
       </p>
 
       <h2>The nine built-ins</h2>
@@ -38,7 +40,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/print.css</code>
             </td>
-            <td>2.55 kB</td>
+            <td>2.54 kB</td>
           </tr>
           <tr>
             <td>
@@ -49,7 +51,7 @@ export function Features() {
               edited — an incremental <code>saveDocument()</code> that keeps the fields interactive.
             </td>
             <td>none needed</td>
-            <td>0.78 kB</td>
+            <td>0.79 kB</td>
           </tr>
           <tr>
             <td>
@@ -62,7 +64,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/forms.css</code>
             </td>
-            <td>2.06 kB</td>
+            <td>2.00 kB</td>
           </tr>
           <tr>
             <td>
@@ -74,7 +76,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/outline.css</code>
             </td>
-            <td>0.96 kB</td>
+            <td>0.98 kB</td>
           </tr>
           <tr>
             <td>
@@ -106,7 +108,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/attachments.css</code>
             </td>
-            <td>1.09 kB</td>
+            <td>1.10 kB</td>
           </tr>
           <tr>
             <td>
@@ -123,7 +125,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/annotate.css</code>
             </td>
-            <td>1.85 kB</td>
+            <td>1.86 kB</td>
           </tr>
           <tr>
             <td>
@@ -135,14 +137,14 @@ export function Features() {
               figure&apos;s alternative text is, and this is what turns that into{' '}
               <code>role</code>d elements owning the text spans they describe. No control, no panel, no
               key — the tree is how the page <em>is</em>, not a view of it. The cost is{' '}
-              <strong>0.37 kB</strong> of gate; the ~50 kB of pdf.js viewer it reads is a lazy{' '}
+              <strong>0.38 kB</strong> of gate; the ~50 kB of pdf.js viewer it reads is a lazy{' '}
               <code>import()</code> taken only for a document that declares itself tagged, and it is
               fetched at runtime, so it is not in your bundle and not in this table.
             </td>
             <td>
               <code>pdfjs-react-reader/structure.css</code>
             </td>
-            <td>0.37 kB</td>
+            <td>0.38 kB</td>
           </tr>
           <tr>
             <td>
@@ -156,8 +158,11 @@ export function Features() {
               hands the planned pages to the save dialog as a new file, and Split cuts the list at any
               row into two files. <strong>Flatten</strong> is the other half: it bakes every mark and
               field value into the page, so the marks survive a reader who opens the file somewhere with
-              no editor to show them. The one tier with a dependency of its own —{' '}
-              <code>@cantoo/pdf-lib</code>, an <em>optional</em> peer that nothing else imports.
+              no editor to show them. One of the two tiers with a dependency of its own —{' '}
+              <code>@cantoo/pdf-lib</code>, an <em>optional</em> peer that nothing else imports. Merging two
+              documents into a third is the other, and it lives on its own entry point instead of in a
+              feature, because a merge is a way to get a document rather than a control over the one on
+              screen: see <a href="#/recipes">Recipes</a>.
             </td>
             <td>
               <code>pdfjs-react-reader/edit.css</code>
@@ -169,24 +174,27 @@ export function Features() {
 
       <p>
         The optional peer is arranged so that the two ways to be wrong are both loud and neither is
-        silent. Not installing it and importing <code>pdfjs-react-reader/edit</code> is a bundler that
-        cannot resolve the module — it fails at build, on the machine that made the choice. Not
-        installing it and importing <em>anything else</em> is fine, including <code>tsc</code>: no shipped
-        declaration file names the writer, because every value crossing that boundary is bytes and plain
-        objects. The 251.4 kB the peer gzips to is therefore a decision you make once, at install, for the
-        one capability that needs it.
+        silent. Not installing it and importing <code>pdfjs-react-reader/edit</code> or{' '}
+        <code>pdfjs-react-reader/merge</code> is a bundler that cannot resolve the module — it fails at
+        build, on the machine that made the choice. Not installing it and importing <em>anything
+        else</em> is fine, including <code>tsc</code>: no shipped declaration file names the writer, because
+        every value crossing that boundary is bytes and plain objects. The 251.4 kB the peer gzips to is
+        therefore a decision you make once, at install, for the one library that needs it.
       </p>
 
       <p>
         Cost is measured, not estimated, and the figures above are this build
         (re-measured at each release close, and after anything that adds a page prop): <code>npm run size</code> bundles one file per
         consumer import with both esbuild and Rollup and reports the larger of the two, so a feature is
-        only &ldquo;small&rdquo; if two independent tree-shakers agree. All nine together cost 15.04 kB
-        over the <code>28.01 kB</code> core — less than their sum, because they share the shell they attach
+        only &ldquo;small&rdquo; if two independent tree-shakers agree. All nine together cost 14.97 kB
+        over the <code>29.09 kB</code> core — less than their sum, because they share the shell they attach
         to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
-        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 59.14 kB, because
+        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 60.75 kB, because
         that entry re-exports every headless hook whether or not you name one — so quote the import,
-        not the entry.
+        not the entry. One caveat about the base figure itself: adding an entry point reshuffles the shared
+        chunks that every path is built from, so <code>core</code> moves a little at each release for reasons
+        that are not about the feature being added. The <em>over core</em> column nets that out, and it is the
+        one to read.
       </p>
 
       <p>

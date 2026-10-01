@@ -126,6 +126,8 @@ export const ES_LABELS: PdfViewerLabels = Object.freeze({
   searchNoResults: 'Sin resultados',
   searchMatchSummary: '{current} de {total}',
   searchMatchOnPage: '{current} de {total} · pág. {page}',
+  searchMatchSummaryPartial: '{current} de {total} por ahora',
+  searchMatchOnPagePartial: '{current} de {total} por ahora · pág. {page}',
   withShortcut: '{label} ({shortcut})',
   passwordProtected: 'Este documento está protegido con contraseña.',
   passwordRejected: 'Esa contraseña no abrió el documento.',

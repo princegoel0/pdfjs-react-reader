@@ -166,6 +166,9 @@ export interface PdfViewerLabels {
   searchNoResults: string;
   searchMatchSummary: string;
   searchMatchOnPage: string;
+  /** While pages are still being read: the count is a floor, and saying so is the requirement (FR-39). */
+  searchMatchSummaryPartial: string;
+  searchMatchOnPagePartial: string;
   /** Composes a control's label with its keyboard hint. */
   withShortcut: string;
 
@@ -331,6 +334,8 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   searchNoResults: 'No results',
   searchMatchSummary: '{current} of {total}',
   searchMatchOnPage: '{current} of {total} · p{page}',
+  searchMatchSummaryPartial: '{current} of {total} so far',
+  searchMatchOnPagePartial: '{current} of {total} so far · p{page}',
   withShortcut: '{label} ({shortcut})',
 
   passwordProtected: 'This document is password protected.',

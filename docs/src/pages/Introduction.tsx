@@ -100,8 +100,19 @@ export function Introduction() {
             <td>
               The page-editing and flatten tier: <code>editFeature</code>, <code>createEditFeature</code>,
               the pure page-plan helpers, and <code>arrangePages</code> / <code>flattenBytes</code> on
-              their own. The only entry that reaches for <code>@cantoo/pdf-lib</code>, its{' '}
-              <em>optional</em> peer — install it to mount this, and nothing else asks for it.
+              their own.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/merge</code>
+            </td>
+            <td>
+              Two documents, one new file: <code>mergeDocuments</code>, <code>describeMergeSources</code> and
+              the <code>usePdfMerge</code> picker state — and no component, because which files may be merged
+              and what happens to the result is the host&apos;s business. With <code>edit</code>, this is where
+              <code>@cantoo/pdf-lib</code> is reached — its <em>optional</em> peer. Install it to mount either,
+              and neither the root entry nor <code>headless</code> asks for it.
             </td>
           </tr>
           <tr>
@@ -158,76 +169,83 @@ export function Introduction() {
             <td>
               <code>PdfViewer</code> alone — pages, text, search, ink, thumbnails, chrome
             </td>
-            <td>28.01 kB</td>
+            <td>29.09 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>
               <code>+ printFeature</code>
             </td>
-            <td>30.47 kB</td>
-            <td>+2.55 kB</td>
+            <td>31.63 kB</td>
+            <td>+2.54 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ downloadFeature</code>
             </td>
-            <td>28.69 kB</td>
-            <td>+0.78 kB</td>
+            <td>29.88 kB</td>
+            <td>+0.79 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ formsFeature</code>
             </td>
-            <td>29.97 kB</td>
-            <td>+2.06 kB</td>
+            <td>31.10 kB</td>
+            <td>+2.00 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ outlineFeature</code>
             </td>
-            <td>28.90 kB</td>
-            <td>+0.96 kB</td>
+            <td>30.08 kB</td>
+            <td>+0.98 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ layersFeature</code>
             </td>
-            <td>29.13 kB</td>
+            <td>30.30 kB</td>
             <td>+1.21 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ attachmentsFeature</code>
             </td>
-            <td>29.00 kB</td>
-            <td>+1.09 kB</td>
+            <td>30.19 kB</td>
+            <td>+1.10 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ annotateFeature</code>
             </td>
-            <td>29.77 kB</td>
-            <td>+1.85 kB</td>
+            <td>30.95 kB</td>
+            <td>+1.86 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ structureFeature</code> — the document tree, as accessibility structure
             </td>
-            <td>28.38 kB</td>
-            <td>+0.37 kB</td>
+            <td>29.47 kB</td>
+            <td>+0.38 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ editFeature</code> — pages, flatten and signing
             </td>
-            <td>33.82 kB</td>
+            <td>34.98 kB</td>
             <td>+5.89 kB</td>
           </tr>
           <tr>
             <td>All nine</td>
-            <td>43.05 kB</td>
-            <td>+15.04 kB</td>
+            <td>44.06 kB</td>
+            <td>+14.97 kB</td>
+          </tr>
+          <tr>
+            <td>
+              A merge on its own (<code>pdfjs-react-reader/merge</code>)
+            </td>
+            <td>0.78 kB</td>
+            <td>separate entry</td>
           </tr>
           <tr>
             <td>
@@ -241,10 +259,13 @@ export function Introduction() {
       <p>
         All nine together cost less than their sum, because each is measured against the same core they
         attach to. The two shipped-file paths are what a bundler that cannot tree-shake pays for the
-        whole entry surface: <strong>59.14 kB</strong> for <code>index.js</code> and{' '}
-        <strong>31.02 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
-        <code>edit.js</code> is its own 8.64 kB, and it is the only shipped file that imports the writer.
-        For scale, <code>pdfjs-dist</code> 6.3 gzips to 131.7 kB on the main thread and 375.3 kB in its
+        whole entry surface: <strong>60.75 kB</strong> for <code>index.js</code> and{' '}
+        <strong>32.53 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
+        <code>edit.js</code> is its own 6.16 kB and <code>merge.js</code> 1.60 kB — the only two shipped
+        files that import the writer. Read the <em>Over core</em> column rather than the base row when you
+        are asking what a feature costs: adding an entry point reshuffles the shared chunks every path is
+        built from, so <code>core</code> itself moves for reasons that are not about your bundle. For
+        scale, <code>pdfjs-dist</code> 6.3 gzips to 131.7 kB on the main thread and 375.3 kB in its
         worker, and <code>@cantoo/pdf-lib</code> to 251.5 kB — measured the same way the size gate
         measures, so the ratio between our layer and the engine is the point rather than the digits.
       </p>

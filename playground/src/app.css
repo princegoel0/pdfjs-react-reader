@@ -146,3 +146,46 @@ body {
   font-variant-numeric: tabular-nums;
   color: var(--pjsr-muted-fg);
 }
+
+/* The merge demo, which is playground chrome rather than package chrome: it exists to prove the recipe
+   against `usePdfMerge` fits in one file, so it borrows the package's own tokens and nothing else. */
+.merge-demo {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.merge-demo-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.merge-demo fieldset {
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.merge-demo button {
+  min-width: 32px;
+  height: 32px;
+  margin: 2px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.merge-demo-plan {
+  margin: 12px 0;
+  padding-left: 20px;
+}
+
+.merge-demo-plan li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
