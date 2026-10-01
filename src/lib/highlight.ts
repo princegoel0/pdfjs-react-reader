@@ -70,7 +70,15 @@ function splitDiv(div: HTMLElement, ranges: DivRange[], activeLocal: number): bo
     if (end <= start) continue;
     if (start > cursor) frag.append(document.createTextNode(text.slice(cursor, start)));
     const mark = document.createElement('mark');
-    mark.className = range.local === activeLocal ? 'pjsr-mark pjsr-mark--active' : 'pjsr-mark';
+    const active = range.local === activeLocal;
+    mark.className = active ? 'pjsr-mark pjsr-mark--active' : 'pjsr-mark';
+    /*
+     * FR-44's second channel, in the tree rather than on the screen: which of the matches the reader is
+     * *on* is otherwise carried by a darker tint, and a tint is the one thing forced-colours mode is
+     * certain to flatten. `aria-current` says it to an assistive technology whatever the palette does, and
+     * the stylesheet keys the shape channel off the same attribute, so the two can never disagree.
+     */
+    if (active) mark.setAttribute('aria-current', 'true');
     mark.textContent = text.slice(start, end);
     frag.append(mark);
     cursor = end;

@@ -28,7 +28,7 @@ export function Api() {
             <td>
               <code>pdfjs-react-reader</code>
             </td>
-            <td>The viewer, its parts, the controller, the eight hooks the stock chrome needs, the feature contract and the library layer beneath them. 203 names.</td>
+            <td>The viewer, its parts, the controller, the eight hooks the stock chrome needs, the feature contract and the library layer beneath them. 228 names.</td>
           </tr>
           <tr>
             <td>
@@ -37,14 +37,14 @@ export function Api() {
             <td>
               Every hook — those eight plus <code>usePdfOptionalContent</code> and{' '}
               <code>usePdfAttachments</code> — and every library function, with no React components. For a
-              host writing its own viewer. 158 names.
+              host writing its own viewer. 181 names.
             </td>
           </tr>
           <tr>
             <td>
               <code>pdfjs-react-reader/features/&lt;name&gt;</code>
             </td>
-            <td>One of <code>print</code>, <code>download</code>, <code>forms</code>, <code>outline</code>, <code>layers</code>, <code>annotate</code>, <code>attachments</code>.</td>
+            <td>One of <code>print</code>, <code>download</code>, <code>forms</code>, <code>outline</code>, <code>layers</code>, <code>annotate</code>, <code>attachments</code>, <code>structure</code>.</td>
           </tr>
           <tr>
             <td>
@@ -66,9 +66,11 @@ export function Api() {
               <code>…&lt;name&gt;.css</code>
             </td>
             <td>
-              Eight sheets — <code>styles</code>, <code>print</code>, <code>forms</code>, <code>outline</code>,{' '}
-              <code>layers</code>, <code>annotate</code>, <code>attachments</code>, <code>edit</code> — one per
-              feature that paints anything.
+              Nine sheets — <code>styles</code>, <code>print</code>, <code>forms</code>, <code>outline</code>,{' '}
+              <code>layers</code>, <code>annotate</code>, <code>attachments</code>, <code>structure</code>,{' '}
+              <code>edit</code> — one per feature that paints anything. <code>structure.css</code> is the one
+              of them that is load-bearing rather than cosmetic: it is what keeps an accessibility layer out
+              of the page's layout.
             </td>
           </tr>
         </tbody>

@@ -84,6 +84,28 @@ export function Theming() {
         rather than assuming the default reads.
       </p>
 
+      <h2>Forced colours</h2>
+      <p>
+        Under <code>forced-colors: active</code> the browser replaces the used value of every colour a
+        rule resolves to, whatever was authored — so the viewer does not argue with it. The tokens are
+        re-pointed at the system palette (<code>Canvas</code>, <code>CanvasText</code>,{' '}
+        <code>GrayText</code>, <code>ButtonFace</code>, <code>Highlight</code>) in one block, which is
+        also why a theme that overrides tokens still wins: the override is on the same declarations.
+        Two things the browser does <em>not</em> do for you, though. A transparent background stays
+        transparent but a shadow is dropped, so every separation the page, a menu or a thumbnail drew
+        with a shadow also has an <code>outline</code>, which cannot move a box. And four places opt out
+        with <code>forced-color-adjust: none</code>, because there the colour is the reader’s own choice
+        rather than chrome: the ink swatches, the strokes drawn in them, the signature pad and the
+        annotation colour plate.
+      </p>
+      <p>
+        If you write your own theme, the rule to keep is the one the shell keeps: nothing that means
+        something should mean it by colour alone. A match carries a rule under it, the current match a
+        ring and <code>aria-current</code>, an armed control a border, the selected tab a thicker
+        underline — all declared for every palette, because the requirement is not a high-contrast
+        special case.
+      </p>
+
       <h2>Layout, not just colour</h2>
       <p>
         <code>--pjsr-control-h</code> and <code>--pjsr-icon</code> are coupled on purpose: the glyph

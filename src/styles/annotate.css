@@ -311,3 +311,15 @@
   outline: 2px solid var(--pjsr-accent);
   outline-offset: 1px;
 }
+
+/* ---------- forced colours (FR-44) ---------- */
+
+@media (forced-colors: active) {
+  /* The plate beside each colour name is the reason the select exists — "Pink" and "Red" are one letter
+     apart, and the reader is choosing a paint. Forced, every plate in the list becomes the same system
+     colour and the control is a word list again, so this one declaration is the difference between
+     adapting the palette and destroying it. Its `var(--pjsr-border)` edge still comes from the theme. */
+  .pjsr-annotate-swatch {
+    forced-color-adjust: none;
+  }
+}

@@ -130,6 +130,14 @@ const FEATURES = [
   { name: 'annotate', marker: 'createEditorEventBus' },
   { name: 'attachments', marker: 'usePdfAttachments' },
   /*
+   * The structure tier's marker is the peer specifier it lazily imports, for the same reason `edit`'s is
+   * `@cantoo/pdf-lib`: the failure worth catching is that specifier appearing in a bundle that never asked
+   * for the tier — about 50 kB gzipped of pdf.js viewer, since `web/pdf_viewer.mjs` does not tree-shake.
+   * It also catches the subtler version, where core itself starts naming the module and every consumer
+   * pays a chunk they cannot see.
+   */
+  { name: 'structure', marker: 'pdfjs-dist/web/pdf_viewer.mjs' },
+  /*
    * The edit tier's marker is the optional peer's own specifier, not one of our
    * symbols, because the failure worth catching here is the writer arriving in a
    * bundle that never asked for it. It stays an import rather than inlined code, so

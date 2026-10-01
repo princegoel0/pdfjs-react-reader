@@ -9,7 +9,11 @@
  * by `scripts/check-size.mjs`, not by a comment.
  */
 import type { ComponentType } from 'react';
-import type { AnnotationEditorUIManager, PDFDocumentProxy } from 'pdfjs-dist';
+import type {
+  AnnotationEditorUIManager,
+  PDFDocumentProxy,
+  PDFPageProxy,
+} from 'pdfjs-dist';
 import type { AnnotationValueStore } from './form';
 import type { InkStroke } from './ink';
 import type { PdfViewerLabels, PdfViewerLabelsOverride } from './labels';
@@ -19,6 +23,34 @@ import type { OptionalContentConfigHandle } from './optional-content';
 
 /** What a feature's Runner publishes for its own controls and the shell to read. */
 export type FeaturePublication = Record<string, unknown>;
+
+/**
+ * The part of pdf.js's `StructTreeLayerBuilder` a page uses.
+ *
+ * Written here rather than imported from `pdfjs-dist/web/pdf_viewer.mjs`: naming that module anywhere in
+ * the core is the thing `scripts/check-size.mjs` greps for, even in a type position, because the shipped
+ * file is a 320 kB pre-bundled viewer that does not tree-shake. `render` is typed as what the
+ * implementation does — it resolves the tree's root element, which is the only way it can be mounted —
+ * and not as the generated declaration, which promises `void`.
+ */
+export interface PdfStructTreeLayer {
+  render(): Promise<HTMLElement | null>;
+  updateTextLayer(): void;
+  hide(): void;
+  show(): void;
+}
+
+/**
+ * pdf.js's constructor: positional, and identical across the advertised peer range.
+ *
+ * `rawDims` is `unknown` rather than a shape, because that is what the caller has: the generated
+ * declaration types the viewport's `rawDims` as `Object`, which is assignable to nothing narrower, and
+ * `any` in the engine's own signature. The builder reads four numeric fields off it and only to place one
+ * element, so naming them here would be a promise about a peer's internals that nothing checks.
+ */
+export interface PdfStructTreeLayerBuilder {
+  new (page: PDFPageProxy, rawDims: unknown): PdfStructTreeLayer;
+}
 
 /** The knobs the shell forwards to every page it renders. */
 export interface FeaturePageProps {
@@ -44,6 +76,26 @@ export interface FeaturePageProps {
    * layer itself — has to be built by the page that owns the divs it attaches to.
    */
   annotationEditorUIManager?: AnnotationEditorUIManager | null;
+  /**
+   * Ask every page to extract its marked-content structure, which is what a structure tree binds to.
+   *
+   * A static switch rather than a per-document answer, and deliberately so: a text layer built without it
+   * has no `markedContent` wrappers at all, so a page that learned the document was tagged *after*
+   * building one would have to rebuild the layer to attach a tree — the 39.8 ms-per-page rebuild this
+   * project removed from the zoom path in `0.8`, arriving instead on the first paint of every page.
+   * Asking is the feature's decision, made when it is mounted; whether a tree then appears is the
+   * document's, and costs nothing on a page that turns out to have none.
+   */
+  structureLayer?: boolean;
+  /**
+   * pdf.js's structure-tree builder, once the feature has imported it and read the document's `MarkInfo`.
+   *
+   * The constructor rather than an instance, for the reason documented on
+   * {@link FeaturePageProps.annotationEditorUIManager}: the instance owns a page's DOM and has to be built
+   * by the page that owns the divs its tree is appended to. It arrives asynchronously, and the page's
+   * text layer is already marked by then, so nothing rebuilds when it lands.
+   */
+  structTreeLayerBuilder?: PdfStructTreeLayerBuilder | null;
 }
 
 /**

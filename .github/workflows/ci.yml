@@ -47,6 +47,11 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # FR-45. The same file runs inside `npm test` above, so a violation fails every job; this step is
+      # here so the failure has a name on the checks list rather than being line 4,000 of a suite.
+      - name: Accessibility audit (axe-core, WCAG 2.0/2.1/2.2 A+AA)
+        run: npm run a11y
+
       - name: Build
         run: npm run build
 

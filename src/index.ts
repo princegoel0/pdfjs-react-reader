@@ -48,6 +48,8 @@ export {
   type PdfFeatureControl,
   type PdfFeatureKeyBinding,
   type PdfFeaturePanel,
+  type PdfStructTreeLayer,
+  type PdfStructTreeLayerBuilder,
   type PdfViewerShell,
 } from './lib/features';
 export {

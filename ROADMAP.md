@@ -75,11 +75,11 @@ any of them — `PRD.md` §4 stopped at FR-28 and nobody had added a row since `
 | `FR-40` | Injectable external index | `0.11` | **not started.** `FR-26`'s controller seam is the hook this hangs off, and it is built |
 | `FR-41` | Dual ESM and CJS output | `0.12` | **not started, and a build change.** `"type": "module"`, no `.cjs` emitted, `main` and `module` both point at `dist/index.js` |
 | `FR-42` | Document merge | `0.11` | **not started.** No `merge` in `src/edit.tsx` or `dist/edit.d.ts`. Needs a second document lifecycle in a tier that writes the one it is showing |
-| `FR-43` | Structure-tree integration | `0.10` | **not started — this is `#154`.** `PdfPage` passes `structTreeLayer: null` at two call sites. Spike required before committing: `StructTreeLayerBuilder` is **not** in the engine's public entry, it lives at `pdfjs-dist/web/struct_tree_layer_builder.js`, and its `.d.ts` carries the same positional-vs-object constructor ambiguity that broke `AnnotationEditorUIManager` across 5.x. If it lands it must be opt-in, or every consumer pays for it |
-| `FR-44` | Forced colours and high contrast | `0.10` | **not started.** No `forced-colors` block in any stylesheet. Part of it is not CSS: a mark conveyed by colour alone has to also be conveyed by shape, outline or text |
-| `FR-45` | WCAG 2.2 AA conformance | `0.10` | **partly built, unasserted.** A valid ARIA tree, instance-scoped keys, `useId`, visible focus, 44 px targets, page announcements and `prefers-reduced-motion` all shipped in phases 6/6b and are tested. What is missing is the *conformance claim* — an automated audit in CI rather than a list of things someone remembered to do |
+| `FR-43` | Structure-tree integration | `0.10` | **built 2026-10-01, as `structureFeature`; both clauses of the requirement now have code.** The builder is exported from `pdfjs-dist/web/pdf_viewer.mjs` — **not** from `pdfjs-dist/web/struct_tree_layer_builder.js`, which is pdf.js's *source* layout and is not in the shipped package — and importing that one class statically costs a consumer **~50 kB gzipped at both ends of the peer range, about 1.8× our whole core**, because the 320 kB viewer module does not tree-shake. So the objection was bytes, not the 1.4–4.6 ms a page the spike measured. What shipped is the opt-in tier `pdfjs-react-reader/features/structure`, **0.37 kB over core**, whose lazy `import()` of the peer module the browser takes only for a document whose `MarkInfo` says it is tagged — measured as **zero requests** for an untagged one. Two page props, not one, because a text layer built without marked content cannot be bound afterwards except by rebuilding it: `structureLayer` is static (mounting the feature decides) and `structTreeLayerBuilder` waits for the document. The tree is mounted **beside** the canvas rather than inside it, which is where pdf.js puts its own and can, that viewer's canvas being `role="presentation"` while ours is `role="img"` with the page label — and `img` makes its descendants presentational, so the copied placement yields a tree no accessibility tree contains. The constructor is positional and identical at 6.2.108 and 6.3.289, with two lies in its types (`render()` resolves the node it built, not `void`; `getMarkInfo()` answers a `Map`, not the object its own declaration promises — that one cost a silent no-op until the browser pass). **The annotation clause went in the same pass**, on a `/Link` added to the fixture for exactly that purpose: the annotation and editor layers are now constructed with the page's structure layer, and the `<a>` comes back owning the tree node that owns its words — `aria-owns` present and resolving with the feature on, absent with it off. The price is one extra annotation-layer render per tagged page, asserted as a count (2 with the feature, 1 without) rather than waved at. **What is still open is not code:** whether an assistive technology announces these roles. The snapshot available here filters unnamed nodes, pdf.js's headings own their text by reference, and the link's own accessible name is still its URL — the mechanism matches pdf.js's viewer, the announcement is unverified. Numbers in §0.10 |
+| `FR-44` | Forced colours and high contrast | `0.10` | **built 2026-10-01.** The tokens are re-pointed at the system palette in one `@media (forced-colors: active)` block, because in that mode the user agent replaces the used value of every `<color>` a rule resolves to whatever was authored — the useful work is elsewhere. Three places it was: separations drawn with a shadow (the page sheet, a menu, a thumbnail frame) become `outline`s, since a theme drops shadows and `Canvas` on `Canvas` is an invisible page; four declarations opt out with `forced-color-adjust: none` where the colour *is* the value (ink swatches, ink strokes, the signature pad, the annotation colour plate); and `forms.css` had the one colour the override cannot reach — its unfocused-field tint is an SVG inside a data URL, opaque to the browser, so it stayed indigo in a black-on-white theme while the field's authored border is `transparent`, i.e. the tint was the only thing showing where a field is. **The colour-only half of the requirement is met outside any media query**: a match carries a rule under it, the current match a ring plus `aria-current="true"`, an armed control a border, the selected tab a thicker underline — widths and shapes survive every palette, and 1.4.1 does not wait for high contrast. `src/styles/forced-colors.test.ts` holds the sheets to it (a literal colour ⇒ the file must say what forced colours does with it; no literal inside a block). Not verified: what a real contrast theme renders, which needs the OS state — see §0.10 |
+| `FR-45` | WCAG 2.2 AA conformance | `0.10` | **built 2026-10-01, and it paid for itself immediately.** axe-core runs the WCAG 2.0/2.1/2.2 A-and-AA tags over the shell's loading, failed and password states, the sidebar on each tab, the open search bar, an outline tree, an ink layer, the password prompt and the real `PdfPage` with the engine's own text layer in it — 12 tests, inside `npm test` and as a named CI step (`npm run a11y`). Its first run reported `aria-required-children` on the sidebar: the close control was a child of `role="tablist"`, which a tablist may not have. Eleven accessibility test files had covered that row's tabindex, labels, ids and focus ring and none could see a child that did not belong. The audit also states its own reach as an assertion (`color-contrast` and `aria-hidden-focus` come back `incomplete` under jsdom, because there is no layout), so the day a browser engine can resolve geometry the test fails and someone re-reads the claim rather than the changelog |
 | `FR-46` | SSR-safe module graph | `0.9` | **built 2026-09-30, as a test rather than a claim.** `src/lib/ssr.test.ts` runs in the node project and asserts the premise first — `document`, `window`, `HTMLCanvasElement` and `Worker` are each `typeof … === 'undefined'`, stated as its own test because a premise nobody checks is a premise that quietly stops being true when a config changes — then imports **every JS target in `package.json`'s export map** (13 modules today), each resolved from `dist/…` back to its `src/…` file. The list is read from the map rather than typed out, so the day a fourteenth entry is added it is covered by the same loop or the loop fails to find its source and says so. It also proves the helpers that *reach* for the DOM degrade instead of crashing: `resolveSourceUrl` with no `document.baseURI`, `isAllowedSource` where a path entry has no origin to bind to (a relative string still matches as text, and a cross-origin absolute does not — both pinned, because that asymmetry is the security property), and `classifySource` / `base64ToBytes` running server-side. 17 tests. **Two claims corrected on the way:** `README.md` said pdf.js "needs DOM globals at import time, so this package is client-side only" — false, and now contradicted by a passing test; and the Installation callout said the library "never touches `window` at module scope" without ever having been checked. Both now say the true, narrower thing: **importing is safe anywhere, rendering is browser-only**, so `'use client'` is about the render, and the pure helpers belong on the server where a source string actually gets decided. What is *not* claimed: SSR rendering or hydration, and `dist/` is not what the test imports (`npm test` runs before `npm run build`), so the property is proven at source level and the `0.12` browser matrix is where the shipped bundle gets its own check |
-| `FR-47` | Touch and gesture arbitration | `0.10` | **partly built, unverifiable here.** Wheel zoom, pinch zoom and drag-and-drop shipped in `0.2`. Gesture *isolation* — pinch without also scrolling the host page — cannot be tested without the devices `#141` is blocked on |
+| `FR-47` | Touch and gesture arbitration | `0.10` | **built 2026-10-01, and one gesture was dead.** pdf.js's `TouchManager` claims a two-finger `touchmove` with `preventDefault` and `stopPropagation` *before* it knows whether the span between the fingers changed, and this viewer answered only the zoom half — so a two-finger pan reached us, did nothing, and was taken away from the browser that would have scrolled. `onPanning` now scrolls the container by the midpoint delta; the viewport declares `touch-action: pan-x pan-y` and `overscroll-behavior: contain`, which is the only way to state the policy before a listener can win a race; the freehand layer keeps the fingers while it is armed; and a consumed gesture still bubbles with `defaultPrevented` set rather than being stopped, because starving the host's listeners is the failure the requirement names. Measured in Chromium with synthetic touches: pinch `fit-width → 1.73` with the move prevented, and a 120 px two-finger drag moving `scrollTop` by 120 with the scale unchanged. What still needs the devices of `#141` is narrower than it was: whether the browser commits to its own pan before the first `touchmove` reaches JavaScript |
 | `FR-48` | Browser and engine verification matrices | `0.12` | **not started.** `ci.yml` has four jobs, all Node on `ubuntu-latest`, none of which starts a browser. The `react` matrix is the pattern to copy; the engine matrix is the one `PRD.md` §6's compatibility policy promises |
 | `FR-49` | Benchmark fixture suite, profiles A–D | `0.12` | **A only.** `long-sample.pdf` exists from `scripts/make-long-pdf.mjs` and is measured. There is no image-heavy fixture, no vector-heavy fixture, and no low-memory harness |
 | `FR-50` | Published API maturity tags | `0.12` | **not started.** No name in `dist/*.d.ts` carries a maturity tag, so nothing distinguishes a stable prop from one we would still change |
@@ -106,7 +106,7 @@ condition rather than a `0.8` task. See *0.7.0 — closed* for the whole table.
 `FR-21`–`FR-23` were added on 2026-09-24 alongside the tier decision below; `FR-24`–`FR-28` were
 added with `0.5` on 2026-09-26; `FR-29`–`FR-33` were written backwards onto the paper on 2026-09-29, for
 work that had already shipped; `FR-34`–`FR-51` were added the same day by the PRD rewrite, for work that
-has not started.
+had not started.
 
 **The rewrite also tightened some of the older rows, so all 33 were reconciled against the new wording on
 2026-09-29 — before any `0.9` feature work, because a plan built on rows that say "done" when the
@@ -2080,31 +2080,138 @@ Accessibility and touch, together, because both are about a reader whose input o
 not the one the shell was first drawn for — and because both are blocked on the same missing thing, real
 devices (`#141`).
 
-* **`FR-43` structure tree — `#154`, and it needs a spike before it needs a decision.** `PdfPage` passes
-  `structTreeLayer: null` at two call sites. The builder is `StructTreeLayerBuilder`, which is **not** in
-  the engine's public entry: it lives at `pdfjs-dist/web/struct_tree_layer_builder.js`, inside the viewer
-  bundle, and its `.d.ts` declares a constructor of `(pdfPage, rawDims)` while its options type says
-  `{ pdfPage, rawDims }` — the same positional-versus-object ambiguity that broke `AnnotationEditorUIManager`
-  across 5.x. So the spike measures three things before any of it is promised: does importing from `web/`
-  pull the viewer bundle into every consumer's graph, does the constructor signature hold across the
-  supported engine range, and what does it cost per page. **If it lands it is opt-in**, because a tagged-PDF
-  feature that costs bytes for everyone is the exact trade `FR-23` exists to prevent. If the spike says the
-  boundary is not crossable, `FR-43` moves to `PRD.md` §2.3 as a documented exclusion — which is a
-  legitimate outcome and a better one than a fragile import.
-* **`FR-44` forced colours and high contrast.** No stylesheet has a `forced-colors` block today. Part of
-  this is not CSS: a search match, the active match and an annotation highlight are all distinguished by
-  colour alone right now, so each needs a second channel — shape, outline or text.
-* **`FR-45` WCAG 2.2 AA conformance.** Most of the substance shipped in phases 6 and 6b and is tested:
-  valid ARIA tree, instance-scoped keys, `useId`, visible focus, 44 px targets, page announcements,
-  `prefers-reduced-motion`. What is missing is the *claim* — an automated audit in CI, so conformance is a
-  failing job rather than a list of things someone remembered to do.
-* **`FR-47` gesture arbitration.** Wheel zoom, pinch zoom and drag-and-drop shipped in `0.2`; isolation —
-  a pinch that does not also scroll the host page — cannot be verified without devices, so this item is
-  gated on the same hardware as `#141` and may land as a documented exclusion if that hardware never
-  appears.
+**Released as `0.10.0` on 2026-10-01: all four requirements are built.** `FR-43` came first and needed a
+fixture before it could be measured; `FR-47` turned out to have a dead gesture in it; `FR-44` found a colour
+the user agent cannot reach; and `FR-45`'s audit reported an ARIA violation on its first run. What the
+release could not do on this machine is named at the end of each entry rather than left implied.
 
-**Gate:** the spike has a written answer; the audit runs and passes; and either a device pass happened or
-`PRD.md` §8's mobile rows say what they are.
+* **`FR-43` structure tree — the tier shipped on 2026-09-30 as `structureFeature`; `#154` closed by taking the API call the owner chose (option (a): a new opt-in tier, not a `PdfPage` prop). That first pass built the tree, not the whole requirement** — `PRD.md`'s FR-43 asks for two things, and the second, "the annotation and editor layers receive a structure-layer instance", needed a fixture with an annotated annotation in it before the cost of wiring could be measured against anything; it landed on 2026-10-01, in the annotation bullet under "what the build measured" below. The spike's five measurements came first, all against the installed package rather than pdf.js's repository layout:
+  * **Where it lives.** `StructTreeLayerBuilder` is exported from `pdfjs-dist/web/pdf_viewer.mjs`, typed at `types/web/struct_tree_layer_builder.d.ts`. The path this section named before the spike — `web/struct_tree_layer_builder.js` — **is pdf.js's source tree, not the shipped package**; `web/` in the tarball holds `pdf_viewer.mjs`, its CSS, a one-line `.d.mts` and `images/`.
+  * **What it costs to bundle.** A consumer file importing only that class, minified, esbuild: core alone is 431 kB / **129.3 kB gz** at 6.3.289 and 428 / 127.5 at 6.2.108; core plus the builder is 602 / **180.3** and 596 / 177.6. **≈ 50 kB gz across the whole advertised range — 1.8× our entire core.** Not a tree-shaking miss at our end: the output still carries `PDFHistory`, `DownloadManager`, `ProgressBar`, `SpreadMode`, `AnnotationEditorLayer`, `XfaLayer` and `TextLayer`, and `pdfjs-dist` declares no `sideEffects`. One export from a 320 kB pre-bundled module is that module.
+  * **Whether the signature holds.** Identical at both ends: `constructor(pdfPage, rawDims)` positional, and the bundle's own call site is `new StructTreeLayerBuilder(pdfPage, viewport.rawDims)`. Two type lies alongside it: the docblock claims an options object while the generated `.d.ts` declares two `any` positionals, and `render()` is declared `Promise<void>` while the implementation resolves the tree's DOM node — the only way to mount it.
+  * **What it costs and adds per page.** Measured in a browser against the new `tagged-sample.pdf`, with the worker on the main thread so no `Worker` was constructed: **1.4 ms** (page 2) and **4.6 ms** (page 1, which also pays the first read of the tree) to build an 8-node and a 10-node `.structTree` subtree whose roles are `heading aria-level=1`, `paragraph`, `list`/`listitem`, `figure`, and `table`/`row`/`columnheader`/`cell`, each `aria-owns`-ing the text span it describes, with the figure's `/Alt` arriving as `aria-label`. The same page's text layer as we build it renders 5 spans and carries **0** `data-struct-tree-node-id`. The gain is WCAG 1.3.1 — headings, lists, tables and named figures as structure rather than as a run of text — and its runtime price is single-digit milliseconds.
+  * **The fixture, and the key that decides whether it proves anything.** `getStructTree()` answered `null` for all seventeen other readable fixtures, so `scripts/make-tagged-pdf.mjs` writes one that does not. Writing it found the silent one: a `/StructElem` whose kid is an integer MCID is dropped unless the element also carries `/Pg` — `parseKid` compares the element's page against the page being walked and returns `null` when it cannot tell — so the roles all still read back with every mark unbound. `src/lib/tagged.test.ts` asserts the tree, asserts that an untagged file answers `null`, and asserts the counterfactual: rename `/Pg`, and the marks vanish while the roles stay. The generator refuses to write a file without it.
+  **So the recommendation this section first wrote — record the exclusion — priced only the bytes and was wrong.** The runtime cost is negligible and the accessibility gain is concrete; the whole objection is 50 kB of peer module that no reader needs for an untagged document, which is most documents. A lazy `import()` taken only for a document that declares itself tagged moves those bytes to the pages that use them, and asks no licensing question because the code stays pdf.js's.
+
+* **`FR-43`, what the build measured after the spike — three findings, all three invisible to the suite that already existed.**
+
+  * **The fixture bound nothing, and passed every test.** Its `BDC` operators carried one operand where the
+    operator takes two (a tag *and* a property list), so pdf.js logged `Skipping command BDC: expected 2
+    args` and emitted no marked content at all. The structure tree is assembled from `/StructParents`,
+    `/ParentTree` and each element's `/Pg` and never reads a content stream, so the roles read back exactly
+    as authored while the `aria-owns` ids they pointed at had never been written. Of the three legal
+    spellings, the inline property list is the one that yields an id in this engine; the `/MC0` name-key into
+    `/Properties` that real producers also write reaches `getTextContent` unresolved and yields none. The
+    generator now refuses a `BDC` without its list, and `tagged.test.ts` asserts the pairing (the marks the
+    content opens equal the marks the tree binds) plus a second same-length counterfactual: blank the
+    property list and the tree stays complete while the content marks go to zero. This is also what the
+    spike's "our text layer marks 0 of its 5 spans" was really measuring — the role counts stood, the
+    comparison did not.
+  * **`getMarkInfo()` resolves with a `Map`, not the object its declaration promises.** The gate read
+    `info.Marked`; on a `Map` that is `undefined`, which is the same answer an untagged document gives. So
+    the feature reported every tagged PDF in the world as untagged, silently, with nothing in the console —
+    and the unit test that should have caught it had been handed a plain object, because that is what the
+    types said. Both shapes are read now; the `Map`, and the `null` a file with no `MarkInfo` answers, are
+    pinned against the real engine in `tagged.test.ts`.
+  * **A feature can publish a value and hand it to nobody.** `structureFeature`'s `Runner` published the
+    builder while `pageProps` returned only the static switch, so a page got marked spans, a fetched 50 kB
+    chunk, and no tree. The assertion written at the time ("an untagged document gets no
+    `structTreeLayerBuilder`") is one the bug satisfies, and it kept passing. `pageProps` forwards both
+    halves now, the test asserts the *merged* props carry the class, and the constant-only version was
+    re-run to watch it fail twice.
+  * **Where the tree goes.** pdf.js appends it inside the page canvas, whose role there is
+    `presentation`; ours is `img` with the page's label, and `img` makes its descendants presentational.
+    Measured in Chromium with the same markup in both positions: inside, the snapshot reports an image and
+    no heading; beside it, the heading appears and the page keeps its name. So the tree is a sibling of the
+    canvas, and `structure.css` keeps it out of the layout (`contain: strict`, 0×0 verified).
+  * **Verified in the browser, and one thing not.** Tagged fixture: 10 marked spans, two trees, 14 role
+    nodes (`heading/1`, `paragraph`, `list`/`listitem`×3, `figure` with the `/Alt` as its name, and
+    `table`/`row`/`columnheader`/`cell`), every `aria-owns` resolving to a real element, the same DOM node
+    surviving `zoomTo(2)` with no rebuild, and the marks resolving again after a rotation rebuilt them.
+    Untagged document with the feature mounted: **zero requests** for `pdfjs-dist/web/pdf_viewer.mjs`. Not
+    verified: that an assistive technology announces these as headings — the accessibility snapshot available
+    here filters unnamed nodes, and pdf.js's heading and list elements own their text by reference rather
+    than carrying a name. That claim belongs with the `0.12` matrix and a real AT.
+  * **The annotation clause, and the fixture it needed first.** `PRD.md` asks that the annotation and editor
+    layers *receive* the structure-layer instance, so a link or widget is announced with its owning node.
+    The reason that was not built with the rest was the reason it needed a fixture before it could be built
+    at all: the layer reads the builder from its **constructor**, so installing an instance that arrives with
+    a lazily-fetched chunk re-renders every annotation on the page — a certain cost against a gain nothing in
+    the repository could show. So `make-tagged-pdf.mjs` grew a `/Link` structure element over real words, and
+    with it the second silent-failure mode of this file: **an annotation's `/StructParent` must map to a
+    single element in `/ParentTree`, while a page's `/StructParents` maps to an array.** `StructTreePage.parse`
+    iterates the first and hands the second straight to `addNode`, so an array there is a non-dictionary and
+    the element is dropped — with the roles, the marks and the rest of the tree all still reading back fine.
+    The ids then agree by construction: the worker serialises the kid as `pdfjs_internal_id_` + the
+    annotation's object id, and the annotation layer builds `contentElement.id` the same way, which
+    `tagged.test.ts` pins by comparing against `getAnnotations()` rather than by hard-coding an object
+    number. Measured in Chromium with the feature on: the `<a>` carries
+    `aria-owns="…_link_0"` and that node carries `aria-owns="p14R_mc5"`, both resolving; with it off, the
+    `<a>` has no `aria-owns` at all. Cost, asserted rather than assumed: two annotation-layer constructions
+    per tagged page instead of one.
+  * **What the wiring does not buy, said plainly.** The link's accessible name in Chrome's snapshot is still
+    its URL, not "See the annual statement" — the ownership chain reaches the words through two `aria-owns`
+    hops and the name computation does not follow them. So the requirement's mechanism is in place and
+    matching pdf.js's own viewer, and the announcement quality is an open question for the `0.12`
+    assistive-technology pass, not something this pass can claim.
+  * **Two gates that could not have caught any of it, now extended.** `scripts/copy-assets.mjs` asserted
+    every `exports` target exists; it did not assert the reverse, so `structure.css` was built, imported by
+    the playground (which resolves `pdfjs-react-reader/*` onto `src/`) and entirely unoffered to a consumer
+    for a whole session. And the size gate cannot see a peer's lazily-imported bytes at all — the tier reads
+    as 0.37 kB over core, which is true of the bundle and not of the network, so the docs say that rather
+    than letting the figure imply it.
+* **`FR-47` gesture arbitration, and the gesture that went nowhere.** The engine claims a two-finger
+  `touchmove` — `preventDefault` and `stopPropagation` — before it knows whether the span between the
+  fingers changed, and the viewer answered only the zoom half of that claim. So a pan arrived, did nothing,
+  and was taken from the browser that would otherwise have scrolled: the document stopped moving under a
+  reader's second finger, and the host page could not move either. `onPanning` now moves the container by
+  the midpoint delta, and the rest of the requirement is the boundary work: `touch-action: pan-x pan-y` and
+  `overscroll-behavior: contain` on the viewport (the browser may pan the document and may never pinch-zoom
+  its own page underneath ours, stated where the browser must decide before JavaScript wins the race), the
+  freehand layer keeping its fingers while it is armed, and a consumed gesture still bubbling with
+  `defaultPrevented` set — stopping propagation would have been the starvation the requirement names.
+  Chromium, synthetic touches: `fit-width → 1.73` on a symmetric spread, `scrollTop` 0 → 120 on a two-finger
+  drag with the scale unchanged. **What remains device-only** is one clause, not the feature: whether a
+  browser commits to its own pan before the first `touchmove` reaches the listener, which is a race no
+  harness here can lose or win on purpose.
+* **`FR-44` forced colours, where the interesting part was not the CSS.** In `forced-colors: active` the
+  user agent replaces the used value of every `<color>` a rule resolves to, keeping the alpha and leaving
+  `transparent` alone — so re-pointing the tokens at `Canvas`/`CanvasText`/`GrayText`/`ButtonFace`/`Highlight`
+  is the small half. The three things the override does not do: it cannot restore a separation that was
+  drawn with a `box-shadow` (the page sheet, a menu, a thumbnail frame now carry an `outline`, which also
+  cannot move a box the engine sized); it does not reach a colour **inside a data URL** (which is how
+  `forms.css` paints an unfocused field, so that indigo would have stayed put in a black-on-white theme —
+  and that field's authored border is `transparent`, so the tint was the only thing showing where a field
+  is); and it does not know that a colour is sometimes the *content* (four `forced-color-adjust: none`
+  declarations, each with its reason written beside it: ink swatches, ink strokes, the signature pad, the
+  annotation colour plate). The colour-only half of the requirement was met outside any media query —
+  a rule under a match, a ring and `aria-current` on the active one, a border on an armed control, a thicker
+  underline on the selected tab — because a width survives every palette and WCAG 1.4.1 does not wait for a
+  theme. **Not verified:** what a real contrast theme renders. This machine can enter one — Windows contrast
+  themes set `forced-colors: active` for Chromium — but entering it is an OS setting, so the pass is offered
+  rather than taken; the blocks are verified to parse and apply as CSSOM rules, and the channels to compute
+  to distinct values at `devicePixelRatio` 1.25.
+* **`FR-45` the audit, which found a violation on its first run.** axe-core, the WCAG 2.0/2.1/2.2 A-and-AA
+  tags, twelve tests over the shell's three document states, the sidebar on each tab, the search bar, an
+  outline tree, an ink layer, the password prompt, and the real `PdfPage` with the engine's own text layer
+  and marks in it. `npm run a11y` names it, and it runs inside `npm test`, so it fails the `react` matrix
+  and the `consumer` job too. What it found: `aria-required-children` on `.pjsr-sidebar-tabs`, whose
+  `role="tablist"` owned the close button — a violation eleven hand-written accessibility test files had
+  walked past while checking that row's tabindex, labels, ids and focus ring. Getting the page component
+  under the audit took two harness discoveries worth keeping (jsdom's `getContext('2d')` returning `null`
+  into a `WeakMap`, and `streamTextContent` being a `ReadableStream` rather than a promise), and the audit
+  asserts its own reach: `color-contrast` and `aria-hidden-focus` are `incomplete` without a layout, which
+  is the `0.12` matrix's half of this requirement rather than this one's.
+* **One stale claim retired on the way.** `CODE_REFERENCE.md` §16 said the token block carries a
+  `prefers-contrast` rule and a dark preset, and §11 said search marks are `data-pjsr-match` spans with a
+  phrase crossing spans kept as one highlight. None of that was true: there is no `prefers-contrast` rule
+  (and there will not be one while Safari at the floor does not implement it), no shipped dark preset, and
+  a crossing phrase is *two* `<mark>` elements, one per span. A document that describes an API the code
+  does not have is the same defect as a test that asserts a behaviour the feature does not.
+
+**Gate:** met. The spike has its written answer (§0.10 above); the audit runs, passes, and has failed on
+purpose; and `PRD.md` §8's mobile rows say what they are, because the device pass still has not happened —
+`FR-47`'s race and `FR-44`'s rendered theme are both on that list, and `#141`/`#156` carry them forward.
 
 ### 0.11.0 — Index & Assemble: beyond one page, and beyond one document (FR-39, FR-40, FR-42)
 
@@ -2193,6 +2300,8 @@ had asked for:
 * **`#143`** — the accessibility audit, moved here from the `0.8` row that promised it. It has a named
   item now: `PdfPage` passes `structTreeLayer: null` in two places, so the tagged-PDF structure the
   `PRD.md` §6's Accessibility NFR asks screen readers to be given is declined in code, not merely unaudited.
+  *(Written at the `0.9` close; `FR-43` built it a day later — see §0.10. The audit itself is still open,
+  and what remains of it is an assistive-technology pass rather than code.)*
 * **`#144`** — **closed by measuring, both halves.** A written appearance paints in our viewer, and so
   does a written *in-session* one. Loading `signature-signed-sample.pdf` showed each of the three marks
   inside its own box — the 200 × 60, the 150 × 40 and the `/F 20` box on page two — against nothing in

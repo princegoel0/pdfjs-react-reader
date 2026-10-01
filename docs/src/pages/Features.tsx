@@ -3,18 +3,19 @@ export function Features() {
     <>
       <h1>Features &amp; tiers</h1>
       <p className="doc-lede">
-        Eight things a viewer can do to a document — print it, save it, fill it in, show its outline,
-        switch its layers, hand over its attachments, mark it up, rearrange its pages — are values you
-        import. The reason is
-        arithmetic: measured on the <code>0.9</code> build,{' '}
+        Nine things a viewer can do to a document — print it, save it, fill it in, show its outline,
+        switch its layers, hand over its attachments, mark it up, rearrange its pages, read its structure
+        to a screen reader — are values you import. The reason is
+        arithmetic: measured on this build,{' '}
         <code>PdfViewer</code> with every switch off — wheel, pinch, fullscreen, keys, drop, and{' '}
-        <code>controls.hide</code> over the whole bar — costs <strong>27.86 kB</strong> gzipped against{' '}
-        <strong>27.81 kB</strong> with them all on, and <strong>27.76 kB</strong> for the plain{' '}
-        <code>src</code> alone. Turning controls off costs a little more than leaving them on, because
-        saying &ldquo;hide&rdquo; is itself code. Only an import decides what your bundle contains.
+        <code>controls.hide</code> over the whole bar — costs <strong>28.10 kB</strong> gzipped against{' '}
+        <strong>28.01 kB</strong> for the same viewer left at its defaults, which is byte-for-byte the
+        plain <code>src</code> import. Turning controls off costs a little more than leaving them on,
+        because saying &ldquo;hide&rdquo; is itself code. Only an import decides what your bundle
+        contains.
       </p>
 
-      <h2>The eight built-ins</h2>
+      <h2>The nine built-ins</h2>
       <table className="doc-table">
         <thead>
           <tr>
@@ -37,7 +38,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/print.css</code>
             </td>
-            <td>2.52 kB</td>
+            <td>2.55 kB</td>
           </tr>
           <tr>
             <td>
@@ -48,7 +49,7 @@ export function Features() {
               edited — an incremental <code>saveDocument()</code> that keeps the fields interactive.
             </td>
             <td>none needed</td>
-            <td>0.75 kB</td>
+            <td>0.78 kB</td>
           </tr>
           <tr>
             <td>
@@ -61,7 +62,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/forms.css</code>
             </td>
-            <td>2.02 kB</td>
+            <td>2.06 kB</td>
           </tr>
           <tr>
             <td>
@@ -73,7 +74,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/outline.css</code>
             </td>
-            <td>0.94 kB</td>
+            <td>0.96 kB</td>
           </tr>
           <tr>
             <td>
@@ -89,7 +90,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/layers.css</code>
             </td>
-            <td>1.19 kB</td>
+            <td>1.21 kB</td>
           </tr>
           <tr>
             <td>
@@ -105,7 +106,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/attachments.css</code>
             </td>
-            <td>1.07 kB</td>
+            <td>1.09 kB</td>
           </tr>
           <tr>
             <td>
@@ -122,7 +123,26 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/annotate.css</code>
             </td>
-            <td>1.83 kB</td>
+            <td>1.85 kB</td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/features/structure</code>
+            </td>
+            <td>
+              The structure tree the document already carries, as accessibility structure: a tagged PDF
+              says which of its words are a heading, a list item, a table cell or a figure and what that
+              figure&apos;s alternative text is, and this is what turns that into{' '}
+              <code>role</code>d elements owning the text spans they describe. No control, no panel, no
+              key — the tree is how the page <em>is</em>, not a view of it. The cost is{' '}
+              <strong>0.37 kB</strong> of gate; the ~50 kB of pdf.js viewer it reads is a lazy{' '}
+              <code>import()</code> taken only for a document that declares itself tagged, and it is
+              fetched at runtime, so it is not in your bundle and not in this table.
+            </td>
+            <td>
+              <code>pdfjs-react-reader/structure.css</code>
+            </td>
+            <td>0.37 kB</td>
           </tr>
           <tr>
             <td>
@@ -142,7 +162,7 @@ export function Features() {
             <td>
               <code>pdfjs-react-reader/edit.css</code>
             </td>
-            <td>5.87 kB</td>
+            <td>5.89 kB</td>
           </tr>
         </tbody>
       </table>
@@ -158,13 +178,13 @@ export function Features() {
       </p>
 
       <p>
-        Cost is measured, not estimated, and the figures above are the <code>0.9</code> build
-        (re-measured at each release close): <code>npm run size</code> bundles one file per
+        Cost is measured, not estimated, and the figures above are this build
+        (re-measured at each release close, and after anything that adds a page prop): <code>npm run size</code> bundles one file per
         consumer import with both esbuild and Rollup and reports the larger of the two, so a feature is
-        only &ldquo;small&rdquo; if two independent tree-shakers agree. All eight together cost 14.76 kB
-        over the <code>27.76 kB</code> core — less than their sum, because they share the shell they attach
+        only &ldquo;small&rdquo; if two independent tree-shakers agree. All nine together cost 15.04 kB
+        over the <code>28.01 kB</code> core — less than their sum, because they share the shell they attach
         to. Every figure on this page is the cost of <em>one consumer import</em>, which is what your
-        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 57.90 kB, because
+        bundle pays, and none of them is the peer. Summing the shipped files of the whole root entry instead gives 59.14 kB, because
         that entry re-exports every headless hook whether or not you name one — so quote the import,
         not the entry.
       </p>
@@ -249,7 +269,7 @@ const edit = createEditFeature({ fileName: 'contract-edited.pdf' });
 
       <h2>The authoring hooks</h2>
       <p>
-        Exported from the package root, for a feature of your own — which is how <code>editFeature</code>, the newest of the eight, is written:
+        Exported from the package root, for a feature of your own — which is how <code>editFeature</code> and <code>structureFeature</code>, the two newest, are written:
       </p>
       <ul>
         <li>

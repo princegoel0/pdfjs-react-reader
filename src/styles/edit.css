@@ -177,3 +177,16 @@
   color: var(--pjsr-muted-fg);
   font-size: 11px;
 }
+
+/* ---------- forced colours (FR-44) ---------- */
+
+@media (forced-colors: active) {
+  /* The pad is the one surface in this package that is neither chrome nor a page: it is where a reader
+     draws a mark in an ink of their choosing, and the UA's override would take both the white of the sheet
+     and the colour of the stroke, leaving a signature drawn in `CanvasText` on a background of
+     `CanvasText`. Nothing about the control stops working in a high-contrast theme — the dashed edge is
+     still a `CanvasText` border because it is declared as a token — only the paint is left alone. */
+  .pjsr-sign-pad {
+    forced-color-adjust: none;
+  }
+}

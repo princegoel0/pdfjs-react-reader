@@ -8,6 +8,7 @@ import { formsFeature } from '../../dist/features/forms.js';
 import { layersFeature } from '../../dist/features/layers.js';
 import { outlineFeature } from '../../dist/features/outline.js';
 import { printFeature } from '../../dist/features/print.js';
+import { structureFeature } from '../../dist/features/structure.js';
 
 /** Everything this package ships in its own UI layer. */
 export const View = () =>
@@ -22,5 +23,6 @@ export const View = () =>
       annotateFeature,
       attachmentsFeature,
       editFeature,
+      structureFeature,
     ],
   });

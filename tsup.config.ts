@@ -16,6 +16,10 @@ export default defineConfig({
     'features/layers': 'src/features/layers.tsx',
     'features/annotate': 'src/features/annotate.tsx',
     'features/attachments': 'src/features/attachments.tsx',
+    // The only entry whose payload is a lazy `import()` of a peer module: the tier itself is a gate and a
+    // few hundred bytes, and what it fetches at runtime is ≈50 kB of pdf.js viewer. `external` below keeps
+    // that specifier intact rather than folding the viewer into the tier.
+    'features/structure': 'src/features/structure.tsx',
     // One entry per shipped catalog. Not re-exported from the index on purpose: a
     // language is 134 strings, and importing the viewer should not hand it to you.
     'locales/de': 'src/locales/de.ts',

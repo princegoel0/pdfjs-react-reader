@@ -17,6 +17,7 @@ const entries = {
   'pdfjs-react-reader/features/layers': 'dist/features/layers.d.ts',
   'pdfjs-react-reader/features/annotate': 'dist/features/annotate.d.ts',
   'pdfjs-react-reader/features/attachments': 'dist/features/attachments.d.ts',
+  'pdfjs-react-reader/features/structure': 'dist/features/structure.d.ts',
 };
 const out = {};
 for (const [name, file] of Object.entries(entries)) {

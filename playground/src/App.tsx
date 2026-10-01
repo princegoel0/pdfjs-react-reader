@@ -17,6 +17,7 @@ import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { printFeature } from 'pdfjs-react-reader/features/print';
 import { layersFeature } from 'pdfjs-react-reader/features/layers';
 import { attachmentsFeature } from 'pdfjs-react-reader/features/attachments';
+import { structureFeature } from 'pdfjs-react-reader/features/structure';
 import { DE_LABELS } from 'pdfjs-react-reader/locales/de';
 import 'pdfjs-react-reader/styles.css';
 import 'pdfjs-react-reader/print.css';
@@ -26,6 +27,7 @@ import 'pdfjs-react-reader/layers.css';
 import 'pdfjs-react-reader/annotate.css';
 import 'pdfjs-react-reader/attachments.css';
 import 'pdfjs-react-reader/edit.css';
+import 'pdfjs-react-reader/structure.css';
 import './app.css';
 
 // The standard pdf.js test document (14 pages).
@@ -85,6 +87,10 @@ export default function App() {
   // means to draw on it, so it starts off.
   const [withAnnotate, setWithAnnotate] = useState(false);
   const [withEdit, setWithEdit] = useState(false);
+  // Off by default, and it changes nothing you can see on screen: the structure tree is the page as an
+  // accessibility tree, so the only fixture that answers is `tagged-sample.pdf`, and what to look for is
+  // in the browser's own a11y snapshot rather than in the pixels.
+  const [withStructure, setWithStructure] = useState(false);
   // The same props, rendered through a layout written in playground/src/CustomLayout.tsx.
   const [compound, setCompound] = useState(false);
   // Find results come from playground/src/HostFind.tsx instead of the engine's text.
@@ -105,6 +111,7 @@ export default function App() {
     ...(withAttachments ? [attachmentsFeature] : []),
     ...(withAnnotate ? [annotateFeature] : []),
     ...(withEdit ? [editFeature] : []),
+    ...(withStructure ? [structureFeature] : []),
   ];
 
   const note = useCallback((message: string) => {
@@ -295,6 +302,14 @@ export default function App() {
               onChange={(e) => setWithEdit(e.target.checked)}
             />
             &nbsp;edit
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={withStructure}
+              onChange={(e) => setWithStructure(e.target.checked)}
+            />
+            &nbsp;structure
           </label>
         </span>
         <label>

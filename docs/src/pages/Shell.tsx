@@ -190,6 +190,25 @@ export function Viewer() {
         still works at every zoom level.
       </p>
       <p>
+        A pinch and a two-finger pan are the same physical event until the distance between the
+        fingers changes, and the engine claims the whole <code>touchmove</code> before it knows which
+        one it is holding — so the viewer answers both: the span growing zooms, the midpoint travelling
+        scrolls the document. The page area also declares <code>touch-action: pan-x pan-y</code> and{' '}
+        <code>overscroll-behavior: contain</code>, which is the part a listener cannot settle: it tells
+        the browser before the gesture starts that panning is the document’s and page zoom is not
+        yours, and that running out of document does not chain into the host page.
+      </p>
+      <p>
+        Nothing is registered on <code>window</code> or <code>document</code>, and a gesture the viewer
+        takes is prevented but still allowed to bubble — <code>event.defaultPrevented</code> is how your
+        own listener learns it was consumed, rather than never hearing about it. While the freehand tool
+        is armed the touch manager releases the sequence outright, so the drawing surface under the
+        finger keeps it. Every gesture has a route that is not a gesture: the zoom select and{' '}
+        <code>zoomTo</code>/<code>zoomBy</code>, the arrow and page keys on the focused region, the
+        sidebar’s own scroll, and a <code>src</code> that is yours to set — the drop is a convenience
+        over that, not the only way to change document.
+      </p>
+      <p>
         Drag-and-drop is off by default for the same reason the shell never navigates: a viewer whose
         document is controlled by the host app must not swap it out behind the app’s back. Turn it on
         with <code>enableDrop</code>, or leave it off and use <code>onDropFile</code> to drive the

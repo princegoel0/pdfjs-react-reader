@@ -17,6 +17,7 @@ const sheets = [
   ['src/styles/layers.css', 'dist/layers.css'],
   ['src/styles/annotate.css', 'dist/annotate.css'],
   ['src/styles/attachments.css', 'dist/attachments.css'],
+  ['src/styles/structure.css', 'dist/structure.css'],
   ['src/styles/edit.css', 'dist/edit.css'],
 ];
 
@@ -56,5 +57,22 @@ const missing = Object.entries(exportMap).flatMap(([subpath, entry]) => {
 
 if (missing.length) {
   console.error(`package.json exports point at files this build did not emit:\n${missing.join('\n')}`);
+  process.exit(1);
+}
+
+// The other direction, which is the one a playground cannot catch: `tsconfig.json` resolves
+// `pdfjs-react-reader/*` onto `src/`, so a stylesheet built and imported by the playground but never
+// added to the export map typechecks, plays and docs-builds while every consumer import of it fails.
+// `structure.css` was emitted for a whole session before anyone looked.
+const unlisted = sheets
+  .map(([, to]) => `./${to.replace('dist/', '')}`)
+  .filter((subpath) => !(subpath in exportMap));
+
+if (unlisted.length) {
+  console.error(
+    `this build emitted stylesheets that package.json exports does not offer:\n` +
+      `${unlisted.map((s) => `  ${s}`).join('\n')}\n` +
+      `  (add each to "exports" with "types": "./dist/styles.d.ts")`,
+  );
   process.exit(1);
 }

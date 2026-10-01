@@ -158,69 +158,76 @@ export function Introduction() {
             <td>
               <code>PdfViewer</code> alone — pages, text, search, ink, thumbnails, chrome
             </td>
-            <td>27.76 kB</td>
+            <td>28.01 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>
               <code>+ printFeature</code>
             </td>
-            <td>30.28 kB</td>
-            <td>+2.52 kB</td>
+            <td>30.47 kB</td>
+            <td>+2.55 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ downloadFeature</code>
             </td>
-            <td>28.51 kB</td>
-            <td>+0.75 kB</td>
+            <td>28.69 kB</td>
+            <td>+0.78 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ formsFeature</code>
             </td>
-            <td>29.78 kB</td>
-            <td>+2.02 kB</td>
+            <td>29.97 kB</td>
+            <td>+2.06 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ outlineFeature</code>
             </td>
-            <td>28.71 kB</td>
-            <td>+0.94 kB</td>
+            <td>28.90 kB</td>
+            <td>+0.96 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ layersFeature</code>
             </td>
-            <td>28.95 kB</td>
-            <td>+1.19 kB</td>
+            <td>29.13 kB</td>
+            <td>+1.21 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ attachmentsFeature</code>
             </td>
-            <td>28.84 kB</td>
-            <td>+1.07 kB</td>
+            <td>29.00 kB</td>
+            <td>+1.09 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ annotateFeature</code>
             </td>
-            <td>29.59 kB</td>
-            <td>+1.83 kB</td>
+            <td>29.77 kB</td>
+            <td>+1.85 kB</td>
+          </tr>
+          <tr>
+            <td>
+              <code>+ structureFeature</code> — the document tree, as accessibility structure
+            </td>
+            <td>28.38 kB</td>
+            <td>+0.37 kB</td>
           </tr>
           <tr>
             <td>
               <code>+ editFeature</code> — pages, flatten and signing
             </td>
-            <td>33.63 kB</td>
-            <td>+5.87 kB</td>
+            <td>33.82 kB</td>
+            <td>+5.89 kB</td>
           </tr>
           <tr>
-            <td>All eight</td>
-            <td>42.53 kB</td>
-            <td>+14.76 kB</td>
+            <td>All nine</td>
+            <td>43.05 kB</td>
+            <td>+15.04 kB</td>
           </tr>
           <tr>
             <td>
@@ -232,11 +239,11 @@ export function Introduction() {
         </tbody>
       </table>
       <p>
-        All eight together cost less than their sum, because each is measured against the same core they
+        All nine together cost less than their sum, because each is measured against the same core they
         attach to. The two shipped-file paths are what a bundler that cannot tree-shake pays for the
-        whole entry surface: <strong>57.90 kB</strong> for <code>index.js</code> and{' '}
-        <strong>30.85 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
-        <code>edit.js</code> is its own 8.55 kB, and it is the only shipped file that imports the writer.
+        whole entry surface: <strong>59.14 kB</strong> for <code>index.js</code> and{' '}
+        <strong>31.02 kB</strong> for <code>headless.js</code>, each plus <code>styles.css</code>;{' '}
+        <code>edit.js</code> is its own 8.64 kB, and it is the only shipped file that imports the writer.
         For scale, <code>pdfjs-dist</code> 6.3 gzips to 131.7 kB on the main thread and 375.3 kB in its
         worker, and <code>@cantoo/pdf-lib</code> to 251.5 kB — measured the same way the size gate
         measures, so the ratio between our layer and the engine is the point rather than the digits.
@@ -297,7 +304,14 @@ export function Introduction() {
         failures are <code>role="alert"</code>, and every text token clears WCAG AA contrast. Touch
         targets reach 44&nbsp;px on coarse pointers while mouse-driven screens keep the dense
         layout. Shortcuts are scoped to the viewer instance, so a viewer never hijacks the host
-        page's <code>Ctrl+F</code>.
+        page's <code>Ctrl+F</code>. Under <code>forced-colors</code> the chrome takes the system
+        palette, and nothing that means something means it by colour alone.
+      </p>
+      <p>
+        Conformance is audited rather than inspected: axe-core runs the WCAG 2.0, 2.1 and 2.2 A and AA
+        rules over the shell and every primitive in the test suite, and the run states what it cannot
+        see — contrast and target size need a layout, and an assistive technology has to be the reader
+        for the rest. Those belong to the browser matrix, not to this page.
       </p>
 
       <h2>Browser support</h2>

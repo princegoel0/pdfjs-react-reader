@@ -23,6 +23,7 @@ import { attachmentMimeType } from '../lib/attachments';
 import { downloadBytes } from '../lib/download';
 import type { AnnotationValueStore } from '../lib/form';
 import type { OptionalContentConfigHandle } from '../lib/optional-content';
+import type { PdfStructTreeLayer, PdfStructTreeLayerBuilder } from '../lib/features';
 import type { InkSettings, InkStroke, PdfPoint } from '../lib/ink';
 import type { PageDims } from '../lib/layout';
 import type { PdfLinkService } from '../lib/link-service';
@@ -106,6 +107,23 @@ export interface PdfPageProps {
    * their editors draw them. See {@link FeaturePageProps.annotationEditorEditing}.
    */
   annotationEditorEditing?: boolean;
+  /**
+   * Extract this page's marked content, which is what a structure tree binds to.
+   *
+   * Off by default, and not because it is cosmetic: without it the text layer has no `markedContent`
+   * wrappers at all, so a tree built against such a layer would own ids that were never written. It rides
+   * {@link FeaturePageProps.structureLayer}, the feature's static opt-in, rather than a per-document
+   * answer, because a layer built unmarked cannot be bound afterwards without rebuilding it.
+   */
+  structureLayer?: boolean;
+  /**
+   * pdf.js's structure-tree builder, contributed by the structure feature once its lazy chunk has arrived.
+   *
+   * The constructor, not the instance: this is the page that owns the divs the tree is appended to and the
+   * text layer it binds into, so this is where the instance belongs. Nothing happens without it, and
+   * nothing here assumes a document is tagged — the feature reads `MarkInfo` and decides that.
+   */
+  structTreeLayerBuilder?: PdfStructTreeLayerBuilder | null;
   /** Notified after the user edits a form field. */
   onFormChange?: () => void;
   /** Freehand strokes for this page. */
@@ -262,6 +280,8 @@ export const PdfPage = memo(function PdfPage({
   optionalContentConfig = null,
   annotationEditorUIManager = null,
   annotationEditorEditing = false,
+  structureLayer = false,
+  structTreeLayerBuilder = null,
   onFormChange,
   inkStrokes,
   inkDrawing = false,
@@ -315,6 +335,17 @@ export const PdfPage = memo(function PdfPage({
   const taskRef = useRef<RenderTask | null>(null);
   const [page, setPage] = useState<PDFPageProxy | null>(null);
   const [textLayer, setTextLayer] = useState<TextLayer | null>(null);
+  /*
+   * The structure layer this page built, once a feature handed over the class that builds it.
+   *
+   * State rather than a ref, because two other layers are constructed with it: pdf.js's annotation layer
+   * reads the builder from its *constructor* and asks it for each element's `aria-label` and `aria-owns`,
+   * and the same goes for the editor layer. A ref would let those two read `null` on the ordinary path,
+   * since the instance exists only after the text layer has rendered — which is after they were first
+   * built. So the instance arriving re-renders the annotation layer once, per tagged page: the price of
+   * the attribute actually landing, and the reason the tree is a feature rather than a default.
+   */
+  const [structLayer, setStructLayer] = useState<PdfStructTreeLayer | null>(null);
   // The XFA layer's markable divs, held as state because the highlight effect has to know
   // the moment the layer is built.
   const [xfaDivs, setXfaDivs] = useState<HTMLElement[]>([]);
@@ -502,7 +533,12 @@ export const PdfPage = memo(function PdfPage({
 
     let cancelled = false;
     const layer = new TextLayer({
-      textContentSource: page.streamTextContent(),
+      // The wrappers a structure tree binds to are emitted by the worker, not added afterwards, so this
+      // is the one decision about tagging a page has to make before it builds. It is a prop rather than a
+      // lookup for that reason: `structureLayer` is set by mounting the feature and never changes
+      // afterwards, which is what keeps this effect from re-running — a rebuild costs 39.8 ms on a
+      // 163-span page, and takes the search marks with it.
+      textContentSource: page.streamTextContent({ includeMarkedContent: structureLayer }),
       container,
       viewport: at,
     });
@@ -535,7 +571,7 @@ export const PdfPage = memo(function PdfPage({
       offAbort();
       stop();
     };
-  }, [page, rotation, begin, end, drop, reportError]);
+  }, [page, rotation, structureLayer, begin, end, drop, reportError]);
 
   // The spans pdf.js lays out are positioned in percentages and sized from
   // `--total-scale-factor`, so a scale change needs only `--scale-x` recomputed for
@@ -546,6 +582,72 @@ export const PdfPage = memo(function PdfPage({
     if (!textLayer || !viewport) return;
     textLayer.update({ viewport });
   }, [textLayer, viewport]);
+
+  /*
+   * The structure tree, once a feature has brought both a marked text layer and pdf.js's builder.
+   *
+   * The order is the one pdf.js's own page view uses — text layer rendered, then tree — and it is not
+   * cosmetic: the tree's elements own this page's text by id (`aria-owns="p3R_mc0"`), and
+   * `updateTextLayer()`, which places the alt-text spans the tree promises, resolves those ids through
+   * `document.getElementById`. Against a layer that is still being pumped, the marks it cannot find are
+   * skipped silently and the tree reads as a tree with nothing in it.
+   *
+   * Keyed on the page and the layer, and deliberately not on the viewport. The geometry the builder writes
+   * is `calc(var(--total-scale-factor) * …)`, so a zoom changes nothing that needs rebuilding; a rotation
+   * does, and it rebuilds the text layer underneath at the same time, which is what re-runs this.
+   *
+   * A pure-XFA page never arrives here: it builds no text layer, so the guard above stops this one. That
+   * is the same call pdf.js makes, for the same reason — the XFA tree already carries the form's own
+   * semantics, and a second copy of them would be a second thing for a screen reader to read.
+   */
+  useEffect(() => {
+    const host = canvasWrapperRef.current;
+    const at = viewportRef.current;
+    if (!structTreeLayerBuilder || !page || !textLayer || !host || !at) return;
+
+    const layer = new structTreeLayerBuilder(page, at.rawDims);
+    setStructLayer(layer);
+    let cancelled = false;
+    let tree: HTMLElement | null = null;
+
+    layer
+      .render()
+      .then((built) => {
+        if (cancelled || !built) return;
+        tree = built;
+        layer.updateTextLayer();
+        /*
+         * A sibling of the canvas, not its child — which is where pdf.js puts it, and where it would be
+         * invisible to us. That viewer marks its canvas `role="presentation"`, whose descendants stay in
+         * the accessibility tree; ours carries `role="img"` and a page label, and `img` makes its
+         * descendants presentational. Measured in Chromium: the same tree inside our canvas reports no
+         * heading at all, and beside it reports the heading and keeps the page name.
+         */
+        host.append(built);
+        layer.show();
+      })
+      .catch((err: unknown) => {
+        // Routed past `reportError`, so the page is not called `error` for a missing accessibility
+        // overlay: the canvas painted, the words are selectable, and a host that shows a failure UI for
+        // this would be telling the reader their document is broken when only its structure is absent.
+        if (cancelled) return;
+        onErrorRef.current?.(err instanceof Error ? err : new Error(String(err)));
+      });
+
+    const stop = () => {
+      cancelled = true;
+      setStructLayer((current) => (current === layer ? null : current));
+      // The builder has no `cancel()`, so an in-flight tree fetch is simply not mounted when it lands —
+      // which is what `cancelled` is for above as much as for the node below.
+      tree?.remove();
+    };
+    const offAbort = onAbort(signalRef.current, stop);
+
+    return () => {
+      offAbort();
+      stop();
+    };
+  }, [structTreeLayerBuilder, page, textLayer]);
 
   // Annotations (links, markups, form widgets). pdf.js's `AnnotationLayer.update`
   // only repositions the layer, so programmatic form writes force a re-render
@@ -574,7 +676,14 @@ export const PdfPage = memo(function PdfPage({
       // over, and hands each one to it. Without it, editing an existing
       // annotation would add a second copy instead of moving that one.
       annotationEditorUIManager,
-      structTreeLayer: null,
+      /*
+       * The page's own structure layer, or null until it exists. This is the half of `FR-43` the tier pays
+       * an extra render for: the layer reads the builder here, at construction, and uses it to give each
+       * link the `aria-owns` of the words it is drawn over (`enableLinkOwnership`, which pdf.js turns on
+       * only for a visible, layer-unmasked `<a>`) or the enclosing element's `/Alt` as its `aria-label`.
+       * `tagged-sample.pdf` carries one such link for exactly that reason.
+       */
+      structTreeLayer: structLayer,
       commentManager: null,
     } as unknown as ConstructorParameters<typeof AnnotationLayer>[0]);
     annotationLayerRef.current = layer;
@@ -628,6 +737,7 @@ export const PdfPage = memo(function PdfPage({
     linkService,
     annotationStorage,
     annotationEditorUIManager,
+    structLayer,
     renderForms,
     formVersion,
     begin,
@@ -754,7 +864,10 @@ export const PdfPage = memo(function PdfPage({
       uiManager: annotationEditorUIManager,
       pageIndex: pageNumber - 1,
       div: container,
-      structTreeLayer: null,
+      // The same instance the annotation layer got. An editor takes over an existing annotation, so the
+      // two have to agree on which elements the structure tree already owns; `render()` re-adopts the
+      // managers' editors from the page index, which is what makes a rebuild here safe rather than a loss.
+      structTreeLayer: structLayer,
       accessibilityManager: null,
       // The link the other way: `layer.enable()` asks this annotation layer for
       // the elements an editor can take over, so leaving it null would make
@@ -777,7 +890,7 @@ export const PdfPage = memo(function PdfPage({
       drawLayer.destroy();
       container.replaceChildren();
     };
-  }, [annotationEditorUIManager, page, viewport, pageNumber, reportError]);
+  }, [annotationEditorUIManager, page, viewport, pageNumber, structLayer, reportError]);
 
   /*
    * The divs a search mark wraps: the text layer's when there is one, and the XFA layer's

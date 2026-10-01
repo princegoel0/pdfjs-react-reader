@@ -1,6 +1,6 @@
 {
   "name": "pdfjs-react-reader",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "MIT-licensed, headless-first PDF viewer for React built directly on pdfjs-dist. Virtualized rendering, text layer, search, forms, and an optional drop-in UI shell.",
   "type": "module",
   "license": "MIT",
@@ -59,6 +59,10 @@
       "types": "./dist/features/attachments.d.ts",
       "import": "./dist/features/attachments.js"
     },
+    "./features/structure": {
+      "types": "./dist/features/structure.d.ts",
+      "import": "./dist/features/structure.js"
+    },
     "./locales/de": {
       "types": "./dist/locales/de.d.ts",
       "import": "./dist/locales/de.js"
@@ -99,6 +103,10 @@
       "types": "./dist/styles.d.ts",
       "default": "./dist/attachments.css"
     },
+    "./structure.css": {
+      "types": "./dist/styles.d.ts",
+      "default": "./dist/structure.css"
+    },
     "./edit.css": {
       "types": "./dist/styles.d.ts",
       "default": "./dist/edit.css"
@@ -116,6 +124,7 @@
     "build:docs": "vite build docs",
     "preview:docs": "vite preview docs --port 4173",
     "test": "vitest run",
+    "a11y": "vitest run src/components/a11y.audit.test.tsx src/components/a11y.page.test.tsx",
     "typecheck": "tsc --noEmit",
     "size": "node scripts/check-size.mjs",
     "size:update": "node scripts/check-size.mjs --update",
@@ -144,6 +153,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "axe-core": "^4.13.0",
     "jsdom": "^30.1.1",
     "pdfjs-dist": "^6.2.108",
     "react": "^19.0.0",

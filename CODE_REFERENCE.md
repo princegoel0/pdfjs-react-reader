@@ -46,21 +46,21 @@ React DOM, `pdfjs-dist`, and one optional writer.
 
 | Thing | Number | Where it comes from |
 | --- | --- | --- |
-| Version in `package.json` | `0.9.0` — **not published**; npm only has `0.1.0`, `0.1.1`, and `0.2`–`0.9` go out together as `1.0.0` | `package.json:2` |
+| Version in `package.json` | `0.10.0` — **not published**; npm only has `0.1.0`, `0.1.1`, and `0.2`–`0.10` go out together as `1.0.0` | `package.json:2` |
 | Module system | ESM only (`"type": "module"`, tsup builds no CommonJS) | `package.json:4` |
 | Runtime dependencies | **none** | `package.json` `dependencies` |
 | Peer dependencies | `pdfjs-dist ^6.2.108`, `react ^18 \|\| ^19`, `react-dom ^18 \|\| ^19`, `@cantoo/pdf-lib ^2.11.1` (optional) | `package.json` `peerDependencies` |
 | `engines` field | `node >= 20` — the only engine statement the package makes | `package.json` `engines` |
 | Files published | `["dist"]` only — no `src/`, no playground, no docs | `package.json` `files` |
-| Importable subpaths | **22** (10 JS entries + 3 languages + 8 stylesheets + `package.json`) | `package.json` `exports` |
-| Names on the main entry | **226** | `node scripts/inventory.mjs`, over `dist/index.d.ts` |
+| Importable subpaths | **24** (11 JS entries + 3 languages + 9 stylesheets + `package.json`) | `package.json` `exports` |
+| Names on the main entry | **228** | `node scripts/inventory.mjs`, over `dist/index.d.ts` |
 | Names on `/headless` | **181** | the same, over `dist/headless.d.ts` |
 | Names on `/edit` | **32** | `dist/edit.d.ts` |
-| Source files (non-test) | **76**, 14,606 lines | `src/**` |
-| Test files / tests | **59 files / 661 tests**, in two projects (`node`, `dom`) | `npm run test` |
-| Stylesheets | 8, from 72 to 1,265 lines | `src/styles/` |
-| Fixtures | 18 PDFs, produced by 14 generator scripts, **all 18 tracked** as of the `0.9` close — before it, three (`damaged-truncated`, `damaged-xref`, `labelled-sample`) existed only on this machine while their tests read them from disk, which would have failed a fresh clone's `npm test` | `playground/fixtures/`, `scripts/make-*.mjs` |
-| CI | 4 jobs in `ci.yml`, 1 deploy workflow in `docs.yml` | `.github/workflows/` |
+| Source files (non-test) | **77**, 14,950 lines | `src/**` |
+| Test files / tests | **67 files / 718 tests**, in two projects (`node`, `dom`) | `npm run test` |
+| Stylesheets | 9, from 24 to 1,372 lines | `src/styles/` |
+| Fixtures | 19 PDFs, produced by 15 generator scripts — **18 of the 19 tracked; `tagged-sample.pdf` is not yet**, and `src/lib/tagged.test.ts` reads it from disk, so a fresh clone's `npm test` fails until it is added. That is the same mistake the `0.9` close had to fix for three others (`damaged-truncated`, `damaged-xref`, `labelled-sample`), which is why the check is in §22 and not in a resolution to remember. `tagged-sample.pdf` is the only fixture that declares a structure tree | `playground/fixtures/`, `scripts/make-*.mjs` |
+| CI | 4 jobs in `ci.yml` (one of them a named axe audit step), 1 deploy workflow in `docs.yml` | `.github/workflows/` |
 
 ### Bundle size, gzipped, per what you import
 
@@ -69,26 +69,36 @@ reports the worse of the two. Decimal kB. Reproduced by `npm run size`.
 
 | What you import | Size | Over core |
 | --- | --- | --- |
-| `core` — `<PdfViewer>` alone: pages, text, search, ink, thumbnails, layout, toolbar, sidebar, virtualisation, worker | **27.76 kB** | — |
-| `+ printFeature` | 30.28 | +2.52 |
-| `+ downloadFeature` | 28.51 | +0.75 |
-| `+ formsFeature` | 29.78 | +2.02 |
-| `+ outlineFeature` | 28.71 | +0.94 |
-| `+ layersFeature` | 28.95 | +1.19 |
-| `+ attachmentsFeature` | 28.84 | +1.07 |
-| `+ annotateFeature` | 29.59 | +1.83 |
-| `+ editFeature` (pages, flatten, signing) | 33.63 | **+5.87** |
-| **all eight** | **42.53** | +14.76 |
+| `core` — `<PdfViewer>` alone: pages, text, search, ink, thumbnails, layout, toolbar, sidebar, virtualisation, worker | **28.01 kB** | — |
+| `+ printFeature` | 30.56 | +2.55 |
+| `+ downloadFeature` | 28.79 | +0.78 |
+| `+ formsFeature` | 30.07 | +2.06 |
+| `+ outlineFeature` | 28.97 | +0.96 |
+| `+ layersFeature` | 29.22 | +1.21 |
+| `+ attachmentsFeature` | 29.09 | +1.09 |
+| `+ annotateFeature` | 29.86 | +1.85 |
+| `+ structureFeature` | 28.38 | **+0.37** |
+| `+ editFeature` (pages, flatten, signing) | 33.90 | **+5.89** |
+| **all nine** | **43.05** | +15.04 |
 | `headless` entry alone (no shell, no shaking) | 4.06 | — |
-| shipped `index.js` path (whole entry, no shaking) | 57.90 | — |
-| shipped `headless.js` path | 30.85 | — |
+| shipped `index.js` path (whole entry, no shaking) | 59.14 | — |
+| shipped `headless.js` path | 31.02 | — |
 | `dist/edit.js` on its own | 8.64 | — |
 | one language file (`de` / `es` / `fr`) | 2.38 / 2.37 / 2.39 | — |
 
-**The baseline was re-accepted for `FR-12`, so every number above equals `npm run size` today.** The chain
-that got there is in the Unreleased notes: `FR-37`/`FR-03`/`FR-07` measured +0.39 kB on top of the
-`FR-38` acceptance without needing one, and `FR-12` then pushed the `shell` path past the ratchet — which is
-when the re-accepting happened, after the growth was attributed rather than golfed.
+**The baseline was re-accepted at the `0.10` close, so every number above equals `npm run size` today.**
+What each step of the release paid for: `FR-43` took core **+0.17 kB** (27.76 → 27.93) for two page props
+and the effect that mounts a structure tree, and the `shell` path **+0.84 kB** (57.90 → 58.74) — more than
+core moved, because an eleventh entry changes how tsup splits the shared chunks, which is the same
+attribution `FR-12` had to make for the same reason. `FR-44` and `FR-47` then took core **+0.08 kB**
+(27.93 → 28.01) — the two `TouchManager` callbacks, the drawing ref, and one attribute on a mark — and the
+`shell` path **+0.40 kB** (58.74 → 59.14), most of which is `styles.css`: the shipped-path figures sum the
+whole entry including its sheet, and the forced-colours pass grew that sheet from 17,490 B to 18,465 B
+minified. `structure` itself is 0.37 kB over core: the `MarkInfo` gate, the lazy `import()`, and the
+published class. **What this table cannot see is the point of the design**: the ≈50 kB of
+`pdfjs-dist/web/pdf_viewer.mjs` that import fetches at runtime is a peer's bytes, external to every path
+measured here, so the tier looks nearly free and is only free *to the bundle*. §20 carries that as a
+documentation duty, not a measurement.
 
 For scale, measured the same way (gzip level 9): `pdf.min.mjs` **131.70 kB**, `pdf.worker.min.mjs`
 **375.25 kB**, and `@cantoo/pdf-lib` **251.41 kB** for what our writer imports (256.05 kB for its whole
@@ -107,14 +117,14 @@ number above.
 
 ---
 
-## 3. Every way in — the 22 import paths
+## 3. Every way in — the 24 import paths
 
 `package.json` → `exports`. Every JS path ships a `.js` and a matching `.d.ts`.
 
 | You write | You get |
 | --- | --- |
-| `pdfjs-react-reader` | Everything: the shell, the toolbar, the hooks, the library layer (203 names) |
-| `pdfjs-react-reader/headless` | Hooks + pure logic, no shell (158 names) |
+| `pdfjs-react-reader` | Everything: the shell, the toolbar, the hooks, the library layer (228 names) |
+| `pdfjs-react-reader/headless` | Hooks + pure logic, no shell (181 names) |
 | `pdfjs-react-reader/edit` | The page-editing / flatten / signing tier (32 names) — the only file that imports the writer |
 | `pdfjs-react-reader/features/print` | `printFeature`, `createPrintFeature`, `PrintScope`, 2 types |
 | `pdfjs-react-reader/features/download` | `downloadFeature`, `createDownloadFeature`, 2 types |
@@ -123,9 +133,10 @@ number above.
 | `pdfjs-react-reader/features/layers` | `layersFeature`, 1 type |
 | `pdfjs-react-reader/features/annotate` | `annotateFeature`, `createEditorEventBus`, 2 types |
 | `pdfjs-react-reader/features/attachments` | `attachmentsFeature`, 1 type |
+| `pdfjs-react-reader/features/structure` | `structureFeature`, 1 type — no control, no panel, no factory: its entire surface is page props |
 | `pdfjs-react-reader/locales/de` \| `/es` \| `/fr` | One complete language each; **separate entries so importing the viewer never hands you a language you didn't ask for** |
 | `pdfjs-react-reader/styles.css` | The shell theme |
-| `…/print.css` `forms.css` `outline.css` `layers.css` `annotate.css` `attachments.css` `edit.css` | A feature's CSS, only needed if you mount that feature |
+| `…/print.css` `forms.css` `outline.css` `layers.css` `annotate.css` `attachments.css` `structure.css` `edit.css` | A feature's CSS, only needed if you mount that feature. `structure.css` is the one of them that is not cosmetic: its rule is what keeps an accessibility layer out of the page's layout |
 | `pdfjs-react-reader/package.json` | Read-only access (for tools that want the version) |
 
 `"sideEffects": ["**/*.css"]` — stylesheets survive tree-shaking, JavaScript does not.
@@ -135,8 +146,10 @@ number above.
 ## 4. Every name you can import, grouped
 
 The full name list from the built `.d.ts` files, grouped by what it is for, and **current through the
-`0.9` close**: 226 names on this entry, 181 on `/headless`, 32 on `/edit` (§2 has the same three figures
-from a different measurement). `T` below marks a type-only export, and each hook's option/result pair is
+`FR-43` work**: 228 names on this entry, 181 on `/headless`, 32 on `/edit` (§2 has the same three figures
+from a different measurement). The two `FR-43` added are `PdfStructTreeLayer` and
+`PdfStructTreeLayerBuilder`: a prop a host cannot name is a prop a host cannot fill in, so the types behind
+`FeaturePageProps.structTreeLayerBuilder` are exports rather than anonymous members of another interface. `T` below marks a type-only export, and each hook's option/result pair is
 written once rather than twenty times. `node scripts/inventory.mjs` prints the flat list per entry, so a
 disagreement between this section and the build is a fact about this section.
 
@@ -293,7 +306,7 @@ The viewer is **uncontrolled** — it holds its own state; the handle is how you
 
 ---
 
-## 7. The eight features, and what each one actually adds
+## 7. The nine features, and what each one actually adds
 
 Every feature is a plain object (`src/lib/features.ts`): `id`, optional `Runner`, `controls`, `panel`,
 `keys`, `pageProps`, `replaces`. The `Runner` is where its hooks live, and it is keyed by `id` — not by
@@ -308,7 +321,12 @@ array position, because reordering a list would otherwise silently remount a sur
 | `features/layers` | `layers` | — | **Layers** tab | — | Optional-content groups; switching one redraws every page (one shared `OptionalContentConfig`) |
 | `features/attachments` | `attachments` | — | **Attachments** tab | — | List embedded files, save any one |
 | `features/annotate` | `annotate` | `draw` (6) | — | — | pdf.js's own editor manager behind **three tools only**: highlight, free text, ink. Colour picker from the engine palette, Delete live while a mark is selected, undo/redo on published state |
+| `features/structure` | `structure` | — | — | — | The document's own structure tree, as accessibility structure. `pageProps` and nothing else: `structureLayer` (extract marked content) and, once `MarkInfo` says tagged and the lazy chunk has arrived, `structTreeLayerBuilder` |
 | `edit` | `edit` | — | **Pages** tab (with a **Sign** section when the file has signature fields) | — | Move / rotate / remove pages as a *plan* you can step back before writing; Apply; Extract planned pages as a new file; Split at any row; Flatten; sign a box |
+
+`structure` is the only feature with no user interface, which makes it the contract's cleanest test case:
+a `Runner`, a `pageProps`, and no control to fold, no panel to open, no key to bind — a feature is allowed
+to be only a decision about what the pages extract and mount.
 
 Two rules inside that table are load-bearing and easy to break:
 * `annotate` can't do underline, strikeout or squiggly — the engine has no editors for them — and
@@ -427,7 +445,8 @@ promises Buffer input, and copying every byte array to suit the engine is a host
 ## 11. How a page is rendered
 
 Each page is one DOM node with up to five layers stacked by CSS positioning
-(`src/components/PdfPage.tsx`):
+(`src/components/PdfPage.tsx`), plus a structure tree that is a *sibling* of the canvas rather than another
+overlay:
 
 | Layer | Notes |
 | --- | --- |
@@ -436,6 +455,7 @@ Each page is one DOM node with up to five layers stacked by CSS positioning
 | annotation layer | Form widgets, links, popups. `role="region"` with a label so a screen reader can find it; popups are click-to-open (hover-only tooltips failed 84 px from a viewport edge with no way back). |
 | editor layer | Only when a feature that edits is mounted. `isEditing` is passed so an armed editor doesn't paint a duplicate over the canvas copy; the repaint is gated on *this* page having editable annotations. |
 | XFA layer | A `position: absolute` child, because pdf.js's own `XfaLayer` CSS is **not** shipped — we restate the rules we depend on. |
+| structure tree | Only when `structureFeature` is mounted, the document declares itself tagged, and the page's text layer has finished. `role`d elements that `aria-owns` the text spans, appended to the canvas wrapper — **not inside the canvas**, which is where pdf.js puts its own. Measured in Chromium: our canvas is `role="img"`, and `img` makes its descendants presentational, so a tree inside it is in the DOM and nowhere in the accessibility tree. pdf.js gets away with it because its canvas is `role="presentation"`, and taking that role instead would cost the page its name. The same instance also goes to the **annotation** and **editor** layers at construction, which is how a link gets the `aria-owns` of the words it is drawn over. |
 
 Plus our own ink overlay (`InkLayer`) for the core freehand path.
 
@@ -450,6 +470,12 @@ and a stuttering one:
   through the file** (`meanBox`, `spreadSample`) rather than page 1's box.
 * **The layers are wired in the order pdf.js expects.** `optionalContentConfig` is copied off the first
   viewport read, because it isn't assigned until after `run()` returns.
+* **The structure tree is keyed on the page and its text layer, never on the viewport.** The geometry pdf.js
+  writes into the tree is `calc(var(--total-scale-factor) * …)`, so a zoom is already answered by the style
+  on the layer and rebuilding would throw away a mounted tree for nothing — verified in the browser as the
+  same DOM node surviving `zoomTo(2)`. A rotation *does* rebuild, because the text layer it binds to is
+  rebuilt with it, and the marks resolve afterwards (measured: 14 role nodes, every `aria-owns` target
+  present in the document).
 * **The canvas density is watched, not sampled.** `useDevicePixelRatio()` returns a live value maintained by
   `src/lib/dpr.ts`: a `(resolution: Xdppx)` query pinned to the current ratio and re-armed whenever it
   stops matching, with a feature-detected `resize` fallback for engines that do not know the `resolution`
@@ -461,15 +487,38 @@ and a stuttering one:
   `CanvasRenderingContext2D` counters the FR-08 measurement used (see `ROADMAP.md`'s task-0 findings),
   and asserted in `src/lib/dpr.test.ts` and `PdfPage.status.test.tsx`.
 
-**Two deliberate `null`s you should know about:** `annotationCanvasMap: null` and `structTreeLayer: null`,
-both passed at the layer call sites in `PdfPage`'s render path. The first means an annotation that pdf.js
-routes to its own canvas would not be collected — measured, our signature appearances don't take that path,
-so it costs nothing today. The second **declines the tagged-PDF structure the PRD's accessibility
-requirement asks for**; that is an open decision, not an oversight (§20).
+**One deliberate `null` you should know about:** `annotationCanvasMap: null` at the annotation call site means an annotation that pdf.js routes to its own canvas would not be collected — measured, our signature appearances don't take that path, so it costs nothing today. `structTreeLayer` is no longer one of them. The page builds the structure layer as soon as the feature's class and its own text layer exist, keeps it in state, and passes it into the annotation and editor layers' constructors. **The cost is one extra annotation-layer render per tagged page** — the instance cannot exist before the text layer has rendered, and those layers read it at construction — which `PdfPage.structure.test.tsx` pins as a count (2 with the feature, 1 without) rather than leaving as an apology. Untagged documents, the overwhelming majority, pay nothing.
 
-Search marks are `data-pjsr-match` spans inside the text layer. Matching is whole-`Range` replacement
-rather than per-span splitting, so a phrase crossing a span boundary is one highlight, not two — and it
-is why the layer is rebuilt on a page turn instead of patched.
+Search marks are `<mark class="pjsr-mark">` elements that `src/lib/highlight.ts` writes into the text
+layer's own divs. A match's character range is mapped onto every div it touches, so a phrase crossing a
+span boundary is **two** marks — one per span, each carrying the part of the phrase that span holds — and
+the match the reader is on adds `pjsr-mark--active` and `aria-current="true"` in the same statement that
+sets its class. Clearing a query collapses each touched div back to a single text node (`unwrapMarks`), so
+a search never rebuilds the layer. `src/lib/highlight.test.tsx` pins those three behaviours.
+
+**Gesture arbitration (`FR-47`).** Everything the reader does with a wheel or a finger is registered on one
+element — the virtualizer's scroll container, `.pjsr-viewport` — and never on `window` or `document`, which
+is what "the host application's own listeners are not starved" means in practice: a gesture starting outside
+the viewer is not ours to see. Inside it, the four claims are:
+
+| Gesture | Who gets it | How it is settled |
+| --- | --- | --- |
+| Plain wheel | the browser, scrolling the document | the `wheel` listener returns without `preventDefault` |
+| Ctrl/Cmd + wheel | the viewer, zooming | `passive: false` is required — React attaches its own `wheel` listener passively, and `preventDefault` from `onWheel` is a no-op that logs |
+| Two-finger pinch | the viewer, zooming | pdf.js's `TouchManager`, which claims the `touchmove` before it knows the gesture |
+| Two-finger pan | the viewer, scrolling | the same claim, answered by `onPanning` — without it the gesture dies, because the manager already prevented it |
+| One finger on a drawing surface | the surface | `touch-action: none` there, and `isPinchingDisabled` while freehand is armed |
+
+A consumed gesture is prevented but **not** stopped from bubbling: `event.defaultPrevented` is how a host
+learns the viewer took it, which is the DOM's own protocol and the difference between arbitrating and
+starving. The declarative half is on the container — `touch-action: pan-x pan-y` (the browser may pan, and
+may never pinch-zoom its own page underneath our zoom) and `overscroll-behavior: contain` (the end of the
+document does not chain into the host page) — because `touch-action` is the only way to state a policy
+before a listener runs, and a `preventDefault` that arrives after the browser began a pan moves the page
+twice. `ViewerController.gestures.test.tsx` drives all of this under jsdom: the engine reads only
+`touches`/`changedTouches` and `clientX`/`screenX`, and jsdom has no `Touch` constructor, so the events are
+plain `Event`s carrying arrays. Whether the first `touchmove` of a real trackpad gesture arrives before or
+after Chrome commits to its own pan is a device question, and stays with `#141`.
 
 ---
 
@@ -602,33 +651,59 @@ counter, error messages). `{page}`-style slots are filled by `formatLabel`.
 
 ## 16. Styling
 
-Eight stylesheets, plain CSS, no framework, all custom properties under `--pjsr-*`
-(`src/styles/viewer.css` holds the tokens: colour, radii, spacing, control heights, focus ring,
-`prefers-reduced-motion`, `prefers-contrast`, and a dark preset). Every class is prefixed `pjsr-`.
+Nine stylesheets, plain CSS, no framework, all custom properties under `--pjsr-*`
+(`src/styles/viewer.css` holds the tokens: colour, radii, spacing, control heights and the focus ring,
+plus a `prefers-reduced-motion` block and the `forced-colors` block below). Every class is prefixed
+`pjsr-`. There is no `prefers-contrast` rule and there will not be one while Safari at the advertised
+floor does not implement it: a style no browser here can reach is a claim, not a style.
 
 | File | Lines | Ships as |
 | --- | --- | --- |
-| `viewer.css` | 1,265 | `pdfjs-react-reader/styles.css` |
-| `annotate.css` | 313 | `…/annotate.css` |
-| `edit.css` | 179 | `…/edit.css` |
+| `viewer.css` | 1,372 | `pdfjs-react-reader/styles.css` |
+| `annotate.css` | 325 | `…/annotate.css` |
+| `edit.css` | 192 | `…/edit.css` |
+| `forms.css` | 137 | `…/forms.css` |
 | `print.css` | 113 | `…/print.css` |
-| `forms.css` | 109 | `…/forms.css` |
 | `outline.css` | 90 | `…/outline.css` |
 | `attachments.css` | 74 | `…/attachments.css` |
 | `layers.css` | 72 | `…/layers.css` |
+| `structure.css` | 24 | `…/structure.css` |
 
-`src/lib/assets.ts` prints the minified sizes at build time (e.g. `styles.css` 34,295 B → 17,490 B,
-`annotate.css` 11,622 → 3,891). A feature's CSS is its own entry, so mounting a feature and not
+`src/lib/assets.ts` prints the minified sizes at build time (e.g. `styles.css` 38,687 B → 18,465 B,
+`annotate.css` 12,186 → 3,968). A feature's CSS is its own entry, so mounting a feature and not
 importing its sheet is a visible, fixable mistake rather than a subtle one. Engine CSS is **not** vendored
 — pdf.js ships text-layer and annotation-layer sheets under Apache-2.0 and our sheets restate the rules we
 depend on; the licensing question is a `1.0` decision (§20).
 
-Accessibility built into the CSS, not bolted on: 4 px focus ring offset, `forced-colors` support,
-reduced motion, and spacing normalised to a 4/8 grid.
+**Forced colours (`FR-44`).** In `forced-colors: active` the user agent replaces the used value of every
+`<color>` a rule resolves to — `color`, `background-color`, `border-color`, `outline-color`, `fill`,
+`stroke`, `accent-color` and the rest — with a system colour, keeping the alpha and leaving transparent
+alone. Authoring against that leaves three jobs, and each is done in one place:
+
+* The tokens are re-pointed at `Canvas` / `CanvasText` / `GrayText` / `ButtonFace` / `Highlight` in
+  `viewer.css`, which is why no feature sheet needs a block to follow the theme — they read the tokens.
+* Separation that a shadow carried becomes an `outline`: the overflow menu, an annotation popup, the page
+  sheet against its backdrop, the thumbnail frame. A `border` would change a box the engine sizes.
+* Four declarations opt out with `forced-color-adjust: none`, each with its reason beside it: the ink
+  swatches and the strokes drawn in them (`viewer.css`), the annotation colour plate (`annotate.css`), the
+  signature pad (`edit.css`). There the colour is the reader's own choice, not chrome. `forms.css` does the
+  opposite job — its unfocused-field tint is an SVG inside a data URL, which the override cannot reach, so
+  under forced colours the image is dropped, the tint is re-declared as a system colour, and the box gets
+  the `CanvasText` edge it never had (its authored border is `transparent`).
+
+`src/styles/forced-colors.test.ts` holds the sheets to that: a file that declares a *literal* colour must
+carry a `forced-colors` block, no block may author a literal, and the second channels below exist as
+declarations.
+
+**Meaning never rides on colour alone.** A search match carries a `border-bottom`; the active match an
+`outline` and `aria-current="true"` (both set by the one statement in `lib/highlight.ts` that sets its
+class); an armed toolbar button switches its `transparent` border on; the selected sidebar tab thickens its
+underline from 2 px to 3. The channels are declared outside any media query, because 1.4.1 does not wait
+for a high-contrast theme — and they survive one, because a width and a shape are not colours.
 
 ---
 
-## 17. Tests: 59 files, 661 tests, two projects
+## 17. Tests: 67 files, 718 tests, two projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
 from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library). Parenthesised counts are the
@@ -638,8 +713,10 @@ files this section has ever itemised; the rest are named, not counted, so a stal
   `ink` `keyboard` `labels` `layout` `link-service` `optional-content` `outline` `page-plan`
   `pdf-write` (30) `print` `search` (35) `signature` `source` (17) `toolbar` `worker` `zoom` `locales`
   (16) — plus `abort` (14) `retry` (29) `search.abort` (4) and **`source.classify` (39)**, the rule that
-  `classifySource` and `normalizeSource` are the same heuristic, **`ssr` (17)**, which imports every
-  entry point in the export map with no DOM (FR-46), **`dpr` (13)** — the ratio hub, driven by a stubbed
+  `classifySource` and `normalizeSource` are the same heuristic, **`ssr` (18)**, which imports every
+  entry point in the export map with no DOM (FR-46; the eighteenth case is `features/structure`, which the
+  loop picked up by reading the map rather than by anyone adding it), **`dpr` (13)** — the ratio hub,
+  driven by a stubbed
   `matchMedia` whose recorded queries are what the assertions read (FR-07), **`page-labels` (12)**,
   both directions of the label table and the clamp-or-refuse line (FR-12), and **`worker.fallback` (1)**,
   **`.onpage` (1)**, **`.nocode` (1)**, **`.deadurl` (1)** — four files because each asserts one state of
@@ -652,21 +729,53 @@ files this section has ever itemised; the rest are named, not counted, so a stal
   plus **`usePdfPageLabels` (8)**: one read per document, `null` as the ordinary answer, and a stopped caller
   getting no round trip at all (FR-12, FR-36)
 * Components: `Toolbar` `ViewerContext` `ViewerController` **`PasswordPrompt` (8)**
-  **`ViewerLayout.failure` (4)** `FeatureHost`, and **`PdfPage.status` (13)** — the first file that ever
+  **`ViewerLayout.failure` (4)** `FeatureHost`, **`PdfPage.structure` (10)** — the order the tree mounts in,
+  its placement *beside* the canvas rather than inside it, no rebuild across a zoom, the annotation layer
+  receiving the instance at the cost of one measured re-render, and a failed tree reaching `onError` without
+  calling the page broken — and **`PdfPage.status` (13)** — the first file that ever
   rendered `PdfPage`, the only one that drives its layers by hand, and the one that proves a display change
   reaches the canvas buffer while a `resize` at the same density does not, plus **`ViewerLabels` (6)** — the
   bar mounted against a stub controller, which is the only place the `controller → ViewerParts → Toolbar`
   link of the label table is asserted
 * Engine behaviour, through pdf.js itself: **`damaged`** (6), **`encrypted`** (3),
   **`encrypted.reprompt`** (1) — one load per file, because a load left parked in the Node fake worker
-  stops every case after it
-* Tiers: `features/download` `edit` (11) `edit.extract` (5) `edit.signatures` (8)
+  stops every case after it — and **`tagged`** (7), the structure tree read back from the engine: the roles, the marks the content
+  stream actually opens, the two agreeing, `getMarkInfo()`'s real shape, the link annotation's id matching
+  the one the tree claims (compared against `getAnnotations()`, so the generator's object numbering stays out
+  of the test), and *two* counterfactuals — rename `/Pg` and the marks vanish while the roles stay; blank a
+  `BDC`'s property list and the tree is untouched while the text layer loses every element it could have
+  owned
+* The stylesheet itself, read as source: **`styles/forced-colors` (4)** — every sheet that declares a
+  literal colour must say what `forced-colors` does with it, no `forced-colors` block may author a literal,
+  and the colour-only signals must each carry a non-colour channel as a declaration (§16). A rule that
+  deleted the mark's `border-bottom` passes every DOM test in the repository and fails this one
+* The audit (`FR-45`): **`a11y.audit` (12)** runs axe-core's WCAG 2.0/2.1/2.2 A-and-AA tags over the
+  loading, failed and password states, the sidebar on each of its four tabs, the open search bar, an
+  outline tree, an ink layer and the password prompt — and asserts its own blind spots as a list
+  (`color-contrast` and `aria-hidden-focus` come back `incomplete`, because jsdom has no layout), so the
+  day axe can resolve geometry the assertion fails and someone re-reads the claim. **`a11y.page` (2)**
+  audits the real `PdfPage` with the engine's own text layer and our marks inside it
+* Tiers: `features/download` `edit` (11) `edit.extract` (5) `edit.signatures` (8), and
+  **`features/structure` (10)** — the gate counted by reads of the peer class (zero for an untagged file,
+  one for a tagged one), both `MarkInfo` shapes, the document changing under it, and the merged page props
+  carrying the class rather than only the switch
+* Interaction, driven by hand: **`ViewerController.gestures` (9)** — the table in §11 asserted one row at a
+  time, including the pan that has to move the scroll container and the drawing layer that has to keep the
+  finger, plus the two declarations the browser reads first
 
 Recipes that took real time to learn, and are worth reusing: a click handler that `void`s an async write
 means you **cannot await it** — settle on `waitFor`, not a fixed timer, and clear mocks only after
 in-flight work lands, or the next test inherits a call it never made. jsdom has no canvas 2D context
 (guarded) and a zero-sized `getBoundingClientRect` (stub it). And a feature panel's state is published in
 an **effect**, so its first render sees `{}` — read every feature state through a default.
+
+Two more, both bought while trying to audit a page rather than a mock of one: jsdom's
+`HTMLCanvasElement.prototype.getContext('2d')` returns `null`, and pdf.js's text layer feeds that straight
+into a `WeakMap`, so the page dies with `TypeError: Invalid value used as weak map key` before it builds a
+single span — a stub returning `{ canvas, font, measureText }` is the whole fix. And `streamTextContent`
+is a `ReadableStream` of `{ items, styles }`: hand the layer a promise of a list and the constructor wraps
+the promise as if it were a chunk, which fails later as `items is not iterable` rather than at the call
+that was wrong.
 
 ---
 
@@ -740,7 +849,8 @@ handler — but **no other 5.x surface is supported or tested**, and `PRD.md`'s 
 | Item | State |
 | --- | --- |
 | **Real-device matrix** (`#141`) | **Never run.** iOS Safari 14/15 and Android Chrome are stated targets; every frame number in every document is Chromium on one Windows machine at ~145 Hz. The `:has()` container-query fallback is written but has never executed on a Safari. Either it gets run or the device claims come out |
-| **Accessibility audit** (`#143`) | Open. Its concrete code item is `structTreeLayer: null` (§11) — the tagged-PDF structure the PRD asks for is declined in code, so that's an enable-or-document decision, and assistive-technology testing can't happen here |
+| **Accessibility audit** (`#143`) | **Built in `0.10`, and it earned its keep**: axe-core over the shell's three document states, the sidebar on each tab, the search bar, four primitives and the real `PdfPage`, in the suite and as a named CI step (§17). Its first run reported `aria-required-children` on the sidebar's tablist — a close button among the tabs — which eleven earlier accessibility test files had walked past. What is left is what no audit under jsdom can see: contrast and target size need a layout, and an assistive technology has to be the reader |
+| **Whether a screen reader sees the tree** | **Not established.** The DOM is verified in Chromium (14 role nodes across the fixture's two pages, every `aria-owns` resolving to a real element, the figure's `/Alt` as its name), but the accessibility snapshot available here *filters unnamed nodes*, and pdf.js's heading and list elements carry no name of their own — they own their text by reference. So "a screen reader announces these as headings" is a claim for the `0.12` device matrix with a real AT, not something this pass proved |
 | **Core freehand ink retirement** (`#124`) | Your call, still unanswered: the shell's own ink duplicates `annotate`'s, which is the one that saves |
 | **Freezing the mutable exports** | Held for `1.0`'s breaking window (§9). Docs tell a host to spread instead, which is correct before and after |
 | **A worker holding the writer** | The real fix for the ~1,080 ms main-thread block when applying/extracting/splitting/flattening a 1,000-page document. Not attempted: today the mitigation is that nothing takes that path unless asked |
@@ -748,8 +858,8 @@ handler — but **no other 5.x surface is supported or tested**, and `PRD.md`'s 
 | **Repo settings** | The `main` ruleset, and whether `1.0.0` publishes with `--provenance`. Settings, not YAML |
 | **An XFA packet whose fields bind through `dataId`** | Still needed — `XfaLayer.setAttributes` has `case "dataId": break;`, so the key is consumed for the binding and never written to the DOM, which is why that question can't be answered from a page today |
 | **Named slots / `PdfViewer.Root`** | Not built, and `0.5` **declined** them: what shipped is `controls.order`/`hide`/`priorities` plus exported parts you compose by hand. `PRD.md` §5.2 shows the slots form and labels it "not the shipped API" |
-| **The shell's page path under jsdom** | No test has mounted the real controller against a document that had finished loading — that combination hangs the harness, twice measured to a 60 s and a 120 s kill. So the shell end to end is verified in a browser and around its parts in unit tests, never under jsdom; the harness fix belongs with the CI work, not with a feature |
-| **Nothing published since `0.1.1`** | `0.2`–`0.9` are committed on local `dev` and the whole sequence publishes together as `1.0.0`. CI has never seen any of it, which §19 says plainly and every "verified" claim in these files is dated by |
+| **The shell's page path under jsdom** | No test has mounted the real controller against a document that had finished loading — that combination hangs the harness, twice measured to a 60 s and a 120 s kill, and `0.10` did not need to try again: `a11y.page.test.tsx` mounts `PdfPage` with a page proxy handed to it directly, which is the part of that path worth auditing. So the shell end to end is still verified in a browser and around its parts in unit tests. Two blockers found on the way, both fixable and neither trivial: jsdom's `getContext('2d')` returning `null` (stubbed there) and the virtualizer needing a sized viewport before it will mount a slot |
+| **Nothing published since `0.1.1`** | The `0.2`-onward sequence lives on local `dev` only — `git log --oneline dev` is the authority on which releases are committed — and the whole of it publishes together as `1.0.0`. CI has never seen any of it, which §19 says plainly and every "verified" claim in these files is dated by |
 
 ---
 
@@ -772,6 +882,10 @@ were **fixed toward the code** on 2026-09-28; the entries remain as the correcti
 | Docs pages quoting 128.6 / 366.5 / 245.5 kB for engine and peer, on the version that names itself | 131.70 / 375.25 / 251.41 kB measured | Restated, **with the method named** — the trap is documented in `ROADMAP.md` |
 | `ROADMAP.md` "39 tests across four files" for signing | 35 across three | Corrected |
 | Catalog "142 strings" in three places | 144 | Corrected, including a stale number in the test's own comment |
+| A tagged fixture whose tree read back correctly | Its `BDC` operators had one operand instead of two, so pdf.js skipped every marked section with a console warning. The tree is built from `/StructParents`, `/ParentTree` and `/Pg` and never reads the content stream, so all six assertions above it passed on a file that bound nothing | Fixed in `scripts/make-tagged-pdf.mjs`, which now refuses to write a `BDC` without its property list, and pinned twice in `tagged.test.ts`: the content/tree pairing, and the same-length counterfactual that blanks the list. Found by the browser pass, not by the test |
+| `getMarkInfo()` resolves with a "MarkInfo object" (its own declaration) | It resolves with a **`Map`** keyed `Marked`/`UserProperties`/`Suspects`, and with `null` — not `{}` — when the file declares nothing. Reading `.Marked` off a `Map` is `undefined`, which is indistinguishable from "untagged" and fails silently for every tagged PDF in existence | Both shapes read; the `Map` pinned against the real engine in `tagged.test.ts` so a change upstream is noticed at the boundary rather than in a browser |
+| A feature that published a builder and handed it to no one | `structureFeature`'s Runner published `structTreeLayerBuilder` while `pageProps` returned only the static switch — marked text layers, a fetched 50 kB chunk, no tree. The test that should have caught it asserted the property was *absent* for an untagged document, which is the one case where the bug is invisible | `pageProps` forwards both halves; the test now asserts the merged props *carry* the class for a tagged document, and the constant-only version was re-run to watch it fail twice |
+| "the annotation layer receives the structure instance" — declined on cost | The redraw is real (the layer reads it at construction) but the gain was unshowable, because the only tagged fixture had no annotations. Adding a `/Link` to the fixture settled it in an hour | Built, with the render count asserted; see §11 and `ROADMAP.md` |
 | A signature box "shows nothing in our viewer" because of `/F 16` | Probe sampled a page-1 rectangle for a page-2 annotation; re-measured, it **does** paint | Retracted, and the retraction is the record |
 | "In-session signature doesn't repaint" (filed as a defect) | The filter counted the fixture's navy while the writer draws black; colour-agnostic re-measurement: 0 → 856 px | Ticket withdrawn, lesson kept |
 
@@ -849,7 +963,9 @@ Nothing here should be taken on trust. Each of these re-derives a number above:
 ```bash
 node -e "const p=require('./package.json');console.log(Object.keys(p.exports).length, p.version)"
 grep -rc "" src/**/*.ts src/**/*.tsx            # file inventory (§2)
-npm run test                                    # 661 tests in 59 files (§2, §17)
+npm run test                                    # 718 tests in 67 files (§2, §17)
+npm run a11y                                    # the axe audit on its own (FR-45); it also runs inside the line above
+npx vitest run src/styles/forced-colors.test.ts # §16's stylesheet rules, read from src/styles rather than from a list
 node -e "const u=require('caniuse-lite/dist/unpacker/feature'),f=require('caniuse-lite/dist/unpacker/features').features;const s=u(f['css-media-resolution']).stats;console.log(s.safari['14'],s.safari['16.0'],s.chrome['90'],s.firefox['90'])"   # the §11 `resolution` support flags (caniuse-lite is transitive, via the toolchain, not a declared dependency)
 npm run size                                    # every size figure in §2, plus the two failing rules
 node -e "console.log(Object.keys(require('./dist/index.js')).length)"   # names on the main entry
@@ -858,15 +974,20 @@ npx vitest run --project node src/lib/worker.fallback.test.ts src/lib/worker.fal
 npm run build && node scripts/inventory.mjs   # the grouped name lists in §4, straight from dist/*.d.ts
 grep -n "MAX_RENDER\|PRINT_MEMORY\|CAP_AREA" src/lib/canvas.ts src/lib/print.ts   # §9
 grep -n "structTreeLayer\|annotationCanvasMap" src/components/PdfPage.tsx          # §11
-node scripts/make-signature-pdf.mjs && node scripts/make-damaged-pdf.mjs && node scripts/make-labelled-pdf.mjs   # fixtures are generated, never downloaded
+node scripts/make-signature-pdf.mjs && node scripts/make-damaged-pdf.mjs && node scripts/make-labelled-pdf.mjs && node scripts/make-tagged-pdf.mjs   # fixtures are generated, never downloaded
+node -e "const fs=require('fs');import('pdfjs-dist/legacy/build/pdf.mjs').then(async m=>{const d=await m.getDocument({data:new Uint8Array(fs.readFileSync('playground/fixtures/tagged-sample.pdf')),verbosity:0}).promise;const i=await d.getMarkInfo();console.log(i instanceof Map?[...i]:i);const p=await d.getPage(1);for await(const c of p.streamTextContent({includeMarkedContent:true}))console.log(c.items.map(x=>x.str??x.type+(x.id?':'+x.id:'')).join(' '))})"   # §11: the two shapes `FR-43` depends on, from the engine rather than from this file
 node -e "const fs=require('fs');import('pdfjs-dist/legacy/build/pdf.mjs').then(async m=>{const d=await m.getDocument({data:new Uint8Array(fs.readFileSync('playground/fixtures/labelled-sample.pdf'))}).promise;console.log(d.numPages, await d.getPageLabels())})"   # §8's label table is the engine's answer, not this file's guess
 npm run serve:auth &  curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5300/outline-sample.pdf; curl -s -o /dev/null -w '%{http_code}\n' -H 'Authorization: Bearer dev-token' http://localhost:5300/outline-sample.pdf   # 401 then 200 — the document `FR-34`'s browser pass loaded through the playground, which is the only way to see the header arrive
-# The "every switch off (27.86 kB) vs on (27.81 kB)" pair on the Features page is not a `npm run size`
+# The "every switch off (28.10 kB) vs defaults (28.01 kB)" pair on the Features page is not a `npm run size`
 # path: bundle two consumer files that import `PdfViewer` from `dist/index.js` — one passing every
 # `enable*` as false plus a `controls.hide` over the whole bar, one at defaults — through esbuild and
 # Rollup exactly as `scripts/check-size.mjs` does, gzip the minified output at level 9, take the larger,
-# and divide by 1000 (the gate's `KB` is decimal). The plain `src` fixture measures 27.76 kB by the same
-# route, which is the anchor that says the method was reproduced rather than approximated.
+# and divide by 1000 (the gate's `KB` is decimal). The plain `src` fixture measures 28.01 kB by the same
+# route, which is the anchor that says the method was reproduced rather than approximated — and it is also
+# the "defaults" number, because a `PdfViewer` at its defaults *is* the plain import, byte for byte.
+git ls-files playground/fixtures | wc -l   # must equal `ls playground/fixtures/*.pdf | wc -l`: a generated
+#                                           # fixture that is not tracked fails a fresh clone's `npm test`,
+#                                           # which has happened twice. `tagged-sample.pdf` is untracked now.
 git log --oneline -1 && git status --porcelain | wc -l   # what is and isn't committed
 ```
 

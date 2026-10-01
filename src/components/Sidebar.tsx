@@ -63,35 +63,43 @@ export function Sidebar({
 
   return (
     <aside className="pjsr-sidebar" aria-label={labels.sidebarRegion} onKeyDown={onKeyDown}>
-      <div className="pjsr-sidebar-tabs" role="tablist" aria-label={labels.sidebarViews}>
-        {tabs.map((entry, index) => (
-          <button
-            key={entry.id}
-            type="button"
-            role="tab"
-            id={tabId(entry.id)}
-            aria-selected={tab === entry.id}
-            aria-controls={panelId}
-            tabIndex={tab === entry.id ? 0 : -1}
-            className={`pjsr-sidebar-tab${tab === entry.id ? ' pjsr-sidebar-tab--active' : ''}`}
-            onClick={() => onTabChange(entry.id)}
-            ref={(el) => {
-              tabRefs.current.set(entry.id, el);
-            }}
-            onKeyDown={(event) => {
-              // Roving tabindex for the tablist: Left/Right move between tabs,
-              // wrapping, because a feature can add the last one.
-              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-              event.preventDefault();
-              const step = event.key === 'ArrowRight' ? 1 : -1;
-              const next = tabs[(index + step + tabs.length) % tabs.length]!;
-              onTabChange(next.id);
-              tabRefs.current.get(next.id)?.focus();
-            }}
-          >
-            {entry.label}
-          </button>
-        ))}
+      {/*
+       * `role="tablist"` requires that every element it owns is a tab, and the close control is not one.
+       * Until FR-45's audit ran it said so — `aria-required-children`, on the row, in the markup every
+       * reader of the sidebar walks through — the header keeps the row styling and the tablist is the
+       * cluster inside it, so the close button sits beside the list rather than among its children.
+       */}
+      <div className="pjsr-sidebar-header">
+        <div className="pjsr-sidebar-tabs" role="tablist" aria-label={labels.sidebarViews}>
+          {tabs.map((entry, index) => (
+            <button
+              key={entry.id}
+              type="button"
+              role="tab"
+              id={tabId(entry.id)}
+              aria-selected={tab === entry.id}
+              aria-controls={panelId}
+              tabIndex={tab === entry.id ? 0 : -1}
+              className={`pjsr-sidebar-tab${tab === entry.id ? ' pjsr-sidebar-tab--active' : ''}`}
+              onClick={() => onTabChange(entry.id)}
+              ref={(el) => {
+                tabRefs.current.set(entry.id, el);
+              }}
+              onKeyDown={(event) => {
+                // Roving tabindex for the tablist: Left/Right move between tabs,
+                // wrapping, because a feature can add the last one.
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                event.preventDefault();
+                const step = event.key === 'ArrowRight' ? 1 : -1;
+                const next = tabs[(index + step + tabs.length) % tabs.length]!;
+                onTabChange(next.id);
+                tabRefs.current.get(next.id)?.focus();
+              }}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
         {onClose && (
           <button
             type="button"

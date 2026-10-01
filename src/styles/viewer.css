@@ -437,6 +437,10 @@
 .pjsr-button:is([aria-pressed='true'], [aria-expanded='true']) {
   background: color-mix(in srgb, var(--pjsr-accent) 14%, transparent);
   color: var(--pjsr-accent);
+  /* FR-44's second channel. The base border is `transparent`, so turning it on adds a ring without moving
+     anything: which control is armed is then carried by an outline as well as by a tint the reader's
+     palette is free to flatten. */
+  border-color: currentColor;
 }
 
 /* ---------- search highlights ---------- */
@@ -445,10 +449,17 @@
   color: transparent;
   background: color-mix(in srgb, var(--pjsr-accent) 22%, transparent);
   border-radius: 2px;
+  /* FR-44's second channel. Which words matched is carried here by a tint, and a tint is the one thing a
+     forced palette is certain to flatten, so marked words also carry a rule under them and the match the
+     reader is on carries a ring around it. `outline` rather than `border` because an outline cannot change
+     the box a text span was laid out in. */
+  border-bottom: 1px solid var(--pjsr-accent);
 }
 
 .pjsr-text-layer mark.pjsr-mark--active {
   background: color-mix(in srgb, var(--pjsr-accent) 55%, transparent);
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: 1px;
 }
 
 /* An XFA page paints its words in the layer itself, so a mark there tints behind
@@ -458,10 +469,13 @@
 .pjsr-xfa-layer mark.pjsr-mark {
   background-color: color-mix(in srgb, var(--pjsr-accent) 22%, transparent);
   border-radius: 2px;
+  border-bottom: 1px solid var(--pjsr-accent);
 }
 
 .pjsr-xfa-layer mark.pjsr-mark--active {
   background-color: color-mix(in srgb, var(--pjsr-accent) 55%, transparent);
+  outline: 2px solid var(--pjsr-accent);
+  outline-offset: 1px;
 }
 
 /* ---------- XFA pages ---------- */
@@ -577,6 +591,17 @@
   min-height: 0;
   overflow: auto;
   background: var(--pjsr-viewport-bg);
+  /*
+   * Declared, not left to a listener winning a race: the page area pans and nothing
+   * else. `pinch-zoom` is absent because a two-finger gesture inside the viewer is
+   * the viewer's zoom (FR-47), and a browser that also zoomed its own page would do
+   * it twice over; a descendant that needs the finger outright — the ink layer, an
+   * editor surface — still says `touch-action: none`, which the browser takes as the
+   * intersection of the chain rather than as an override of this line.
+   */
+  touch-action: pan-x pan-y;
+  /* Scrolling to the end of the document must not chain into the host page. */
+  overscroll-behavior: contain;
 }
 
 .pjsr-viewport:focus-visible {
@@ -829,13 +854,25 @@
   border-right: 1px solid var(--pjsr-border);
 }
 
-.pjsr-sidebar-tabs {
+/* The row the sidebar opens with: the tablist and the close control beside it. The close control used to
+   live *inside* the `role="tablist"`, which FR-45's audit reported on its first run — a tablist requires
+   every element it owns to be a tab, and dismissing the panel is not one. Two flex boxes, and the close
+   keeps its `margin-left: auto` from the row. */
+.pjsr-sidebar-header {
   display: flex;
   align-items: center;
   gap: var(--pjsr-cluster-gap);
   padding: 4px 4px 0;
   border-bottom: 1px solid var(--pjsr-border);
   flex: none;
+}
+
+.pjsr-sidebar-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--pjsr-cluster-gap);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .pjsr-sidebar-tab {
@@ -865,6 +902,9 @@
 .pjsr-sidebar-tab--active {
   color: var(--pjsr-accent);
   border-bottom-color: var(--pjsr-accent);
+  /* FR-44's second channel: the base underline is 2px and transparent, so thickening it says "this tab is
+     the one you are looking at" in a width as well as in a colour the reader's palette owns. */
+  border-bottom-width: 3px;
 }
 
 .pjsr-sidebar-close {
@@ -1272,3 +1312,61 @@
   }
 }
 
+
+/* ---------- forced colours (FR-44) ---------- */
+
+/* What the reader's palette owns, and what it does not.
+ *
+ * The override is the user agent's to make: in forced-colours mode it replaces the used value of every
+ * `<color>` a rule resolves to — `color`, `background-color`, `border-color`, `outline-color`, `fill`,
+ * `stroke`, `text-decoration-color` and the rest of the list — with the matching system colour, and it
+ * does that whatever the author declared. So the useful work here is not fighting it. Three things are:
+ * re-pointing the tokens at the system palette so the declarations the UA *keeps* (the alpha of a tint,
+ * a shadow's spread, an SVG's own coordinates) land on colours that belong together; giving back the two
+ * separations that were carried by a shadow, which a high-contrast theme is free to drop; and holding the
+ * line where the colour is the content, which is the one case `forced-color-adjust: none` is for.
+ *
+ * `prefers-contrast` is deliberately not used: Safari does not implement it at `PRD.md` §8's floor, so a
+ * rule keyed to it could never be verified here and would be a claim rather than a style. */
+
+@media (forced-colors: active) {
+  .pjsr-viewer {
+    --pjsr-bg: Canvas;
+    --pjsr-fg: CanvasText;
+    --pjsr-muted-fg: GrayText;
+    --pjsr-border: CanvasText;
+    --pjsr-toolbar-bg: Canvas;
+    --pjsr-hover-bg: ButtonFace;
+    --pjsr-accent: Highlight;
+    --pjsr-viewport-bg: Canvas;
+    /* An error is still an error because it is *worded* as one and announced with `role="alert"`; the
+       red was never the channel. `GrayText` and `CanvasText` are the two colours the theme guarantees
+       against `Canvas`, so the status text keeps its hierarchy without inventing a hue. */
+    --pjsr-danger-fg: CanvasText;
+    /* Zeroed here, paid back as borders below: a shadow is decoration, and a theme that removes it takes
+       the menu's separation with it. */
+    --pjsr-page-shadow: none;
+    --pjsr-menu-shadow: none;
+  }
+
+  .pjsr-overflow-menu,
+  .pjsr-annotation-layer .popup,
+  .pjsr-page-slot,
+  .pjsr-thumbnail-frame {
+    /* `outline` rather than `border`, because a border changes the box: the page slot and the thumbnail
+       frame are sized in page units that the engine writes, and a 2 px wider sheet is a page whose layers
+       no longer line up. An outline draws on the box without joining it. Without this rule the page is
+       `Canvas` on a `Canvas` backdrop and the document's edges disappear with the shadow that drew them. */
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  /* The reader picked these colours; they are the value of the control and the ink of the mark, not chrome.
+     Forced to `CanvasText`, a palette becomes a row of identical dots and a drawn signature drawn in the
+     chosen colour loses it — while the page the ink sits on is a bitmap the palette cannot reach either,
+     so overriding here would break the thing it decorates. */
+  .pjsr-ink-swatch-dot,
+  .pjsr-ink-layer {
+    forced-color-adjust: none;
+  }
+}

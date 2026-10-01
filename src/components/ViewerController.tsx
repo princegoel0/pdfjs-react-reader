@@ -675,10 +675,17 @@ export function useViewerController({
   // ---- wheel and pinch zoom ------------------------------------------------
   const resolvedScaleRef = useRef(resolvedScale);
   resolvedScaleRef.current = resolvedScale;
+  const drawingRef = useRef(ink.drawing);
+  drawingRef.current = ink.drawing;
 
   // Registered natively with `passive: false`: React attaches its own `wheel`
   // listener passively, so `preventDefault()` from an `onWheel` prop is a no-op
   // that also logs a warning — the page would scroll while we zoomed.
+  //
+  // A consumed gesture is prevented but still allowed to bubble. Stopping it would
+  // be the starvation FR-47 forbids: a host listening for wheel on an ancestor keeps
+  // its listener, and `event.defaultPrevented` is how it learns the viewer took the
+  // gesture. That is the arbitration protocol, and it is the DOM's own.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !enableWheelZoom) return;
@@ -698,6 +705,15 @@ export function useViewerController({
   // from the type system, and a pdf.js minor could change them silently. The
   // whole construction is guarded so an incompatible engine loses pinch zoom
   // and nothing else.
+  //
+  // A pinch and a two-finger pan are one physical event until the span between the
+  // fingers changes, and the manager claims the `touchmove` for both: it calls
+  // `preventDefault` and `stopPropagation` on the second finger's every move, before
+  // it knows which gesture it is holding. So both answers are ours to give — zoom
+  // when the span grows, scroll when only the midpoint travels. Without `onPanning`
+  // the second one is swallowed on the way in: the gesture reaches us, we do nothing
+  // with it, and the browser has been told not to, so the document stops moving
+  // halfway through a two-finger scroll.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !enablePinchZoom) return;
@@ -718,6 +734,16 @@ export function useViewerController({
         ) => {
           setScaleMode(pinchScale(startScale, previousDistance, distance));
         },
+        onPanning: (dx: number, dy: number) => {
+          // Content follows the fingers, so a downward drag reveals what is above it.
+          el.scrollLeft -= dx;
+          el.scrollTop -= dy;
+        },
+        // The freehand layer wants every finger while it is armed: a pinch that
+        // zoomed mid-stroke would move the page under the pen, and `#onTouchStart`
+        // bails on this predicate before it claims anything, which leaves the
+        // sequence to the layer's own `touch-action: none`.
+        isPinchingDisabled: () => drawingRef.current,
       });
     } catch {
       return;

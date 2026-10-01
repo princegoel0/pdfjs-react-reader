@@ -1,0 +1,24 @@
+/* pdfjs-react-reader — the structure tree, shipped with features/structure
+ * Import this alongside 'pdfjs-react-reader/styles.css'. The theme tokens live in
+ * the core sheet; everything here is rules this file needs and the core stylesheet
+ * must not carry, because a feature you did not ask for should not be styled for.
+ *
+ * This one sheet is not cosmetic, which is unusual for this package: the tree it
+ * styles is an accessibility layer, and a tree that shifts the page's layout is a
+ * visible defect in a viewer that is otherwise rendering correctly. The marked-content
+ * wrappers it binds to are styled by the core sheet already, because they belong to
+ * the text layer and not to this feature. */
+
+/* pdf.js's own name for the element it hands back from `render()`, and the one it
+ * scopes its own rule to from inside the canvas. Here the tree is the canvas's
+ * sibling, so it needs taking out of the flow: the elements are empty containers
+ * whose text is `aria-owns`-ed from the layer above, but empty is not the same as
+ * zero-sized until something says so. `contain: strict` is what makes it so —
+ * size, layout, paint and style all stay inside the box. */
+.pjsr-canvas-wrapper .structTree {
+  position: absolute;
+  top: 0;
+  left: 0;
+  contain: strict;
+  pointer-events: none;
+}

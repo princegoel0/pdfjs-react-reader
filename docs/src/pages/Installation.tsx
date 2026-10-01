@@ -45,6 +45,7 @@ import 'pdfjs-react-reader/outline.css';
 import 'pdfjs-react-reader/layers.css';
 import 'pdfjs-react-reader/attachments.css';
 import 'pdfjs-react-reader/annotate.css';
+import 'pdfjs-react-reader/structure.css';
 import 'pdfjs-react-reader/edit.css';`}</code>
       </pre>
       <p>
@@ -53,15 +54,17 @@ import 'pdfjs-react-reader/edit.css';`}</code>
         separate files on purpose: a bundler drops CSS that no JavaScript module imports, so a
         feature's rules cannot ride inside its own module, and one file per tier is what lets a
         download-only viewer ship no print rules at all. <code>download</code> needs no sheet — its
-        control is an ordinary toolbar button.
+        control is an ordinary toolbar button, and <code>structure</code> needs one that is not about looks
+        at all: its rule is what keeps an accessibility layer out of the page's layout, so mounting the
+        feature and skipping the sheet is a defect rather than an unstyled viewer.
       </p>
 
       <h2>Optional capabilities</h2>
       <p>
         <code>{'<PdfViewer src="/a.pdf" />'}</code> is a viewer that reads: pages, selectable text,
         search, thumbnails, ink, zoom and rotation. Print, save, fillable form widgets, the bookmarks
-        tab, the layers panel, the attachments panel, marking the document up, and moving or flattening
-        whole pages are features you add,
+        tab, the layers panel, the attachments panel, marking the document up, moving or flattening
+        whole pages, and reading a tagged document's structure tree are features you add,
         because they are imports and an import is the only thing
         that decides what your bundle contains:
       </p>
@@ -74,11 +77,12 @@ import { outlineFeature } from 'pdfjs-react-reader/features/outline';
 import { layersFeature } from 'pdfjs-react-reader/features/layers';
 import { attachmentsFeature } from 'pdfjs-react-reader/features/attachments';
 import { annotateFeature } from 'pdfjs-react-reader/features/annotate';
+import { structureFeature } from 'pdfjs-react-reader/features/structure';
 import { editFeature } from 'pdfjs-react-reader/edit';
 
 <PdfViewer
   src="/a.pdf"
-  features={[printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature, annotateFeature, editFeature]}
+  features={[printFeature, downloadFeature, formsFeature, outlineFeature, layersFeature, attachmentsFeature, annotateFeature, structureFeature, editFeature]}
 />`}</code>
       </pre>
       <p>

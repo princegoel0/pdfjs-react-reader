@@ -107,3 +107,31 @@
   top: 25%;
   width: 50%;
 }
+
+/* ---------- forced colours (FR-44) ---------- */
+
+@media (forced-colors: active) {
+  .pjsr-annotation-layer {
+    /* Two things the reader's palette would otherwise not be able to reach.
+     *
+     * The "you can type here" tint is an SVG written into a data URL, and the forced-colours override
+     * applies to the `<color>` values it can parse: a document inside a quoted attribute is opaque to it,
+     * so that indigo would have survived a high-contrast theme untouched. It goes, and the same alpha comes
+     * back as a system colour below.
+     *
+     * And an unfocused field's border is `transparent` — the tint was the only thing showing where the
+     * field is. Take the tint away and a 20-field form turns into blank paper with no cue that anything
+     * accepts input, so the box gets a real edge. */
+    --annotation-unfocused-field-background: none;
+    --input-focus-border-color: Highlight;
+    --input-hover-border-color: CanvasText;
+    --input-unfocused-border-color: CanvasText;
+    --input-disabled-border-color: GrayText;
+  }
+
+  .pjsr-annotation-layer .textWidgetAnnotation :is(input, textarea),
+  .pjsr-annotation-layer .choiceWidgetAnnotation select,
+  .pjsr-annotation-layer .buttonWidgetAnnotation:is(.checkBox, .radioButton) input {
+    background-color: color-mix(in srgb, Highlight 12%, transparent);
+  }
+}

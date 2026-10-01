@@ -221,6 +221,7 @@ export function Compatibility() {
               Import <code>pdfjs-react-reader/styles.css</code>, plus{' '}
               <code>print.css</code> / <code>forms.css</code> / <code>outline.css</code> /{' '}
               <code>layers.css</code> / <code>attachments.css</code> /{' '}
+              <code>structure.css</code> /{' '}
               <code>annotate.css</code> for the
               features you mounted, or supply your own rules for the <code>.pjsr-*</code> classes. The
               text layer in particular needs its positioning CSS or selectable text will overlay the
@@ -296,62 +297,67 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Core (<code>PdfViewer</code> with no features)</td>
-            <td>27.76 kB</td>
+            <td>28.01 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Core + print</td>
-            <td>30.28 kB</td>
-            <td>+2.52 kB</td>
+            <td>30.47 kB</td>
+            <td>+2.55 kB</td>
           </tr>
           <tr>
             <td>Core + download</td>
-            <td>28.51 kB</td>
-            <td>+0.75 kB</td>
+            <td>28.69 kB</td>
+            <td>+0.78 kB</td>
           </tr>
           <tr>
             <td>Core + forms</td>
-            <td>29.78 kB</td>
-            <td>+2.02 kB</td>
+            <td>29.97 kB</td>
+            <td>+2.06 kB</td>
           </tr>
           <tr>
             <td>Core + outline</td>
-            <td>28.71 kB</td>
-            <td>+0.94 kB</td>
+            <td>28.90 kB</td>
+            <td>+0.96 kB</td>
           </tr>
           <tr>
             <td>Core + layers</td>
-            <td>28.95 kB</td>
-            <td>+1.19 kB</td>
+            <td>29.13 kB</td>
+            <td>+1.21 kB</td>
           </tr>
           <tr>
             <td>Core + attachments</td>
-            <td>28.84 kB</td>
-            <td>+1.07 kB</td>
+            <td>29.00 kB</td>
+            <td>+1.09 kB</td>
           </tr>
           <tr>
             <td>Core + annotate</td>
-            <td>29.59 kB</td>
-            <td>+1.83 kB</td>
+            <td>29.77 kB</td>
+            <td>+1.85 kB</td>
+          </tr>
+          <tr>
+            <td>Core + structure</td>
+            <td>28.38 kB</td>
+            <td>+0.37 kB</td>
           </tr>
           <tr>
             <td>Core + edit</td>
-            <td>33.63 kB</td>
-            <td>+5.87 kB</td>
+            <td>33.82 kB</td>
+            <td>+5.89 kB</td>
           </tr>
           <tr>
-            <td>All eight features</td>
-            <td>42.53 kB</td>
-            <td>+14.76 kB</td>
+            <td>All nine features</td>
+            <td>43.05 kB</td>
+            <td>+15.04 kB</td>
           </tr>
           <tr>
             <td>Root entry, every export</td>
-            <td>57.90 kB</td>
+            <td>59.14 kB</td>
             <td>—</td>
           </tr>
           <tr>
             <td>Headless entry, every export</td>
-            <td>30.85 kB</td>
+            <td>31.02 kB</td>
             <td>—</td>
           </tr>
           <tr>
@@ -379,7 +385,7 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.9.0</code>. While it is pre-1.0, minor versions may contain breaking
+        The package is <code>0.10.0</code>. While it is pre-1.0, minor versions may contain breaking
         changes, so pin exactly in an application. The full release entry, the development log and the
         versioning policy live in <code>CHANGELOG.md</code> at the repository root, which GitHub renders
         on the project home page.
