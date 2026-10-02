@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { isPdfError, type PdfError } from './errors';
 import { normalizeSource, resolveSourceUrl } from './source';
 
 const PDF_MAGIC_BASE64 = 'JVBERi0xLjQK'; // "%PDF-1.4\n"
@@ -53,15 +54,20 @@ describe('normalizeSource', () => {
   });
 
   it('rejects unsupported types', async () => {
-    await expect(normalizeSource(42 as unknown as string)).rejects.toThrow(TypeError);
+    const error = await normalizeSource(42 as unknown as string).catch((err: unknown) => err);
+    expect(isPdfError(error, 'INVALID_SOURCE')).toBe(true);
   });
 
   // A string that is not recognisably a path used to be fetched as one, which
   // sends whatever the app's origin happens to serve there to the parser.
   it('refuses a bare word rather than fetching it', async () => {
-    await expect(normalizeSource('report')).rejects.toThrow(TypeError);
-    await expect(normalizeSource('the monthly report')).rejects.toThrow(/Unrecognized PDF source/);
-    await expect(normalizeSource('C:\\docs\\report.pdf')).rejects.toThrow(TypeError);
+    for (const src of ['report', 'the monthly report', 'C:\\docs\\report.pdf']) {
+      const error = await normalizeSource(src).catch((err: unknown) => err);
+      // FR-54: refused input carries a code as well as a sentence, so a host can react without matching
+      // on wording it has no reason to trust.
+      expect(isPdfError(error, 'INVALID_SOURCE')).toBe(true);
+      expect((error as Error).message).toMatch(/Unrecognized PDF source/);
+    }
   });
 
   it('still accepts paths without an extension', async () => {
@@ -115,6 +121,22 @@ describe('allowedSources', () => {
     await expect(
       normalizeSource('https://evil.example/files/a.pdf', { allowedSources: ['/files/'] }),
     ).rejects.toThrow(/allowedSources/);
+  });
+
+  it('names the origin of a refused URL and never its signed query (FR-54)', async () => {
+    const error = await normalizeSource(
+      'https://cdn.example.com/pdfs/contract.pdf?st=SECRETTOKEN123&se=4100000000',
+      { allowedSources: ['https://other.example'] },
+    ).catch((err: unknown) => err);
+
+    expect(isPdfError(error, 'SOURCE_NOT_ALLOWED')).toBe(true);
+    // §3.6: credentials never travel in a public error. A pre-signed URL keeps its credential in the query
+    // string, and this message is documented as safe to show a reader and to be logged by a host — so the
+    // assertions that matter are the negative ones: the token *and* the path it authorises.
+    expect((error as Error).message).toContain('https://cdn.example.com');
+    expect((error as Error).message).not.toContain('SECRETTOKEN123');
+    expect((error as Error).message).not.toContain('contract.pdf');
+    expect((error as PdfError).details).toEqual({ origin: 'https://cdn.example.com' });
   });
 
   it('matches a relative source against the page, not the worker', async () => {

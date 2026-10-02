@@ -210,6 +210,7 @@ export function ViewerPages() {
     ink,
     commitFor,
     handlePageError,
+    pageRetries,
     passwordPrompt,
     submitPassword,
   } = useViewer();
@@ -285,6 +286,8 @@ export function ViewerPages() {
                       inkSettings={ink.settings}
                       onInkCommit={commitFor(index)}
                       onBaseDimensions={reportPageDims}
+                      // Before `{...pageProps}`, so a host writing their own retry state keeps it.
+                      retryToken={pageRetries[index + 1] ?? 0}
                       onError={handlePageError}
                     />
                   </div>

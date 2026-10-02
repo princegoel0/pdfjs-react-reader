@@ -1,5 +1,7 @@
 /*
- * FR-39's clause where a reader actually meets it: the counter.
+ * FR-39's clause where a reader actually meets it: the counter. FR-15 is the other half of the same widget —
+ * case, whole-word, next and previous, and a live "n of m" that distinguishes a partial index from a finished
+ * one.
  *
  * A number that is still growing has to say it is growing — that is the whole requirement, and it lives in
  * one string. So these tests are about which template the box picks, in four states that are easy to

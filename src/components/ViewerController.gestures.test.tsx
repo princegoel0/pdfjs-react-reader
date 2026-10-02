@@ -1,5 +1,6 @@
 /*
- * FR-47: which listener takes which gesture.
+ * FR-47: which listener takes which gesture. FR-28 is the same controller's promise that each affordance —
+ * fullscreen, drag-and-drop, wheel zoom — can be refused and observed by the host separately.
  *
  * Three of these four gestures arrive at the same element — the scroll container the virtualizer hands
  * out — and a reader's finger cannot say twice, so the answer has to be decided rather than discovered.

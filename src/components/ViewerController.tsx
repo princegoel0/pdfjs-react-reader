@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, CSSProperties, DragEvent, KeyboardEvent } from 'react';
 import { TouchManager } from 'pdfjs-dist';
 import { usePdfDocument } from '../headless/usePdfDocument';
+import type { PdfError } from '../lib/errors';
+import { toPdfError } from '../lib/errors';
 import type { PasswordReason } from '../lib/status';
 import { usePdfInk } from '../headless/usePdfInk';
 import { usePdfPageLabels } from '../headless/usePdfPageLabels';
@@ -83,7 +85,7 @@ export interface ViewerController {
   status: ReturnType<typeof usePdfDocument>['status'];
   numPages: number;
   isReady: boolean;
-  error: Error | null;
+  error: PdfError | null;
   reload: (src?: PdfViewerProps['src']) => void;
   /** Show different bytes in place of the document on screen; see `PdfViewerShell`. */
   replaceDocument: (bytes: Uint8Array, name?: string) => void;
@@ -175,7 +177,10 @@ export interface ViewerController {
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
 
   // ---- errors --------------------------------------------------------------
-  handlePageError: (error: Error) => void;
+  handlePageError: (error: PdfError) => void;
+  /** How many times each 1-based page has been re-queued, and the one function that raises it. */
+  pageRetries: Record<number, number>;
+  retryPage: (page: number) => void;
 
   /** The same surface `PdfViewer` exposes through a ref. */
   handle: PdfViewerHandle;
@@ -335,8 +340,21 @@ export function useViewerController({
   // visibly flash and lose selection on each parent re-render).
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
-  const handlePageError = useCallback((err: Error) => {
+  const handlePageError = useCallback((err: PdfError) => {
     onErrorRef.current?.(err);
+  }, []);
+
+  /*
+   * FR-37's re-queue, published. A page that reached `error` has no other way back: its row stays mounted,
+   * the virtualizer keeps asking for it, and none of the dependencies a repaint would need — scale,
+   * rotation, which page is open — are things a reader should disturb to get one page painted again. So the
+   * shell keeps one counter per 1-based page and `PdfPage` treats a change as "start this page again".
+   * Monotonic rather than a boolean because a page can fail twice, and the second retry must also be a
+   * change. That is FR-54's "retry and requeue transitions are deterministic" stated as state.
+   */
+  const [pageRetries, setPageRetries] = useState<Record<number, number>>({});
+  const retryPage = useCallback((page: number) => {
+    setPageRetries((current) => ({ ...current, [page]: (current[page] ?? 0) + 1 }));
   }, []);
 
   // Same treatment for the annotation state: a host's inline arrow must not give the
@@ -887,7 +905,7 @@ export function useViewerController({
           try {
             config.setOCGState({ state: [...action.state], preserveRB: action.preserveRB });
           } catch (reason) {
-            handlePageError(reason instanceof Error ? reason : new Error(String(reason)));
+            handlePageError(toPdfError(reason));
             return;
           }
           repaint();
@@ -942,6 +960,7 @@ export function useViewerController({
       setLayout: (layout) => setPageLayout(layout),
       rotate: (degrees) => setRotation((r) => normalizeRotation(r + degrees)),
       rotatePage: (page, degrees) => rotatePageRef.current(page, degrees),
+      retryPage,
       openSidebar: (open, tab) => {
         setSidebarOpen(open);
         if (tab) setSidebarTab(tab);
@@ -952,7 +971,9 @@ export function useViewerController({
         searchRef.current.search(query, options);
       },
     }),
-    [],
+    // Every setter above is stable: the state functions are `useState` setters, and `retryPage` is a
+    // `useCallback` with no dependencies, so the handle keeps one identity for the life of the viewer.
+    [retryPage],
   );
 
   // Answers the engine's request through the load's own submit, which puts the document back to `loading`.
@@ -1033,6 +1054,8 @@ export function useViewerController({
     onDragLeave,
     onDrop,
     handlePageError,
+    pageRetries,
+    retryPage,
     handle,
   };
 }

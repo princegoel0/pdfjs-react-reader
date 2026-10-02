@@ -1,4 +1,5 @@
 import { GlobalWorkerOptions, PDFWorker } from 'pdfjs-dist';
+import { PdfError } from './errors';
 
 /**
  * Two forms, tried in this order, because they fail differently:
@@ -122,7 +123,10 @@ export function configureTrustedTypes(name: string = DEFAULT_POLICY_NAME): void 
     trustedTypes?: { createPolicy(n: string, rules: ScriptUrlPolicy): ScriptUrlPolicy };
   };
   if (!g.trustedTypes) {
-    throw new Error(
+    // FR-54: a published function's failure is coded, and this one is a configuration statement — the page
+    // asked for a policy in a browser that exposes no `trustedTypes` at all, so nothing needs one.
+    throw new PdfError(
+      'CONFIGURATION_ERROR',
       'configureTrustedTypes - this browser exposes no `trustedTypes` global, ' +
         'so no policy is needed. Call it only on a page that requires Trusted Types.',
     );

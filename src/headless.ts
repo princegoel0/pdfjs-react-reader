@@ -12,6 +12,14 @@ export {
   type PdfPageStatus,
   type PdfPasswordRequest,
 } from './lib/status';
+/** §3.6's error contract, on the headless entry too — a host with no shell still has to branch on a code. */
+export {
+  PDF_ERROR_CODES,
+  PdfError,
+  isCancellationCode,
+  isPdfError,
+  type PdfErrorCode,
+} from './lib/errors';
 export {
   usePdfVirtualizer,
   type PdfViewportRef,

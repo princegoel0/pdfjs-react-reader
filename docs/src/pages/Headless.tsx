@@ -3,7 +3,7 @@ import { HeadlessExample } from '../examples/HeadlessExample';
 const HOOKS: [string, string][] = [
   [
     'usePdfDocument({ src, workerSrc?, assetUrl?, cMapUrl?, standardFontUrl?, allowedSources?, httpHeaders?, withCredentials?, rangeChunkSize?, disableRange?, disableStream?, retry?, onRetryAttempt?, onProgress?, signal?, enableXfa?, onPasswordRequired? })',
-    'Loads the file. Returns { status, doc, numPages, isReady, error, passwordRequest, capabilities, reload }. `status` is the published document model — idle, loading, password-required, ready, error, destroyed — and every other field is read off it, so `ready` never arrives without a handle and a cancelled load reports `destroyed` rather than an error. The network options apply to a URL source only; `retry` defaults to three attempts with full-jitter backoff and never retries a 401, a 403, a 404 or a corrupt file; `onProgress` reports `{ loaded, total, percent }` as bytes arrive, with `percent` null when the response did not state a length; `signal` cancels the load exactly as an unmount would and reports no error.',
+    'Loads the file. Returns { status, doc, numPages, isReady, error, passwordRequest, capabilities, reload }. `status` is the published document model — idle, loading, password-required, ready, error, cancelled, destroyed — and every other field is read off it, so `ready` never arrives without a handle, and a load stopped by the host’s own signal reports `cancelled` while an unmount reports `destroyed`, neither of them as an error. The network options apply to a URL source only; `retry` defaults to three attempts with full-jitter backoff and never retries a 401, a 403, a 404 or a corrupt file; `onProgress` reports `{ loaded, total, percent }` as bytes arrive, with `percent` null when the response did not state a length; `signal` cancels the load exactly as an unmount would and reports no error.',
   ],
   [
     'usePdfVirtualizer({ doc, numPages, scale, gap?, rotation?, pageRotations?, overscan?, layout? })',
@@ -132,12 +132,13 @@ export function Headless() {
         <code>PdfDocumentStatus</code> and <code>PdfPageStatus</code>. Every other field on the result is
         read off the document&apos;s state, which is what makes the pair impossible to catch
         disagreeing: <code>status</code> is never <code>ready</code> with a null <code>doc</code>, and a
-        load the host cancelled lands on <code>destroyed</code> having never passed through{' '}
-        <code>error</code>.
+        load the host stopped with its own <code>AbortSignal</code> lands on <code>cancelled</code> — a
+        mounted viewer with a reader in front of it, which has to show something — while an unmount or a
+        superseded source lands on <code>destroyed</code>. Neither ever passes through <code>error</code>.
       </p>
       <pre>
         <code>{`// usePdfDocument
-'idle' → 'loading' → 'password-required' → 'ready' → 'error' | 'destroyed'
+'idle' → 'loading' → 'password-required' → 'ready' → 'error' | 'cancelled' | 'destroyed'
 
 const { status, doc, error, passwordRequest, reload } = usePdfDocument({ src });
 
@@ -149,6 +150,7 @@ const { status, doc, error, passwordRequest, reload } = usePdfDocument({ src });
   />
 )}
 {status === 'error' && error && <MyFailure message={error.message} onRetry={reload} />}
+{status === 'cancelled' && <MyStopped />}
 
 // PdfPage, one page at a time
 'queued' → 'rendering' → 'rendered' → 'released', with 'cancelled' and 'error' off the middle
@@ -164,6 +166,14 @@ const onPageStatus = useCallback((pageNumber: number, state: PdfPageStatus) => {
 </code>
       </pre>
       <p>
+        A page that reached <code>error</code> comes back by re-queueing, and the API for that is published
+        rather than left to the virtualizer: <code>retryToken</code> on <code>PdfPage</code> is a counter,
+        and changing it fetches the page proxy again — <code>queued → rendering → rendered</code>, the same
+        sequence as any other start. Inside the shell the same thing is{' '}
+        <code>handle.retryPage(page)</code>, one 1-based page at a time, so a page that failed while the
+        reader was elsewhere does not need their zoom or position disturbed to come back.
+      </p>
+      <p>
         A wrong password does not fail the load. The engine re-asks within about a millisecond and the hook
         publishes that as a fresh <code>password-required</code> with <code>reason:
         &apos;incorrect-password&apos;</code>, so the prompt above comes back with its own message and needs
@@ -178,6 +188,50 @@ const onPageStatus = useCallback((pageNumber: number, state: PdfPageStatus) => {
         never reports — a page the virtualizer has not mounted is not there to say so, which is exactly
         what <code>virtualSlots</code> describe. A zoom reads <code>released → rendering → rendered</code>{' '}
         and produces no <code>cancelled</code>: nothing was in flight when the buffer was handed back.
+      </p>
+
+      <h2>Every failure you can branch on</h2>
+      <p>
+        A failure that reaches a host is a <code>PdfError</code>: a stable <code>code</code> from the list
+        below, a <code>message</code> safe to put in front of a reader, optional <code>details</code> with the
+        numbers, and the engine&apos;s own error as <code>cause</code>. Branch on the code. The message is
+        wording, wording is the part a library is allowed to improve, and a UI that matched a sentence breaks
+        in the release that rephrased it — while the byte offset and the malformed dictionary a support ticket
+        needs are one property deeper, untouched.
+      </p>
+      <pre>
+        <code>{`import { isPdfError, isCancellationCode, PDF_ERROR_CODES } from 'pdfjs-react-reader/headless';
+
+INVALID_SOURCE     NETWORK_ERROR      HTTP_ERROR           AUTH_ERROR
+PASSWORD_REQUIRED  PASSWORD_INVALID   LOAD_CANCELLED       RENDER_CANCELLED
+SEARCH_CANCELLED   WORKER_ERROR       CONFIGURATION_ERROR  UNSUPPORTED_FEATURE
+RESOURCE_LIMIT     SOURCE_NOT_ALLOWED ALREADY_SIGNED       PDF_PARSE_ERROR
+WRITER_ERROR       UNKNOWN_ERROR      // 18 codes; PDF_ERROR_CODES is the list
+
+const onError = (error: PdfError) => {
+  if (isCancellationCode(error.code)) return;        // the reader stopped it; not a fault
+  switch (error.code) {
+    case 'AUTH_ERROR':           return showSignIn();
+    case 'RESOURCE_LIMIT':       return show('this range needs ' + error.details?.neededBytes + ' bytes');
+    case 'SOURCE_NOT_ALLOWED':   return show('that origin is not allowed: ' + error.details?.origin);
+    default:                     return show(error.message);
+  }
+};`}
+</code>
+      </pre>
+      <p>
+        Three of those codes are cancellations, and a cancellation never arrives at an error callback at all —
+        a load the host stopped reads <code>status: &apos;cancelled&apos;</code>, a render stopped by a scroll
+        reads <code>cancelled</code> on the page, and an aborted index goes back to <code>idle</code>. The
+        codes exist so the two facts a host sometimes has to tell apart — the reader pressed Stop, and the
+        document arrived already broken — stay tellable apart for the lifetime of the package.
+      </p>
+      <p>
+        The same rule covers a document&apos;s address. A source refused by <code>allowedSources</code> names
+        the <strong>origin</strong> it refused and nothing else, because a pre-signed URL carries its
+        credential in the query string and an error message is exactly the thing that ends up in a log line.
+        Nothing in this package puts a token, a header value or a cookie in a message, a <code>details</code>{' '}
+        field or a <code>cause</code> it created.
       </p>
 
       <h2>Two rules that matter</h2>

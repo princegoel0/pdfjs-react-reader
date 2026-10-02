@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { PdfError, toPdfError } from '../lib/errors';
 import { attachmentMimeType, normalizeAttachments, type AttachmentInfo } from '../lib/attachments';
 import { downloadBytes } from '../lib/download';
 
 export interface UsePdfAttachmentsOptions {
   doc: PDFDocumentProxy | null;
-  onError?: (error: Error) => void;
+  onError?: (error: PdfError) => void;
 }
 
 export interface UsePdfAttachmentsResult {
   /** Attached files in name order; null until the first read finishes. */
   files: AttachmentInfo[] | null;
   loading: boolean;
-  error: Error | null;
+  error: PdfError | null;
   supported: boolean;
   /** The file whose bytes are in flight, or null. */
   busyId: string | null;
@@ -32,7 +33,7 @@ export function usePdfAttachments(options: UsePdfAttachmentsOptions): UsePdfAtta
   const { doc, onError } = options;
   const [files, setFiles] = useState<AttachmentInfo[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<PdfError | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<{ id: string; message: string } | null>(null);
 
@@ -52,7 +53,7 @@ export function usePdfAttachments(options: UsePdfAttachmentsOptions): UsePdfAtta
       })
       .catch((reason: unknown) => {
         if (cancelled) return;
-        setError(reason instanceof Error ? reason : new Error(String(reason)));
+        setError(toPdfError(reason));
         setFiles(null);
         setLoading(false);
       });
@@ -80,12 +81,17 @@ export function usePdfAttachments(options: UsePdfAttachmentsOptions): UsePdfAtta
       ready
         .then((content) => {
           if (!content || content.length === 0) {
-            throw new Error(`"${file.filename}" has no readable content.`);
+            // The document says it holds this file and hands back nothing readable, which is the file being
+            // damaged rather than the save failing — §3.6's `PDF_PARSE_ERROR`, stated here instead of leaving
+            // the wrapper to guess `UNKNOWN_ERROR` from an unnameable Error.
+            throw new PdfError('PDF_PARSE_ERROR', `"${file.filename}" has no readable content.`, {
+              details: { filename: file.filename },
+            });
           }
           downloadBytes(content as Uint8Array, file.filename, attachmentMimeType(file.filename));
         })
         .catch((reason: unknown) => {
-          const failure = reason instanceof Error ? reason : new Error(String(reason));
+          const failure = toPdfError(reason);
           setSaveError({ id, message: failure.message });
           onError?.(failure);
         })

@@ -1,5 +1,5 @@
 /*
- * The marks a search leaves in the text layer, and the two channels that say which one the reader is on.
+ * FR-14: the marks a search leaves in the text layer, and the two channels that say which one the reader is on.
  *
  * `PRD.md`'s FR-44 names the active match as a distinction carried by colour alone, so this file pins the
  * fix where it is made: one statement in `splitDiv` sets the class, the ring's hook and `aria-current`

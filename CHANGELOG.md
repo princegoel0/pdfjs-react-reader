@@ -44,7 +44,7 @@ partly: FR-48 has a harness that ran on one of its three engines here, FR-49 has
   asks a DOM question of jsdom, and jsdom is one engine that rasterises no canvas, knows no
   `devicePixelRatio`, dispatches no touch, ignores `forced-colors` and arbitrates no wheel — which is
   everything `PRD.md` §8 actually claims. The script serves the playground from source, points it at the
-  fixtures and the engine's own support files rather than a CDN, and drives twelve claims through Chromium,
+  fixtures and the engine's own support files rather than a CDN, and drives thirteen claims through Chromium,
   Firefox and WebKit at 1280×900 and a 375×812 dpr-2 mobile profile. A page is *painted* when the non-white
   pixel fraction over the whole canvas says so — **1.07 %** on a text page at desktop, **1.29 %** at 375 —
   and its backing store follows the device: **1214×1571** device px for 1214 css at dpr 1, **670×867** for
@@ -57,6 +57,52 @@ partly: FR-48 has a harness that ran on one of its three engines here, FR-49 has
   A plain wheel scrolls and holds the scale at 1.98 where a ctrl+wheel takes it to 2.84. Forced colours
   turns the page slot's outline `solid 1px` and removes the shadow. Zero requests left the machine, and no
   uncaught error appeared in any cell.
+
+- **`FR-54`: the error contract is a published interface, and `FR-37`'s two missing states are produced.**
+  `PdfError` with §3.6's eighteen codes, plus `PdfErrorCode`, `PDF_ERROR_CODES`, `isPdfError`,
+  `isCancellationCode` — reachable from the root entry and from `/headless`, five new names, all tagged
+  experimental because 0.12 has never been published. Every failure path a host can see now runs through it:
+  the load, a page render and each overlay layer it builds, text indexing, print, download, merge, the writer,
+  source refusals, the feature and viewer context guards, and Trusted Types configuration. Three things worth
+  saying plainly. (1) `isPdfError` tests the *shape* — a code from the list, beside a message — and not
+  `instanceof` or the class name, because `abortError()` returns a `PdfError` that keeps `name: "AbortError"`:
+  every cancellation filter in this package and in hosts reads that name, so renaming it would move cancelled
+  renders into error handlers, and a guard keyed on the class name would call an abort a non-error. (2) The
+  vocabulary is asserted against `PRD.md` itself, so a code added in the module and not the specification, or
+  reworded in either, fails the test that names both sides. (3) `RENDER_CANCELLED` and `UNSUPPORTED_FEATURE`
+  are produced by mapping the engine's own exceptions through `toPdfError`; a render *this* package cancels
+  never becomes an error object at all, which is FR-04 working rather than a missing throw site. On the state
+  side, `cancelled` is now what a host that aborts a load observes — the suite previously asserted that a
+  stopped load landed on `destroyed`, a departure from §3.5 — and the page model gained the re-queue it names:
+  `retryPage(page)` on the handle and `retryToken` on `PdfPage`, one counter per page, so a second retry of
+  the same page is still a change.
+
+### Changed
+
+- **`signFields` refuses a field that holds a signature value by failing the call.** It already refused; the
+  refusal was a name in `refused`, the same list that holds fields the document does not have at all, and the
+  other marks were written. Now a mark aimed at a `/Sig` field carrying a `/V` throws `ALREADY_SIGNED` with the
+  field in `details`, checked before anything is written so the call leaves nothing half-done. The reason for
+  the hardness: a document signed in three of the four boxes you asked for still reads as signed, and nothing
+  in it says which one is missing. The built-in pad disables those rows and refuses a plan that names one, so
+  the shell's behaviour is unchanged — this reaches a caller who drives the writer directly, and the tier has
+  never been published.
+
+- **A writer or merge operation reports what it could not do, in numbers.** A plan naming a page the document
+  does not have, an angle that is not a quarter turn, a print range that cannot fit the canvas budget: each is
+  now a `PdfError` — `CONFIGURATION_ERROR` for the caller's instruction, `RESOURCE_LIMIT` for the ceiling,
+  `WRITER_ERROR` for the peer faulting, `PDF_PARSE_ERROR` for bytes that are not a document — and the failing
+  numbers ride in `details` (`{ page: 20, total: 20 }`, `{ neededBytes, budgetBytes, pages, fits }`) rather
+  than only inside the sentence. `@cantoo/pdf-lib`'s own exceptions never reach a host: they are kept verbatim
+  as `cause`, because the diagnosis belongs in a support ticket and the code belongs in a `switch`.
+
+- **One cost of the contract is bytes, and the ceiling noticed.** Core measured **29.09 kB → 30.01 kB** gzipped
+  and the shell moved with it, which `npm run size` records as a stale baseline and `size:update` accepts as a
+  decision. Less comfortable: `edit`'s cost over core went from **5.89 kB to 6.25 kB**, past the 6 kB
+  per-feature ceiling in `scripts/check-size.mjs`, so `npm run verify` fails until either the writer's routing
+  shrinks or the ceiling is reviewed and moved deliberately — FR-23 allows exactly those two answers and no
+  third. Both numbers are here rather than only in a failing gate because the second is the one that matters:
+  a tier that has to parse the file it is showing is the reason that ceiling moved once already.
 
 ### Verified, and what that verification did not reach
 

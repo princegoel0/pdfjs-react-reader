@@ -222,7 +222,7 @@ describe('the document state model', () => {
     expect(viewer.latest().status).toBe('loading');
   });
 
-  it('lands a cancelled load on `destroyed` and never routes it through `error`', async () => {
+  it('lands a host-cancelled load on `cancelled` and never routes it through `error`', async () => {
     calls.mockImplementation(
       () => ({ promise: new Promise<PDFDocumentProxy>(() => undefined), destroy: () => Promise.resolve() }) satisfies FakeTask,
     );
@@ -231,8 +231,14 @@ describe('the document state model', () => {
     await waitFor(() => expect(viewer.latest().status).toBe('loading'));
 
     act(() => controller.abort());
-    expect(viewer.latest().status).toBe('destroyed');
+    // FR-37: `cancelled` is a state a host can observe, not just a rule about what is not written. Before
+    // it existed, an abort left `destroyed` — true of the internal teardown but useless to a viewer still on
+    // screen, which cannot tell "the reader stopped this" from "the component went away".
+    expect(viewer.latest().status).toBe('cancelled');
     expect(viewer.statuses()).not.toContain('error');
+    expect(viewer.statuses(), 'a cancellation is not a failure on the way to being terminal').not.toContain(
+      'destroyed',
+    );
     expect(viewer.latest().error).toBeNull();
     expect(viewer.latest().doc).toBeNull();
   });

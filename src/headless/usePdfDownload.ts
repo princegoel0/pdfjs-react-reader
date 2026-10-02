@@ -1,12 +1,14 @@
 import { useCallback, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PdfError } from '../lib/errors';
+import { toPdfError } from '../lib/errors';
 import { downloadBytes, pdfFileName } from '../lib/download';
 
 export interface UsePdfDownloadOptions {
   doc: PDFDocumentProxy | null;
   /** Name for the saved file, with or without the extension. */
   fileName?: string;
-  onError?: (error: Error) => void;
+  onError?: (error: PdfError) => void;
   /**
    * Abandon a download in progress. Collecting the bytes of a large document is a round trip to the worker
    * that can take seconds, and until now the only way out was to unmount. An abort writes no file and
@@ -34,7 +36,7 @@ export interface PdfDownloadOptions {
 export interface UsePdfDownloadResult {
   download: (options?: PdfDownloadOptions) => Promise<void>;
   isBusy: boolean;
-  error: Error | null;
+  error: PdfError | null;
   /** The name the next download will use. */
   fileName: string;
 }
@@ -52,7 +54,7 @@ export function usePdfDownload({
   signal,
 }: UsePdfDownloadOptions): UsePdfDownloadResult {
   const [isBusy, setIsBusy] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<PdfError | null>(null);
 
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -90,7 +92,7 @@ export function usePdfDownload({
       if (signalRef.current?.aborted) return;
       downloadBytes(bytes, pdfFileName(fileNameRef.current));
     } catch (err) {
-      const next = err instanceof Error ? err : new Error(String(err));
+      const next = toPdfError(err);
       setError(next);
       onErrorRef.current?.(next);
     } finally {

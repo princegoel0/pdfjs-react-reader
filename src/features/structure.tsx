@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toPdfError } from '../lib/errors';
 import { usePdfFeaturePublish, usePdfFeatureShell } from '../components/FeatureHost';
 import { STRUCTURE_FEATURE_ID } from './ids';
 import type { PdfFeature, PdfStructTreeLayerBuilder } from '../lib/features';
@@ -69,7 +70,7 @@ function StructureRunner() {
       // A structure tree is an overlay on a page that already reads fine, so this goes to `onError` and
       // nowhere else: the page keeps painting, and turning a missing a11y layer into a load failure would
       // tell the reader their document is broken when it is not.
-      if (!cancelled) reportError(err instanceof Error ? err : new Error(String(err)));
+      if (!cancelled) reportError(toPdfError(err));
     });
 
     return () => {

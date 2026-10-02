@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle } from 'react';
 import type { CSSProperties } from 'react';
+import type { PdfError } from '../lib/errors';
 import type { AssetUrl } from '../lib/assets';
 import type { PdfViewerLabelsOverride } from '../lib/labels';
 import type { PdfAnnotationState } from '../lib/editing-state';
@@ -109,7 +110,7 @@ export interface PdfViewerProps {
    * without it the viewer shows its own `PasswordPrompt` instead.
    */
   onPasswordRequired?: (submit: PasswordSubmit, reason: PasswordReason) => void;
-  onError?: (error: Error) => void;
+  onError?: (error: PdfError) => void;
   /**
    * Override any subset of the shell's strings. Unspecified keys keep their
    * English default, so a partial catalog is always valid.
@@ -200,6 +201,12 @@ export interface PdfViewerHandle {
   rotate: (degrees: number) => void;
   /** Rotates a single 1-based page in place. */
   rotatePage: (page: number, degrees: number) => void;
+  /**
+   * Re-queues a single 1-based page: its proxy is fetched again and it paints again. This is the way back
+   * out of `error` for one page without disturbing the reader's zoom or position — §3.5's "an explicit
+   * retry re-queues the page", and the page-side half of FR-54's deterministic retry transitions.
+   */
+  retryPage: (page: number) => void;
   openSidebar: (open: boolean, tab?: SidebarTab) => void;
   /** Enters fullscreen, or exits when already active. Needs a user gesture. */
   toggleFullscreen: () => void;

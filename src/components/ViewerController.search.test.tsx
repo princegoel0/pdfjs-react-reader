@@ -1,5 +1,7 @@
 /*
- * The shell's half of FR-39: it has to tell the index where the reader is.
+ * The shell's half of FR-39: it has to tell the index where the reader is. FR-26 is the same seam seen from the
+ * other side — a host-supplied controller drives the bar, the marks and the counter, so the shell must never
+ * reach around it to the built-in search.
  *
  * The hook is tested against a `focusPage` it is handed directly (`usePdfSearch.incremental.test.tsx`),
  * which proves it walks outward from whatever it is given and nothing about who gives it. This file is the

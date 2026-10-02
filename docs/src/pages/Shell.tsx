@@ -55,6 +55,7 @@ const HANDLE: [string, string][] = [
   ['setLayout(layout)', 'continuous, single or spread.'],
   ['rotate(degrees)', 'Rotates the whole document.'],
   ['rotatePage(page, degrees)', 'Rotates one page in place.'],
+  ['retryPage(page)', 'Re-queues one 1-based page: its proxy is fetched again and it paints again. The published way back out of a page’s `error`, which is otherwise a state a mounted row never leaves.'],
   ['openSidebar(open, tab?)', 'Opens the sidebar. The tab argument is a string, and the only tabs that exist are the ones mounted: `thumbnails` is core, while `outline`, `layers`, `attachments` and the edit tier’s `edit` need their feature.'],
   ['toggleFullscreen()', 'Needs a user gesture, like every fullscreen request.'],
   ['search(query, options?)', 'Runs a search and reveals the search bar. `options` takes the same `caseSensitive`, `wholeWord` and `regex` flags the find bar exposes, and several words in one query means all of them on a page.'],

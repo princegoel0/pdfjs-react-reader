@@ -250,6 +250,36 @@ export function CustomViewer({ src }: { src: string }) {
 The [documentation site](https://princegoel0.github.io/pdfjs-react-reader/) runs this live, alongside
 the shell, theming and form examples.
 
+## Errors and cancellation
+
+Every failure that reaches you is a `PdfError`: a stable `code`, a `message` safe to put in front of a
+reader, optional `details` with the numbers, and the engine's own error as `cause`. Branch on the code —
+a message is wording, and wording is the part a library is allowed to improve.
+
+```ts
+import { isCancellationCode, isPdfError } from 'pdfjs-react-reader/headless';
+
+<PdfViewer
+  src="/contract.pdf"
+  onError={(error) => {
+    if (isCancellationCode(error.code)) return;         // the reader stopped it; not a fault
+    if (error.code === 'AUTH_ERROR') return signIn();
+    show(error.message);
+  }}
+/>
+```
+
+Eighteen codes ship, from `INVALID_SOURCE` to `UNKNOWN_ERROR`, and `PDF_ERROR_CODES` is the list. A code
+is never reused for a different meaning. Three of them are cancellations — `LOAD_CANCELLED`,
+`RENDER_CANCELLED`, `SEARCH_CANCELLED` — and a cancellation never reaches an error callback at all: a load
+you abort reads `status: 'cancelled'`, a page you scroll out reads `cancelled`, and an aborted index goes
+back to `idle`. Both ends of the page path can be started again — `handle.retryPage(page)` re-queues one
+page without disturbing zoom or position, and `reload()` starts the document over.
+
+A source refused by `allowedSources` names the **origin** it refused and never the path or the query,
+because a pre-signed URL carries its credential in the query string and an error message is exactly the
+thing that ends up in a log line.
+
 ## The shell, controlled
 
 `PdfViewer` owns its own state, so it takes a ref instead of a pile of controlled props:
@@ -268,9 +298,10 @@ viewer.current?.rotatePage(3, 90);  // one page, not the document
 viewer.current?.search('indemnity');
 ```
 
-`goToPage · zoomTo · zoomBy · fitTo · setLayout · rotate · rotatePage · openSidebar ·
-toggleFullscreen · search` are the whole surface. The change events fire for what the user did, not
-for what mounted: a fit mode resolving to 87 % during load does not announce itself as a change.
+`goToPage · zoomTo · zoomBy · fitTo · setLayout · rotate · rotatePage · retryPage · openSidebar ·
+toggleFullscreen · search · replaceDocument` are the whole surface. The change events fire for what
+the user did, not for what mounted: a fit mode resolving to 87 % during load does not announce itself
+as a change.
 
 Strings are one typed catalog, so a partial override is always valid:
 
@@ -573,7 +604,7 @@ writes files, and what is not allowed is work done without being asked for, twic
 
 Targets are Chrome ≥ 90, Safari ≥ 14, Firefox ≥ 90 and Edge ≥ 90, plus modern mobile browsers.
 
-What is measured where: `npm run test:browsers` (FR-48) drives twelve claims — a canvas that paints,
+What is measured where: `npm run test:browsers` (FR-48) drives thirteen claims — a canvas that paints,
 backing-store density against `devicePixelRatio`, selectable text, search marks and the no-hits state,
 thumbnails and outline, the 1,000-page document's slot count, the toolbar fold at 375 px, keyboard paging,
 wheel zoom against plain scroll, pinch against two-finger pan, forced colours, uncaught errors — through

@@ -8,6 +8,7 @@ import {
 } from 'pdfjs-dist';
 import type { InkStroke } from '../lib/ink';
 import { onAbort } from '../lib/abort';
+import { PdfError, toPdfError } from '../lib/errors';
 import { drawInkStrokes } from '../lib/ink';
 import {
   PRINT_MEMORY_BUDGET,
@@ -31,7 +32,8 @@ export interface UsePdfPrintOptions {
    * caller hands it over here.
    */
   getInkStrokes?: (pageIndex: number) => InkStroke[];
-  onError?: (error: Error) => void;
+  /** A job that failed, coded (§3.6). A cancelled job reports nothing here — `cancel` is not a failure. */
+  onError?: (error: PdfError) => void;
   /**
    * Stop an in-flight job. Aborting runs the same `cancel()` the returned handle exposes, so a host can
    * stop from its own controller rather than by unmounting. Cancelling is not an error and reports none.
@@ -53,7 +55,7 @@ export interface UsePdfPrintResult {
   isPrinting: boolean;
   /** 0..1 across the pages rendered so far. */
   progress: number;
-  error: Error | null;
+  error: PdfError | null;
   /** False on iOS Safari, where printing script-rendered canvases is broken. */
   supported: boolean;
 }
@@ -102,7 +104,7 @@ export function usePdfPrint({
 }: UsePdfPrintOptions): UsePdfPrintResult {
   const [isPrinting, setIsPrinting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<PdfError | null>(null);
 
   // Refs keep `print` stable and let `cancel` reach the running task.
   const docRef = useRef(doc);
@@ -154,7 +156,12 @@ export function usePdfPrint({
 
       try {
         const pages = planPrintPages(current.numPages, options.range);
-        if (pages.length === 0) throw new Error('There is nothing to print.');
+        // FR-54: both of these are the caller's instruction meeting a ceiling, not the printer failing, and
+        // §3.6's codes say which. `RESOURCE_LIMIT` in particular carries the numbers as `details`, so a host
+        // that offers "print a shorter range" does not have to parse a sentence to work out what to suggest.
+        if (pages.length === 0) {
+          throw new PdfError('CONFIGURATION_ERROR', 'There is nothing to print.', { details: { pages: 0 } });
+        }
 
         const first = await current.getPage(pages[0]!);
         const firstViewport = first.getViewport({
@@ -167,12 +174,19 @@ export function usePdfPrint({
         const scale = options.scale ?? planPrintScale(base, pages.length);
         if (!scale) {
           const fits = maxPrintablePages(base, PRINT_SCALES[1] ?? 1.5);
-          throw new Error(
+          const needed = estimatePrintBytes(
+            base,
+            PRINT_SCALES[PRINT_SCALES.length - 1] ?? 1,
+            pages.length,
+          );
+          throw new PdfError(
+            'RESOURCE_LIMIT',
             `Printing ${pages.length} pages needs ${formatBytes(
-              estimatePrintBytes(base, PRINT_SCALES[PRINT_SCALES.length - 1] ?? 1, pages.length),
+              needed,
             )} of canvas memory, more than the ${formatBytes(
               PRINT_MEMORY_BUDGET,
             )} budget allows. Print a shorter range (about ${fits} pages at a time), or pass a lower scale.`,
+            { details: { neededBytes: needed, budgetBytes: PRINT_MEMORY_BUDGET, pages: pages.length, fits } },
           );
         }
 
@@ -243,7 +257,7 @@ export function usePdfPrint({
         await Promise.race([printed, delay(250)]);
       } catch (err) {
         if (!cancelledRef.current) {
-          const next = err instanceof Error ? err : new Error(String(err));
+          const next = toPdfError(err);
           setError(next);
           onErrorRef.current?.(next);
         }

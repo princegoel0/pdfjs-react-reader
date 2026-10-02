@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
+import { PdfError } from '../lib/errors';
 import type { ViewerController } from './ViewerController';
 
 const ControllerContext = createContext<ViewerController | null>(null);
@@ -32,7 +33,8 @@ export function ViewerProvider({
 export function useViewer(): ViewerController {
   const controller = useContext(ControllerContext);
   if (!controller) {
-    throw new Error(
+    throw new PdfError(
+      'CONFIGURATION_ERROR',
       'pdfjs-react-reader: this part needs a viewer to read from. Render it inside <PdfViewer>, ' +
         'or wrap your own layout in <ViewerProvider controller={…}>.',
     );

@@ -1,3 +1,8 @@
+/*
+ * FR-29 depends on this mapping: the editor manager reports six keys and a resting state, and the annotate
+ * feature offers a tool only when the engine says that tool can be persisted. Getting a name wrong here turns a
+ * working editor into a silently disabled control.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   HIGHLIGHT_COLORS,

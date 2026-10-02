@@ -1,3 +1,7 @@
+/*
+ * FR-20: a download is the bytes the engine holds, named so a reader can tell a save from a flatten. The
+ * filename is the part of that contract this file can prove without a browser.
+ */
 import { describe, expect, it } from 'vitest';
 import { pdfFileName } from './download';
 

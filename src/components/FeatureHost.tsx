@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { PdfError } from '../lib/errors';
 import type { AnyPdfFeature, FeaturePublication, PdfViewerShell } from '../lib/features';
 import { samePublication } from '../lib/features';
 
@@ -32,7 +33,12 @@ const FeatureScope = createContext<ScopedStore | null>(null);
 function useScope(): ScopedStore {
   const scope = useContext(FeatureScope);
   if (!scope) {
-    throw new Error('pdfjs-react-reader: feature hooks only work inside a mounted feature.');
+    // §3.7: a feature used where it was never registered is a configuration failure, and it fails
+    // deterministically with the code rather than with a sentence a bundler minifies away.
+    throw new PdfError(
+      'CONFIGURATION_ERROR',
+      'pdfjs-react-reader: feature hooks only work inside a mounted feature.',
+    );
   }
   return scope;
 }

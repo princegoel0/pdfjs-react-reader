@@ -14,6 +14,8 @@ import {
   type ResolvedSearchOptions,
   type SearchOptions,
 } from '../lib/search';
+import type { PdfError } from '../lib/errors';
+import { toPdfError } from '../lib/errors';
 import { abortError, isCancellation } from '../lib/abort';
 import type { PageTextIndex } from '../lib/search';
 
@@ -21,7 +23,7 @@ export type SearchStatus = 'idle' | 'indexing' | 'ready' | 'error';
 
 export interface UsePdfSearchOptions {
   doc: PDFDocumentProxy | null;
-  onError?: (error: Error) => void;
+  onError?: (error: PdfError) => void;
   /**
    * Stop an in-flight index. Indexing is the longest thing this package does on the main thread, and until
    * now the only way to stop it was to unmount. Aborting returns the hook to `idle` and reports no error:
@@ -364,7 +366,7 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
             // the main thread, and a host that cancels a thousand-page index should wait at most one
             // page, not the file.
             if (runIdRef.current !== runId) return;
-            if (signalRef.current?.aborted) throw abortError('Text indexing was aborted.');
+            if (signalRef.current?.aborted) throw abortError('Text indexing was aborted.', 'SEARCH_CANCELLED');
             await scanPages([page]);
             indexed++;
             sinceFlush++;
@@ -396,7 +398,7 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
           completeRef.current = true;
           setResults([]);
           setCounts([]);
-          onErrorRef.current?.(err instanceof Error ? err : new Error(String(err)));
+          onErrorRef.current?.(toPdfError(err));
         }
       })();
     },

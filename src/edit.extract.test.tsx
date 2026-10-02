@@ -1,5 +1,6 @@
 /*
- * Extract and split, tested where the difference between them is the whole point.
+ * FR-30, extract and split: tested where the difference between them is the whole point — one page plan written
+ * out twice, and a batch that costs no bytes until it is applied.
  *
  * Both produce bytes with the same writer pass as Apply, so a test that only checked "a file
  * came out" would not notice them clobbering the document on screen — which is exactly what a

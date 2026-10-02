@@ -12,6 +12,7 @@
  * Types only, no runtime: importing this module emits nothing, so publishing the models costs no bytes.
  */
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PdfError } from './errors';
 
 /**
  * Why the engine is asking for a credential. `incorrect-password` is the re-prompt: the first request is
@@ -31,6 +32,7 @@ export type PdfDocumentStatus =
   | 'loading'
   | 'password-required'
   | 'ready'
+  | 'cancelled'
   | 'error'
   | 'destroyed';
 
@@ -73,5 +75,12 @@ export type PdfDocumentLoad =
   | { status: 'loading' }
   | { status: 'password-required'; request: PdfPasswordRequest }
   | { status: 'ready'; doc: PDFDocumentProxy }
-  | { status: 'error'; error: Error }
+  /**
+   * The consumer stopped it — an `AbortSignal` they hold, or the password prompt dismissed. Terminal, and
+   * deliberately **not** an error: nothing reached `onError`, because the reader asked for this. That
+   * distinction is FR-04's, and this arm is where it stops being a comment and becomes a type — a host
+   * cannot render a failure banner out of a state that carries no error.
+   */
+  | { status: 'cancelled' }
+  | { status: 'error'; error: PdfError }
   | { status: 'destroyed' };

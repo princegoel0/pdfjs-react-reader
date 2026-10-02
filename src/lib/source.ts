@@ -1,3 +1,5 @@
+import { describeOrigin, PdfError } from './errors';
+
 export type PdfSource = string | ArrayBuffer | Uint8Array | Blob;
 
 /** Result of normalization: either a URL pdf.js fetches itself, or raw bytes. */
@@ -28,9 +30,10 @@ function base64FromLabel(label: string): Uint8Array {
  */
 export function base64ToBytes(base64: string): Uint8Array {
   const compact = base64.replace(/\s/g, '');
-  if (!compact) throw new TypeError('base64ToBytes: the string is empty.');
+  if (!compact) throw new PdfError('INVALID_SOURCE', 'base64ToBytes: the string is empty.');
   if (!BASE64_RE.test(compact) || compact.length % 4 !== 0) {
-    throw new TypeError(
+    throw new PdfError(
+      'INVALID_SOURCE',
       'base64ToBytes: not a base64 string. Expected the alphabet A–Z a–z 0–9 + / ' +
         'with = padding, a length that is a multiple of 4, and no URL characters.',
     );
@@ -101,6 +104,28 @@ export type PdfSourceClassification =
   | { kind: 'bytes'; data: Uint8Array }
   | { kind: 'refused'; reason: PdfSourceRefusal; message: string };
 
+/**
+ * How much of a host's string is safe to repeat back.
+ *
+ * §3.6: a refusal names the origin and the reason, never the path or the query. That is not pedantry — a
+ * pre-signed S3 or SAS URL carries its credential *in the query string*, and a message is exactly the thing
+ * that ends up in a log line, a support ticket and a rendered error panel. So anything URL-shaped contributes
+ * its origin; a path contributes "the same origin"; and only a string that cannot be a URL at all (a bare
+ * word, a Windows path, an empty value) is echoed, truncated, with anything after `?` or `#` cut off first
+ * because a pasted path can carry a token too.
+ */
+function describeSource(src: string): string {
+  const trimmed = src.trim();
+  if (!trimmed) return 'an empty string';
+  if (/^data:/i.test(trimmed)) return 'a data: URL';
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || trimmed.startsWith('//')) return describeOrigin(trimmed);
+  if (trimmed.startsWith('/')) return 'the same origin';
+  const head = trimmed.split(/[?#]/)[0] ?? '';
+  // Quoted exactly as before: the message is a sentence a host may match or show, and re-quoting it would be
+  // churn with no security or clarity behind it.
+  return JSON.stringify(head.length > 48 ? `${head.slice(0, 48)}…` : head);
+}
+
 /** The sentence `normalizeSource` throws for a refused string, and the classifier reports as `message`. */
 function refusalMessage(src: string, reason: PdfSourceRefusal): string {
   const why =
@@ -112,7 +137,7 @@ function refusalMessage(src: string, reason: PdfSourceRefusal): string {
           ? 'a data URL that says base64 must carry base64'
           : 'a bare word is not a path, and fetching one returns whatever this origin serves there';
   return (
-    `Unrecognized PDF source ${JSON.stringify(src)}: ${why}. Expected a URL, a path, ` +
+    `Unrecognized PDF source ${describeSource(src)}: ${why}. Expected a URL, a path, ` +
     'a base64 string, or an ArrayBuffer, Uint8Array or Blob of file bytes.'
   );
 }
@@ -223,10 +248,16 @@ export async function normalizeSource(
   if (typeof src === 'string') {
     const classified = classifySource(src);
     if (classified.kind === 'bytes') return { kind: 'data', data: classified.data };
-    if (classified.kind === 'refused') throw new TypeError(classified.message);
+    if (classified.kind === 'refused') throw new PdfError('INVALID_SOURCE', classified.message);
     const { allowedSources } = options ?? {};
     if (allowedSources && !isAllowedSource(resolveSourceUrl(classified.url), allowedSources)) {
-      throw new Error(`Refused to load ${classified.url}: it is not listed in allowedSources.`);
+      // The origin, never the href: a pre-signed URL's query string *is* the credential, and this message is
+      // documented as safe to show a reader.
+      throw new PdfError(
+        'SOURCE_NOT_ALLOWED',
+        `Refused to load ${describeOrigin(classified.url)}: it is not listed in allowedSources.`,
+        { details: { origin: describeOrigin(classified.url) } },
+      );
     }
     return { kind: 'url', url: classified.url };
   }
@@ -235,5 +266,8 @@ export async function normalizeSource(
   if (typeof Blob !== 'undefined' && src instanceof Blob) {
     return { kind: 'data', data: new Uint8Array(await src.arrayBuffer()) };
   }
-  throw new TypeError('Unsupported PDF source: expected string, ArrayBuffer, Uint8Array, or Blob');
+  throw new PdfError(
+    'INVALID_SOURCE',
+    'Unsupported PDF source: expected string, ArrayBuffer, Uint8Array, or Blob',
+  );
 }

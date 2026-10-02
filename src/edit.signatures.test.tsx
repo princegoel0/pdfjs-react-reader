@@ -1,5 +1,7 @@
 /*
- * The signature panel, and the two things only a component test can prove.
+ * FR-32, visual signing: the signature panel, and the two things only a component test can prove — that a field
+ * already carrying a signature value is refused rather than covered over, and that the mark lands in every
+ * widget box that field declares.
  *
  * The first is the seam: a mark drawn in the pad's CSS pixels has to arrive in the file as a path
  * inside the rectangle of the box that was clicked. `pdf-write.test.ts` covers what happens to

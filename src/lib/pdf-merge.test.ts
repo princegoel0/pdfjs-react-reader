@@ -16,6 +16,8 @@ import { join } from 'node:path';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { describeMergeSources, mergeDocuments, type MergeSource } from './pdf-merge';
+import type { PdfError } from './errors';
+import { isPdfError } from './errors';
 
 const fixture = (name: string): Uint8Array =>
   new Uint8Array(readFileSync(join(process.cwd(), 'playground', 'fixtures', name)));
@@ -117,6 +119,41 @@ describe('merging documents', () => {
     await expect(
       mergeDocuments({ sources: [], order: [{ source: 0, page: 0 }] }),
     ).rejects.toThrow(/at least one document/);
+  });
+
+  /*
+   * FR-54 on the merge entry. Every one of those refusals above is a plan the sources cannot satisfy, which
+   * is the caller's instruction failing rather than the writer faulting, so each carries
+   * `CONFIGURATION_ERROR` and the numbers behind it — a host that wants to say "your page list is out by
+   * three" reads them off `details` instead of parsing the sentence.
+   */
+  it('codes the refusals rather than leaving them as prose', async () => {
+    const capture = async (run: () => Promise<unknown>): Promise<unknown> => {
+      try {
+        await run();
+      } catch (error) {
+        return error;
+      }
+      throw new Error('the plan was expected to be refused');
+    };
+
+    const pastEnd = await capture(() =>
+      mergeDocuments({ sources: sources(), order: [{ source: 1, page: 9 }] }),
+    );
+    expect(isPdfError(pastEnd, 'CONFIGURATION_ERROR')).toBe(true);
+    expect((pastEnd as PdfError).details).toEqual({ page: 9, source: 1, pages: 2 });
+
+    const noSources = await capture(() => mergeDocuments({ sources: [], order: [{ source: 0, page: 0 }] }));
+    expect(isPdfError(noSources, 'CONFIGURATION_ERROR')).toBe(true);
+    expect((noSources as PdfError).details).toEqual({ sources: 0 });
+
+    // An abort is not a bad plan: the cancellation code the caller named has to survive the trip out.
+    const controller = new AbortController();
+    controller.abort();
+    const stopped = await capture(() =>
+      mergeDocuments({ sources: sources(), order: [{ source: 0, page: 0 }] }, { signal: controller.signal }),
+    );
+    expect(isPdfError(stopped, 'LOAD_CANCELLED')).toBe(true);
   });
 
   it('produces no bytes for a caller that stopped caring', async () => {

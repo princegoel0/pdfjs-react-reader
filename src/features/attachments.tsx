@@ -1,3 +1,4 @@
+import type { PdfError } from '../lib/errors';
 import { AttachmentsView } from '../components/AttachmentsView';
 import { usePdfFeaturePublish, usePdfFeatureShell, usePdfFeatureState } from '../components/FeatureHost';
 import { usePdfAttachments } from '../headless/usePdfAttachments';
@@ -8,7 +9,7 @@ import type { PdfFeature } from '../lib/features';
 export interface AttachmentsFeatureState {
   files: AttachmentInfo[] | null;
   loading: boolean;
-  error: Error | null;
+  error: PdfError | null;
   busyId: string | null;
   saveError: { id: string; message: string } | null;
   download: (id: string) => void;

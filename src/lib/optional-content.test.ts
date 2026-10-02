@@ -1,3 +1,8 @@
+/*
+ * FR-24: an optional-content group is a state the whole render shares, not a copy a panel mutates. The order it
+ * flattens into and the ids it exposes are asserted here, where the engine's per-call config cannot hide a
+ * divergence between what the panel shows and what the page draws.
+ */
 import { describe, expect, it } from 'vitest';
 import { flattenOptionalContent, optionalContentGroupIds } from './optional-content';
 import type { OptionalContentGroupState, OptionalContentOrderEntry } from './optional-content';

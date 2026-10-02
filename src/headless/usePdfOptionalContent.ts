@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PdfError } from '../lib/errors';
+import { toPdfError } from '../lib/errors';
 import {
   flattenOptionalContent,
   type OcStateAction,
@@ -26,14 +28,14 @@ export interface UsePdfOptionalContentOptions {
   revision?: number;
   /** Notified after a mutation, so the caller can ask the pages to redraw. */
   onChanged?: () => void;
-  onError?: (error: Error) => void;
+  onError?: (error: PdfError) => void;
 }
 
 export interface UsePdfOptionalContentResult {
   /** Layer rows in document order; null until the first read finishes. */
   rows: OptionalContentRow[] | null;
   loading: boolean;
-  error: Error | null;
+  error: PdfError | null;
   /** False when the document declares no groups at all. */
   supported: boolean;
   /** The instance being mutated, so a caller can hand it to `page.render`. */
@@ -71,7 +73,7 @@ export function usePdfOptionalContent(
   const { doc, config: injected = null, revision = 0, onChanged, onError } = options;
   const [fetched, setFetched] = useState<OptionalContentConfigHandle | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<PdfError | null>(null);
 
   const config = injected ?? fetched;
 
@@ -97,7 +99,7 @@ export function usePdfOptionalContent(
         if (cancelled) return;
         // A document whose layer tree cannot be parsed still reads; the panel is
         // what fails, and it says so in place of the list.
-        setError(reason instanceof Error ? reason : new Error(String(reason)));
+        setError(toPdfError(reason));
         setLoading(false);
       });
 
@@ -123,7 +125,7 @@ export function usePdfOptionalContent(
       try {
         apply(config);
       } catch (reason) {
-        const failure = reason instanceof Error ? reason : new Error(String(reason));
+        const failure = toPdfError(reason);
         setError(failure);
         onError?.(failure);
         return;

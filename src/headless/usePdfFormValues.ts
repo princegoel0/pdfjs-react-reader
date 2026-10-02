@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PdfError } from '../lib/errors';
+import { toPdfError } from '../lib/errors';
 import {
   clearFormValues,
   collectWidgets,
@@ -16,7 +18,7 @@ import {
 
 export interface UsePdfFormValuesOptions {
   doc: PDFDocumentProxy | null;
-  onError?: (error: Error) => void;
+  onError?: (error: PdfError) => void;
 }
 
 export interface UsePdfFormValuesResult {
@@ -94,7 +96,7 @@ export function usePdfFormValues(options: UsePdfFormValuesOptions): UsePdfFormVa
       .catch((err: unknown) => {
         if (cancelled) return;
         setLoading(false);
-        onErrorRef.current?.(err instanceof Error ? err : new Error(String(err)));
+        onErrorRef.current?.(toPdfError(err));
       });
     return () => {
       cancelled = true;

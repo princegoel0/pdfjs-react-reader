@@ -1,3 +1,4 @@
+import type { PdfError } from '../lib/errors';
 import { LayersView } from '../components/LayersView';
 import { usePdfFeaturePublish, usePdfFeatureShell, usePdfFeatureState } from '../components/FeatureHost';
 import { usePdfOptionalContent } from '../headless/usePdfOptionalContent';
@@ -8,7 +9,7 @@ import type { OptionalContentRow } from '../lib/optional-content';
 export interface LayersFeatureState {
   rows: OptionalContentRow[] | null;
   loading: boolean;
-  error: Error | null;
+  error: PdfError | null;
   setVisibility: (id: string, visible: boolean) => void;
 }
 

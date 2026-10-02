@@ -13,6 +13,7 @@
  * it may as well call the loader and catch that.
  */
 import { describe, expect, it } from 'vitest';
+import { isPdfError, PdfError } from './errors';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -180,13 +181,24 @@ describe('base64ToBytes', () => {
     expect(wrapped).toEqual(oneLine);
   });
 
-  it('throws a TypeError that says what was wrong, not a DOMException about characters', () => {
-    expect(() => base64ToBytes('')).toThrow(TypeError);
+  it('throws a PdfError that says what was wrong, not a DOMException about characters', () => {
+    expect(() => base64ToBytes('')).toThrow(PdfError);
     expect(() => base64ToBytes('not base64 !!!')).toThrow(/not a base64 string/);
     expect(() => base64ToBytes('AAAA')).not.toThrow();
     // A length that is not a multiple of 4 is the other way this fails in the wild, and `atob` reports it
     // as a malformed character rather than as the padding problem it is.
     expect(() => base64ToBytes(`${BASE64_PDF}A`)).toThrow(/not a base64 string/);
+    // FR-54: the code is the part a host switches on, so a bad input arrives as INVALID_SOURCE and not
+    // as "some unknown thing went wrong".
+    const thrown: unknown = (() => {
+      try {
+        base64ToBytes('');
+        return null;
+      } catch (error) {
+        return error;
+      }
+    })();
+    expect(isPdfError(thrown, 'INVALID_SOURCE')).toBe(true);
   });
 });
 
@@ -208,9 +220,9 @@ describe('the classifier and the loader are the same rule', () => {
     const classified = classifySource(src);
     if (classified.kind === 'refused') {
       // Same type, same words: a host that checked first and a host that only passed `src` through are
-      // told the same thing.
+      // told the same thing — and the thing they are told carries a code, not just a sentence (FR-54).
       const error = await normalizeSource(src).catch((err: unknown) => err);
-      expect(error).toBeInstanceOf(TypeError);
+      expect(isPdfError(error, 'INVALID_SOURCE')).toBe(true);
       expect((error as Error).message).toBe(classified.message);
       return;
     }

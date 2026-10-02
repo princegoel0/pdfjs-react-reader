@@ -13,6 +13,7 @@ import {
   usePdfFeatureShell,
   usePdfFeatureState,
 } from './components/FeatureHost';
+import { toPdfError } from './lib/errors';
 import { downloadBytes, pdfFileName } from './lib/download';
 import { formatLabel } from './lib/labels';
 import type { PdfViewerLabels } from './lib/labels';
@@ -311,7 +312,7 @@ function EditRunner() {
         }
         return true;
       } catch (err) {
-        onErrorRef.current(err instanceof Error ? err : new Error(String(err)));
+        onErrorRef.current(toPdfError(err));
         return false;
       } finally {
         busy.current = false;
@@ -417,7 +418,7 @@ function EditRunner() {
       setLastResult(result);
       return result;
     } catch (err) {
-      const next = err instanceof Error ? err : new Error(String(err));
+      const next = toPdfError(err);
       onErrorRef.current(next);
       return null;
     } finally {
@@ -457,7 +458,7 @@ function EditRunner() {
       setNotice({ kind: 'signed', field, boxes: result.signed.length });
       return true;
     } catch (err) {
-      onErrorRef.current(err instanceof Error ? err : new Error(String(err)));
+      onErrorRef.current(toPdfError(err));
       setNotice({ kind: 'sign-failed', field });
       return false;
     } finally {
@@ -1011,6 +1012,14 @@ export {
   rotatePlanned,
 } from './lib/page-plan';
 export { arrangePages, findSignatureFields, flattenBytes, signFields } from './lib/pdf-write';
+/*
+ * §3.6: the error contract is reachable from the entries that report failures. This one reports writer
+ * faults, impossible plans and already-signed fields, and a host that only ever imports `/edit` should not
+ * have to reach into the core bundle to branch on a code — the root entry's copy is the same module, so
+ * these re-exports cost nothing but the promise.
+ */
+export { isCancellationCode, isPdfError, PdfError } from './lib/errors';
+export type { PdfErrorCode } from './lib/errors';
 /*
  * The geometry a signature pad needs, on its own and without the writer: `padToBox` is what
  * turns pointer positions into a mark, and a host that drives its own pad has no reason to

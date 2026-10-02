@@ -1,5 +1,5 @@
 /**
- * The flatten boundary, tested against real files rather than a mock of them.
+ * FR-31, the flatten boundary, tested against real files rather than a mock of them.
  *
  * `pdf-write` is the only module that touches the optional peer, so these are the
  * tests that notice when the peer's behaviour moves underneath us. Two of them exist
@@ -11,6 +11,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import type { PdfError } from './errors';
+import { isPdfError, isCancellationCode } from './errors';
 import { arrangePages, findSignatureFields, flattenBytes, signFields } from './pdf-write';
 
 const fixture = (name: string): Uint8Array =>
@@ -258,19 +260,17 @@ describe('signatures', () => {
     expect(fields.map((f) => f.alreadySigned)).toEqual([false, false, false, true]);
   });
 
-  it('writes the marks and leaves the fields unsigned', async () => {
+  it('writes the marks into the fields that are unsigned, and refuses a list that includes a signed one', async () => {
     const source = fixture('signature-sample.pdf');
     const fields = await findSignatureFields(source);
     const result = await signFields(
       source,
-      fields.map((field) => ({ field: field.name, points: MARK })),
+      fields.filter((field) => !field.alreadySigned).map((field) => ({ field: field.name, points: MARK })),
     );
     const out = text(result.bytes);
 
     expect(result.signed).toEqual(['sigPlain', 'sigKid', 'sigNoRotate']);
-    // Asked for four, written into three: the signed field is the one refused, and the
-    // answer names it rather than reporting a smaller success.
-    expect(result.refused).toEqual(['sigAlreadySigned']);
+    expect(result.refused).toEqual([]);
     expect(out.startsWith('%PDF-')).toBe(true);
     expect(count(out, 'S Q')).toBe(3);
     expect(count(out, '/FT /Sig')).toBe(4);
@@ -315,14 +315,36 @@ describe('signatures', () => {
     const source = fixture('signature-sample.pdf');
     const fields = await findSignatureFields(source);
     const signed = fields.find((f) => f.alreadySigned)!;
-    const result = await signFields(source, [{ field: signed.name, points: MARK }]);
-
     expect(signed.name).toBe('sigAlreadySigned');
-    expect(result.signed).toEqual([]);
-    expect(result.refused).toEqual(['sigAlreadySigned']);
-    expect(result.bytes).toBe(source);
+
+    // FR-54: `ALREADY_SIGNED` is §3.6's code for this refusal, so a host can branch on the reason
+    // instead of joining `refused` against `findSignatureFields` and guessing which of the two it was.
+    let thrown: unknown = null;
+    try {
+      await signFields(source, [{ field: signed.name, points: MARK }]);
+      expect.unreachable('a field carrying a /V must refuse the write');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isPdfError(thrown, 'ALREADY_SIGNED')).toBe(true);
+    expect((thrown as PdfError).details).toEqual({ field: 'sigAlreadySigned' });
+
+    /*
+     * The call that *could* have written three of the four is refused in full, which is the part a
+     * per-mark `refused` list got wrong: a document signed in three of the boxes you asked for still
+     * reads as signed, and nothing in it says the fourth is missing.
+     */
+    await expect(
+      signFields(source, [
+        { field: 'sigPlain', points: MARK },
+        { field: signed.name, points: MARK },
+      ]),
+    ).rejects.toSatisfy((error: unknown) => isPdfError(error, 'ALREADY_SIGNED'));
+
     // And the claim itself is untouched, so a validator still reads what it did before.
-    expect(objectOf(text(result.bytes), 'sigAlreadySigned')).toContain('/V << /Type /Sig');
+    expect(objectOf(text(source), 'sigAlreadySigned')).toContain('/V << /Type /Sig');
+    const stillThere = await findSignatureFields(source);
+    expect(stillThere.filter((f) => f.alreadySigned).map((f) => f.name)).toEqual(['sigAlreadySigned']);
   });
 
   it('writes nothing for a mark too short to be a signature', async () => {
@@ -360,7 +382,7 @@ describe('signatures', () => {
     const fields = await findSignatureFields(source);
     const { bytes } = await signFields(
       source,
-      fields.map((field) => ({ field: field.name, points: MARK })),
+      fields.filter((field) => !field.alreadySigned).map((field) => ({ field: field.name, points: MARK })),
     );
     const flat = await flattenBytes(bytes);
     const out = text(flat.bytes);
@@ -409,7 +431,7 @@ describe('signatures', () => {
     const fields = await findSignatureFields(source);
     const { bytes } = await signFields(
       source,
-      fields.map((field) => ({ field: field.name, points: MARK })),
+      fields.filter((field) => !field.alreadySigned).map((field) => ({ field: field.name, points: MARK })),
     );
     const moved = await arrangePages(bytes, { order: [1, 0] });
     const after = await findSignatureFields(moved.bytes);
@@ -502,5 +524,58 @@ describe('the writer honours an abort signal', () => {
     // The caller's buffer is never mutated in place, aborted or not — a cancel that had already
     // half-written into the document would be worse than no cancellation at all.
     expect(source).toEqual(before);
+  });
+});
+
+/*
+ * FR-54 on the writer. Two families of failure reach a host from `/edit` — the peer faulting, and this
+ * module refusing an instruction it cannot carry out — and neither is branchable while it is a bare
+ * `Error`. The split between the three codes is the content of this block: a damaged file is the
+ * document's fault, a bad page order is the caller's, and an abort is nobody's.
+ */
+describe('the writer codes its failures', () => {
+  const capture = async (run: () => Promise<unknown>): Promise<unknown> => {
+    try {
+      await run();
+    } catch (error) {
+      return error;
+    }
+    throw new Error('the call was expected to fail');
+  };
+
+  it('names damaged bytes a parse failure, because the file is what broke', async () => {
+    const error = await capture(() => flattenBytes(new Uint8Array([0x25, 0x50, 0x4c, 0x58, 1, 2, 3])));
+    expect(isPdfError(error, 'PDF_PARSE_ERROR')).toBe(true);
+    // The peer's own words survive: they are the diagnosis, and a support ticket needs them.
+    expect((error as PdfError).message).toContain('Reading the document for writing');
+    expect((error as PdfError).cause).toBeInstanceOf(Error);
+  });
+
+  it('names an impossible page order a configuration failure, with the numbers attached', async () => {
+    const error = await capture(() => arrangePages(fixture('page-order-sample.pdf'), { order: [0, 20] }));
+    expect(isPdfError(error, 'CONFIGURATION_ERROR')).toBe(true);
+    expect((error as PdfError).details).toEqual({ page: 20, total: 20 });
+
+    const angle = await capture(() =>
+      arrangePages(fixture('page-order-sample.pdf'), { order: [0, 1], rotations: { 1: 45 } }),
+    );
+    expect(isPdfError(angle, 'CONFIGURATION_ERROR')).toBe(true);
+    expect((angle as PdfError).details).toEqual({ angle: 45 });
+  });
+
+  it('keeps an abort an abort, whatever the writer was in the middle of', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const error = await capture(() =>
+      signFields(
+        fixture('signature-sample.pdf'),
+        [{ field: 'sigPlain', points: MARK }],
+        { signal: controller.signal },
+      ),
+    );
+    // A cancellation that arrived coded as `WRITER_ERROR` would be FR-04 collapsing into FR-54, and the
+    // wrapper is the place it could happen: the peer is never reached, so this is all ours.
+    expect(isPdfError(error, 'LOAD_CANCELLED')).toBe(true);
+    expect(isCancellationCode((error as PdfError).code)).toBe(true);
   });
 });

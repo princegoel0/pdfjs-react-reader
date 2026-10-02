@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PdfError } from '../lib/errors';
+import { toPdfError } from '../lib/errors';
 import { describeMergeSources, mergeDocuments } from '../lib/pdf-merge';
 import { isCancellation, throwIfAborted } from '../lib/abort';
 import type { MergePageRef, MergeResult, MergeSource } from '../lib/pdf-merge';
@@ -10,7 +12,7 @@ export interface UsePdfMergeOptions {
    * keep holding the same bytes it opened with after a merge finishes.
    */
   sources: readonly MergeSource[];
-  onError?: (error: Error) => void;
+  onError?: (error: PdfError) => void;
   /** Stops the page-count read, which is the only asynchronous thing before the merge itself. */
   signal?: AbortSignal;
 }
@@ -81,7 +83,7 @@ export function usePdfMerge(options: UsePdfMergeOptions): UsePdfMergeResult {
         if (!cancelled) setAvailable(counted.map((doc) => doc.pages));
       } catch (error) {
         if (cancelled || isCancellation(error)) return;
-        onErrorRef.current?.(error instanceof Error ? error : new Error(String(error)));
+        onErrorRef.current?.(toPdfError(error));
       }
     })();
     return () => {
@@ -124,7 +126,7 @@ export function usePdfMerge(options: UsePdfMergeOptions): UsePdfMergeResult {
         );
       } catch (error) {
         if (isCancellation(error)) return null;
-        onErrorRef.current?.(error instanceof Error ? error : new Error(String(error)));
+        onErrorRef.current?.(toPdfError(error));
         return null;
       } finally {
         setBusy(false);

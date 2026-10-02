@@ -1,3 +1,8 @@
+/*
+ * FR-05 guards here: placeholder heights come from real page dimensions, so the scrollbar does not jump as the
+ * pages measure themselves. Nothing above this file can see a scrollbar, so the sampling and grouping are the
+ * observable thing.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   applyRotation,

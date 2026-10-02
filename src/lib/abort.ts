@@ -17,19 +17,62 @@
  * also why there is no `composeAbort` here: nothing in the package needs two signals merged into one, and a
  * helper only its own tests call is surface area, not a feature.
  *
- * Worth recording while it is fresh: `AbortSignal.any` is Chrome 116, Safari 17.4 and Firefox 124, and
- * every one of those is past the floors `PRD.md` §8 advertises. No test in this repository could catch
- * using it, because every job we run is Node on Linux — which is the argument for FR-48, not against it.
+ * Worth recording while it is fresh: `AbortSignal.any` is Chrome 116, Safari 17.4 and Firefox 124. When this
+ * module was written the advertised floors were Chrome 90 / Safari 14 / Firefox 90, so avoiding it was a
+ * compatibility requirement. The 2026-10-02 lock raised the floors *past* it — and pdf.js 6.0 requires it
+ * natively — so nothing here is a compatibility constraint any more. The guard in `abort.test.ts` still
+ * forbids the call, and task #203 decides whether it stays for a different stated reason or comes out; until
+ * it does, compose signals by hand, as `onAbort` below does.
  */
+
+import type { PdfErrorCode } from './errors';
+import { PdfError } from './errors';
 
 /** The name we put on a cancellation we caused, matching what the platform's own aborts carry. */
 export const ABORT_ERROR_NAME = 'AbortError';
 
-/** An `Error`, not a `DOMException`: the name is the contract, and this has to survive a realm hop. */
-export function abortError(message = 'The operation was aborted.'): Error {
-  const error = new Error(message);
+/**
+ * A cancellation as a `PdfError` with a cancellation code — but keeping `name` as `AbortError`.
+ *
+ * The name is deliberately not `PdfError` here. Every engine check in this package, and a great many in
+ * hosts, filter cancellations by `name === 'AbortError'`, and a cancelled render that started reaching error
+ * handlers because the wrapper renamed it would be a regression dressed up as an improvement. The code is
+ * what the host switches on; the name is what the platform's own idiom still recognises.
+ */
+export function abortError(
+  message = 'The operation was aborted.',
+  code: PdfErrorCode = 'LOAD_CANCELLED',
+): PdfError {
+  const error = new PdfError(code, message);
   error.name = ABORT_ERROR_NAME;
   return error;
+}
+
+/**
+ * The error to raise for a signal that fired, carrying what the caller asked for.
+ *
+ * FR-04's clause: where the platform gives a reason, it survives. `signal.reason` is whatever
+ * `controller.abort(reason)` was handed — an `Error` with a message the host wrote, a DOMException with
+ * nothing useful in it, or a plain string. The first is the case worth keeping: a host that aborts with
+ * "reader navigated away" should not have that turned back into our generic sentence.
+ */
+export function cancellationFrom(
+  signal: AbortSignal | undefined,
+  code: PdfErrorCode,
+  fallbackMessage = 'The operation was aborted.',
+): PdfError {
+  const reason = signal?.reason;
+  if (reason instanceof Error && reason.name !== ABORT_ERROR_NAME) {
+    const error = new PdfError(code, reason.message, { cause: reason });
+    error.name = ABORT_ERROR_NAME;
+    return error;
+  }
+  if (typeof reason === 'string' && reason.trim()) {
+    const error = new PdfError(code, reason);
+    error.name = ABORT_ERROR_NAME;
+    return error;
+  }
+  return abortError(fallbackMessage, code);
 }
 
 /** True when the caller asked us to stop. Distinct from `isCancellation`, which also covers the engine. */
@@ -76,6 +119,10 @@ export function onAbort(signal: AbortSignal | undefined, handler: () => void): (
  * a write already handed to the writer. Put the check before the loop and before the save, not just at
  * the top, or a caller who aborts at 90 % through a thousand pages still gets a file.
  */
-export function throwIfAborted(signal: AbortSignal | undefined, message?: string): void {
-  if (signal?.aborted) throw abortError(message ?? 'The operation was aborted.');
+export function throwIfAborted(
+  signal: AbortSignal | undefined,
+  message?: string,
+  code: PdfErrorCode = 'LOAD_CANCELLED',
+): void {
+  if (signal?.aborted) throw cancellationFrom(signal, code, message ?? 'The operation was aborted.');
 }

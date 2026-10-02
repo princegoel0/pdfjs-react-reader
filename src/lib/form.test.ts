@@ -1,3 +1,7 @@
+/*
+ * FR-16 and FR-17: which fields a form exposes as controls a reader can actually use, and what the value layer
+ * promises back — read, write, reset to the arriving document, and dirty enough to warn before discarding.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   clearFormValues,

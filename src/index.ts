@@ -78,6 +78,18 @@ export {
   type PdfPageStatus,
   type PdfPasswordRequest,
 } from './lib/status';
+/**
+ * §3.6's error contract. `PdfError` is exported as a value rather than only a type so a host writing its own
+ * find strategy or feature can throw one the shell and the host's own handler both recognise, instead of
+ * inventing a fifth cancellation spelling.
+ */
+export {
+  PDF_ERROR_CODES,
+  PdfError,
+  isCancellationCode,
+  isPdfError,
+  type PdfErrorCode,
+} from './lib/errors';
 export {
   usePdfVirtualizer,
   type PdfViewportRef,

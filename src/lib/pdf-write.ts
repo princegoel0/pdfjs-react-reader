@@ -21,6 +21,8 @@
  */
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFObject, PDFSignature, degrees } from '@cantoo/pdf-lib';
 import { throwIfAborted } from './abort';
+import { PdfError, isPdfError, toPdfError } from './errors';
+import type { PdfErrorCode } from './errors';
 import { boxToPage, isSignable, signatureContent } from './signature';
 import type { BoxPoint, PageRect, SignatureStyle } from './signature';
 
@@ -37,6 +39,49 @@ export type PdfBytes = Uint8Array;
  */
 export interface WriteOptions {
   signal?: AbortSignal;
+}
+
+/*
+ * FR-54: a writer failure reaches a host as a coded error, not as a `@cantoo/pdf-lib` exception.
+ *
+ * Three codes cover this module and the split between them is the useful part:
+ *
+ *  - `WRITER_ERROR` — the peer faulted. Its own message is kept verbatim as ours, because "Unexpected N
+ *    type: undefined" is the diagnosis and a paraphrase would lose it, and the exception rides along as
+ *    `cause`.
+ *  - `CONFIGURATION_ERROR` — what the caller asked for cannot be honoured: a page order naming a page the
+ *    document does not have, an angle that is not a multiple of 90. The writer worked; the instruction was
+ *    impossible. A host shows this as "fix what you sent", not "the file is broken".
+ *  - `ALREADY_SIGNED` — §3.6 names it, FR-32 is the behaviour, and until now the only trace of the refusal
+ *    was a name in a `refused` list that also holds fields that do not exist at all.
+ *
+ * A cancellation is never re-coded: `toPdfError` returns a `PdfError` untouched, so an abort that already
+ * carries `LOAD_CANCELLED` stays exactly that on its way out.
+ */
+function asWriterError(error: unknown, code: PdfErrorCode, operation: string): PdfError {
+  if (isPdfError(error)) return error;
+  const wrapped = toPdfError(error);
+  if (wrapped.code !== 'UNKNOWN_ERROR') return wrapped;
+  return new PdfError(code, `${operation}: ${wrapped.message}`, { cause: error });
+}
+
+/**
+ * Run one peer call so a raw writer exception never becomes a host's error surface.
+ *
+ * Exported for `pdf-merge`, which is the other module that touches the optional peer and so the other
+ * place a `@cantoo/pdf-lib` failure can reach a caller — it is internal to the package and on no entry
+ * point, exactly like `loadForWriting` below.
+ */
+export async function writerCall<T>(
+  operation: string,
+  fn: () => T | Promise<T>,
+  code: PdfErrorCode = 'WRITER_ERROR',
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    throw asWriterError(error, code, operation);
+  }
 }
 
 /** One signature field, or one widget of one, as the file declares it. */
@@ -66,9 +111,9 @@ export interface PdfSignatureField {
   hasAppearance: boolean;
   /**
    * Whether the field holds a `/V`, which on a `/Sig` field is a signature value: the bytes
-   * of who signed, when, and over what range. `signFields` refuses these, because drawing a
-   * mark over one leaves a document that still claims to be cryptographically signed and no
-   * longer is.
+   * of who signed, when, and over what range. `signFields` fails the call with `ALREADY_SIGNED`
+   * rather than writing one, because drawing a mark over it leaves a document that still claims
+   * to be cryptographically signed and no longer is.
    */
   alreadySigned: boolean;
 }
@@ -154,9 +199,9 @@ export async function flattenBytes(
   if (fieldsRemoved > 0) {
     giveUnsignedSignatureWidgetsAnAppearance(doc);
     throwIfAborted(options.signal, 'Flattening was aborted.');
-    doc.getForm().flatten();
+    await writerCall('Flattening the form', () => doc.getForm().flatten());
   }
-  const out = await doc.save({ useObjectStreams: false });
+  const out = await writerCall('Writing the flattened file', () => doc.save({ useObjectStreams: false }));
   return { bytes: out, fieldsRemoved, hadNoForm: fieldsRemoved === 0 };
 }
 
@@ -200,7 +245,16 @@ function giveUnsignedSignatureWidgetsAnAppearance(doc: PDFDocument): void {
  * on no entry point.
  */
 export async function loadForWriting(bytes: PdfBytes): Promise<PDFDocument> {
-  return PDFDocument.load(toArrayBuffer(bytes), { ignoreEncryption: true });
+  /*
+   * A file the writer cannot read is a parse failure, not a writer fault: §3.6 has both codes and the host's
+   * answer to them differs. "The bytes you handed me are not a PDF" points at the document; `WRITER_ERROR`
+   * would point at us.
+   */
+  return writerCall(
+    'Reading the document for writing',
+    () => PDFDocument.load(toArrayBuffer(bytes), { ignoreEncryption: true }),
+    'PDF_PARSE_ERROR',
+  );
 }
 
 /** `pdf-lib` will not accept a `Uint8Array` view that is offset into a larger buffer. */
@@ -227,14 +281,26 @@ export async function arrangePages(
   const doc = await loadForWriting(bytes);
   const total = doc.getPageCount();
   const order = arrangement.order;
-  if (order.length === 0) throw new Error('a PDF must keep at least one page');
+  // FR-54: an arrangement the document cannot carry out is the caller's instruction failing, not the writer
+  // faulting, so it gets `CONFIGURATION_ERROR` and the numbers behind it rather than a sentence to parse.
+  if (order.length === 0) {
+    throw new PdfError('CONFIGURATION_ERROR', 'a PDF must keep at least one page', {
+      details: { pages: 0, total },
+    });
+  }
 
   const kept = new Set<number>();
   for (const index of order) {
     if (!Number.isInteger(index) || index < 0 || index >= total) {
-      throw new Error(`page ${index} is not one of this document's ${total} pages`);
+      throw new PdfError('CONFIGURATION_ERROR', `page ${index} is not one of this document's ${total} pages`, {
+        details: { page: index, total },
+      });
     }
-    if (kept.has(index)) throw new Error(`page ${index} is asked for twice`);
+    if (kept.has(index)) {
+      throw new PdfError('CONFIGURATION_ERROR', `page ${index} is asked for twice`, {
+        details: { page: index },
+      });
+    }
     kept.add(index);
   }
 
@@ -265,7 +331,7 @@ export async function arrangePages(
   permutePageTree(doc, order.map((original) => survivors.indexOf(original)));
 
   throwIfAborted(options.signal, 'Rearranging pages was aborted.');
-  const out = await doc.save({ useObjectStreams: false });
+  const out = await writerCall('Writing the rearranged file', () => doc.save({ useObjectStreams: false }));
   return { bytes: out, pages: order.length, removed };
 }
 
@@ -284,15 +350,30 @@ function permutePageTree(doc: PDFDocument, order: number[]): void {
   if (order.length < 2) return;
   const tree = doc.context.lookup(doc.catalog.get(PDFName.of('Pages')), PDFDict);
   const kidsEntry = tree.get(PDFName.of('Kids'));
-  if (!kidsEntry) throw new Error('the page tree has no /Kids array');
+  /*
+   * These three are the writer's own bookkeeping disagreeing with the page count it reported a line earlier.
+   * Nothing the caller sent can cause them, which is what makes them `WRITER_ERROR` rather than the
+   * `CONFIGURATION_ERROR` the validation above returns.
+   */
+  if (!kidsEntry) {
+    throw new PdfError('WRITER_ERROR', 'the page tree has no /Kids array', {
+      details: { expected: order.length },
+    });
+  }
   const kids = doc.context.lookup(kidsEntry, PDFArray);
   const current = kids.asArray();
   if (current.length !== order.length) {
-    throw new Error(`the page tree holds ${current.length} pages, the order names ${order.length}`);
+    throw new PdfError(
+      'WRITER_ERROR',
+      `the page tree holds ${current.length} pages, the order names ${order.length}`,
+      { details: { inTree: current.length, inOrder: order.length } },
+    );
   }
   const refs = order.map((index) => {
     const ref = current[index];
-    if (!ref) throw new Error(`page ${index} is not in the page tree`);
+    if (!ref) {
+      throw new PdfError('WRITER_ERROR', `page ${index} is not in the page tree`, { details: { page: index } });
+    }
     return ref;
   });
   tree.set(PDFName.of('Kids'), doc.context.obj(refs));
@@ -303,7 +384,9 @@ function permutePageTree(doc: PDFDocument, order: number[]): void {
 function normaliseAngle(angle: number): number {
   const normalised = ((Math.round(angle) % 360) + 360) % 360;
   if (normalised % 90 !== 0) {
-    throw new Error(`a page rotation must be a multiple of 90 degrees, got ${angle}`);
+    throw new PdfError('CONFIGURATION_ERROR', `a page rotation must be a multiple of 90 degrees, got ${angle}`, {
+      details: { angle },
+    });
   }
   return normalised;
 }
@@ -438,9 +521,14 @@ export async function findSignatureFields(
  * `/Rect`, which is what lets a path recorded in the same space be written without any
  * translation — and it is the same space `lib/ink.ts` already stores strokes in.
  *
- * A mark whose field is not in the file is refused rather than dropped quietly, and a
- * request that writes nothing does not re-save the document: the bytes that come back
+ * A mark whose field is not in the file is reported in `refused` rather than dropped quietly,
+ * and a request that writes nothing does not re-save the document: the bytes that come back
  * are then the bytes that went in.
+ *
+ * A mark aimed at a field that already carries a `/V` fails the whole call with
+ * `ALREADY_SIGNED`, before anything is written. It is the one refusal that is not a per-mark
+ * outcome: a document signed in three of the four boxes you asked for still reads as signed,
+ * and the reader has no way to see which one is missing.
  */
 export async function signFields(
   bytes: PdfBytes,
@@ -455,14 +543,27 @@ export async function signFields(
     .getFields()
     .filter((field): field is PDFSignature => field instanceof PDFSignature);
 
+  /*
+   * A `/V` on a `/Sig` field is somebody's claim about these bytes, and a picture drawn into the same box
+   * makes that claim false without saying so (FR-32). The check runs over every mark first, so the refusal
+   * costs nothing: no widget is left holding a new appearance, and `alreadySigned` on the field report is
+   * how a caller avoids the question — the built-in pad disables those rows for exactly this reason.
+   */
+  for (const mark of wanted) {
+    const field = fields.find((candidate) => candidate.getName() === mark.field);
+    if (field && hasSignatureValue(doc, field, field.acroField.dict)) {
+      throw new PdfError('ALREADY_SIGNED', `Field "${mark.field}" already holds a signature value.`, {
+        details: { field: mark.field },
+      });
+    }
+  }
+
   const signed: string[] = [];
   const written = new Set<string>();
   for (const mark of wanted) {
     throwIfAborted(options.signal, 'Signing was aborted.');
     const field = fields.find((candidate) => candidate.getName() === mark.field);
-    // Refused rather than overwritten: a `/V` is somebody's claim about the document, and a
-    // picture drawn into the same box makes that claim false without saying so.
-    if (!field || hasSignatureValue(doc, field, field.acroField.dict)) continue;
+    if (!field) continue;
     written.add(mark.field);
     for (const widget of signatureWidgets(doc, field)) {
       const rect = rectOf(doc, widget);
@@ -486,5 +587,6 @@ export async function signFields(
   const refused = marks.filter((mark) => !written.has(mark.field)).map((mark) => mark.field);
   if (!signed.length) return { bytes, signed, refused };
   throwIfAborted(options.signal, 'Signing was aborted.');
-  return { bytes: await doc.save({ useObjectStreams: false }), signed, refused };
+  const out = await writerCall('Writing the signed file', () => doc.save({ useObjectStreams: false }));
+  return { bytes: out, signed, refused };
 }

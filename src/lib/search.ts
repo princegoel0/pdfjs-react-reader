@@ -390,7 +390,9 @@ export async function extractAllText(
   for (let i = 0; i < numPages; i++) {
     // Checked per page rather than up front: this loop is the longest thing the package does on the main
     // thread, and a host that cancels a thousand-page index should wait at most one page, not the file.
-    if (signal?.aborted) throw abortError('Text indexing was aborted.');
+    // FR-54's cancellation codes name the operation that stopped, so a host that aborts the index and the
+    // load at the same moment can tell the two rejections apart without a flag of its own.
+    if (signal?.aborted) throw abortError('Text indexing was aborted.', 'SEARCH_CANCELLED');
     out[i] = await extractPageText(doc, i);
     onProgress?.((i + 1) / numPages);
     if (i % 5 === 4) await new Promise((resolve) => setTimeout(resolve, 0));

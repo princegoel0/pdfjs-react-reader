@@ -29,6 +29,8 @@ import type { PageDims } from '../lib/layout';
 import type { PdfLinkService } from '../lib/link-service';
 import type { PageMatch } from '../lib/search';
 import type { PdfPageStatus } from '../lib/status';
+import type { PdfError } from '../lib/errors';
+import { toPdfError } from '../lib/errors';
 
 /** `RenderParameters` is not exported, and the OC promise's type is only named there. */
 type RenderParams = Parameters<PDFPageProxy['render']>[0];
@@ -134,7 +136,11 @@ export interface PdfPageProps {
   onInkCommit?: (points: PdfPoint[]) => void;
   /** Called once the page's intrinsic (scale-1) dimensions are known. */
   onBaseDimensions?: (index: number, dims: PageDims) => void;
-  onError?: (error: Error) => void;
+  /**
+   * A failure that reached this page, as §3.6's coded error. A cancellation never arrives here — it is the
+   * `cancelled` member of `onStatusChange`, which is the whole point of FR-04.
+   */
+  onError?: (error: PdfError) => void;
   /**
    * Cancel this page's work from outside — the proxy fetch, the canvas render, and each overlay layer.
    * Aborting runs exactly what scrolling the row out runs, and reports nothing: a cancellation is not a
@@ -159,6 +165,16 @@ export interface PdfPageProps {
    * memo working.
    */
   onStatusChange?: (pageNumber: number, status: PdfPageStatus) => void;
+  /**
+   * Re-queues this page: change the value and the page proxy is fetched again, which runs the whole paint
+   * sequence once more. It is how a page that reached `error` leaves `error` — §3.5's "an explicit retry
+   * re-queues the page", and the reason `PdfViewerHandle.retryPage` exists rather than a host having to
+   * remount a row to get a page back.
+   *
+   * A number, not a boolean, because a page can fail twice in a row and the second retry has to be a change.
+   * The value itself carries no meaning; only its changing does.
+   */
+  retryToken?: number;
 }
 
 /** A pass whose completion the `rendered` state waits for. */
@@ -291,6 +307,7 @@ export const PdfPage = memo(function PdfPage({
   onError,
   onStatusChange,
   signal,
+  retryToken = 0,
 }: PdfPageProps) {
   const labels = useLabels();
   const { report, begin, end, drop } = usePageProgress(onStatusChange, pageNumber);
@@ -365,7 +382,9 @@ export const PdfPage = memo(function PdfPage({
       // §3.5: a failure that reached the page is a state, not only an event. Reported before the callback
       // so a host watching both sees them in the order they happened.
       report('error');
-      onErrorRef.current?.(err instanceof Error ? err : new Error(String(err)));
+      // FR-54: the page's failure is a coded error. A cancellation never arrives here — every caller above
+      // returns on it first — so what reaches a host is a fault with a code, never the mechanism.
+      onErrorRef.current?.(toPdfError(err));
     },
     [report],
   );
@@ -407,7 +426,9 @@ export const PdfPage = memo(function PdfPage({
       offAbort();
       cancelled = true;
     };
-  }, [doc, pageNumber, report, reportError]);
+    // `retryToken` is in this list on purpose: the proxy fetch is the one effect whose re-running puts a
+    // page back at `queued`, and every layer effect below already keys on the `page` it produces.
+  }, [doc, pageNumber, report, reportError, retryToken]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -631,7 +652,7 @@ export const PdfPage = memo(function PdfPage({
         // overlay: the canvas painted, the words are selectable, and a host that shows a failure UI for
         // this would be telling the reader their document is broken when only its structure is absent.
         if (cancelled) return;
-        onErrorRef.current?.(err instanceof Error ? err : new Error(String(err)));
+        onErrorRef.current?.(toPdfError(err));
       });
 
     const stop = () => {

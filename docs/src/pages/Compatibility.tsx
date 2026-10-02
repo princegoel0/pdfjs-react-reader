@@ -264,7 +264,7 @@ export function Compatibility() {
           <tr>
             <td>Chromium (desktop and the mobile-shell emulation paths)</td>
             <td>
-              Verified. <code>npm run test:browsers</code> drives twelve claims — a painted canvas measured
+              Verified. <code>npm run test:browsers</code> drives thirteen claims — a painted canvas measured
               as ink over the whole page, backing-store density against <code>devicePixelRatio</code>, text
               you can select, search that marks and advances, thumbnails and outline, virtualization of a
               1,000-page document, the toolbar fold at 375&nbsp;px, keyboard paging including the{' '}

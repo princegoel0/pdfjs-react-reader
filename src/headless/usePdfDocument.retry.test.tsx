@@ -12,6 +12,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InvalidPDFException, ResponseException, type PDFDocumentProxy } from 'pdfjs-dist';
 import type { RetryAttemptInfo } from '../lib/retry';
+import { isPdfError } from '../lib/errors';
 import { usePdfDocument } from './usePdfDocument';
 
 const calls = vi.hoisted(() => vi.fn());
@@ -95,8 +96,11 @@ describe('FR-35 retrying a load', () => {
     expect(calls, 'a refused credential must not be retried').toHaveBeenCalledTimes(1);
     expect(reported).toHaveLength(0);
     // Asserted so "exactly one call" cannot also be satisfied by an unrelated
-    // failure — a mock wired wrong would make one call too, and pass.
-    expect(result.current.error, 'the surfaced failure is the 401 itself').toBe(refusal);
+    // failure — a mock wired wrong would make one call too, and pass. FR-54: the surfaced failure is a
+    // `PdfError` carrying AUTH_ERROR, with the engine's own exception preserved underneath it rather than
+    // replaced — the code is ours to promise, the message is the origin's to explain.
+    expect(isPdfError(result.current.error, 'AUTH_ERROR'), 'the surfaced failure is the 401').toBe(true);
+    expect((result.current.error as unknown as { cause: unknown }).cause).toBe(refusal);
   });
 
   it('never retries a 403 either', async () => {
@@ -106,7 +110,10 @@ describe('FR-35 retrying a load', () => {
 
     await waitFor(() => expect(result.current.error).not.toBeNull());
     expect(calls).toHaveBeenCalledTimes(1);
-    expect(result.current.error).toBe(refusal);
+    // A 403 is the same decision as a 401 from the reader's side: their credential is not accepted, and
+    // another attempt will not change that.
+    expect(isPdfError(result.current.error, 'AUTH_ERROR')).toBe(true);
+    expect((result.current.error as unknown as { cause: unknown }).cause).toBe(refusal);
   });
 
   it('never retries a corrupt document, which will not become parseable', async () => {

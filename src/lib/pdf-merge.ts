@@ -18,7 +18,9 @@
  */
 import { PDFDocument } from '@cantoo/pdf-lib';
 import { throwIfAborted } from './abort';
-import { loadForWriting, type PdfBytes, type WriteOptions } from './pdf-write';
+import { PdfError } from './errors';
+import { loadForWriting, writerCall } from './pdf-write';
+import type { PdfBytes, WriteOptions } from './pdf-write';
 
 /** One page of one source, addressed the way the picker sees it. */
 export interface MergePageRef {
@@ -87,8 +89,18 @@ export async function mergeDocuments(
   options: WriteOptions = {},
 ): Promise<MergeResult> {
   const { sources, order } = plan;
-  if (sources.length === 0) throw new Error('a merge needs at least one document to take pages from');
-  if (order.length === 0) throw new Error('a merge needs at least one page in it');
+  // FR-54: a plan the sources cannot satisfy is the caller's instruction failing, in the same shape the
+  // page-arranging writer uses — `CONFIGURATION_ERROR` with the numbers, not a sentence to parse.
+  if (sources.length === 0) {
+    throw new PdfError('CONFIGURATION_ERROR', 'a merge needs at least one document to take pages from', {
+      details: { sources: 0 },
+    });
+  }
+  if (order.length === 0) {
+    throw new PdfError('CONFIGURATION_ERROR', 'a merge needs at least one page in it', {
+      details: { pages: 0, sources: sources.length },
+    });
+  }
 
   throwIfAborted(options.signal, 'Merging was aborted.');
   const loaded: PDFDocument[] = [];
@@ -102,12 +114,18 @@ export async function mergeDocuments(
   // before it has built a document, not part-way through one the caller then has to throw away.
   for (const ref of order) {
     if (!Number.isInteger(ref.source) || ref.source < 0 || ref.source >= sources.length) {
-      throw new Error(`source ${ref.source} is not one of the ${sources.length} documents offered`);
+      throw new PdfError(
+        'CONFIGURATION_ERROR',
+        `source ${ref.source} is not one of the ${sources.length} documents offered`,
+        { details: { source: ref.source, sources: sources.length } },
+      );
     }
     const pages = available[ref.source]!;
     if (!Number.isInteger(ref.page) || ref.page < 0 || ref.page >= pages) {
-      throw new Error(
+      throw new PdfError(
+        'CONFIGURATION_ERROR',
         `page ${ref.page} is not one of source ${ref.source + 1}'s ${pages} pages`,
+        { details: { page: ref.page, source: ref.source, pages } },
       );
     }
   }
@@ -116,12 +134,16 @@ export async function mergeDocuments(
   const taken = new Array<number>(sources.length).fill(0);
   for (const ref of order) {
     throwIfAborted(options.signal, 'Merging was aborted.');
-    const [copied] = await out.copyPages(loaded[ref.source]!, [ref.page]);
+    // Peer calls, so both are guarded the way the page writer guards its own: a `copyPages` that faults
+    // arrives as `WRITER_ERROR` with the peer's words preserved, never as a `@cantoo/pdf-lib` exception.
+    const [copied] = await writerCall(`Copying page ${ref.page + 1} of source ${ref.source + 1}`, () =>
+      out.copyPages(loaded[ref.source]!, [ref.page]),
+    );
     out.addPage(copied);
     taken[ref.source] = (taken[ref.source] ?? 0) + 1;
   }
 
   throwIfAborted(options.signal, 'Merging was aborted.');
-  const bytes = await out.save({ useObjectStreams: false });
+  const bytes = await writerCall('Writing the merged file', () => out.save({ useObjectStreams: false }));
   return { bytes, pages: order.length, taken, available };
 }

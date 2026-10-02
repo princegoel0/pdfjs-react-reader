@@ -9,6 +9,7 @@ import {
 import { normalizeSource, type PdfSource } from '../lib/source';
 import { pdfAssetUrls, type AssetUrl } from '../lib/assets';
 import { onAbort } from '../lib/abort';
+import { PdfError, toPdfError } from '../lib/errors';
 import { backoffDelay, classifyLoadError, resolveAttempts } from '../lib/retry';
 import type { RetryAttemptInfo, RetryPolicy } from '../lib/retry';
 import type {
@@ -158,7 +159,14 @@ export interface UsePdfDocumentResult {
   doc: PDFDocumentProxy | null;
   numPages: number;
   isReady: boolean;
-  error: Error | null;
+  /**
+   * The failure, as a `PdfError`, and null in every state except `error`.
+   *
+   * Narrowed from `Error` deliberately: a host that only wants the message sees the same string, and a host
+   * that wants to react — retry button for `NETWORK_ERROR`, credential prompt for `PASSWORD_INVALID`, no
+   * banner at all for a cancellation — gets a code to switch on instead of a sentence to match.
+   */
+  error: PdfError | null;
   /**
    * The pending credential request while `status` is `password-required`, and null in every other state.
    *
@@ -244,8 +252,9 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
   onProgressRef.current = onProgress;
 
   // Set by the load effect to whatever its teardown currently is, so a host signal arriving after the
-  // load started can stop it without the signal being a dependency of the load itself.
-  const cancelRef = useRef<(() => void) | null>(null);
+  // load started can stop it without the signal being a dependency of the load itself. The argument says
+  // who asked: a host abort lands on `cancelled`, an unmount or a superseded load on `destroyed`.
+  const cancelRef = useRef<((byHost?: boolean) => void) | null>(null);
 
   const reload = useCallback((nextSrc?: PdfSource) => {
     if (nextSrc !== undefined) srcRef.current = nextSrc;
@@ -258,6 +267,9 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
     let cancelled = false;
     let task: PDFDocumentLoadingTask | null = null;
     let owned: OwnedPdfWorker | null = null;
+    // The error a host submitted to dismiss a password prompt, if any. Kept by identity so the catch below
+    // can tell "the reader dismissed the prompt" from "the origin refused us" and code it accordingly.
+    let passwordDismissal: unknown;
 
     setLoad({ status: 'loading' });
     setCapabilities(null);
@@ -339,6 +351,7 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
                 // state could otherwise answer it after the engine had already re-asked, clearing the new
                 // prompt and leaving the load waiting on a request nothing is showing.
                 submit: (password) => {
+                  if (password instanceof Error) passwordDismissal = password;
                   setLoad((current) =>
                     current.status === 'password-required' && current.request === request
                       ? { status: 'loading' }
@@ -411,19 +424,29 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
           cause.message +=
             ' — the pdf.js worker was not found automatically. Pin it with `workerSrc` ' +
             "(e.g. `import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'`).";
+          setLoad({ status: 'error', error: new PdfError('WORKER_ERROR', cause.message, { cause }) });
+          return;
         }
-        setLoad({ status: 'error', error: cause });
+        // A prompt the reader dismissed is the engine failing to get a credential, which is neither a
+        // network failure nor an unclassified one — and the host said so by submitting an `Error`.
+        setLoad({
+          status: 'error',
+          error: toPdfError(cause, err === passwordDismissal ? { code: 'PASSWORD_REQUIRED' } : undefined),
+        });
       }
     })();
 
     // The same teardown an unmount runs, published so the host-signal effect below can reach it. It has to
     // close over this effect's `cancelled`, `task` and `owned`, which nothing outside can see.
-    const teardown = () => {
+    //
+    // `byHost` is the difference between the two terminal non-failure states, and it is the reader's
+    // experience of them: an unmount has nobody left to tell, so the load is simply gone (`destroyed`), while
+    // an abort leaves a mounted viewer on screen that must show *something* — and what it shows is
+    // `cancelled`, never a failure banner. §3.5 allows a superseded load to go straight to `destroyed`, so
+    // only the host-initiated path writes `cancelled`.
+    const teardown = (byHost = false) => {
       cancelled = true;
-      // §3.5: a superseded or cancelled load lands on `destroyed`, never on `error`. Writing the state here
-      // rather than leaving the previous value in place is what makes a host-initiated stop observable —
-      // an unmount has nobody left to tell, but an abort keeps the component mounted.
-      setLoad({ status: 'destroyed' });
+      setLoad(byHost ? { status: 'cancelled' } : { status: 'destroyed' });
       // A worker handed to `getDocument` is not owned by the loading task, so it
       // has to be released here or every reload leaks one.
       void task?.destroy().finally(() => owned?.dispose());
@@ -445,10 +468,10 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
     // Already aborted is not "about to abort": the load must not start at all, and reporting no error is
     // the point — a caller that cancelled has already stopped caring.
     if (signal.aborted) {
-      cancelRef.current?.();
+      cancelRef.current?.(true);
       return undefined;
     }
-    return onAbort(signal, () => cancelRef.current?.());
+    return onAbort(signal, () => cancelRef.current?.(true));
   }, [signal]);
 
   // Every field below is read off `load`, so the status and the fields it summarizes are one value.

@@ -19,6 +19,7 @@ import type { InkStroke } from './ink';
 import type { PdfViewerLabels, PdfViewerLabelsOverride } from './labels';
 import type { PageLayout, ScaleMode } from './layout';
 import type { PdfAnnotationState } from './editing-state';
+import type { PdfError } from './errors';
 import type { OptionalContentConfigHandle } from './optional-content';
 
 /** What a feature's Runner publishes for its own controls and the shell to read. */
@@ -137,8 +138,8 @@ export interface PdfViewerShell {
   setLayout: (layout: PageLayout) => void;
   /** Turn one page of the document on screen, in view state until a feature writes it. */
   rotatePage: (page: number, degrees: number) => void;
-  /** Routes a failure into the viewer's own `onError`. */
-  reportError: (error: Error) => void;
+  /** Routes a failure into the viewer's own `onError`, coded as §3.6's `PdfError`. */
+  reportError: (error: PdfError) => void;
   /**
    * Routes an annotation-editor change into the viewer's own `onAnnotationChange`.
    *
