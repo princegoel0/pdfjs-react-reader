@@ -72,11 +72,15 @@ if (!existsSync(baselinePath) && !update) {
  * ------------------------------------------------------------------ */
 
 /**
- * The dist files reachable from one entry, following tsup's `./chunk-*.js`
- * hoisting. Six entries share chunks now, so attributing every chunk to every
- * path would report a shell that contains features nobody imported.
+ * The dist files reachable from one entry, following tsup's chunk hoisting. Six entries share chunks now,
+ * so attributing every chunk to every path would report a shell that contains features nobody imported.
+ *
+ * The pattern is per format, because FR-41's two halves are not built the same way: the ESM output hoists
+ * shared code into `chunk-*.js` reached by static `import`, and the CJS output is one self-contained
+ * `*.cjs` per entry — which is worth measuring precisely because it means a CJS host that names two entries
+ * downloads the shared code twice, where an ESM host pays for it once.
  */
-function reachableFrom(entry) {
+function reachableFrom(entry, pattern) {
   const found = new Set();
   const queue = [entry];
   while (queue.length) {
@@ -84,26 +88,35 @@ function reachableFrom(entry) {
     if (!file || found.has(file) || !existsSync(join(dist, file))) continue;
     found.add(file);
     const code = readFileSync(join(dist, file), 'utf8');
-    for (const match of code.matchAll(/from\s+['"](\.[^'"]+\.js)['"]/g)) {
+    for (const match of code.matchAll(pattern)) {
       queue.push(posix.normalize(posix.join(posix.dirname(file), match[1])));
     }
   }
   return [...found].sort();
 }
 
+const ESM_REF = /from\s+['"](\.[^'"]+\.js)['"]/g;
+const CJS_REF = /require\(['"](\.[^'"]+\.cjs)['"]\)/g;
+
 const styleSheet = existsSync(join(dist, 'styles.css')) ? ['styles.css'] : [];
 const filePaths = [
-  { label: 'shell', files: [...reachableFrom('index.js'), ...styleSheet] },
-  { label: 'headless', files: [...reachableFrom('headless.js'), ...styleSheet] },
+  { label: 'shell', files: [...reachableFrom('index.js', ESM_REF), ...styleSheet] },
+  { label: 'headless', files: [...reachableFrom('headless.js', ESM_REF), ...styleSheet] },
+  /*
+   * The CommonJS half of FR-41, measured the same way so the two are comparable. `styles.css` is included
+   * because a CJS consumer imports it identically — CSS has no second format.
+   */
+  { label: 'shell (cjs)', files: [...reachableFrom('index.cjs', CJS_REF), ...styleSheet] },
+  { label: 'headless (cjs)', files: [...reachableFrom('headless.cjs', CJS_REF), ...styleSheet] },
   /*
    * The shipped catalogs, measured as the files a consumer is served rather than as a
    * bundle: a catalog imports nothing, so the only question about it is how many bytes
    * of words it carries, and ratcheting that is what keeps a 134-string file from
    * quietly turning into a 400-string one.
    */
-  { label: 'catalog:de', files: reachableFrom('locales/de.js') },
-  { label: 'catalog:es', files: reachableFrom('locales/es.js') },
-  { label: 'catalog:fr', files: reachableFrom('locales/fr.js') },
+  { label: 'catalog:de', files: reachableFrom('locales/de.js', ESM_REF) },
+  { label: 'catalog:es', files: reachableFrom('locales/es.js', ESM_REF) },
+  { label: 'catalog:fr', files: reachableFrom('locales/fr.js', ESM_REF) },
 ];
 
 /* ------------------------------------------------------------------ *

@@ -7,7 +7,157 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet. `0.12` Prove (FR-41, FR-48–FR-51) is next.
+`0.12` Prove (FR-41, FR-48–FR-51) is in progress. Four of its five requirements are built and the fifth is
+partly: FR-48 has a harness that ran on one of its three engines here, FR-49 has two of its four profiles.
+
+### Added
+
+- **`FR-41`: the package can be `require()`d.** `tsup` now emits `esm` **and** `cjs`, so every published
+  path is four files — `x.js`, `x.cjs`, `x.d.ts`, `x.d.cts` — and the export map answers `import` and
+  `require` separately with its own `types` in each, which is the part that silently rots: a map with one
+  `types` and two formats resolves declarations for one of them and gives TypeScript `any` for the other,
+  with no error anywhere. `main` moved to the CommonJS file, `module` stayed ESM, and `sideEffects` still
+  exempts only CSS. Fifteen JS paths, all four files each, verified from a packed tarball.
+- **Two checks, because an export map is easy to write wrong quietly.** `npm run check:packaging` is the
+  last step of `npm run verify`: it reads the map, requires and imports every entry, and compares the
+  **name lists**, so a format whose surface has drifted is caught as the second package it would have
+  become. `npm run check:tarball` is the half no in-repo check can do — it packs, installs the tarball
+  beside its real peers into a `type: "commonjs"` project, resolves every path both ways, and typechecks
+  **one identical source file as `.mts` and as `.cts`** under `NodeNext`, where the extension alone decides
+  which condition TypeScript asks for. Needs the network, so it is its own command and a CI step rather
+  than a `verify` step. Measured here on node 24: 15/15 paths, names identical, both declaration modes
+  resolve.
+- **What the second format costs, which is not what you would guess.** The ESM output is a chunk graph
+  shared between entries; the CommonJS output is one self-contained file per entry. The shell alone is
+  therefore *cheaper* as CJS — **50.83 kB** against **56.79 kB**, because one gzip stream beats fifteen
+  small ones — and the shell plus headless together is *dearer*: **75.31 kB** against **60.19 kB**, since
+  nine chunk files are shared by the ESM pair and none by the CJS one. Both shipped CJS paths are now
+  ratcheted by `npm run size`, because a format nobody measures is a format that can grow.
+- **A `packaging` CI job on a Node matrix (`20.9`, `20`, `22`), because one boundary is Node's and not
+  ours.** `pdfjs-dist` is an ESM-only peer with no `exports` map of its own, so a `require()` that reaches
+  it loads only on a Node new enough to require ESM — a fact about Node's release history that this
+  repository would rather measure than quote. The check prints
+  `require-esm-support=yes|partial (n/15 on node X)` and passes either way on that boundary; the matrix is
+  what turns it into a sentence the docs can carry. **That sentence is not written yet**, because the job
+  has never run: `0.12`'s whole theme is CI, and per the shipping rule nothing is pushed until `1.0.0`.
+- **`FR-48`: `npm run test:browsers` puts the compatibility table in a browser.** Every other check here
+  asks a DOM question of jsdom, and jsdom is one engine that rasterises no canvas, knows no
+  `devicePixelRatio`, dispatches no touch, ignores `forced-colors` and arbitrates no wheel — which is
+  everything `PRD.md` §8 actually claims. The script serves the playground from source, points it at the
+  fixtures and the engine's own support files rather than a CDN, and drives twelve claims through Chromium,
+  Firefox and WebKit at 1280×900 and a 375×812 dpr-2 mobile profile. A page is *painted* when the non-white
+  pixel fraction over the whole canvas says so — **1.07 %** on a text page at desktop, **1.29 %** at 375 —
+  and its backing store follows the device: **1214×1571** device px for 1214 css at dpr 1, **670×867** for
+  335 at dpr 2. Double-click selects a word from the text layer. Search counts (`"1 of 20 · p1"` →
+  `"2 of 20 · p2"`), paints marks, leaves one active, and says `"No results"` rather than nothing when a
+  query misses. The 1,000-page fixture holds **2 mounted page slots** before the jump and 2 after it, over a
+  1,162,682 px scroll height, and paints the last page. The bar folds into **12 rows** at 375 px and not at
+  1280. Keyboard paging works from a focused control — and `ArrowRight` does **not** page, which is the
+  documented exemption that keeps a wide row scrollable, so the refusal is measured beside the acceptance.
+  A plain wheel scrolls and holds the scale at 1.98 where a ctrl+wheel takes it to 2.84. Forced colours
+  turns the page slot's outline `solid 1px` and removes the shadow. Zero requests left the machine, and no
+  uncaught error appeared in any cell.
+
+### Verified, and what that verification did not reach
+
+The run's own honesty is the requirement, so the gaps are in the record rather than implied by a green
+count. On this Windows host **two of the three engines never started**: Playwright's validator refuses
+Firefox for a `mozglue.dll` that is present (662 KB) and survived a fresh 122 MB `install --force firefox`,
+and `firefox.exe --version` run straight from its own folder exits `0xC0000142` — DLL initialisation failed,
+no output. WebKit's launcher exits the same way. `mf.dll`, `mfplat.dll` and both `vcruntime140` files are in
+System32, so the missing-redistributable and N-edition explanations do not fit, and *why* the loader refuses
+these two is not established. No code of ours ran in either case, so §8's Firefox, Safari and iOS rows are
+neither passed nor failed here — they are unbacked, and the sixth CI job (`browser`, `ubuntu-latest` with
+`npx playwright install --with-deps`) is the instrument that has to answer them. It has never run.
+
+Two measured gaps belong to emulation rather than to the viewer: Chromium's mobile profile delivers **no
+wheel events at all** to the page, so the wheel check reports `skip` with what the engine was offered
+(`""`) instead of a pass; and the pinch is a **synthetic `TouchEvent` sequence**, which proves the
+`onPinching`/`onPanning` split (a spreading pair took the scale 0.55 → 0.61, a same-span drag scrolled to
+160 px and held it) and proves nothing about a digitizer. That is why §8 lists a real-device pass beside the
+emulated one instead of underneath it.
+- **`FR-50`: every published name carries a maturity state, and the build says so.** `api-maturity.json`
+  holds all **315** distinct names reachable from the twelve JS entry points — **272 stable, 43
+  experimental, none deprecated** — and `npm run check:maturity` is the last step of `npm run verify`: it
+  reads the published surface out of `dist/` through the same `scripts/api-names.mjs` that prints
+  `CODE_REFERENCE.md` §4, and fails on an exported name with no state, a state with no name behind it (the
+  stale direction, which no amount of prose maintenance catches), a non-stable name with no reason, or a
+  fifth state invented in the file. It runs itself against nine synthetic violations before it grades the
+  real manifest, because a check that has never seen a bad input has not been shown to be a check.
+- **The classification is derived, not voted on.** A name reachable from a published entry at the `0.9.0`
+  close is stable; anything newer is experimental, because `0.10` and `0.11` are both still unpublished and
+  a shape cannot be learned from use that has had none. Twelve older names were moved by hand and each says
+  why in its note: the core freehand ink group, because `#124` is an open proposal to retire it now that
+  annotate's ink is the one that survives a save, and the four signing helpers, because where the signing
+  surface lives is an open decision even though the capability is not. That is the useful property of the
+  exercise — a promise you intend to break is not a promise, and the file is where the difference has to be
+  written down.
+- **What is deliberately not claimed:** the manifest is not shipped in the tarball and has no export-map
+  subpath, so a consumer reads the states from the docs site — the API page's *Stability* table is generated
+  from the same JSON, which is why it cannot drift — rather than from `node_modules`. Adding a
+  `./api-maturity.json` entry is a one-line change if a tool ever needs it programmatically; it was not
+  worth moving the published-subpath count for on the strength of a hypothesis.
+- **One flake removed while the gate was being extended.** `edit.extract.test.tsx`'s second case waited on
+  a 30 ms timer for an extract that is a twenty-page writer pass, so under a full-suite run it asserted
+  against a plan that had not landed yet and reported `disabled: true` as though it were a defect. It now
+  waits for the status line the first case in that file already waits for — the lesson was written in the
+  file and applied to only one of the two tests that needed it.
+
+- **`FR-51`: the six ways a document can be wrong, in one named suite.** `src/lib/edge-cases.test.ts` is a
+  table whose rows are the requirement's own shapes — truncated mid object, xref past the end, encrypted,
+  wrong password, rotated page, over-large page — and whose column is the thing `FR-51` actually asks for:
+  which of `recovers`, `refuses` and `parks` each one is, because a viewer that shows a blank page for all
+  six has not failed six times, it has failed to say anything. Each row also cites the file that proves the
+  mechanism, and three guards keep the table from becoming decoration: the six keys are pinned against the
+  requirement's list, every citation must still anchor on an `it(` in the file it names (a comment that
+  mentions the words does not count), and the four rows that run in this process record that they ran — so
+  skipping one fails the suite rather than shrinking it.
+- **Two rows are cited rather than run, and the file says why instead of quietly dropping them.** The
+  wrong-password re-prompt cannot share a process with the others: the engine re-asks in the same microtask
+  chain, and a callback that answers every ask loops at about 27,000 asks a second and starves every load
+  after it — which is why `encrypted.reprompt.test.ts` is its own file. The over-large page has **no
+  fixture**: its ceilings are arithmetic, measured in `canvas.test.ts` against a 3060×3960 and a
+  40,000×1000 box, and generating a giant page here would re-assert the same numbers with extra steps
+  rather than reach the thing arithmetic cannot — what the engine reports for a page that big. That is an
+  open task, not a passing test.
+- **A fact no earlier test established.** `/Rotate` reaches `page.rotate` from the file and `getViewport`
+  swaps the box to match: page 5 of `page-order-sample.pdf` is `612×792` stored and `792×612` reported,
+  while page 8 is wide with *no* rotation at all. The second half is the point — without it the swap could
+  be read as the engine reporting the longer side first. `layout.test.ts` has always assumed the rotation
+  is there to be had; now something proves it.
+
+- **`FR-49`, two profiles of four: `npm run bench` and a scanned-book fixture.** §6 names four document
+  shapes because they fail differently, and until now one of them had a fixture and none of them had a
+  harness. `scripts/benchmark.mjs` serves the playground, drives the fixtures in Chromium, and keeps the two
+  kinds of number §6 insists on keeping apart: a **bar** is structural and fails the run — the canvas count
+  stays bounded, off-screen canvases are genuinely gone rather than merely off screen, the render caps bind
+  where they are supposed to — and a **measure** is a timing, printed with the machine it came from and
+  never failed on, because "a maximum observed on one device does not become a promise that a slower
+  reader's machine will break". Measured here: profile A's cold page reached ink in **100 ms**, which is *at*
+  §6's bar and not under it; four canvases and four slots were the most mounted anywhere in a forty-step
+  pass; profile B's pages paint at **25 % ink** where a text page manages 0.5 %. The most useful number is
+  the one about which ceiling applies: at dpr 2 and 500 % zoom a letter page would want 48.5 MP, the
+  screen-relative cap on a 1280×900 display says 13.8 MP, the canvas came back at 13.8 MP rendered at
+  **1.07× instead of 2×**, and the page still painted — degradation, not a dead tab. The script reads all
+  three ceilings out of `src/lib/canvas.ts` rather than copying them, because a benchmark that hard-codes the
+  ceiling it checks would pass the day someone lowers it.
+- **`scan-sample.pdf`, generated.** Twelve pages, each one 2550×3300 DeviceRGB scan drawn onto a letter box
+  — 0.82 MB tracked, 8.4 MP per page once decoded, and **no text operators at all**, which `scan.test.ts`
+  asserts through the engine rather than trusting the generator: a fixture that quietly grew a text layer
+  would answer a pixels question with a text-run measurement. The generator's own self-check caught a real
+  defect on its second run: the object-number ranges collided, so the page tree shared number 38 with the
+  last image and pdf.js refused the document with "Invalid Root reference". A hand-written PDF can be wrong
+  that way without any byte looking wrong, which is why the check now asserts that the highest object number
+  equals the object count.
+- **Three bars in this harness were wrong before they were right, and the file says so.** A 400 % zoom on a
+  dpr-1 desktop peaked at 3.45 MP against a 33.6 MP ceiling, so "the cap held" described a run where no cap
+  engaged. Counting canvases that had left the DOM but kept their buffer measured nothing, because a removed
+  element is not in `document` to be queried. And comparing live *pixel* totals between the first and last
+  third of a scroll failed on profile A for a reason that was not a leak — its pages have three different
+  boxes, so the later third simply had bigger canvases; the count of canvases still held is the
+  box-independent shape of the claim.
+- **Still open:** profiles C (vector-heavy) and D (low-memory device) have no fixture, and the report prints
+  that as a note per profile rather than leaving the section silent.
 
 ## [0.11.0] — 2026-10-01
 

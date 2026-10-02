@@ -141,7 +141,13 @@ describe('extract and split', () => {
     render(<Harness shell={makeShell()} />);
     click(rowButton(0, /Move page later/));
     click(byLabel(/^Save these pages as a new file$/));
-    await settle();
+    // The status line, not `settle()`: an extract is a writer pass over twenty pages, and under the load of
+    // a full suite run 30 ms is not enough for it to finish — the assertion then reads a button that is
+    // still disabled because the plan has not landed yet, which is the flake the test above already
+    // documents and solved the same way.
+    await waitFor(() =>
+      expect(document.querySelector('.pjsr-pages-status')?.textContent).toMatch(/Saved 20 pages/),
+    );
     expect(byLabel(/^Apply page changes$/)?.hasAttribute('disabled')).toBe(false);
     expect(document.querySelector('.pjsr-pages-summary')?.textContent).toMatch(/not applied/);
   });

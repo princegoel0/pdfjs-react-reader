@@ -224,6 +224,19 @@ pre {
   word-break: break-word;
 }
 
+/* The other case: a column of short, meaningful tokens — a maturity state, a
+   config key — where breaking `experimental` into `experim/ental` turns the
+   value into something a reader has to reconstruct. Automatic table layout
+   gives such a column the space it asks for, which is none. */
+.doc-table td.doc-key {
+  white-space: nowrap;
+}
+
+.doc-table td.doc-key code {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 .doc-callout {
   margin: 20px 0;
   padding: 12px 14px;

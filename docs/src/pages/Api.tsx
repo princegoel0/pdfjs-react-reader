@@ -1,12 +1,31 @@
+import maturity from '../../../api-maturity.json';
+
+// The JSON import gives literal key types; the page indexes by names it discovered from the same file, so
+// the widening is the honest description of what is happening rather than a suppression.
+const tags = maturity.tags as Record<string, string>;
+const notes = maturity.notes as Record<string, string>;
+
+/** The names that are not `stable`, with the reason each one says it is not. */
+const movable = Object.entries(notes)
+  // `untagged` cannot happen — `check:maturity` fails the build on it — but the index type allows a miss,
+  // and a page that would have crashed is better than one that renders `undefined` into a table cell.
+  .map(([name, why]) => ({ name, tag: tags[name] ?? 'untagged', why }))
+  .filter((row) => row.tag !== 'stable')
+  .sort((a, b) => (a.tag === b.tag ? a.name.localeCompare(b.name) : a.tag < b.tag ? -1 : 1));
+
+const stableCount = Object.values(tags).filter((t) => t === 'stable').length;
+
 export function Api() {
   return (
     <>
       <h1>The API surface</h1>
       <p className="doc-lede">
-        Every name the package hands you, and what each one is for. <code>1.0</code> freezes this list:
-        from that version on, a name here that is not marked as plumbing is a promise that the next
-        release will not rename it. Before <code>1.0</code> the surface is still moving —{' '}
-        <a href="#/compatibility">the upgrade guide</a> says what has changed and what to do about it.
+        Every name the package hands you, and what each one is for. Each of them carries a maturity state
+        — see <a href="#stability">Stability</a> — and the set is not a list somebody keeps by hand:{' '}
+        <code>npm run check:maturity</code> reads the published names out of the build and fails if one of
+        them has no state, or if a state in the file no longer has a name behind it.{' '}
+        <code>1.0</code> freezes the <em>stable</em> ones; the promise is only worth making because the set
+        it applies to is legible.
       </p>
 
       <h2>Entry points</h2>
@@ -428,6 +447,66 @@ export function Api() {
           </tr>
         </tbody>
       </table>
+
+      <h2 id="stability">Stability</h2>
+      <p>
+        Every published name is in exactly one of four states, and the file that says so is{' '}
+        <code>api-maturity.json</code>. The states matter because a pre-<code>1.0</code> package may break
+        an experimental name and may not break a stable one, which is the only way it can be honest about
+        what it promises while still asking you to use it today.
+      </p>
+      <table className="doc-table">
+        <thead>
+          <tr>
+            <th>State</th>
+            <th>What it commits to</th>
+          </tr>
+        </thead>
+        <tbody>
+          {maturity.policy.map((line) => (
+            <tr key={line.split(' ')[0]}>
+              <td className="doc-key">
+                <code>{line.split(' — ')[0]}</code>
+              </td>
+              <td>{line.split(' — ')[1]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p>
+        <strong>{stableCount}</strong> of the {Object.keys(maturity.tags).length} published names are
+        stable. The rest are every name that may still move under you, with the reason the manifest records
+        for it — a state without a reason is rejected by the check, because that is how a temporary label
+        becomes permanent.
+      </p>
+      <table className="doc-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>State</th>
+            <th>Why it is not stable</th>
+          </tr>
+        </thead>
+        <tbody>
+          {movable.map((row) => (
+            <tr key={row.name}>
+              <td>
+                <code>{row.name}</code>
+              </td>
+              <td className="doc-key">{row.tag}</td>
+              <td>{row.why}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p>
+        The rule that keeps all of this current is mechanical:{' '}
+        <code>npm run check:maturity</code> reads the published surface out of <code>dist/</code> and fails
+        the build if a name has no state, if a state has no name, if a non-stable name has no reason, or if
+        the file invents a fifth state. It is the last step of <code>npm run verify</code>, and it runs
+        itself against nine synthetic violations first — a check that has never seen a bad input is not yet
+        a check.
+      </p>
 
       <h2>What you may not change</h2>
       <p>

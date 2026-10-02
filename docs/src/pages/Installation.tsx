@@ -23,8 +23,11 @@ npm install @cantoo/pdf-lib`}</code>
         <code>pdfjs-dist</code> is a peer dependency on purpose: it stays your copy, at your
         version, and the package requires <code>^6.2.108</code> — see{' '}
         <a href="#/compatibility">Versions &amp; compatibility</a> for why v4 is excluded and why the
-        6.x floor is 6.2.108. React 18 or 19 is required. The build is ESM-only
-        (<code>"type": "module"</code>) with generated TypeScript declarations.
+        6.x floor is 6.2.108. React 18 or 19 is required. The build is dual —{' '}
+        <code>"type": "module"</code> with a <code>.cjs</code> and a <code>.d.cts</code> beside every{' '}
+        <code>.js</code> — so a <code>require()</code> host and an <code>import</code> host both resolve
+        it (see <a href="#/compatibility">Versions &amp; compatibility</a> for the one limit that belongs
+        to Node rather than to this package).
       </p>
       <p>
         <code>@cantoo/pdf-lib</code> is an <em>optional</em> peer, and the only things that ask for it are

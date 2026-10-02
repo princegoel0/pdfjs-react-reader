@@ -47,7 +47,7 @@ React DOM, `pdfjs-dist`, and one optional writer.
 | Thing | Number | Where it comes from |
 | --- | --- | --- |
 | Version in `package.json` | `0.11.0` — **not published**; npm only has `0.1.0`, `0.1.1`, and `0.2`–`0.11` go out together as `1.0.0` | `package.json:2` |
-| Module system | ESM only (`"type": "module"`, tsup builds no CommonJS) | `package.json:4` |
+| Module system | **Both formats** (FR-41): `format: ['esm', 'cjs']` under `"type": "module"`, so every published path is `x.js` + `x.cjs` with `x.d.ts` + `x.d.cts`, and the export map answers `import` and `require` separately | `tsup.config.ts`, `package.json` `exports` |
 | Runtime dependencies | **none** | `package.json` `dependencies` |
 | Peer dependencies | `pdfjs-dist ^6.2.108`, `react ^18 \|\| ^19`, `react-dom ^18 \|\| ^19`, `@cantoo/pdf-lib ^2.11.1` (optional) | `package.json` `peerDependencies` |
 | `engines` field | `node >= 20` — the only engine statement the package makes | `package.json` `engines` |
@@ -56,11 +56,14 @@ React DOM, `pdfjs-dist`, and one optional writer.
 | Names on the main entry | **234** | `node scripts/inventory.mjs`, over `dist/index.d.ts` |
 | Names on `/headless` | **187** | the same, over `dist/headless.d.ts` |
 | Names on `/edit` | **32**, on `/merge` **9** | `dist/edit.d.ts`, `dist/merge.d.ts` |
+| Distinct public names, by maturity | **315** — 272 stable, 43 experimental, 0 deprecated | `api-maturity.json`, audited by `npm run check:maturity` |
 | Source files (non-test) | **80**, 15,629 lines | `src/**` |
-| Test files / tests | **74 files / 759 tests**, in two projects (`node`, `dom`) | `npm run test` |
+| Test files / tests | **76 files / 770 tests**, in two projects (`node`, `dom`) | `npm run test` |
 | Stylesheets | 9, from 24 to 1,372 lines | `src/styles/` |
-| Fixtures | 19 PDFs, produced by 15 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree | `playground/fixtures/`, `scripts/make-*.mjs` |
-| CI | 4 jobs in `ci.yml` (one of them a named axe audit step), 1 deploy workflow in `docs.yml` | `.github/workflows/` |
+| Fixtures | 20 PDFs, produced by 16 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded | `playground/fixtures/`, `scripts/make-*.mjs` |
+| Benchmark | `npm run bench` measures §6's profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). A and B have fixtures and numbers; C and D report that they have neither | `scripts/benchmark.mjs`, `ROADMAP.md` §1 `FR-49` |
+| CI | 6 jobs in `ci.yml` (`verify`, `docs`, `react`, `consumer`, `packaging` for FR-41 on a Node matrix, and `browser` for FR-48 across three engines; the axe audit is a step inside `verify`), 1 deploy workflow in `docs.yml` | `.github/workflows/` |
+| Browser evidence | **Chromium 153, desktop and mobile-emulated: 23 checks ok, 1 skipped** — and the skip is a finding, because that profile delivers no wheel events to the page at all. Firefox and WebKit do not start on this host (`0xC0000142`, DLL initialisation, before any of this package's code runs), so §8's Firefox, Safari and iOS rows wait for the CI `browser` job, which has never run | `scripts/browser-matrix.mjs`, `ROADMAP.md` §1 `FR-48` |
 
 ### Bundle size, gzipped, per what you import
 
@@ -82,6 +85,7 @@ reports the worse of the two. Decimal kB. Reproduced by `npm run size`.
 | **all nine** | **44.06** | +14.97 |
 | `headless` entry alone (no shell, no shaking) | 4.06 | — |
 | `merge` alone (writer and hook, no shell) | **0.78** | — |
+| the CommonJS build of the two shipped paths | 54.79 / 28.44 | — |
 | shipped `index.js` path (whole entry, no shaking) | 60.75 | — |
 | shipped `headless.js` path | 32.53 | — |
 | `dist/edit.js` on its own | 6.16 | — |
@@ -104,6 +108,18 @@ design**: the ≈50 kB of `pdfjs-dist/web/pdf_viewer.mjs` that `structureFeature
 peer's bytes, external to every path measured here, so the tier looks nearly free and is only free *to the
 bundle*. §20 carries that as a documentation duty, not a measurement.
 
+### 2.1 What the CommonJS half costs
+
+tsup splits the ESM output into `chunk-*.js` shared between entries and writes the CJS output as one
+self-contained file per entry. Both consequences are measured on this build rather than assumed: the
+shell entry is **50.83 kB** of CJS against **56.79 kB** of ESM graph — one gzip stream beats fifteen
+small ones — while the shell *plus* headless together is **75.31 kB** of CJS against **60.19 kB** of
+ESM, because nine chunk files are shared by the ESM pair and none is shared by the CJS one. A CJS host
+naming one path pays slightly less; a CJS host naming two pays about a quarter more.
+
+`check-size.mjs` ratchets both shipped CJS paths (`shell (cjs)`, `headless (cjs)`) for that reason: a
+format nobody measures is a format that can grow.
+
 For scale, measured the same way (gzip level 9): `pdf.min.mjs` **131.70 kB**, `pdf.worker.min.mjs`
 **375.25 kB**, and `@cantoo/pdf-lib` **251.41 kB** for what our writer imports (256.05 kB for its whole
 API). The engine is 507 kB before this package contributes anything, which is the context for every
@@ -123,7 +139,9 @@ number above.
 
 ## 3. Every way in — the 25 import paths
 
-`package.json` → `exports`. Every JS path ships a `.js` and a matching `.d.ts`.
+`package.json` → `exports`. Every JS path ships four files: `.js` and `.cjs`, `.d.ts` and `.d.cts`
+(FR-41). `scripts/check-packaging.mjs` fails the build if a published path is missing one of them, or
+if `require()` and `import()` expose different names.
 
 | You write | You get |
 | --- | --- |
@@ -158,6 +176,13 @@ figures from a different measurement). The names `FR-40` and `FR-42` added are t
 `T` below marks a type-only export, and each hook's option/result pair is
 written once rather than twenty times. `node scripts/inventory.mjs` prints the flat list per entry, so a
 disagreement between this section and the build is a fact about this section.
+
+Across all twelve entries the surface is **315 distinct names** (487 name-slots; 171 names are reachable
+from more than one entry, which is what the barrels are for). Each of the 315 carries a maturity state in
+`api-maturity.json` — **272 stable, 43 experimental, none deprecated** — and this section deliberately does
+not repeat them: a tag copied into prose is a tag that can drift from the file that is checked. The
+exceptions, each with its reason, are on the docs site's *Stability* table and in the manifest; the rule
+that keeps them in step is `npm run check:maturity`.
 
 ### Shell components (you can compose these yourself)
 `PdfViewer` `ViewerProvider` `useViewer` `ViewerLayout` `ViewerRoot` `ViewerToolbar` `ViewerSidebar`
@@ -767,7 +792,7 @@ for a high-contrast theme — and they survive one, because a width and a shape 
 
 ---
 
-## 17. Tests: 74 files, 759 tests, two projects
+## 17. Tests: 76 files, 770 tests, two projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
 from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library). Parenthesised counts are the
@@ -803,7 +828,16 @@ files this section has ever itemised; the rest are named, not counted, so a stal
   link of the label table is asserted
 * Engine behaviour, through pdf.js itself: **`damaged`** (6), **`encrypted`** (3),
   **`encrypted.reprompt`** (1) — one load per file, because a load left parked in the Node fake worker
-  stops every case after it — and **`tagged`** (7), the structure tree read back from the engine: the roles, the marks the content
+  stops every case after it — **`edge-cases`** (7), which is `FR-51`'s matrix in one named place: the six
+  ways a document can be wrong, each row classified `recovers` / `refuses` / `parks`, four re-established
+  against the engine here and two cited to the file that can hold them, with guards that the six keys are
+  the requirement's six, that every citation still anchors on an `it(`, and that the four in-process rows
+  ran (so an `it.skip` cannot retire a case quietly). It also establishes something no earlier test did:
+  that `/Rotate` reaches `page.rotate` from the file and `getViewport` swaps the box — page 5 rotated,
+  page 8 wide with no rotation, so the swap cannot be read as a reporting quirk — **`scan`** (4), which is
+  `FR-49`'s premise checked through the engine rather than trusted from its generator: twelve pages, exactly
+  one image drawn on each, a letter box, and **no text items at all**, because a fixture that quietly grew a
+  text layer would answer a pixels question with a text-run measurement — and **`tagged`** (7), the structure tree read back from the engine: the roles, the marks the content
   stream actually opens, the two agreeing, `getMarkInfo()`'s real shape, the link annotation's id matching
   the one the tree claims (compared against `getAnnotations()`, so the generator's object numbering stays out
   of the test), and *two* counterfactuals — rename `/Pg` and the marks vanish while the roles stay; blank a
@@ -868,6 +902,11 @@ that was wrong.
 | `npm run build` | `tsup` → ESM + `.d.ts`, then `scripts/copy-assets.mjs` minifies the CSS and prints the deltas |
 | `npm run build:docs` | Pure `vite build docs` — **never chain a server into a build step** (an earlier version hung a CI job for six hours) |
 | `npm run test` / `typecheck` / `size` / `size:update` | vitest / `tsc --noEmit` / the gate / re-accept the gate |
+| `npm run check:packaging` | FR-41 against `dist/`: both formats and both declaration files per path, then `require()` and `import()` of every entry must expose the same names |
+| `npm run check:maturity` | FR-50 against `dist/`: reads the published names through `scripts/api-names.mjs` and fails if one has no maturity state in `api-maturity.json`, if a state has no name behind it, if a non-stable name has no reason, or if the file invents a fifth state. Runs itself against nine synthetic violations first. Last step of `npm run verify` |
+| `npm run check:tarball` | FR-41 against the **artifact**: `npm pack`, install the tarball beside its real peers into a CommonJS project, resolve every path both ways, and typecheck one identical source file as `.mts` and as `.cts` under `NodeNext`. Needs the network, so it is not in `verify` |
+| `npm run test:browsers` | FR-48: §8's browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; exits non-zero if a check fails **or** if an engine never started, because a row with no job behind it is not a tested row |
+| `npm run bench` | FR-49: §6's profiles against their fixtures. Prints **bars** (structural — bounded canvas count, canvases actually released, the caps binding where they should) and **measures** (timings with the machine named, never failed on). C and D report that they have no fixture |
 | `npm run verify` | typecheck → test → build → size. Also `prepublishOnly` |
 
 **CI** (`.github/workflows/ci.yml`, read-only token, `concurrency` cancelling superseded runs):
@@ -1007,7 +1046,7 @@ before the section it belonged to was accepted:
 | `base64ToPdfSource()` as an external utility, base64 not a primary input | Base64 **is** a primary source string — the classifier takes a ≥128-char pure-base64 string as bytes — and at that date the decoder was internal | FR-01; **partly overtaken 2026-09-30**: `FR-38` exported both halves as `classifySource` and `base64ToBytes`, and the correction stands — a base64 string is still accepted as `src` directly, so the helper is for the step before that, not a required wrapper |
 | "Every async operation requires an `AbortSignal`" | Invalidation is effect-scoped `cancelled` flags, `task.cancel()`, and `RenderingCancelledException` swallowed by name. `AbortController` appears twice, both a real fetch | §3.3, with the invariants stated instead of the mechanism invented |
 | Two named state unions (document and page) | Neither enum existed; the surface was `doc`/`isReady`/`error`/`capabilities` and `page: PDFPageProxy \| null` | §3.4 specified the observable fields plus the invariants, and said why the enums were declined — **overtaken 2026-09-30**: the target spec asks for them anyway, and `FR-37` published both, derived from one tagged value so the fields and the status still cannot disagree |
-| "Both ESM and CJS outputs" | `"type": "module"`, no `.cjs` in `dist`, never has been | §6 React & Runtime |
+| "Both ESM and CJS outputs" | `"type": "module"`, no `.cjs` in `dist`, never has been | §6 React & Runtime — **overtaken 2026-10-01**: FR-41 shipped both formats with declarations for each, and `npm run check:packaging` is what stops the claim drifting from the build again |
 | "Validated for SSR (Next.js)" | Client-side only; `readCanvasEnvironment` exists because it is | §6 React & Runtime. **Half of it is now the other way, on purpose:** `FR-46`'s test imports **every JS target in the export map** with no DOM and none throws — the list is read from `package.json` rather than written out, so it was fifteen files at the `0.11` close and grew by `features/structure` and `/merge` without anyone editing the test — and importing is server-safe while *rendering* stays client-only, which is what the README and the Installation page said before they were checked, in the stronger and wrong form ("pdf.js needs DOM globals at import time, so this package is client-side only") |
 | Page manipulation includes **merge** | No `merge` in `src/edit.tsx` or `dist/edit.d.ts` | §2.4, named as not shipped so nobody files against a promise — **overtaken 2026-10-01**: `FR-42` shipped, on its own `/merge` entry rather than inside `edit`, and §13 now says what a merge carries and what it leaves behind |
 | pdf.js internals "never exposed as the public extension contract" | `dist/index.d.ts` ships `annotationEditorUIManager?: AnnotationEditorUIManager \| null` | Kept as a deliberate trade, and §5.4 names it as why the engine policy pins a major |
@@ -1045,6 +1084,7 @@ node -e "const p=require('./package.json');console.log(Object.keys(p.exports).le
 grep -rc "" src/**/*.ts src/**/*.tsx            # file inventory (§2)
 npm run test                                    # 759 tests in 74 files (§2, §17)
 npm run a11y                                    # the axe audit on its own (FR-45); it also runs inside the line above
+npm run test:browsers                           # FR-48: the §8 browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; it exits non-zero if a check fails *or* if an engine never started, because a row with no job behind it is not a tested row
 npx vitest run src/styles/forced-colors.test.ts # §16's stylesheet rules, read from src/styles rather than from a list
 node -e "const u=require('caniuse-lite/dist/unpacker/feature'),f=require('caniuse-lite/dist/unpacker/features').features;const s=u(f['css-media-resolution']).stats;console.log(s.safari['14'],s.safari['16.0'],s.chrome['90'],s.firefox['90'])"   # the §11 `resolution` support flags (caniuse-lite is transitive, via the toolchain, not a declared dependency)
 npm run size                                    # every size figure in §2, plus the two failing rules
@@ -1052,6 +1092,9 @@ node -e "console.log(Object.keys(require('./dist/index.js')).length)"   # names 
 node --input-type=module -e "const m = await import('pdfjs-dist/legacy/build/pdf.mjs'); console.log(m.GlobalWorkerOptions.workerSrc)"   # §10: pdf.js's own Node default, which an unset `workerSrc` leaves in place
 npx vitest run --project node src/lib/worker.fallback.test.ts src/lib/worker.fallback.onpage.test.ts src/lib/worker.fallback.nocode.test.ts src/lib/worker.fallback.deadurl.test.ts   # §10's four worker states, one process each
 npm run build && node scripts/inventory.mjs   # the grouped name lists in §4, straight from dist/*.d.ts
+node scripts/check-maturity.mjs               # §4's union and §2's maturity row: the 315 distinct names, their states, and the reasons behind every non-stable one
+ls playground/fixtures/*.pdf | wc -l && ls scripts/make-*.mjs | wc -l && git ls-files playground/fixtures | wc -l   # §2's fixture row: on disk, generated, and tracked — the third number is the one that catches an uncommitted fixture
+npm run bench                                 # §2's benchmark row and README's "Behaviour under load" figures, measured rather than quoted
 grep -n "MAX_RENDER\|PRINT_MEMORY\|CAP_AREA" src/lib/canvas.ts src/lib/print.ts   # §9
 grep -n "structTreeLayer\|annotationCanvasMap" src/components/PdfPage.tsx          # §11
 node scripts/make-signature-pdf.mjs && node scripts/make-damaged-pdf.mjs && node scripts/make-labelled-pdf.mjs && node scripts/make-tagged-pdf.mjs   # fixtures are generated, never downloaded

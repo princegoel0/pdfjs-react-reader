@@ -46,17 +46,43 @@ writeFileSync(
 // is where it gets proven. `tsconfig.json` resolves `pdfjs-react-reader/*` onto
 // `src/`, so a target that exists only in the manifest typechecks, plays and
 // docs-builds perfectly while every consumer import of it fails.
+//
+// FR-41 made the same check do two jobs, because the map is now nested: every JS subpath must offer both
+// `import` and `require`, each with its own `types` (a `.d.cts` for a `.cjs`, or a CJS consumer resolves
+// declarations TypeScript will not read), and every file named must exist. The shape half is what catches
+// a half-finished migration — a `require` condition left off is invisible until someone requires it.
 const { exports: exportMap } = JSON.parse(readFileSync('package.json', 'utf8'));
-const missing = Object.entries(exportMap).flatMap(([subpath, entry]) => {
-  const targets = typeof entry === 'string' ? [entry] : Object.values(entry);
-  return targets
+
+/** Every file a subpath's conditions point at, however deeply nested. */
+function targetsOf(entry) {
+  if (typeof entry === 'string') return [entry];
+  return Object.values(entry).flatMap(targetsOf);
+}
+
+const missing = Object.entries(exportMap).flatMap(([subpath, entry]) =>
+  targetsOf(entry)
     .map((target) => target.replace(/^\.\//, ''))
     .filter((file) => !existsSync(file))
-    .map((file) => `  ${subpath} -> ${file}`);
+    .map((file) => `  ${subpath} -> ${file}`),
+);
+
+const incomplete = Object.entries(exportMap).flatMap(([subpath, entry]) => {
+  if (typeof entry === 'string' || !String(entry.import?.default ?? '').endsWith('.js')) return [];
+  const problems = [];
+  if (!entry.require) problems.push('no `require` condition');
+  else if (!entry.require.default?.endsWith('.cjs')) problems.push('`require` does not name a .cjs file');
+  else if (!entry.require.types?.endsWith('.d.cts')) problems.push('`require` has no matching .d.cts types');
+  if (!entry.import.types?.endsWith('.d.ts')) problems.push('`import` has no .d.ts types');
+  return problems.map((problem) => `  ${subpath}: ${problem}`);
 });
 
 if (missing.length) {
   console.error(`package.json exports point at files this build did not emit:\n${missing.join('\n')}`);
+  process.exit(1);
+}
+
+if (incomplete.length) {
+  console.error(`the export map is not dual-format for every JS path:\n${incomplete.join('\n')}`);
   process.exit(1);
 }
 

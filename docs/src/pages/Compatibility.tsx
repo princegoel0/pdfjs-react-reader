@@ -189,8 +189,16 @@ export function Compatibility() {
           <tr>
             <td>Module format</td>
             <td>
-              ESM only (<code>"type": "module"</code>). There is no CommonJS build, so a
-              <code>require()</code>-only bundler will not resolve it.
+              Both, from one build (FR-41): every published path ships <code>.js</code> and{' '}
+              <code>.cjs</code> with a <code>.d.ts</code> and a <code>.d.cts</code> beside them, and the
+              export map answers <code>import</code> and <code>require</code> separately. So a{' '}
+              <code>require()</code>-only toolchain — Jest without ESM enabled, an older Node build
+              script — resolves the package instead of failing to. One limit is Node&apos;s rather than
+              ours: <code>pdfjs-dist</code> is an ESM-only peer with no <code>exports</code> map, so a{' '}
+              <code>require()</code> that reaches it works only on a Node new enough to load ESM from
+              CommonJS. The <code>packaging</code> CI job measures which versions those are, on a matrix,
+              and prints <code>require-esm-support=…</code>; nothing here quotes a version that job has
+              not confirmed.
             </td>
           </tr>
           <tr>
@@ -255,7 +263,16 @@ export function Compatibility() {
         <tbody>
           <tr>
             <td>Chromium (desktop and the mobile-shell emulation paths)</td>
-            <td>Verified — every responsive, printing and form check in the log was run here.</td>
+            <td>
+              Verified. <code>npm run test:browsers</code> drives twelve claims — a painted canvas measured
+              as ink over the whole page, backing-store density against <code>devicePixelRatio</code>, text
+              you can select, search that marks and advances, thumbnails and outline, virtualization of a
+              1,000-page document, the toolbar fold at 375&nbsp;px, keyboard paging including the{' '}
+              <code>ArrowRight</code> exemption, wheel zoom against plain scroll, pinch against two-finger
+              pan, forced colours, and uncaught errors — through Chromium 153 at 1280×900 and 375×812 dpr 2:{' '}
+              <strong>23 ok, 1 skip</strong>, and the skip is that mobile emulation gives the page no wheel
+              events at all. Every responsive, printing and form check in the log was run here too.
+            </td>
           </tr>
           <tr>
             <td>WebKit / Safari 14+</td>
@@ -274,7 +291,10 @@ export function Compatibility() {
       <div className="doc-callout">
         If you are evaluating this for a Safari-critical product, treat the WebKit row as the thing
         to test first. The layout code avoids <code>:has()</code> and <code>dvh</code> without a
-        fallback for exactly that reason, but no measurement has been taken there.
+        fallback for exactly that reason, but no measurement has been taken there.{' '}
+        <code>npm run test:browsers</code> is written for all three engines and a CI job runs it on
+        Linux, where WebKit and Firefox do start; locally neither of them would launch, so those two
+        rows are still a target rather than a result, and the job behind them has never run.
       </div>
 
       <h2>Bundle size</h2>

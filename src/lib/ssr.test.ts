@@ -26,7 +26,22 @@ import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 interface PackageShape {
-  exports: Record<string, { import?: string } | string>;
+  // Either shape the map has used: a bare string, a flat `{ types, import }`, or — since FR-41 — a
+  // condition object nested by module format. Only the ESM target matters here.
+  exports: Record<string, unknown>;
+}
+
+/** The `import`-condition file of one export entry, whichever depth it is nested at. */
+function importTarget(entry: unknown): string | undefined {
+  if (typeof entry === 'string') return entry.endsWith('.js') ? entry : undefined;
+  if (typeof entry !== 'object' || entry === null) return undefined;
+  const value = (entry as Record<string, unknown>).import;
+  if (typeof value === 'string') return value.endsWith('.js') ? value : undefined;
+  if (typeof value === 'object' && value !== null) {
+    const target = (value as Record<string, unknown>).default;
+    return typeof target === 'string' && target.endsWith('.js') ? target : undefined;
+  }
+  return undefined;
 }
 
 /** Every JS target in the export map, as the entry name it is published under. */
@@ -36,10 +51,10 @@ function exportedEntries(): { name: string; distFile: string }[] {
   ) as unknown as PackageShape;
   const entries: { name: string; distFile: string }[] = [];
   for (const [name, target] of Object.entries(pkg.exports)) {
-    const file = typeof target === 'string' ? target : target.import;
+    const file = importTarget(target);
     // Stylesheets and the `types` conditions are not modules, and the CSS entries are the ones that
     // promise nothing about a server.
-    if (!file?.endsWith('.js')) continue;
+    if (!file) continue;
     entries.push({ name, distFile: file });
   }
   return entries;
@@ -78,8 +93,8 @@ describe('importing the package without a DOM', () => {
 
   it('has every entry point in the export map resolvable to a source file', () => {
     const entries = exportedEntries();
-    // The list is only as good as the mapping, so prove the mapping first: eleven modules today, plus the
-    // locales and features that arrive with them.
+    // The list is only as good as the mapping, so prove the mapping first: fifteen modules since FR-41
+    // added `/merge`, plus the locales and features that arrive with them.
     expect(entries.length).toBeGreaterThanOrEqual(4);
     for (const entry of entries) {
       expect(sourceFor(entry.distFile), entry.name).toMatch(/[/\\]src[/\\]/);

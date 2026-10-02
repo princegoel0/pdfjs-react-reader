@@ -232,3 +232,81 @@ jobs:
             echo 'the worker specifier survived unbundled: new URL() was not rewritten'
             exit 1
           fi
+
+  # FR-41's evidence. `verify` checks the source and the bundle; this checks the artefact, on a Node matrix,
+  # because the one thing about dual output that is not ours to promise is whether `require()` can load it at
+  # all: the engine peer is ESM-only with no `exports` map of its own, so that answer belongs to Node.
+  # `scripts/tarball-check.mjs` prints `require-esm-support=yes|partial (n/15 on node X)` for exactly that
+  # reason — the job measures the boundary per version instead of asserting a version from documentation, and
+  # `PRD.md` §8's Node row cites whichever lines this produces.
+  packaging:
+    name: Packaging (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor and the current LTS, plus the old patch that predates Node's CommonJS-loading-ESM
+        # support — the version that decides whether the sentence in the README is a promise or a caveat.
+        node: ['20.9', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build and pack
+        run: npm run build
+
+      # Both formats present, both declaration files, the same names through `require` and `import`.
+      - name: Check the built package
+        run: npm run check:packaging
+
+      # Installs the tarball into a throwaway CommonJS project and resolves every published path from it.
+      - name: Check the tarball
+        run: npm run check:tarball
+
+  # FR-48's evidence: the browser rows of `PRD.md` §8. jsdom is one engine and it rasterises no canvas,
+  # knows no `devicePixelRatio`, dispatches no touch, ignores `forced-colors` and arbitrates no wheel —
+  # which is every claim the table actually makes. This job serves the playground from source with the
+  # engine's own support assets, so a request that leaves the machine is a finding rather than an accident
+  # of the network.
+  #
+  # One job, three engines, no runner matrix: the script prints a line per check per engine *including the
+  # capabilities an engine refuses to emulate*, and a Firefox that will not show forced colours is a result
+  # worth reading. Splitting engines across runners would turn that into three green jobs saying nothing.
+  # A real-device pass is a separate row in §8 for a separate kind of evidence, and is not this job.
+  browser:
+    name: Browser matrix (Chromium, Firefox, WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # WebKit is Safari's engine, which is what the macOS Safari row is claimed against; `--with-deps`
+      # because WebKit's system libraries are not on the runner image.
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run the matrix
+        run: npm run test:browsers
+
+      # FR-49's evidence, in the same job because it needs the same browser install. The script separates
+      # bars (structural, and they fail the job) from measures (timings, printed with the machine they came
+      # from and never failed on) — §6's own rule is that a maximum observed on one device does not become a
+      # promise a slower reader's machine breaks.
+      - name: Run the benchmarks
+        run: npm run bench

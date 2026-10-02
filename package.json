@@ -15,69 +15,159 @@
   "sideEffects": [
     "**/*.css"
   ],
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./headless": {
-      "types": "./dist/headless.d.ts",
-      "import": "./dist/headless.js"
+      "import": {
+        "types": "./dist/headless.d.ts",
+        "default": "./dist/headless.js"
+      },
+      "require": {
+        "types": "./dist/headless.d.cts",
+        "default": "./dist/headless.cjs"
+      }
     },
     "./edit": {
-      "types": "./dist/edit.d.ts",
-      "import": "./dist/edit.js"
+      "import": {
+        "types": "./dist/edit.d.ts",
+        "default": "./dist/edit.js"
+      },
+      "require": {
+        "types": "./dist/edit.d.cts",
+        "default": "./dist/edit.cjs"
+      }
     },
     "./merge": {
-      "types": "./dist/merge.d.ts",
-      "import": "./dist/merge.js"
+      "import": {
+        "types": "./dist/merge.d.ts",
+        "default": "./dist/merge.js"
+      },
+      "require": {
+        "types": "./dist/merge.d.cts",
+        "default": "./dist/merge.cjs"
+      }
     },
     "./features/print": {
-      "types": "./dist/features/print.d.ts",
-      "import": "./dist/features/print.js"
+      "import": {
+        "types": "./dist/features/print.d.ts",
+        "default": "./dist/features/print.js"
+      },
+      "require": {
+        "types": "./dist/features/print.d.cts",
+        "default": "./dist/features/print.cjs"
+      }
     },
     "./features/download": {
-      "types": "./dist/features/download.d.ts",
-      "import": "./dist/features/download.js"
+      "import": {
+        "types": "./dist/features/download.d.ts",
+        "default": "./dist/features/download.js"
+      },
+      "require": {
+        "types": "./dist/features/download.d.cts",
+        "default": "./dist/features/download.cjs"
+      }
     },
     "./features/forms": {
-      "types": "./dist/features/forms.d.ts",
-      "import": "./dist/features/forms.js"
+      "import": {
+        "types": "./dist/features/forms.d.ts",
+        "default": "./dist/features/forms.js"
+      },
+      "require": {
+        "types": "./dist/features/forms.d.cts",
+        "default": "./dist/features/forms.cjs"
+      }
     },
     "./features/outline": {
-      "types": "./dist/features/outline.d.ts",
-      "import": "./dist/features/outline.js"
+      "import": {
+        "types": "./dist/features/outline.d.ts",
+        "default": "./dist/features/outline.js"
+      },
+      "require": {
+        "types": "./dist/features/outline.d.cts",
+        "default": "./dist/features/outline.cjs"
+      }
     },
     "./features/layers": {
-      "types": "./dist/features/layers.d.ts",
-      "import": "./dist/features/layers.js"
+      "import": {
+        "types": "./dist/features/layers.d.ts",
+        "default": "./dist/features/layers.js"
+      },
+      "require": {
+        "types": "./dist/features/layers.d.cts",
+        "default": "./dist/features/layers.cjs"
+      }
     },
     "./features/annotate": {
-      "types": "./dist/features/annotate.d.ts",
-      "import": "./dist/features/annotate.js"
+      "import": {
+        "types": "./dist/features/annotate.d.ts",
+        "default": "./dist/features/annotate.js"
+      },
+      "require": {
+        "types": "./dist/features/annotate.d.cts",
+        "default": "./dist/features/annotate.cjs"
+      }
     },
     "./features/attachments": {
-      "types": "./dist/features/attachments.d.ts",
-      "import": "./dist/features/attachments.js"
+      "import": {
+        "types": "./dist/features/attachments.d.ts",
+        "default": "./dist/features/attachments.js"
+      },
+      "require": {
+        "types": "./dist/features/attachments.d.cts",
+        "default": "./dist/features/attachments.cjs"
+      }
     },
     "./features/structure": {
-      "types": "./dist/features/structure.d.ts",
-      "import": "./dist/features/structure.js"
+      "import": {
+        "types": "./dist/features/structure.d.ts",
+        "default": "./dist/features/structure.js"
+      },
+      "require": {
+        "types": "./dist/features/structure.d.cts",
+        "default": "./dist/features/structure.cjs"
+      }
     },
     "./locales/de": {
-      "types": "./dist/locales/de.d.ts",
-      "import": "./dist/locales/de.js"
+      "import": {
+        "types": "./dist/locales/de.d.ts",
+        "default": "./dist/locales/de.js"
+      },
+      "require": {
+        "types": "./dist/locales/de.d.cts",
+        "default": "./dist/locales/de.cjs"
+      }
     },
     "./locales/es": {
-      "types": "./dist/locales/es.d.ts",
-      "import": "./dist/locales/es.js"
+      "import": {
+        "types": "./dist/locales/es.d.ts",
+        "default": "./dist/locales/es.js"
+      },
+      "require": {
+        "types": "./dist/locales/es.d.cts",
+        "default": "./dist/locales/es.cjs"
+      }
     },
     "./locales/fr": {
-      "types": "./dist/locales/fr.d.ts",
-      "import": "./dist/locales/fr.js"
+      "import": {
+        "types": "./dist/locales/fr.d.ts",
+        "default": "./dist/locales/fr.js"
+      },
+      "require": {
+        "types": "./dist/locales/fr.d.cts",
+        "default": "./dist/locales/fr.cjs"
+      }
     },
     "./styles.css": {
       "types": "./dist/styles.d.ts",
@@ -129,10 +219,15 @@
     "preview:docs": "vite preview docs --port 4173",
     "test": "vitest run",
     "a11y": "vitest run src/components/a11y.audit.test.tsx src/components/a11y.page.test.tsx",
+    "test:browsers": "node scripts/browser-matrix.mjs",
+    "bench": "node scripts/benchmark.mjs",
     "typecheck": "tsc --noEmit",
     "size": "node scripts/check-size.mjs",
     "size:update": "node scripts/check-size.mjs --update",
-    "verify": "npm run typecheck && npm run test && npm run build && npm run size",
+    "check:packaging": "node scripts/check-packaging.mjs",
+    "check:maturity": "node scripts/check-maturity.mjs",
+    "check:tarball": "node scripts/tarball-check.mjs",
+    "verify": "npm run typecheck && npm run test && npm run build && npm run size && npm run check:packaging && npm run check:maturity",
     "prepublishOnly": "npm run verify"
   },
   "engines": {
@@ -160,6 +255,7 @@
     "axe-core": "^4.13.0",
     "jsdom": "^30.1.1",
     "pdfjs-dist": "^6.2.108",
+    "playwright": "^1.63.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsup": "^8.0.0",

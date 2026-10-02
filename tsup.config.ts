@@ -27,7 +27,13 @@ export default defineConfig({
     'locales/es': 'src/locales/es.ts',
     'locales/fr': 'src/locales/fr.ts',
   },
-  format: ['esm'],
+  /*
+   * Two formats, one package (FR-41). ESM is what every bundler and every `import` consumer resolves;
+   * CJS is what a `require()` in a Jest test or a legacy Node toolchain resolves, and tsup names it
+   * `.cjs` so `type: module` keeps the `.js` file ESM. The declaration files come out as `.d.ts` and
+   * `.d.cts`, which is why each condition in the export map carries its own `types`.
+   */
+  format: ['esm', 'cjs'],
   target: 'es2022',
   platform: 'browser',
   dts: true,

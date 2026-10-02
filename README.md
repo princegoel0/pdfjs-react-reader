@@ -172,7 +172,13 @@ has no release that fixes the CVE. Supporting it would mean advising a line we s
 to leave.
 
 Your bundler needs to handle ESM and `exports` maps — Vite 5+, webpack 5+, Rollup 4+, esbuild and
-Turbopack all work. There is no CommonJS build.
+Turbopack all work. There is a CommonJS build beside it — `0.12`'s FR-41 — so every published path ships
+`index.js` and `index.cjs`, `index.d.ts` and `index.d.cts`, and the export map answers `import` and
+`require` separately, so `require('pdfjs-react-reader/headless')` resolves instead of throwing. One
+boundary is Node's rather than ours, and it is worth knowing before you rely on it: `pdfjs-dist` is an
+ESM-only peer with no `exports` map of its own, so a `require()` that reaches it loads only on a Node new
+enough to require ESM. Which versions those are is measured by the `packaging` CI job across a Node matrix
+— not asserted here from a version number nobody checked.
 
 ## Entry points
 
@@ -184,6 +190,20 @@ Turbopack all work. There is no CommonJS build.
 | `pdfjs-react-reader/edit` | The page-editing and flatten tier: `editFeature`, `createEditFeature`, the pure page-plan helpers, and `arrangePages` / `flattenBytes` on their own. |
 | `pdfjs-react-reader/merge` | Putting two documents into a third: `mergeDocuments`, `describeMergeSources` and `usePdfMerge`, with no component — the picker is yours, because which documents may be merged and what happens to the result are the host's business. Together with `/edit` this is where `@cantoo/pdf-lib` is reached: neither the root entry nor `/headless` imports the writer, so a host that never names one of these paths cannot pull it in. |
 | `pdfjs-react-reader/styles.css` + `/print.css` `/forms.css` `/outline.css` `/layers.css` `/attachments.css` `/annotate.css` `/structure.css` `/edit.css` | The default theme for the core chrome, as CSS custom properties, then one sheet per feature that has markup of its own. Separate files because a bundler drops CSS that no JavaScript imports — import the sheets for what you mounted, and nothing else. |
+
+## Stability
+
+Every one of the **315** names this package publishes carries a maturity state, and the file that says so is
+[`api-maturity.json`](api-maturity.json): **272 stable, 43 experimental, none deprecated**. Stable means a
+breaking change needs a major version. Experimental means shipped, typed, and still being shaped by use — it
+may change in a minor, with a changelog line — and each experimental name records *why* it is in that state,
+which is what stops a temporary label from becoming permanent.
+
+The set is not maintained by hand. `npm run check:maturity` reads the published names out of the build and
+fails if one has no state, if a state has no name, if a non-stable name has no reason, or if the file invents
+a fifth state; it is the last step of `npm run verify`, and it runs itself against nine synthetic violations
+before it grades the real ones. The docs site's [API page](https://princegoel0.github.io/pdfjs-react-reader/)
+lists every non-stable name with its reason, generated from the same file.
 
 ## Headless
 
@@ -456,7 +476,8 @@ under `(pointer: coarse)`, 32 px with a mouse.
 - Conformance is audited rather than inspected: axe-core runs the WCAG 2.0, 2.1 and 2.2 A and AA rules
   over the shell and every primitive in the test suite (`npm run a11y`, and a named step in CI). What it
   cannot see without a layout — contrast, target size, and whether an assistive technology really
-  announces what the DOM says — is listed in that file and belongs to the browser matrix.
+  announces what the DOM says — is listed in that file. `npm run test:browsers` now drives three engines
+  through the claims jsdom cannot make, and does not yet measure those.
 
 ## Size
 
@@ -479,6 +500,7 @@ quoted, so a path only counts as small if two independent tree-shakers agree.
 | All nine | 44.06 kB | +14.97 kB |
 | A single headless hook (`usePdfDocument`) | 4.06 kB | — |
 | A merge, on its own (`/merge`, writer and hook) | 0.78 kB | separate entry, not over core |
+| The same two shipped paths as CommonJS (`index.cjs`, `headless.cjs`) | 54.79 / 28.44 kB | the other format, not another feature |
 | A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.39–2.42 kB | separate entry, not over core |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
@@ -513,16 +535,26 @@ measures, at gzip level 9. So the engine dominates any viewer bundle regardless 
 ## Behaviour under load
 
 Size is a ratchet. This is the requirement that is not: the viewer has to stay smooth while it is
-working, on documents big enough to make a mistake visible. Every figure here is measured against
-`long-sample.pdf` — a thousand pages, a nested page tree, three page sizes cycling so no single
-estimate flatters it — in Chromium on one Windows machine, which is the honest limit of what has been
-tested (see [Browser support](#browser-support)).
+working, on documents big enough to make a mistake visible. `npm run bench` is the instrument (FR-49):
+it serves the playground, drives the fixtures, and separates the two kinds of
+number §6 insists on keeping apart — a **bar** is structural and fails the run (canvas count bounded,
+off-screen canvases gone, the render caps binding where they should), a **measure** is a timing printed
+with the machine it came from and never failed on, because a maximum observed on one machine is not a
+promise a slower reader's device will keep. Measured here (Chromium, Windows, `pdfjs-dist` 6.3.289):
 
-- **Scrolling a thousand pages drops no frames.** A reader-speed pass measures p50 7.0 ms and a max of
-  14.1 ms per frame, with zero frames over 16.7 ms; a faster 1,100 px/frame pass peaks at 14.0 ms, also
-  with none over. Reaching a page that has never been painted and drawing it takes 38–55 ms.
-- **Only what is on screen is held.** Two to four page canvases are mounted at any moment across the
-  whole pass, and a row that leaves the viewport has its canvas zeroed rather than kept.
+- **Profile A — text-heavy, `long-sample.pdf`, a thousand pages, three page sizes cycling so no single
+  estimate flatters it.** A page that had never been painted took **100 ms** to its first ink, which is at
+  §6's bar rather than under it, and that is the honest reading of one machine. Four page canvases and four
+  slots were the most mounted anywhere in a forty-step pass, and no sample along the way was blank. The
+  widest canvas reached 4.6 MP against a 33.6 MP absolute ceiling.
+- **Profile B — image-heavy, `scan-sample.pdf`, twelve pages each carrying one 2550×3300 RGB scan.** Pages
+  paint at **25 % ink** where a text page manages 0.5 %, and a cold page took 25 ms. Three canvases and
+  three slots at the peak of the scroll; 5.7 MP widest.
+- **The cap that actually binds is the screen-relative one.** At dpr 2 and 500 % zoom a letter page would
+  want 48.5 MP; the ceiling that applies on a 1280×900 display is 13.8 MP, the canvas came back at 13.8 MP
+  rendered at 1.07× instead of 2×, and the page still painted. Resolution degrades, the tab does not die —
+  which is the whole point of the caps, and the reason the benchmark reads the ceiling out of
+  `src/lib/canvas.ts` rather than copying it.
 - **A zoom step re-lays out the text layer instead of rebuilding it.** 39.8 ms per page per step became
   1.0 ms, which is the difference between zooming on a dense page and watching it flicker.
 - **A feature's expensive question is asked when it is needed, not when it is mounted.** Reading a
@@ -541,10 +573,16 @@ writes files, and what is not allowed is work done without being asked for, twic
 
 Targets are Chrome ≥ 90, Safari ≥ 14, Firefox ≥ 90 and Edge ≥ 90, plus modern mobile browsers.
 
-Honesty note: every measurement in the development log was taken in Chromium. Safari and Firefox are
-targets, not verified — the CSS ships `@media` fallbacks beside every `@container` rule and avoids
-`:has()` precisely because Safari 14 has no container queries, but nothing has been measured there.
-If Safari is critical to you, test that first.
+What is measured where: `npm run test:browsers` (FR-48) drives twelve claims — a canvas that paints,
+backing-store density against `devicePixelRatio`, selectable text, search marks and the no-hits state,
+thumbnails and outline, the 1,000-page document's slot count, the toolbar fold at 375 px, keyboard paging,
+wheel zoom against plain scroll, pinch against two-finger pan, forced colours, uncaught errors — through
+Chromium, Firefox and WebKit at 1280×900 and 375×812 dpr 2. On Chromium the run is **23 ok and 1 skip**,
+and the skip is the finding: that emulation delivers no wheel events to the page at all. Safari and Firefox
+remain targets rather than results — neither engine would start on the machine this was written on, and the
+CI job that runs the same script on Linux has not run yet. The CSS ships `@media` fallbacks beside every
+`@container` rule and avoids `:has()` precisely because Safari 14 has no container queries. If Safari is
+critical to you, test that first.
 
 ## Links
 
