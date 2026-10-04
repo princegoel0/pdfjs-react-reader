@@ -159,7 +159,8 @@ decided it would rather own the layer than rent it.
   ceilings on canvas area and print-job size so a hostile or merely large document cannot exhaust the tab.
 * **Progressive weight.** A display-only application ships a display-only bundle (§4.7).
 * **Accessible by default, not by add-on.** Keyboard-complete, screen-reader legible, high-contrast aware,
-  reduced-motion respecting, and structure-tree backed on tagged documents (§4.11).
+  reduced-motion respecting. On a tagged document, the structure tier is what adds the hierarchy to the text
+  layer (§4.11).
 * **Honest about its own evidence.** Every compatibility and performance claim is tied to a machine that
   ran it (§8).
 
@@ -301,8 +302,12 @@ Six layers, each with a reason to be separate from the one below it:
 | **Viewer shell** | The drop-in component — uncontrolled, taking its parts as props plus a feature list. |
 | **Features & tiers** | Opt-in values the shell never imports statically: print, download, forms, outline, layers, annotate, attachments, edit. |
 
-The rule that keeps the layers honest: **a layer may import downward and never upward.** The core engine
-glue contains no React; the hooks contain no DOM; the shell imports no feature.
+The rule that keeps the layers honest: **a layer may import downward and never upward.** Four sentences, each
+of which a check can decide: the core engine glue imports no React at runtime; a headless hook renders nothing
+and touches no DOM at module scope; the shell imports no feature; and every documented entry point still imports
+safely where there is no DOM at all (FR-46). One operation is browser-only by its nature — printing reaches the
+live document — so a hook may use the DOM when it is *invoked*, which is not the same as depending on it while
+loading.
 
 ### 3.2 Entry points & tree-shaking
 
@@ -552,7 +557,7 @@ and a dependency always initialises before its dependents. Each of those three f
 | **FR-15** | Search Controls | Case sensitivity, whole-word, next and previous, and a live match counter reporting position within the total. |
 | **FR-26** | Replaceable Find Strategy | The find bar, the in-page marks and the counter are driven by a host-supplied controller conforming to a published interface, so an alternative strategy is passed in rather than built around. |
 | **FR-27** | Search Depth | Multi-word queries use AND-per-page semantics: each normalized term must occur on the page for the page to match; normal search treats the query as literal text and escapes it before matching; regex mode treats the query as a raw JavaScript expression. Per-page match counts are exposed to the consumer. Regex execution is cancellable; dedicated worker isolation and a fixed per-page timeout are not part of the `1.0.0` contract. Because matching runs on the viewer's main thread, the pattern is **bounded** instead: at most 256 UTF-16 code units by default, host-configurable, checked before compilation. An over-long, uncompilable or aborted pattern is reported as a pattern problem with its own reason — never silently converted into "no matches", which is a different answer and a wrong one. |
-| **FR-39** | Incremental, Viewport-Prioritised Indexing | Index the visible range first, then continue outward, so the first query on a large document answers against what the reader can see instead of after a whole-file pass. A query may be answered from a partial index and must then say that it was: a result count that is still growing is reported as provisional, never as final. Re-indexing after a page edit invalidates only what changed. |
+| **FR-39** | Incremental, Viewport-Prioritised Indexing | Index the visible range first, then continue outward, so the first query on a large document answers against what the reader can see instead of after a whole-file pass. A query may be answered from a partial index and must then say that it was: a result count that is still growing is reported as provisional, never as final. Invalidation is per page and is offered to the host — a page whose text changed can be re-read on its own, without a whole-document pass — and when the document itself is replaced, by a page inserted, removed or moved, the index built for the old one is discarded with it. Extraction reads a page's content stream, so text held in annotation storage is not part of the index, and no clause here promises it will become searchable. |
 | **FR-40** | Injectable External Index | Accept a prebuilt index — from a server, a search service, or a previous session — conforming to the published index shape, and use it in place of extraction. A host with server-side search over its own corpus should not pay for client-side extraction to get our highlighting. |
 
 ### 4.5 Forms & Annotations
@@ -603,7 +608,7 @@ that had been renamed out of existence.
 | Requirement ID | Feature | Specification |
 | :--- | :--- | :--- |
 | **FR-30** | Page Authoring | Reorder, delete, rotate, extract and split the document's own pages, with undo at two levels: within the pending batch, which is a permutation of integers and costs no bytes; and of the last apply, which restores the snapshot that write started from. A split makes two files. Writes are batched, so a document that is megabytes is parsed once per apply and not once per keystroke. |
-| **FR-31** | True Flattening | Turn widgets and marks into page content, reading the same annotation storage the forms and annotation features write, so what a reader actually marked is what gets flattened. A field with no appearance is given one before flattening, because asking a box for an appearance it does not have is how a flatten throws on every unsigned form. |
+| **FR-31** | True Flattening | Turn supported widgets and supported signature appearances into page content, reading the same annotation storage the forms and annotation features write, so what a reader actually filled in or signed is what gets flattened. Markup annotations — highlight, text markup, ink, free-text — are carried through as annotations rather than converted: redrawing another reader's annotation into a content stream is the content-stream surgery §2.5 puts out of scope, and a flatten that fakes an appearance it cannot reproduce is worse than one that leaves the annotation alone. A field with no appearance is given one before flattening, because asking a box for an appearance it does not have is how a flatten throws on every unsigned form. |
 | **FR-32** | Visual Signing | A mark drawn on a pad, written into a signature field's appearance stream and scaled into each widget box that field declares. No signature *value* is written (§2.5). A field that already carries one is refused, and "already signed" is determined by that value rather than by the presence of an appearance — an empty appearance proves nothing was signed. Locating a document's boxes costs one parse, taken only when there is something to place, and reported while it runs. |
 | **FR-33** | XFA Display, Save Refused | Render a pure-XFA document, whose pages have no painted content of their own. Search marks and thumbnails work against the rendered tree. Viewport changes update the layer rather than re-appending it. Saving an XFA document is refused with a reason, not attempted and corrupted. |
 | **FR-42** | Document Merge | Combine the open document with one or more others into a new file, with page-level selection from each source and a preview of the resulting order. Merge is a *new document*, not a mutation of the open one: the sources stay untouched and the result is written out, so a reader cannot destroy a file by experimenting. Requires a second document lifecycle in the tier, which is why it is scoped separately from FR-30. |
@@ -630,7 +635,7 @@ that had been renamed out of existence.
 | Requirement ID | Feature | Specification |
 | :--- | :--- | :--- |
 | **FR-46** | SSR-Safe Module Graph | Importing any documented entry point in a server environment must not throw: no module-top-level access to `document`, `window`, `canvas` or a worker. Rendering requires a DOM and is client-only, so the documented pattern is a client boundary around the viewer — and the package must make that boundary easy to write rather than easy to get wrong. Server-side import is a tested property, not an accident, and the test covers the published tarball. |
-| **FR-47** | Touch & Gesture Handling (v1.0) | Multi-touch gestures arbitrated explicitly: pinch zooms the page without also scrolling the host page, a one-finger drag on a drawing tool draws rather than scrolls, and a tap on a link or widget activates it. Gesture handling is isolated so the host application's own listeners are not starved, and every gesture has a keyboard or control equivalent. |
+| **FR-47** | Touch & Gesture Handling (v1.0) | Multi-touch gestures arbitrated explicitly: pinch zooms the page without also scrolling the host page, a one-finger drag on a drawing tool draws rather than scrolls, and a tap on a link or widget activates it. Gesture handling is isolated so the host application's own listeners are not starved, and every gesture has a keyboard or control equivalent — with one named exception: a freehand stroke, ink or the signing pad, is a pointer act, and there is no key-by-key way to make the mark. Where the package offers one it says so on the control rather than leaving the reader to discover the absence. |
 | **FR-48** | Browser & Engine Verification Matrices | CI runs the suite across Chromium, Firefox and WebKit, plus a mobile-emulated pass, and tests the published engine floor `6.2.108` and the latest supported 6.x release. React tests run against React 18 and 19, covering the minimum supported patch and the latest patch of each supported major. Matching `react-dom` majors are tested. A compatibility claim in §8 is backed by a job that fails when it regresses; a browser, React major or engine that cannot start is an unverified row, not a pass. |
 | **FR-49** | Benchmark Fixture Suite | A committed fixture for each benchmark profile in §6 — text-heavy, image-heavy, vector-heavy, and a low-memory device harness — generated by a script in the repository so the fixtures are reproducible rather than binary blobs nobody can regenerate. Each profile's target is measured against its fixture in CI and reported, so a regression is a failing job rather than a slower feeling. |
 | **FR-50** | Published API Maturity | Every public name carries a maturity tag (§5.5), enforced by a check rather than by convention: a name that is exported and untagged fails the build. Stability promises are only meaningful if the set of names making them is legible. |
@@ -1014,11 +1019,15 @@ the probe set the number, not the string. The probe runs off the render path and
   expression is reported before any page is read. Indexing is incremental and viewport-prioritised
   (FR-39), reports progress, yields on a bounded interval, and may be replaced wholesale by a host-supplied
   index (FR-40). Multi-word queries use AND-per-page semantics, and per-page counts are exposed. An index belongs to
-  one document and is discarded with it; a page edit invalidates only what changed.
-* **Accessibility.** WCAG 2.2 AA for the shell and every primitive (FR-45), structure-tree backed on
-  tagged documents (FR-43), correct under forced colours and high contrast (FR-44), keyboard-complete with
-  no trap, and announcing page changes. Accessibility is a cross-cutting requirement, not a feature tier:
-  it is not opt-in, not separately bundled, and not deferred to a later release.
+  one document and is discarded with it; invalidation is offered per page, and a change of document discards
+  the index rather than patching the old one.
+* **Accessibility.** WCAG 2.2 AA for the shell and every primitive (FR-45), correct under forced colours and
+  high contrast (FR-44), keyboard-complete with no trap, and announcing page changes. That part is a
+  cross-cutting requirement, not a feature tier: it is not opt-in, not separately bundled, and not deferred to
+  a later release. The one exception is the tagged-document structure integration (FR-43): surfacing a
+  structure tree pulls the engine's own structure builder, so it ships as an opt-in tier like every other
+  per-document capability, and a host that loads it gets the heading, list and table hierarchy a text layer
+  cannot carry on its own.
 * **React & Runtime Compatibility.**
   * **React 18 and 19,** with the matching `react-dom` major, and a CI matrix across both supported majors.
     Core functionality may use React 18 APIs where required; no React 19-only API may be required.

@@ -14,10 +14,16 @@ has now been produced by several of them. The last run of the current workflow �
 `docs`, and on `browser`, which started real engines on a runner for the first time and returned **67 ok / 5
 skipped / 0 failed / 0 not runnable** — the same tally the local run reports, from the same thirteen checks.
 `verify` is red in all three cells at exactly one step, `Bundle size budget`, which is owner decision **#208**;
-the two gates added beside it (#215's follow-on) run green ahead of that step, so a still-undecided byte
-budget no longer hides them. What is left open is not reachable from this machine: §8's pinned browser floors,
-the engine axis inside a browser at both range ends, Edge, hardware, and the assistive-technology pairings.
-The register stands at **44 met, 13 partial, 1 absent** of 58, on a suite of **1,024 tests in 108 files**.
+the two gates added beside it (#215's follow-on) run green ahead of that step, and #218 moved `Pack` and
+`check:examples` in front of it too, so a still-undecided byte budget cannot hide a contract check — that
+reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
+not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
+absent** of 58, on a suite of **1,030 tests in 109 files** — eighteen rows moved when a clause-by-clause read of
+`PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
+below and is the honest number rather than the comfortable one. One of the eighteen, `FR-06`, has since been
+closed in the code rather than in the register (#219), and it went back to `met` on a guard that counts layer
+constructions and holds the reader's focus across the step.
 
 ### Added
 
@@ -278,8 +284,175 @@ The register stands at **44 met, 13 partial, 1 absent** of 58, on a suite of **1
   and refuses to emit a page whose verdict has drifted from them, so a raised `MAX_RENDER_SIDE` stops the build
   of the fixture rather than quietly invalidating what it proves.
 
+### Amended
+
+Five requirements moved, on the owner's ruling of 2026-10-04, and each moved as the lock requires: the id is
+unchanged, the whole requirement is restated, and the reason is written here to stay. Nothing in this list is a
+requirement weakened to match the code — in every case the sentence was saying something the package does not do,
+or cannot do on the engine we advertise, and one of them (`FR-47`) gained a promise instead of losing one.
+
+- **`FR-31` True Flattening** now flattens *supported widgets and supported signature appearances*, says plainly
+  that markup annotations — highlight, text markup, ink, free-text — are carried through as annotations rather
+  than converted, and keeps the missing-appearance repair. **Reason:** the writer's `PDFForm.flatten()` walks
+  `getFields()` and nothing else — for each field it takes `acroField.getWidgets()`, calls
+  `flattenWidgetOntoPage(page, widget, appearanceRef)` per widget, then `removeField(field)`, and finishes with
+  `flattenOrphanWidgets()` for widgets that carry `/FT` but are missing from `/Fields`
+  (`@cantoo/pdf-lib/cjs/api/form/PDFForm.js:635-657`). A highlight or an ink is not a widget, so a flatten never
+  sees one; whether it becomes page content is a question about content-stream surgery, which §2.5 already puts
+  out of scope, and a flatten that fakes an appearance it cannot reproduce is worse than one that leaves the
+  annotation alone. The appearance-repair half is real and stays: `flatten({ updateFieldAppearances: true })` is
+  the default, and the field classes are where an absent `/N` stream is decided
+  (`PDFTextField.js:669` `widget.getAppearances()?.normal instanceof PDFStream`). The old sentence — "turn
+  widgets and marks into page content" — promised a conversion the package does not perform.
+- **`FR-47` Touch & Gesture Handling** keeps its arbitration and adds one named exception: a freehand stroke,
+  ink or the signing pad, is a pointer act with no key-by-key equivalent, and where the package offers such a
+  control it says so on the control. **Reason:** "every gesture has a keyboard or control equivalent" is true of
+  pinch, drag-to-scroll and tap, and false of a drawn mark by construction — the ink editor's path is the
+  pointer's coordinates. The alternative reading of the old clause was to accept a typed-name signature as the
+  "equivalent", which is a different feature the owner has ruled out, so the exception is stated instead of
+  being worked around. This is the one amendment that adds a duty: the control has to disclose the absence.
+- **`FR-39` Incremental, Viewport-Prioritised Indexing** now says invalidation is per page and *offered to the
+  host*, that replacing the document discards the index rather than patching it, and — explicitly — that text
+  held in annotation storage is not part of the index and nothing here promises it will become searchable.
+  §6.2's search paragraph was restated to match. **Reason:** extraction reads the page's content stream
+  (`getTextContent`), while forms, annotations and ink live in `annotationStorage` until they are saved, so the
+  clause as written asked for an answer the extraction path cannot give; and the invalidation surface the
+  package actually has is the host-facing per-page one (`usePdfSearch.invalidatePages`,
+  `src/headless/usePdfSearch.ts:130`), not a private re-index after an edit the package did not make.
+  Task **#206** asked the owner to choose between restating and withdrawing the clause; this is the restatement.
+- **§2.1's accessibility principle and §6.2's cross-cutting rule** now make basic accessibility — WCAG 2.2 AA,
+  keyboard completeness, forced-colours correctness, page-change announcement — mandatory in the core, and put
+  the *tagged-document structure integration* (`FR-43`) in the opt-in tier column. **Reason:** the two rules
+  contradicted each other as written. §3.1 forbids the shell from importing a feature and §4.7 prices a
+  display-only application, while the structure tree is reached through the engine's own
+  `StructTreeLayerBuilder`, which is a per-document capability like print or forms. The integration already
+  ships that way (`src/features/structure.tsx`, `structureFeature`, measured at 0.37 kB over core when it
+  landed); the document now says so, and nothing a reader relies on for access is opt-in.
+- **§3.1's layer rule** is now four sentences a check can decide — the core engine glue imports no React at
+  runtime, a headless hook renders nothing and touches no DOM at module scope, the shell imports no feature, and
+  every documented entry point imports safely where there is no DOM (`FR-46`) — with one carve-out: an operation
+  that is browser-only by nature may use the DOM *when invoked*. **Reason:** "the hooks contain no DOM" could
+  not be true as stated and was never what the code claimed. `usePdfPrint` reaches the live document — it builds
+  a container, appends it to `document.body` and calls `window.print()`
+  (`src/headless/usePdfPrint.ts:141,182,242`) — and no server may import it *as a module* and be broken by
+  that. The decidable property is therefore about load, not about invocation, which is what
+  `src/lib/ssr.test.ts` holds and what a client boundary depends on. A reader of the old sentence could not
+  tell a violated rule from a loosely written one.
+
 ### Changed
 
+- **A zoom step now repositions the annotation and editor layers instead of rebuilding them (#219, FR-06's
+  second sentence).** Both build effects listed `viewport` among their dependencies, so every scale change ran
+  their teardown — `container.replaceChildren()` at `src/components/PdfPage.tsx:774`, `layer.destroy();
+  drawLayer.destroy()` at `:940-942` — and constructed a fresh `AnnotationLayer` and `AnnotationEditorLayer`.
+  That was not only the worker round trip and the element build; it was the reader's place in the page. The
+  widget that held the focus lost it, a mark mid-drag lost its layer, and the `change`/`input` listeners the
+  page attaches beside the container were left pointing at a div whose children had been replaced. The engine's
+  own builders are the authority here, not a preference for less work: `AnnotationLayerBuilder.render`
+  (`web/pdf_viewer.mjs:1861-1870`) calls `annotationLayer.update({ viewport, optionalContentConfig })` whenever
+  it already has a div and constructs only when it does not, and the editor-layer builder does the same at
+  `:4299-4305`; the reason that is enough is that `AnnotationElement` places every widget in percentages of the
+  page box (`style.left = 100 * (x - pageX) / pageWidth`, in `build/pdf.mjs`), which is the one piece of
+  arithmetic a scale change cannot invalidate. So `viewport` left both dependency lists, `rotation` stayed —
+  `update()` re-sizes the box and does not re-orient a percent-placed element, which is also why the text layer
+  has always rebuilt on rotation — and one effect after both builds now hands the new viewport to both layers.
+  `optionalContentConfig` is not passed, deliberately: `updateOC` returns early without it
+  (`pdf.mjs:17831-17836`), so a group the reader switched keeps the state it was last told about rather than
+  silently re-showing what is hidden. `src/components/PdfPage.overlay.test.tsx` is the guard, and it asserts
+  five things the counts alone cannot: one construction and one annotation read across three zoom steps, the
+  `update()` list carrying each new box, the *same element* still in the document, `document.activeElement`
+  still the widget, and the page's own form listener still firing. **Four counterfactuals, each restoring the
+  source by checksum:** the dependency array keyed on `viewport` again gives `the zoom rebuilt the annotation
+  layer: expected 3 to have a length of 1` and `the zoom step moved the reader out of the field: expected
+  <body>… to be <input>`; removing the `update()` call empties four update lists; removing the teardown's
+  `destroy()` fails the rotation case; leaving the editor layer out of the step fails its own count. Measured
+  in chromium on `annotated-sample.pdf`, eight steps through the toolbar's zoom field, with one probe run
+  against HEAD's source and one against this: **48 elements added and 48 removed per sequence becomes 0 and 0**,
+  and 683 ms becomes 637 ms — the element count is the machine-independent number, the wall figure is one
+  sample on this machine and is written down as that. Costs 0.06 kB gz on the shell (64.81 → 64.87) and 0.05 kB
+  on core, with `headless` unchanged, measured by rebuilding and re-running `npm run size` on both sources.
+  The register row this closes is `FR-06`, which #217 had moved to `partial` for exactly this reason, and it
+  went back to `met` on the guard rather than on the code. Two defects the guard found on the way, both fixed
+  in the source rather than in the test: the annotation layer was never `destroy()`ed when its page rotated or
+  scrolled out — only its container was emptied, so the instance and the editable-annotation table the editor
+  layer reads stayed alive behind a page that had moved on, while the engine's own
+  `AnnotationLayerBuilder.cancel` does call it — and the editor layer now rebuilds together with it on a
+  programmatic form write, because `layer.enable()` asks that linked annotation layer which elements an editor
+  may take over, and a released one answers with nothing.
+- **The browser matrix has a fourteenth check, and its first run found a race in the check (#219).**
+  `zoom-updates-the-layers-in-place` reads the same clause off a real engine rather than off a stub: it watches
+  the annotation and editor layers with a `MutationObserver`, drives the toolbar's zoom field through 150 / 200 /
+  250 / 300 %, and fails on any element taken out or put in. Against HEAD's source it reports
+  `4 zoom steps replaced 24 overlay elements and added 24`; against this one,
+  `4 steps 2.84 → 3, 18 overlay elements in place throughout, 0 added / 0 removed` — and it is the only row that
+  moved, twelve others staying green in the same cell, which is the shape a counterfactual should have. The first
+  draft failed on *this* side twice, for two reasons that are both worth keeping. It counted
+  `document.querySelectorAll('.pjsr-annotation-layer *')`, so the second page that 300 % legitimately mounted was
+  read as the first page's layer growing (18 before, 26 after); the assertion now follows the node references it
+  armed, and waits for each requested scale in turn rather than for “any change from the starting one”, which
+  after the first step is true forever and would have timed the sequence as stillness. And on Firefox both cells
+  *skipped* it, because `load()` waits for the document label and the painted canvas — not for the overlay — so
+  arming watched a layer that had not been filled yet. The engine had done nothing wrong; the harness had read
+  its own timing, which is the same trap the benchmark hit when it asked “is this page painted” of whichever
+  canvas was first in the DOM. It now waits up to 10 s for the layer to carry an element and only treats a layer
+  that stays empty as an engine finding; both Firefox cells report ok beside Chromium's two, with WebKit not
+  installed on this host (§8's floor rows for it stay the CI job's to prove).
+- **`Pack` and `check:examples` moved ahead of the bundle-size budget (#218).** The Verify job runs its steps
+  explicitly and carries no `continue-on-error`, so a failing step skips every step behind it — and since
+  #215's follow-on put the maturity and register gates before `Bundle size budget`, the two left behind it were
+  still unreachable while owner decision **#208** stays open. That ordering made FR-52's own gap
+  self-referential: its clause is that the documented examples compile against the packed artifact, the check
+  that proves it has never executed on a runner, and the reason it has not was a step that reports bytes. Both
+  moved steps read only files that exist before the budget runs — `Pack` needs the manifest and the file list,
+  `check:examples` builds the tarball itself — so the reorder costs no time. What it buys was shown by feeding
+  the job its own defect: a manifest whose `files` list omits a published subpath is caught by `Pack`, and with
+  the budget in front of it the run reports nothing about that omission, because the job had already stopped.
+  The size step keeps its verdict — it still reddens the job, and #208 is still owed — it simply no longer blinds
+  what follows it. (FR-52, FR-58)
+- **Eighteen requirements stopped being reported as `met`, because their guards asserted less than their clauses**
+  (#217). The register read 44 met / 13 partial / 1 absent. The re-read this pass was deliberately blind to the
+  register: each row was graded from `PRD.md`'s sentence against `src/` and the test tree only, asking per
+  clause "does the code do this, and is there an assertion that fails if it stops?". Eighteen rows failed the
+  second half of that question, and the four the earlier pass had already flagged turned out to be the tip
+  rather than the whole — the
+  findings, each verified by grep over the whole test tree rather than by reading one file:
+  `FR-05` nothing calls `reportPageDims` and asserts a measured slot, so "the scrollbar does not jump" is only
+  asserted as arithmetic on hand-supplied sizes; `FR-06`'s in-place zoom is violated by the code, not just
+  unasserted — the annotation layer's effect (`src/components/PdfPage.tsx:703-796`) and the editor layer's
+  (`:944`) both take `viewport` in their dependency arrays and destroy-and-rebuild on every scale step, while
+  only the text and structure layers update in place; `FR-08`'s fit-mode repaint half has no assertion at all
+  (jsdom reports a 0×0 viewport, so the only evidence is a manual measurement from 2026-09-29); `FR-10`'s
+  recursion is never exercised — `buildTree` (`src/headless/usePdfOutline.ts:22`) is called by no test, and
+  `outline.test.ts` re-implements the walk with its own `resolveItem` before asking the engine to convert a
+  point; `FR-14` scrolls the active match into view at `PdfPage.tsx:970-977` with no test driving it, the only
+  `scrollIntoView` assertions in the tree belonging to the thumbnail strip and stubbed out in
+  `ViewerParts.composed.test.tsx:49`; `FR-15`'s next/previous arithmetic at `usePdfSearch.ts:485` is never
+  called — `nextMatch`/`prevMatch` appear in tests only as `vi.fn()` stubs; `FR-16` asserts parsed field data,
+  not one real HTML control, and `Sig` appears in no test file; `FR-17`'s published hook `usePdfFormValues` is
+  imported by nothing under test; `FR-24`'s `setVisibility` and `usePdfOptionalContent` likewise, with both page
+  tests passing `optionalContentConfig: null`, so the shared-instance promise is unchecked; `FR-26` has no test
+  that hands the shell a host controller — the `PdfFindController` in `ViewerController.search.test.tsx:59` is
+  the mock's own return value; `FR-28`'s three named refusable affordances are never refused: zero tests pass any
+  `enable*` flag as `false`; `FR-29`'s `annotateFeature` is imported by two test files, one for its stylesheet
+  list and one for a maturity string, and is never mounted, so manager disposal, the authoring round trip and
+  survive-scroll-out are all unasserted; `FR-30`'s undo-of-the-last-apply (`undoApply`, `src/edit.tsx:439`)
+  appears in no test; `FR-32` proves one mark into two boxes belonging to *different* fields, and the scan's
+  progress state appears nowhere; `FR-36`'s thumbnail path wires two aborts (`PdfThumbnail.tsx:126,181`) that
+  `PdfThumbnail.test.tsx` never mentions, and `usePdfPrint`'s signal is tested only for ceilings; `FR-37`'s
+  `destroyed` is produced at `usePdfDocument.ts:489` and asserted only negatively, so deleting the branch would
+  pass; `FR-54` publishes eighteen codes of which three (`PASSWORD_REQUIRED`, `WORKER_ERROR`, `WRITER_ERROR`) are
+  produced by paths no test drives and two (`RENDER_CANCELLED`, `UNSUPPORTED_FEATURE`) are produced nowhere;
+  `FR-55`'s `enableScripting: false` at `PdfPage.tsx:760` is asserted by nothing, and the allowlist is asserted
+  at the library boundary only, never that the shell's option reaches the engine call.
+  The register now reads **26 met / 31 partial / 1 absent**. Two rows the same pass questioned stayed `met` and
+  the reason is recorded in their notes rather than argued here: `FR-13`'s yield is asserted on the hook path the
+  shell actually uses, and `FR-27`'s ceiling, per-page counts and refusals all have their own assertions.
+  **What this is a lesson about:** a `met` row satisfied the gate because the gate can check that a cited test
+  *exists, is a test, and names the requirement* — it cannot check that the test asserts the sentence the row
+  points at. Nineteen of these rows had a real guard file and a real `FR-NN` in its header; the assertion simply
+  stopped at the first clause. The gate is unchanged (a machine should not have to read prose), which means the
+  clause-by-clause re-read is the only thing that keeps this register honest, and it has to be repeated, not
+  remembered. `ROADMAP.md`'s generated block was re-emitted from the new states.
 - **`check:maturity` and `check:fr-evidence` are CI steps now, placed before the step that reddens the job.**
   Both ran only inside `npm run verify`, and no job in `.github/workflows/ci.yml` calls `verify` — so FR-50's
   promise that "a name that is exported and untagged fails the build" meant *this machine's* build, and the

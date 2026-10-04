@@ -124,7 +124,7 @@
     },
     "FR-05": {
       "title": "Viewport Virtualization",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/headless/usePdfVirtualizer.ts",
         "src/lib/layout.ts"
@@ -143,7 +143,10 @@
       "regressionGuard": [
         "src/lib/layout.test.ts"
       ],
-      "gaps": []
+      "gaps": [
+        "placeholder heights coming from real page dimensions are asserted nowhere: `reportPageDims` (src/headless/usePdfVirtualizer.ts:147) is a `vi.fn()` in every test that mounts the shell (ViewerController.search.test.tsx:51) and no test reports a measured page and asserts the slot it lands in, so “the scrollbar does not jump as pages measure themselves” rests on layout.test.ts’s arithmetic over sizes handed to it"
+      ],
+      "note": "Render-what-intersects-plus-overscan is guarded as arithmetic (layout.test.ts:101) and measured in the browser harness, which fails a cell that mounts more than forty pages of a thousand; the measurement path that turns a real page into a slot height has no failing test behind it. The estimate-sampling walk (usePdfVirtualizer.ts:186-200) is the code a regression would live in, and it is the code nothing calls from a test."
     },
     "FR-06": {
       "title": "Responsive Zoom Modes",
@@ -156,20 +159,24 @@
       "automated": [
         "src/lib/zoom.test.ts",
         "src/lib/layout.test.ts",
-        "src/components/PdfPage.textlayer.test.tsx"
+        "src/components/PdfPage.textlayer.test.tsx",
+        "src/components/PdfPage.structure.test.tsx",
+        "src/components/PdfPage.overlay.test.tsx"
       ],
       "acceptance": [
-        "scripts/browser-matrix.mjs#wheel-zoom-and-scroll"
+        "scripts/browser-matrix.mjs#wheel-zoom-and-scroll",
+        "scripts/browser-matrix.mjs#zoom-updates-the-layers-in-place"
       ],
       "documentation": [
         "docs/src/pages/Shell.tsx"
       ],
       "regressionGuard": [
-        "src/components/PdfPage.structure.test.tsx",
-        "src/components/PdfPage.textlayer.test.tsx"
+        "src/components/PdfPage.overlay.test.tsx",
+        "src/components/PdfPage.textlayer.test.tsx",
+        "src/components/PdfPage.structure.test.tsx"
       ],
       "gaps": [],
-      "note": "Range, fit modes and automatic fit are tested; both overlay layers the zoom step touches — the structure layer and the text layer — are now asserted to take one build and N updates, with the new viewport on each update, so \"in place rather than rebuilding\" is a failing test and not a reading of the code. Measured on the way in: pdf.js itself asks for one update straight after build(), so the assertion counts from that baseline rather than from zero."
+      "note": "Built and guarded for all four overlay layers. 25 %-500 % and the three fit modes are guarded in src/lib/zoom.ts and layout.test.ts; the text and structure layers were already asserted to take one build and N updates; and src/components/PdfPage.overlay.test.tsx now does the same for the annotation and editor layers, which the page used to destroy and re-create on every scale step. The guard counts constructions, renders and updates, holds the identity of the element the first build stamped, keeps the focus inside the widget across the step, and fires a `change` through the listener the page attaches beside the layer — so “in place” is now four clauses and not a reading of the code. Four counterfactuals, each restoring the source by checksum: the build effect keyed on `viewport` again gives “the zoom rebuilt the annotation layer: expected 3 to have a length of 1” and “the zoom step moved the reader out of the field”; the `update()` call removed gives an empty update list in four tests; the teardown’s `destroy()` removed fails the rotation case; the editor layer left out of the step fails its own count. Measured in chromium on annotated-sample.pdf, eight zoom steps through the toolbar field, with the same probe run against HEAD’s source and this one: 48 elements added and 48 removed per sequence becomes 0 and 0, and 683 ms becomes 637 ms — the wall figure is one sample on this machine, the element count is not. Costs 0.06 kB gz on the shell (64.81 → 64.87) and 0.05 kB on core; `headless` unchanged. In a real engine the same clause is read by the matrix check `zoom-updates-the-layers-in-place`: a MutationObserver on the two layers, four steps through the toolbar field, and the verdict is element churn — HEAD reports 24 replaced and 24 added, this build reports 18 elements in place throughout with 0 and 0, on chromium and firefox desktop and mobile. WebKit is not installed on this host, so its row stays the CI browser job to prove. Two things the same work fixed because the guard noticed them: the annotation layer was never `destroy()`ed when its page rotated or left (only its container was emptied, so the instance and its editable-annotation table outlived it), and the editor layer now rebuilds with it on a programmatic form write, because an editor that takes over an existing annotation has to be linked to the layer that is live rather than the one that was released."
     },
     "FR-07": {
       "title": "High-DPI Adaptation",
@@ -197,7 +204,7 @@
     },
     "FR-08": {
       "title": "Page Layouts",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/layout.ts",
         "src/headless/usePdfVirtualizer.ts",
@@ -220,8 +227,10 @@
         "src/components/ViewerPages.regroup.test.tsx",
         "src/components/ViewerPages.paint.test.tsx"
       ],
-      "gaps": [],
-      "note": "The clause that was a gap is now the shape of the DOM: a row is a box the shell paints and the pages are its siblings, keyed by page index, placed from `slot.pages`. `VirtualSlot` gained that field and `VirtualSlotPage` is its new published type; `indices`, `width`, `height` and `offsetTop` are unchanged, so a host that reads rows keeps working. Two decisions worth recording. The identity tests run over a whole document of rows rather than the two a jsdom viewport shows, because across two rows the continuous heads (1, 2) and the spread heads (1, 2) coincide and the remount is invisible — the first version of this guard passed against the broken code, and putting the pages back inside the row is what makes it fail. And the repaint half is asserted by counting `page.render()` calls and canvas backing stores at a fixed scale; the fit-mode half, where repainting is correct, cannot be asserted here because a fit scale resolves against a viewport that jsdom gives zero size, so that one stays the browser measurement of 2026-09-29 (scale 1.04 → 0.50, every canvas 792×1025 → 386×499) cited in `ROADMAP.md`."
+      "gaps": [
+        "the fit-mode half of “repaints only when the fit target itself moves” is asserted nowhere. A fit scale resolves against a viewport that jsdom sizes 0×0, so the only evidence is a manual Chromium measurement from 2026-09-29 (scale 1.04 → 0.50, every canvas 792×1025 → 386×499) that no check repeats and no artifact carries"
+      ],
+      "note": "The identity clause — switching regroups the rows without remounting a page — is guarded over a whole document of rows (ViewerPages.regroup.test.tsx:206,220,239,282), and the fixed-zoom half of the repaint clause is guarded by counting `page.render()` calls and backing stores (ViewerPages.paint.test.tsx:207,226,239). The row read `met` while its own note said the fit-mode half could not be asserted here; that is a gap, not a waiver, because a clause whose only evidence is one person’s browser session regresses silently. Closing it means either a harness that gives jsdom a real viewport or a committed browser check."
     },
     "FR-09": {
       "title": "Rotation",
@@ -254,7 +263,7 @@
     },
     "FR-10": {
       "title": "Outline",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/outline.ts",
         "src/headless/usePdfOutline.ts",
@@ -279,8 +288,10 @@
         "src/components/ViewerController.destination.test.tsx",
         "src/components/a11y.audit.test.tsx"
       ],
-      "gaps": [],
-      "note": "Recursive parsing, named destinations, object-reference translation and the axe-audited ARIA tree were already met; what was missing was the second half of “a page and a position”. Three things had to happen for that to be more than a claim. `outline-sample.pdf` now carries real positions — every destination in every fixture used to read `/XYZ null null null`, which names a page and no place, so the clause could be written and tested against an array typed into a test and never meet a document that had one. The offset is asked of the engine (`viewport.convertToViewportPoint` at the live scale and the page’s own `/Rotate` plus the reader’s), not derived here, because the axis flip and the rotation are pdf.js’s business; the test that measures what it answers for the fixture’s own 660 pt runs against the real bytes. And a destination that asks for a magnification changes the scale *first* and measures the place after it lands, which is why the click parks a pending destination for one render. Measured in Chromium on the fixture: at 100 %, “1. Introduction” (`/XYZ 72 660`) puts the viewport at 132 px — the subtitle line, 132 pt down a 792 pt page — “2. Sections” (`/Fit`) goes to 808, page 2’s top, and “3. Conclusion”, reached through the name tree, takes 200 % and then lands at 3544, which is page 3’s top at that scale plus 344 px for its 620 pt. The published additions are additive: `OutlineEntry.position`, the four names around it, and a second argument to `OutlineView`’s `onSelectPage` that a host already written can ignore."
+      "gaps": [
+        "the recursion is never exercised: `buildTree` (src/headless/usePdfOutline.ts:22) is called by no test. outline.test.ts resolves destinations through its own `resolveItem` helper over the raw `doc.getOutline()` array (:158-166), and the nested trees that reach the DOM are hand-built arrays (a11y.audit.test.tsx:193), so “parse the bookmark tree recursively” is proven for the fixture’s top level and for literals nobody parsed"
+      ],
+      "note": "Named-destination translation, object-reference page numbers and the viewport position a click must land on are all asserted against real bytes (outline.test.ts:168-200, ViewerController.destination.test.tsx:169,197,230), and the ARIA tree is axe-audited with nested entries (a11y.audit.test.tsx:183). What is not asserted is the walk that turns the engine’s flat `items` arrays into that tree — the recursion the clause names. `buildTree` is module-private, which is why no test has ever reached it."
     },
     "FR-11": {
       "title": "Thumbnails",
@@ -361,7 +372,7 @@
     },
     "FR-14": {
       "title": "Match Highlighting",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/highlight.ts",
         "src/components/PdfPage.tsx"
@@ -381,11 +392,14 @@
       "regressionGuard": [
         "src/lib/highlight.test.tsx"
       ],
-      "gaps": []
+      "gaps": [
+        "“scroll the active match into view” is asserted nowhere: the call exists (src/components/PdfPage.tsx:968-978, `querySelector(“.pjsr-mark--active”)?.scrollIntoView({ block: “center” })`) but the only `scrollIntoView` assertions in the tree are the thumbnail strip’s (PdfThumbnail.test.tsx:286), and ViewerParts.composed.test.tsx:49 replaces the method with a no-op for every shell test, so deleting the call would leave the suite green"
+      ],
+      "note": "Native `mark` nodes, the active match’s distinguishing class and `aria-current`, and the non-colour channel that survives forced colours are each asserted (highlight.test.tsx:36-47, a11y.page.test.tsx:164, forced-colors.test.ts:86-93). The scroll is the third clause of the sentence and the only one with no failing test behind it."
     },
     "FR-15": {
       "title": "Search Controls",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/components/SearchBox.tsx",
         "src/lib/search.ts",
@@ -406,11 +420,15 @@
       "regressionGuard": [
         "src/components/SearchBox.counter.test.tsx"
       ],
-      "gaps": []
+      "gaps": [
+        "next and previous are never navigated: `nextMatch` and `prevMatch` appear in the test tree only as `vi.fn()` stubs (SearchBox.counter.test.tsx:49-50, ViewerController.search.test.tsx:77-78), so the wrap-around arithmetic at src/headless/usePdfSearch.ts:485 has no assertion and an inverted direction or an off-by-one at either end would pass",
+        "case sensitivity is asserted on the pure matcher (search.test.ts:75,171) but no test toggles the control in the bar, so the option’s journey from the button to the matcher is unguarded"
+      ],
+      "note": "Whole-word matching, the counter’s position-within-total and its provisional form are all asserted (search.test.ts:103-135, SearchBox.counter.test.tsx:76). The navigation half of the clause — next, previous, and what happens at the ends of the list — is code no test has ever run."
     },
     "FR-16": {
       "title": "AcroForm Support",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/components/PdfPage.tsx",
         "src/lib/form.ts",
@@ -427,11 +445,15 @@
       "regressionGuard": [
         "src/lib/form.test.ts"
       ],
-      "gaps": []
+      "gaps": [
+        "“as real HTML controls” is asserted for none of the six widget types: src/lib/form.test.ts reads parsed field data (`expect(combo?.type).toBe(“select”)` at :67 describes the annotation, not the DOM), the only render-level assertion is that the layer was told to render forms (PdfPage.annotations.test.tsx:185, `renderForms === true`), and no test asks what element a widget became",
+        "the signature widget is asserted nowhere: `Sig` appears in no test file, so “a signature widget renders as its box” — the clause that separates this requirement from FR-32’s capturing — has no evidence at any level"
+      ],
+      "note": "Collecting widgets and reading their types off a real AcroForm fixture is guarded (form.test.ts:46-115), which is the data half. The rendered half — six control kinds, each a real element a reader can focus and use — is what the clause promises and what the engine builds, and it is currently a reading of PdfPage.tsx rather than a test. A jsdom assertion over the fixture’s rendered annotation layer would cover all six in one mount."
     },
     "FR-17": {
       "title": "Form Data Sync",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/form.ts",
         "src/headless/usePdfFormValues.ts",
@@ -448,7 +470,11 @@
       "regressionGuard": [
         "src/lib/form.test.ts"
       ],
-      "gaps": []
+      "gaps": [
+        "the published hook is untested: `usePdfFormValues` (src/headless/usePdfFormValues.ts) is imported by no test file — a grep over src/ and scripts/ returns only src/features/forms.tsx:3,39, the definition, the two re-export barrels and check-size.mjs’s bundle marker — so `setValue`, `setFormData`, `getFormData`, `reset`, `version` and `isDirty` are asserted only as functions in src/lib/form.ts and nothing guards the surface a host actually calls",
+        "the dirty flag the clause exists for (“warn before discarding a reader’s work”) reaches a host through that hook, and the only `isDirty` in the tests is a fake feature’s own field (FeatureHost.test.tsx:237)"
+      ],
+      "note": "Two-way write-and-read-back, plain-object serialisation, initial-value reset and dirty comparison are all asserted on the library over the AcroForm fixture (form.test.ts:133,168,171,176,179). The row read `met` on that strength; the clause names a host-facing behaviour, and the host-facing half has no test. An already-issued maturity tag rides on the hook, not on the lib."
     },
     "FR-18": {
       "title": "Annotations: View",
@@ -607,7 +633,7 @@
     },
     "FR-24": {
       "title": "Optional-Content Layers",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/optional-content.ts",
         "src/headless/usePdfOptionalContent.ts",
@@ -625,7 +651,11 @@
       "regressionGuard": [
         "src/lib/optional-content.test.ts"
       ],
-      "gaps": []
+      "gaps": [
+        "the shared-instance clause is asserted nowhere: `setVisibility` and `usePdfOptionalContent` appear in no test file, and both page tests pass `optionalContentConfig: null` (ViewerPages.paint.test.tsx:151, ViewerPages.regroup.test.tsx:142), so “every page redrawing from the same configuration instance the render uses” is a reading of PdfPage.tsx:495 rather than a checked property",
+        "the `SetOCGState` half stops at the relay: link-service.test.ts:39 asserts the callback is invoked with the state and `preserveRB`, and nothing asserts what ViewerController.tsx:996-1004 does with it — that the panel’s shown state moved, not a copy of it"
+      ],
+      "note": "Group flattening and the panel’s tree shape are guarded (optional-content.test.ts:19), the relay is guarded, and the engine’s own limitation — it builds a new config per call, so “the same instance” is impossible as literally written — is measured and documented in the module. What is left is that the two behaviours the clause is about are unasserted: a switch that reaches every page, and a document action that lands on the panel’s state."
     },
     "FR-25": {
       "title": "Embedded Files",
@@ -654,7 +684,7 @@
     },
     "FR-26": {
       "title": "Replaceable Find Strategy",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/headless/usePdfSearch.ts",
         "src/components/PdfViewer.tsx",
@@ -673,7 +703,11 @@
       "regressionGuard": [
         "src/components/SearchBox.counter.test.tsx"
       ],
-      "gaps": []
+      "gaps": [
+        "no test hands the shell a host-supplied controller. The seam is real (`find?: PdfFindController` at PdfViewer.tsx:188, consumed at ViewerController.tsx:445 as `find ?? builtInSearch`) and is never exercised: the `PdfFindController` in ViewerController.search.test.tsx:59 is that test’s own mock return value, not an injected alternative",
+        "SearchBox.counter.test.tsx:86 does pass a host-shaped stub, but straight into `SearchBox`, which proves the counter follows injected state. Nothing proves the in-page marks and the bar’s enablement follow a host controller rather than the built-in search"
+      ],
+      "note": "The interface is published and the shell reads it, so the substitution is possible; what the clause promises is that it works, and that is asserted for one of the three parts the sentence names. A test that injects a controller with one match on page 9 and asserts the marks and the counter come from it, not from the indexed document, is the whole gap."
     },
     "FR-27": {
       "title": "Search Depth",
@@ -704,7 +738,7 @@
     },
     "FR-28": {
       "title": "Composed Shell, Labels, Events, Locales & Shell Affordances",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/components/ViewerContext.tsx",
         "src/components/ViewerController.tsx",
@@ -735,12 +769,15 @@
         "src/components/ViewerController.gestures.test.tsx",
         "src/components/ViewerParts.composed.test.tsx"
       ],
-      "gaps": [],
-      "note": "Met, and now met for the right reason: the row read `met` while PRD §5.3 was still marked **Target API shape**, which is the clause this row points at for its composed-parts half. W5 (task #201) closed that gap — `ViewerRoot` takes the host's `className`/`style` beside the controller's own, `ViewerSidebar` takes children and drops its tab strip when the host supplies the body, `ThumbnailList` reads doc/page count/current page/rotation from `useViewer()` with only its starting width left as a prop, and `OutlineView` reads the bookmark tree out of the outline tier's publication in the same controller's store. §5.3 therefore compiles against the packed artifact and the marker is gone. `Sidebar`'s `extraTabs` became `tabs`, because a tab that selects nothing is a control that lies; `OutlineViewProps` and `ThumbnailListProps` are gone with the props. The labels, controls, events and three individually-refusable affordances were already held and asserted."
+      "gaps": [
+        "the three affordances the clause names as individually switchable and observable are never switched off in any test: a case-insensitive sweep of the test tree finds no `enableWheelZoom`, `enableFullscreen`, `enableDrop`, `enablePinchZoom` or `enableKeyboardNavigation` passed as `false`. The gesture tests assert the behaviour when enabled (ViewerController.gestures.test.tsx:121,177,236), and “leaves a plain wheel alone” (:194) is about a wheel that is not a pinch, not about a refusal",
+        "“observable” is the missing half of the same clause: nothing asserts that a refused affordance leaves the chrome consistent — a hidden fullscreen control after a refused fullscreen, a wheel that does nothing rather than scrolling the host"
+      ],
+      "note": "The composed-parts half of this row is now genuinely guarded: ViewerParts.composed.test.tsx mounts the parts against a controller and the documented example compiles against the packed artifact. The labels, the controls configuration, the event surface and the three libraries behind the affordances each have their own assertions. What the row read as met was the affordance clause, and a prop that nothing refuses is exactly the host’s problem the sentence forbids."
     },
     "FR-29": {
       "title": "Annotation Authoring",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/features/annotate.tsx",
         "src/components/PdfPage.tsx",
@@ -758,11 +795,16 @@
       "regressionGuard": [
         "src/components/PdfPage.structure.test.tsx"
       ],
-      "gaps": []
+      "gaps": [
+        "`annotateFeature` is never mounted by a test. It is imported twice — src/features/stylesheets.test.tsx:23 for its `stylesheets` list, src/lib/core-ink.withdrawal.test.ts:118 for a file-ownership scan — and neither runs the feature, so nothing asserts that the feature owns and disposes the editor manager (annotate.tsx:210 `manager.destroy()`) or that arming a tool goes through the engine’s own manager",
+        "“persisted by an incremental save” has no authoring round trip: pdf-write.test.ts:77 counts `/Highlight`, `/Ink` and `/FreeText` annotations already present in a fixture surviving a flatten. No test creates an editor, writes, and re-opens the bytes",
+        "“an editor survives its page scrolling out and back” is asserted nowhere — the remount tests (ViewerPages.regroup.test.tsx:206,220) prove pages are not remounted and involve no editors"
+      ],
+      "note": "Editing state, the shell seam and the stylesheets are guarded (editing-state.test.ts, features.test.ts), and the persistence primitives are guarded at the writer. What the clause is about is the feature’s lifecycle — the manager it must own because the engine will not share it, and the mark a reader draws that has to survive both a save and a scroll. That was browser-verified once, during 0.6, and the register mistook the memory for a guard."
     },
     "FR-30": {
       "title": "Page Authoring",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/page-plan.ts",
         "src/edit.tsx"
@@ -780,7 +822,11 @@
       "regressionGuard": [
         "src/edit.extract.test.tsx"
       ],
-      "gaps": []
+      "gaps": [
+        "“undo of the last apply, which restores the snapshot that write started from” is asserted nowhere: `undoApply` (src/edit.tsx:439) and its label (:136,:759) appear in no test file, and no `byLabel(/^Undo$/)` query ever reaches the apply-undo control. The batch level is guarded — “steps back through the batch without writing anything” (edit.test.tsx:201, asserting `replaced` was never called at :209) — and the level that touches bytes is not",
+        "“parsed once per apply and not once per keystroke” is only ever observed at one operation per apply (edit.test.tsx:311 counts a single load for a single move). No test performs N operations, applies once, and asserts the document was read once"
+      ],
+      "note": "Reorder, delete, rotate, extract and split are guarded against written bytes and re-opened in jsdom (page-plan.test.ts, pdf-write.test.ts:118-162, edit.extract.test.tsx:156, which asserts two files with the right page kids). The two-level undo is the clause the row claims, and only one of its two levels has ever been executed by a test."
     },
     "FR-31": {
       "title": "True Flattening",
@@ -800,11 +846,12 @@
       "regressionGuard": [
         "src/lib/pdf-write.test.ts"
       ],
-      "gaps": []
+      "gaps": [],
+      "note": "undefined Amended 2026-10-04: the clause now names what the writer does — supported widgets and supported signature appearances, markup annotations carried through untouched — because `PDFForm.flatten()` walks `getFields()` and their widgets and never sees a non-widget annotation (@cantoo/pdf-lib/cjs/api/form/PDFForm.js:635-657). No clause of the restated requirement changed its evidence."
     },
     "FR-32": {
       "title": "Visual Signing",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/pdf-write.ts",
         "src/lib/signature.ts",
@@ -823,8 +870,11 @@
       "regressionGuard": [
         "src/edit.signatures.test.tsx"
       ],
-      "gaps": [],
-      "note": "Marks are written into every widget box a field declares, in page coordinates, and the already-signed refusal is now a thrown `ALREADY_SIGNED` that fails the whole call before anything is written, rather than a name in a `refused` list shared with fields that do not exist: three of four boxes signed still reads as a signed document, and nothing in it says which one is missing. The built-in pad disables those rows, so the throw is what a programmatic caller meets."
+      "gaps": [
+        "“scaled into each widget box that field declares” is proven over two single-box fields, not over one field with two boxes: the two paths asserted at pdf-write.test.ts:263 belong to `sigPlain` and `sigKid`, and no fixture gives one field two `/Annots` entries, so a writer that stopped after the first box would pass",
+        "“reported while it runs” is asserted nowhere: the scanning state that carries the progress (src/edit.tsx:811,980, `signatureScanning`) appears in no test file. The single-parse half is guarded (edit.signatures.test.tsx:155,162,166,170) — one stroke parses once, a second stroke does not parse again"
+      ],
+      "note": "The mark reaching an appearance stream, the `/V` count proving no signature value is written, the `ALREADY_SIGNED` refusal on both the writer and the built-in pad, and the deferred one-parse scan are each asserted. The row’s remaining gap is the plural in the clause — `each widget box` — and the reporting the clause asks for while the scan runs."
     },
     "FR-33": {
       "title": "XFA Display, Save Refused",
@@ -906,7 +956,7 @@
     },
     "FR-36": {
       "title": "Cancellation Tokens",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/abort.ts",
         "src/headless/usePdfDocument.ts",
@@ -940,12 +990,15 @@
         "src/edit.abort.test.tsx",
         "src/lib/search.abort.test.ts"
       ],
-      "gaps": [],
-      "note": "Three gaps, all closed by changing the code. **The page path checked nothing before starting**: every effect in `PdfPage` began its work and asked afterwards, so a page mounted under an already-fired signal still fetched its proxy, still allocated a canvas and still built its layers before discarding them — now each of the seven opens with one check, and the guard counts the `getPage` that does not happen. **Download paid for the bytes first**: the signal was read between the `getData` await and the write, which produced no file but charged the caller for the round trip the abort was meant to avoid; the check moved to the top of the call, and the test that had recorded the old boundary as “honest” now asserts the clause. **The edit tier never passed a signal at all** — the writer primitives all check one, and the one place a write is long enough to want cancelling called them with nothing; a controller now belongs to the panel’s mount, a host can hand `createEditFeature({ signal })` one, and a cancelled pass produces no document and no error report, because §3.6 says a cancellation is not a failure. Two things deliberately unchanged: a `getData` already in flight cannot be recalled (the engine owns that fetch), and a writer loop stops before its *next* page rather than undoing the one it changed — both are the clause’s own exceptions, not gaps in it. Signals are still not merged into one composed object, for a reason about lifetimes rather than a reason about versions: each effect owns a cancellation of its own, so a merged signal would make a scale change look like an abandonment. The test that used to grep the module for `AbortSignal.any` on a platform-floor basis is gone — #203 removed it, because §5.6's baseline rule makes a guard against an API the advertised floors already admit a defect rather than a defence. No code ever called it, and none does now."
+      "gaps": [
+        "two of the operations the clause lists have no cancellation assertion: src/components/PdfThumbnail.tsx:126,181 wire two aborts and PdfThumbnail.test.tsx never mentions a `signal`, and `usePdfPrint`’s host signal (src/headless/usePdfPrint.ts:122-128) is exercised only by the ceilings test, which cancels nothing",
+        "the attachments path takes a signal (usePdfAttachments.ts:21,62; src/lib/attachments.ts:82) that no test aborts"
+      ],
+      "note": "The page, load, search, download, page-label, merge and edit paths are each asserted by a test that aborts and counts what did not happen — the three closures this row gained (the page path checking before starting, download checking before paying for the bytes, the edit tier passing a signal at all) are guarded and stay guarded. What reopens the row is that “every asynchronous operation” is a list, and the thumbnail is the one a reader watches disappear on scroll-out. A writer loop that stops before its next page and a thumbnail that never starts are different promises; only the first is tested."
     },
     "FR-37": {
       "title": "Published State Models",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/status.ts",
         "src/components/PdfPage.tsx",
@@ -968,8 +1021,10 @@
         "src/headless/usePdfDocument.status.test.tsx",
         "src/components/ViewerController.retry.test.tsx"
       ],
-      "gaps": [],
-      "note": "Both models are produced, not merely declared. `cancelled` is what a host that aborts a load observes — the earlier assertion that an aborted load lands on `destroyed` was a departure from §3.5 and is gone, with `destroyed` kept for the unmount and the superseded load, where there is nobody left to tell — and `retryPage(page)` on the handle plus `retryToken` on `PdfPage` publish the re-queue §3.5 promises instead of leaving it inside the virtualizer. The fields (`doc`, `isReady`, `error`) are read off the state, so they still cannot disagree with it.",
+      "gaps": [
+        "“both unions are produced, not merely declared” is not true of `destroyed`: it is produced at src/headless/usePdfDocument.ts:489 and appears in tests only inside negative assertions (usePdfDocument.status.test.tsx:166,245 `not.toContain`), and the supersede test that should be its positive case asserts only that `idle` does not reappear (:267-271). Deleting the branch would leave the suite green"
+      ],
+      "note": "Every other member of both unions has a positive assertion — `cancelled` is observed by a host that aborts (the correction this row made), the page path publishes `retryPage`/`retryToken` rather than keeping re-queueing internal, and the fields are read off the state so a status cannot disagree with a null handle. One member of one union is the exception, and the clause names that as a defect in the model rather than an unused branch.",
       "acceptanceWaiver": "Both unions are produced by components under test rather than declared and unreachable: the document path is driven through a host `AbortSignal` and a password prompt in jsdom, and the page path through fake render tasks whose settle and failure the test controls. What a browser would add — real scroll-out timing — is covered as behaviour by FR-04’s checks, not as a state the model can only show on a device."
     },
     "FR-38": {
@@ -1014,10 +1069,11 @@
         "src/headless/usePdfSearch.incremental.test.tsx"
       ],
       "gaps": [
-        "re-indexing after a page edit invalidates only what changed, but what it re-reads is the content stream, which cannot see annotationStorage — so a form or ink edit never becomes searchable. This is a pdf.js limit rather than an omission, and the module says so at usePdfSearch.ts:104-115",
-        "the test that covers this is titled as though a typed form field were re-found, which overstates what it proves"
+        "the document-swap half of the restated clause is asserted nowhere: `usePdfSearch.ts:282-286` resets the index when `doc` changes, and no test swaps a document and asserts the previous matches are gone",
+        "per-page invalidation is offered to the host on the headless hook (invalidatePages, src/headless/usePdfSearch.ts:130) and asserted there (usePdfSearch.incremental.test.tsx:217), but the shell never surfaces it — no `PdfViewerHandle` path reaches it, and `invalidatePages` in the shell tests is a `vi.fn()` stub",
+        "the test that covers invalidation is titled as though a typed form field were re-found (“re-reads only the page a form field was typed into”), which the amended clause no longer promises and the assertion does not show — it proves one page re-reads and the others do not"
       ],
-      "note": "Viewport-first order, the outward walk and the provisional channel (complete:false making total and counts floors) are met and measured; the invalidation clause satisfies its words and not its intent."
+      "note": "Viewport-first order, the outward walk and the provisional channel (complete:false making total and counts floors) are met and measured. The restated clause moved the target: invalidation is the host’s call, per page, and annotation storage is not part of the index; what is left unasserted is a document swap dropping its index and a shell that never exposes the per-page call."
     },
     "FR-40": {
       "title": "Injectable External Index",
@@ -1224,9 +1280,9 @@
         "src/components/ViewerController.gestures.test.tsx"
       ],
       "gaps": [
-        "the pan half of the arbitration does not exist on the advertised peer floor: pdfjs-dist 6.2.108's TouchManager exposes no onPanning callback at all (zero occurrences in build/pdf.mjs and in its .d.ts), so the engine claims the second finger's touchmove, preventDefaults it and hands nothing back. Measured in chromium with the engine swapped to 6.2.108: the matrix's pinch-vs-pan row fails with \"a two-finger pan moved neither the page nor the scroll position\" while the pinch half passes. 6.3.289 and 6.4.299 pass both halves, and the keyboard and control equivalents stay available on every version, so this is a promise the peer range cannot carry at its bottom end (task #211) rather than a behaviour the shell dropped"
+        "the exception the amendment names has a duty attached to it that the package does not carry: a freehand stroke is pointer-only by construction, and the clause now requires the control that offers one to say so. Nothing in `src/features/annotate.tsx`, its labels or its stylesheet discloses it, and no `touchOnly`-style key exists in any of the four catalogs — so a keyboard reader discovers the absence by trying"
       ],
-      "note": "The arbitration itself is built and guarded: the pinch zooms, the host page does not scroll under it, a drawing tool keeps its one-finger drag, and the gesture code is instance-scoped so a second viewer on the same page is not starved -- all of it passes on 6.3.289 and 6.4.299, in jsdom and in three browsers. What moved this row off `met` is a peer-range fact rather than a shell one: the callback that returns the pan to us is a 6.3 addition, so the version at the bottom of our own advertised range swallows it. Until #211 settles the floor, the honest reading is that FR-47 holds on the range we can prove and on every version's keyboard and control equivalents, and does not hold at 6.2.108's touch surface."
+      "note": "The arbitration itself is built and guarded: the pinch zooms, the host page does not scroll under it, a drawing tool keeps its one-finger drag, and the gesture code is instance-scoped so a second viewer on the same page is not starved -- all of it passes on 6.3.289 and 6.4.299, in jsdom and in three browsers. What moved this row off `met` is a peer-range fact rather than a shell one: the callback that returns the pan to us is a 6.3 addition, so the version at the bottom of our own advertised range swallows it. Until #211 settles the floor, the honest reading is that FR-47 holds on the range we can prove and on every version's keyboard and control equivalents, and does not hold at 6.2.108's touch surface. The amendment also added a duty rather than removing one: the named pointer-only exception has to be disclosed on the control, and it is not — no locale key states it, no test asserts it, which is the second gap this row now carries."
     },
     "FR-48": {
       "title": "Browser & Engine Verification Matrices",
@@ -1400,7 +1456,7 @@
     },
     "FR-54": {
       "title": "Stable Error & Cancellation Contract",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/errors.ts",
         "src/lib/abort.ts",
@@ -1441,12 +1497,16 @@
         "src/headless/usePdfDocument.status.test.tsx",
         "src/components/PdfPage.retry.test.tsx"
       ],
-      "gaps": [],
-      "note": "The contract is §3.6 as a published interface: `PdfError` with the eighteen `PDF_ERROR_CODES`, three cancellation codes, `details` carrying numbers rather than prose, and the engine error preserved as `cause`. Every consumer-visible failure path routes through it — load, page render, overlay layers, text indexing, print, download, merge, the writer, source refusals, the feature and viewer context guards, and Trusted Types configuration. Two things worth recording while they are fresh. (1) `isPdfError` matches the *shape* (a code from the list, beside a message) and never the class name, because `abortError()` returns a `PdfError` that keeps `name: \"AbortError\"` — every cancellation filter here and in hosts reads that name, so renaming it would put cancelled renders into error handlers, and a guard on the name would call an abort a non-error. (2) `RENDER_CANCELLED` and `UNSUPPORTED_FEATURE` are produced by mapping the engine’s own exceptions through `toPdfError`; a render this package cancels never becomes an error object at all, which is FR-04 working rather than a missing throw site."
+      "gaps": [
+        "five of the eighteen published codes are not proven on a path a consumer can reach: `PASSWORD_REQUIRED` (produced at usePdfDocument.ts:473) and `WORKER_ERROR` (:466) are asserted only as `toPdfError` mappings, `WRITER_ERROR` has three production sites (pdf-write.ts:359,367,375) and no assertion at any of them",
+        "`RENDER_CANCELLED` and `UNSUPPORTED_FEATURE` exist only in the name table (errors.ts:132,135): every site that catches a `RenderingCancelledException` returns before reaching `toPdfError` (PdfPage.tsx:937, usePdfPrint.ts), so a published code no consumer can observe is a vocabulary promise with no speaker",
+        "the mappings themselves are asserted against a stand-in: errors.test.ts:41’s `engineError()` is a plain `Error` with `name` assigned, which is the right key for the map but is not the engine’s class, so no test proves a real engine throw routes through it"
+      ],
+      "note": "The four codes the clause names explicitly are all asserted on real paths — `SOURCE_NOT_ALLOWED` (source.test.ts:175), `ALREADY_SIGNED` (pdf-write.test.ts:329), `RESOURCE_LIMIT` (PdfPage.refusal.test.tsx:101, usePdfPrint.ceilings.test.tsx:54) and cancellation (`LOAD_CANCELLED`/`SEARCH_CANCELLED` on abort tests) — and “abort is not an ordinary failure” plus the retry/requeue transitions are guarded. The row is about the universal: `all consumer-visible failures`, which for a code list means every code someone can receive. Five of eighteen are unproven and two are unreachable, and a stable code nobody can produce is a code waiting to be redefined."
     },
     "FR-55": {
       "title": "Worker & Source Security Contract",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/lib/worker.ts",
         "src/lib/source.ts",
@@ -1472,8 +1532,11 @@
         "src/lib/source.test.ts",
         "src/lib/worker.conflict.test.ts"
       ],
-      "gaps": [],
-      "note": "One worker configuration per realm is now enforced rather than conventional: the claim is taken at load start, released in that load's teardown, and a conflicting second load surfaces the PdfError with both origins in its details. allowedSources, scripting disabled at the layer, the Trusted Types policy, honest redirect scoping and the credential clauses §3.6 adds are each asserted — a refusal names only the origin, and the test that refuses a pre-signed source asserts the token and the path are absent from the message."
+      "gaps": [
+        "“embedded JavaScript execution remains disabled” is asserted nowhere: `enableScripting: false` is a literal in the annotation layer’s render params (src/components/PdfPage.tsx:760) and in the render call (:506 region), and while PdfPage.annotations.test.tsx records the params it is handed, no test reads `enableScripting` from them — the string appears in no test file, so removing it would pass",
+        "`allowedSources` is proven at the library boundary only: source.test.ts’s refusals never go through `usePdfDocument`’s option (src/headless/usePdfDocument.ts:310), so nothing asserts that a host’s allowlist reaches the engine call rather than being dropped between the prop and the policy"
+      ],
+      "note": "One worker configuration per realm is enforced and asserted (worker.conflict.test.ts:47, usePdfDocument.worker-conflict.test.tsx:61, released in the load’s teardown), the Trusted Types policy is guarded, and a refusal names only the origin — the test that refuses a pre-signed source asserts the token and the path are absent from the message. The two clauses that reopen this row are the one the row’s waiver claims as covered (“each asserted”) and the one that only holds if the option is wired, which is the kind of clause a deleted literal silently unwrites."
     },
     "FR-56": {
       "title": "Feature Lifecycle Contract",

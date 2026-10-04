@@ -52,41 +52,41 @@ certified on this machine at all.
 | `FR-02` | Worker Configuration | **met** | 5/5 | 0 | — |
 | `FR-03` | Password Protection | **met** | 4/5 | 0 | — |
 | `FR-04` | Cancellation Safety | **partial** | 5/5 | 1 | the AbortSignal reason is not preserved: abortError() fabricates a fresh Error with name AbortEr… |
-| `FR-05` | Viewport Virtualization | **met** | 5/5 | 0 | — |
+| `FR-05` | Viewport Virtualization | **partial** | 5/5 | 1 | placeholder heights coming from real page dimensions are asserted nowhere: `reportPageDims` (src… |
 | `FR-06` | Responsive Zoom Modes | **met** | 5/5 | 0 | — |
 | `FR-07` | High-DPI Adaptation | **met** | 5/5 | 0 | — |
-| `FR-08` | Page Layouts | **met** | 5/5 | 0 | — |
+| `FR-08` | Page Layouts | **partial** | 5/5 | 1 | the fit-mode half of “repaints only when the fit target itself moves” is asserted nowhere. A fit… |
 | `FR-09` | Rotation | **met** | 5/5 | 0 | — |
-| `FR-10` | Outline | **met** | 5/5 | 0 | — |
+| `FR-10` | Outline | **partial** | 5/5 | 1 | the recursion is never exercised: `buildTree` (src/headless/usePdfOutline.ts:22) is called by no… |
 | `FR-11` | Thumbnails | **met** | 5/5 | 0 | — |
 | `FR-12` | Jump-to-Page | **met** | 5/5 | 0 | — |
 | `FR-13` | Text Indexing | **met** | 5/5 | 0 | — |
-| `FR-14` | Match Highlighting | **met** | 5/5 | 0 | — |
-| `FR-15` | Search Controls | **met** | 5/5 | 0 | — |
-| `FR-16` | AcroForm Support | **met** | 4/5 | 0 | — |
-| `FR-17` | Form Data Sync | **met** | 4/5 | 0 | — |
+| `FR-14` | Match Highlighting | **partial** | 5/5 | 1 | “scroll the active match into view” is asserted nowhere: the call exists (src/components/PdfPage… |
+| `FR-15` | Search Controls | **partial** | 5/5 | 2 | next and previous are never navigated: `nextMatch` and `prevMatch` appear in the test tree only … |
+| `FR-16` | AcroForm Support | **partial** | 4/5 | 2 | “as real HTML controls” is asserted for none of the six widget types: src/lib/form.test.ts reads… |
+| `FR-17` | Form Data Sync | **partial** | 4/5 | 2 | the published hook is untested: `usePdfFormValues` (src/headless/usePdfFormValues.ts) is importe… |
 | `FR-18` | Annotations: View | **met** | 5/5 | 0 | — |
 | `FR-19` | High-Fidelity Printing | **partial** | 4/5 | 1 | no acceptance evidence: the print path has never been opened in a browser by the matrix |
 | `FR-20` | Document Download | **met** | 4/5 | 0 | — |
 | `FR-21` | Opt-In Feature Registration | **met** | 5/5 | 0 | — |
 | `FR-22` | Per-Feature Stylesheets | **met** | 5/5 | 0 | — |
 | `FR-23` | Enforced Size Boundary | **met** | 5/5 | 0 | — |
-| `FR-24` | Optional-Content Layers | **met** | 4/5 | 0 | — |
+| `FR-24` | Optional-Content Layers | **partial** | 4/5 | 2 | the shared-instance clause is asserted nowhere: `setVisibility` and `usePdfOptionalContent` appe… |
 | `FR-25` | Embedded Files | **met** | 4/5 | 0 | — |
-| `FR-26` | Replaceable Find Strategy | **met** | 5/5 | 0 | — |
+| `FR-26` | Replaceable Find Strategy | **partial** | 5/5 | 2 | no test hands the shell a host-supplied controller. The seam is real (`find?: PdfFindController`… |
 | `FR-27` | Search Depth | **met** | 5/5 | 0 | — |
-| `FR-28` | Composed Shell, Labels, Events, Locales & Shell Affordances | **met** | 5/5 | 0 | — |
-| `FR-29` | Annotation Authoring | **met** | 4/5 | 0 | — |
-| `FR-30` | Page Authoring | **met** | 4/5 | 0 | — |
+| `FR-28` | Composed Shell, Labels, Events, Locales & Shell Affordances | **partial** | 5/5 | 2 | the three affordances the clause names as individually switchable and observable are never switc… |
+| `FR-29` | Annotation Authoring | **partial** | 4/5 | 3 | `annotateFeature` is never mounted by a test. It is imported twice — src/features/stylesheets.te… |
+| `FR-30` | Page Authoring | **partial** | 4/5 | 2 | “undo of the last apply, which restores the snapshot that write started from” is asserted nowher… |
 | `FR-31` | True Flattening | **met** | 4/5 | 0 | — |
-| `FR-32` | Visual Signing | **met** | 4/5 | 0 | — |
+| `FR-32` | Visual Signing | **partial** | 4/5 | 2 | “scaled into each widget box that field declares” is proven over two single-box fields, not over… |
 | `FR-33` | XFA Display, Save Refused | **partial** | 4/5 | 1 | an XFA thumbnail's paint has no automated assertion: `PdfThumbnail` asks for `getXfa()` and comp… |
 | `FR-34` | Network Contract | **met** | 4/5 | 0 | — |
 | `FR-35` | Bounded Retries | **met** | 4/5 | 0 | — |
-| `FR-36` | Cancellation Tokens | **met** | 4/5 | 0 | — |
-| `FR-37` | Published State Models | **met** | 4/5 | 0 | — |
+| `FR-36` | Cancellation Tokens | **partial** | 4/5 | 2 | two of the operations the clause lists have no cancellation assertion: src/components/PdfThumbna… |
+| `FR-37` | Published State Models | **partial** | 4/5 | 1 | “both unions are produced, not merely declared” is not true of `destroyed`: it is produced at sr… |
 | `FR-38` | Source Utilities | **met** | 4/5 | 0 | — |
-| `FR-39` | Incremental, Viewport-Prioritised Indexing | **partial** | 4/5 | 2 | re-indexing after a page edit invalidates only what changed, but what it re-reads is the content… |
+| `FR-39` | Incremental, Viewport-Prioritised Indexing | **partial** | 4/5 | 3 | the document-swap half of the restated clause is asserted nowhere: `usePdfSearch.ts:282-286` res… |
 | `FR-40` | Injectable External Index | **met** | 4/5 | 0 | — |
 | `FR-41` | Dual Module Output | **met** | 5/5 | 0 | — |
 | `FR-42` | Document Merge | **met** | 4/5 | 0 | — |
@@ -94,15 +94,15 @@ certified on this machine at all.
 | `FR-44` | High Contrast & Forced Colours | **partial** | 5/5 | 1 | the browser check asserts the page-slot outline and shadow only, never the second channels or fo… |
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
 | `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108… |
-| `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the pan half of the arbitration does not exist on the advertised peer floor: pdfjs-dist 6.2.108'… |
+| `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the exception the amendment names has a duty attached to it that the package does not carry: a f… |
 | `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has run green on a runner once -- CI run 37193161535, dev at 15d0888, 2026-10-04… |
 | `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 3 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
 | `FR-52` | Public API & Export Contract | **partial** | 5/5 | 2 | npm run check:examples has still never executed on a runner. The two gates added beside it have … |
 | `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 3 | nothing forbids the root or /headless entry from importing the writer in future — it holds today… |
-| `FR-54` | Stable Error & Cancellation Contract | **met** | 4/5 | 0 | — |
-| `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
+| `FR-54` | Stable Error & Cancellation Contract | **partial** | 4/5 | 3 | five of the eighteen published codes are not proven on a path a consumer can reach: `PASSWORD_RE… |
+| `FR-55` | Worker & Source Security Contract | **partial** | 5/5 | 2 | “embedded JavaScript execution remains disabled” is asserted nowhere: `enableScripting: false` i… |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |
 | `FR-57` | Runtime Resource Budget Contract | **met** | 5/5 | 0 | — |
 | `FR-58` | Release Evidence & Consumer Verification | **absent** | 0/5 | 4 | no release candidate has ever been built and tested on a clean runner from a packed artifact. Th… |
