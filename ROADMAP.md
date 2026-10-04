@@ -95,11 +95,11 @@ certified on this machine at all.
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
 | `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108… |
 | `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the pan half of the arbitration does not exist on the advertised peer floor: pdfjs-dist 6.2.108'… |
-| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has executed on a runner exactly once -- CI run 37190478169, 2026-10-04 -- and r… |
-| `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 4 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
+| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has run green on a runner once -- CI run 37193161535, dev at 15d0888, 2026-10-04… |
+| `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 3 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
 | `FR-50` | Published API Maturity | **partial** | 5/5 | 1 | the check is the last step of npm run verify, which no CI job calls, so an untagged export fails… |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
-| `FR-52` | Public API & Export Contract | **partial** | 5/5 | 2 | npm run check:examples has still never executed on a runner. The Packaging job has (CI run 37190… |
+| `FR-52` | Public API & Export Contract | **partial** | 5/5 | 2 | npm run check:examples has still never executed on a runner, and the reason has moved. CI run 37… |
 | `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 3 | nothing forbids the root or /headless entry from importing the writer in future — it holds today… |
 | `FR-54` | Stable Error & Cancellation Contract | **met** | 4/5 | 0 | — |
 | `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
