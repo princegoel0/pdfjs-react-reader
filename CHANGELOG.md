@@ -278,6 +278,19 @@ checkout has. The register stands at **43 met, 14 partial, 1 absent** of 58, on 
 
 ### Changed
 
+- **`check:fr-evidence` no longer depends on which machine ran it** (#215). The gate compared `ROADMAP.md`'s
+  generated status block byte-for-byte against text joined with `\n`, while `--emit` wrote that LF block into a
+  file whose prose was CRLF under `core.autocrlf=true`. So it was green on the machine that had just emitted
+  it and exited 1 on any fresh checkout, where git hands back a wholly CRLF file — proved by cloning `15d0888`
+  and running the gate there. The compare now normalises `\r\n` on both sides, `--emit` writes the block in
+  whatever ending the file already uses (and through a function replacement, because a leading gap is
+  somebody's prose and prose can carry `$&`), and the emitting file no longer ends up half one ending and
+  half the other. Three self-test cases carry it: the same stale block written with CRLF still has to be
+  caught, a CRLF checkout of an accurate block must produce nothing, and emitting into a CRLF file must leave
+  it CRLF. Each was fed its own counterfactual — the byte-exact compare restored, and `--emit` forced to LF —
+  and each turned the matching case red. Both conditions were then run for real: an all-LF working file and an
+  all-CRLF one each pass, and the fixed gate passes inside a fresh clone, which is where it used to fail.
+  Nothing in CI calls this check today, which is FR-50's open gap; that gap is now safe to close.
 - **The composed parts read the viewer they sit in, which is the shape PRD §5.3 drew and could not
   compile** (FR-28). `ViewerRoot` takes a host `className` and `style` beside the frame classes the
   controller writes; `ViewerSidebar` takes `children`, and when it does the tab strip is not rendered,

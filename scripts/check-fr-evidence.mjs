@@ -75,6 +75,23 @@ const MARK_START = '<!-- FR-EVIDENCE:STATUS:START -->';
 const MARK_END = '<!-- FR-EVIDENCE:STATUS:END -->';
 
 /**
+ * Compare text without caring how its lines end.
+ *
+ * FR-58's evidence machinery must not depend on the machine that ran it. This gate used to compare the
+ * generated block byte-for-byte against text joined with `\n`, while `--emit` wrote that LF block into a
+ * `ROADMAP.md` whose prose was CRLF under `core.autocrlf=true` — so the check was green on the machine that
+ * had just emitted it and exited 1 on any fresh checkout, where git hands back a wholly CRLF file. A gate
+ * that disagrees by line ending is a gate somebody will switch off.
+ */
+const asLf = (text) => text.replace(/\r\n/g, '\n');
+
+/** The line ending a file mostly uses, so a generated block does not turn it into two kinds of file. */
+function dominantEnding(text) {
+  const crlf = (text.match(/\r\n/g) ?? []).length;
+  return crlf > (text.match(/\n/g) ?? []).length - crlf ? '\r\n' : '\n';
+}
+
+/**
  * The status table `ROADMAP.md` §1 publishes. Generated rather than written, because the alternative is what
  * this project just measured: 51 hand-maintained status cells, 21 of them still saying `done` about a
  * requirement the lock had just grown a clause on. Prose in `ROADMAP.md` keeps the *reason* a row moved — the
@@ -104,6 +121,14 @@ export function renderStatusTable(register) {
   ].join('\n');
 }
 
+/** Splice the generated block into a roadmap text, keeping that text's own line endings. */
+export function withStatusBlock(roadmapText, register) {
+  const block = renderStatusTable(register).replace(/\n/g, dominantEnding(roadmapText));
+  // A function replacement, because a leading gap in the register is somebody's prose and prose can carry
+  // `$&`, `$1` or `$$` — which `String.replace` would otherwise expand instead of writing.
+  return roadmapText.replace(/<!-- FR-EVIDENCE:STATUS:START -->[\s\S]*?<!-- FR-EVIDENCE:STATUS:END -->/, () => block);
+}
+
 /** Replace the marked block, or report that the markers are not there to replace. */
 export function emitStatusTable(register) {
   const text = readFileSync(ROADMAP, 'utf8');
@@ -111,8 +136,7 @@ export function emitStatusTable(register) {
     console.error('ROADMAP.md has no FR-EVIDENCE status markers — add them around the block first.');
     process.exit(1);
   }
-  const next = text.replace(/<!-- FR-EVIDENCE:STATUS:START -->[\s\S]*?<!-- FR-EVIDENCE:STATUS:END -->/, renderStatusTable(register));
-  writeFileSync(ROADMAP, next, 'utf8');
+  writeFileSync(ROADMAP, withStatusBlock(text, register), 'utf8');
   console.log(`wrote the status block to ROADMAP.md (${Object.keys(register.requirements).length} rows)`);
 }
 
@@ -123,7 +147,7 @@ function checkStatusBlock(roadmapText, register) {
   }
   const match = /<!-- FR-EVIDENCE:STATUS:START -->[\s\S]*?<!-- FR-EVIDENCE:STATUS:END -->/.exec(roadmapText);
   if (!match) return ['ROADMAP.md has the status block start marker without its end marker'];
-  if (match[0].trim() !== renderStatusTable(register).trim()) {
+  if (asLf(match[0].trim()) !== asLf(renderStatusTable(register).trim())) {
     return ['ROADMAP.md\'s status block is stale against fr-evidence.json — run `node scripts/check-fr-evidence.mjs --emit`'];
   }
   return [];
@@ -303,6 +327,7 @@ export function selfTest() {
     ['an unknown state', withRow({ state: 'done' }), anchors, 'state "done"'],
     ['a malformed requirement key', { ...base, requirements: { 'FR-1': sound } }, anchors, 'is not a requirement id'],
     ['a roadmap block that disagrees with the register', base, anchors, 'status block is stale', `${MARK_START}\n| \`FR-12\` | Jump-to-Page | **met** | 5/5 | 0 | — |\n${MARK_END}`],
+    ['the same disagreement, written with CRLF line endings', base, anchors, 'status block is stale', `${MARK_START}\r\n| \`FR-12\` | Jump-to-Page | **met** | 5/5 | 0 | — |\r\n${MARK_END}`],
     ['a roadmap with no generated block', base, anchors, 'carries no FR-EVIDENCE status block', 'nothing here'],
   ];
 
@@ -317,11 +342,27 @@ export function selfTest() {
     renderStatusTable({ requirements: { 'FR-12': sound } }),
     'after',
   ].join('\n');
-  const soundProblems = audit(base, new Map([['FR-12', { title: 'jump-to-page', clause: 'x' }]]), anchors, roadmapCurrent).problems;
+  const prdOne = new Map([['FR-12', { title: 'jump-to-page', clause: 'x' }]]);
+  const soundProblems = audit(base, prdOne, anchors, roadmapCurrent).problems;
   console.log(
     `  ${soundProblems.length === 0 ? 'ok  ' : 'FAIL'} a sound row produces no problems${soundProblems.length ? ` — got: ${soundProblems.join(' | ')}` : ''}`,
   );
-  return failures + (soundProblems.length ? 1 : 0);
+
+  /*
+   * The same truth in the endings a fresh Windows checkout produces. This is the case that used to fail: the
+   * block compared byte-for-byte against LF-joined text, so a CRLF working file was "stale" no matter what
+   * the register said, and the only machine that ever saw it green was the one that had just emitted it.
+   */
+  const soundCrlf = withStatusBlock(roadmapCurrent.replace(/\n/g, '\r\n'), base);
+  const crlfProblems = audit(base, prdOne, anchors, soundCrlf).problems;
+  console.log(
+    `  ${crlfProblems.length === 0 ? 'ok  ' : 'FAIL'} a CRLF checkout of the same block produces no problems${crlfProblems.length ? ` — got: ${crlfProblems.join(' | ')}` : ''}`,
+  );
+  const mixed = /[^\r]\n/.test(soundCrlf);
+  console.log(
+    `  ${mixed ? 'FAIL' : 'ok  '} emitting into a CRLF file keeps it CRLF${mixed ? ' — the emit left bare LF lines behind' : ''}`,
+  );
+  return failures + (soundProblems.length ? 1 : 0) + (crlfProblems.length ? 1 : 0) + (mixed ? 1 : 0);
 }
 
 function main() {
