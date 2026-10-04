@@ -69,9 +69,6 @@ jobs:
       - name: Requirement evidence register
         run: npm run check:fr-evidence
 
-      - name: Bundle size budget
-        run: npm run size
-
       # The tarball is what consumers actually get; a stray import of a file
       # outside `files` type-checks fine and only breaks after publishing.
       - name: Pack
@@ -82,6 +79,13 @@ jobs:
       # that is not actually published is invisible to all of them and fails only here.
       - name: Examples compile against the packed artifact
         run: npm run check:examples
+
+      # Last, not first: the size ratchet is a reviewed byte budget, and an open decision about bytes must
+      # not be able to hide a contract check. Steps after a failing one are skipped, so until #208 is settled
+      # a budget step ahead of these would have left `check:examples` unreachable on a runner — which is
+      # exactly how FR-52's gap stayed open. It still fails the job; it just no longer blinds what follows.
+      - name: Bundle size budget
+        run: npm run size
 
   # Check-only. A push to `main` also starts docs.yml, which builds this same
   # site in order to publish it, so running the job there would duplicate work.
