@@ -6,7 +6,9 @@
  * either a type or a pure function over those types: no feature code, no pdf.js
  * call, and no import from `src/features/`, which is what keeps the core shell
  * free of the features it hosts. The build-time half of that promise is checked
- * by `scripts/check-size.mjs`, not by a comment.
+ * by `scripts/check-size.mjs`, not by a comment. The one runtime import is §3.6's
+ * `PdfError`, because `orderFeatures` refuses a malformed list with a code rather
+ * than with a sentence — the same reason `src/lib/source.ts` throws what it throws.
  */
 import type { ComponentType } from 'react';
 import type {
@@ -15,11 +17,11 @@ import type {
   PDFPageProxy,
 } from 'pdfjs-dist';
 import type { AnnotationValueStore } from './form';
-import type { InkStroke } from './ink';
 import type { PdfViewerLabels, PdfViewerLabelsOverride } from './labels';
 import type { PageLayout, ScaleMode } from './layout';
 import type { PdfAnnotationState } from './editing-state';
-import type { PdfError } from './errors';
+import type { PdfDestinationPosition } from './outline';
+import { PdfError } from './errors';
 import type { OptionalContentConfigHandle } from './optional-content';
 
 /** What a feature's Runner publishes for its own controls and the shell to read. */
@@ -134,6 +136,14 @@ export interface PdfViewerShell {
   labels: PdfViewerLabels;
   labelsOverride?: PdfViewerLabelsOverride;
   scrollToPage: (page: number) => void;
+  /**
+   * Land on a 1-based page *at the place a destination names*, and take the magnification it asks for.
+   *
+   * A feature that resolves a `/Dest` of its own — a link panel, a structured-tree jump, an attachment that
+   * carries a target — should not have to choose between the page and the position, which is the choice the
+   * outline used to be handed. `null` means the document named no place, and the page top is what you get.
+   */
+  followDestination: (page: number, position: PdfDestinationPosition | null) => void;
   setScaleMode: (mode: ScaleMode) => void;
   setLayout: (layout: PageLayout) => void;
   /** Turn one page of the document on screen, in view state until a feature writes it. */
@@ -167,8 +177,6 @@ export interface PdfViewerShell {
    * layer switched on any other instance paints as if it never moved.
    */
   optionalContentConfig: OptionalContentConfigHandle | null;
-  /** Freehand strokes on a 0-based page. Ink is core chrome, and print needs it. */
-  inkStrokesForPage: (index: number) => InkStroke[];
   /**
    * The viewer's root element, as a ref.
    *
@@ -233,6 +241,25 @@ export interface PdfFeatureKeyBinding<S extends object = FeaturePublication> {
 export interface PdfFeature<S extends object = FeaturePublication> {
   id: string;
   /**
+   * Ids of the features this one requires, validated before anything mounts.
+   *
+   * A *requirement*, not a wish: a dependency is a feature whose absence makes
+   * this one wrong, so `orderFeatures` refuses the list when the named id is not
+   * there. A feature that merely *reads* a peer when it happens to be mounted is
+   * not a dependency and must not be declared as one — `download` asks `forms`
+   * whether the document has edits and works correctly when it never answers,
+   * which is what `usePdfFeaturePeer`'s `Partial` return is for. Declaring that
+   * pair would turn an optional composition into a refusal.
+   *
+   * Ordering is the other half, and it is observable wherever the shell has to resolve a
+   * tie: which Runner initialises first, which feature has the last word on a page
+   * contribution (the later one), which of two equal-priority controls stays in the bar when
+   * the toolbar folds, and which feature claims a chord both of them bind (the first one).
+   * Registration order answers all four, rather than the host's written order answering some
+   * and the dependency graph answering the rest.
+   */
+  dependsOn?: readonly string[];
+  /**
    * Owns the feature's hooks and is the only place that publishes. Mounted once
    * per viewer instance, keyed by `id`, never by position in the list.
    */
@@ -243,19 +270,51 @@ export interface PdfFeature<S extends object = FeaturePublication> {
   /**
    * Built-in control ids this feature takes over, which the shell then hides.
    *
-   * It exists for the case where two controls do one job: `annotateFeature`
-   * replaces `draw`, because its ink is a real `/Ink` annotation that saves and
-   * prints, while the shell's draws an overlay that prints but never reaches a
-   * download. Offered side by side, the two are indistinguishable until one of
-   * them loses the reader's work.
+   * It exists for the case where two controls do one job: a feature that authors
+   * the mark the shell also draws would replace the shell's, because offered side
+   * by side the two are indistinguishable until one of them loses the reader's
+   * work. No built-in needs it today — the shell draws nothing of its own since
+   * FR-18 withdrew its freehand surface — so this is the seam a host or a later
+   * feature writes through, and `withReplacedControls` folds it into the same
+   * `controls.hide` list the application can write by hand.
    *
-   * Declaring it here rather than telling hosts to write `controls: { hide: … }`
-   * means the fold travels with the feature, and the shell still needs no import
-   * of it to apply the rule.
+   * Declaring it on the feature rather than telling hosts to write
+   * `controls: { hide: … }` means the fold travels with the feature, and the shell
+   * still needs no import of it to apply the rule.
    */
   replaces?: readonly string[];
   panel?: PdfFeaturePanel<S>;
   keys?: readonly PdfFeatureKeyBinding<S>[];
+  /**
+   * The published stylesheet specifiers this feature's own chrome needs, spelled as an
+   * application would import them — `styles.css` not included, because that one belongs
+   * to the shell and every consumer of it imports it.
+   *
+   * Declared on the value rather than discovered by convention (§3.7), so the reader
+   * of a feature list can see what registering it will pull into the page *before*
+   * registering it — a stylesheet that arrives by naming convention is a stylesheet a
+   * host cannot audit, and one they forgot to import is a control that renders
+   * unstyled. The shell never loads these: CSS has no runtime import a bundler can
+   * tree-shake, so the application imports them itself and this field is what tells it
+   * the list. `src/features/stylesheets.test.tsx` fails when a built-in declares a
+   * sheet that is not published, or stops declaring one it needs.
+   */
+  stylesheets?: readonly string[];
+  /**
+   * Releases what this feature owns when the shell unregisters it.
+   *
+   * For a feature with a Runner, the Runner's own effect cleanups are usually enough, and
+   * this field is then unnecessary — it exists for the resources that outlive a component:
+   * an object URL cached across documents, a module-level table keyed by feature id, a
+   * worker. The shell calls it once, on unmount, after retiring the feature's published
+   * state, so a peer reads `{}` rather than a dead feature's last publication.
+   *
+   * It runs *before* that feature's Runner effect cleanups, because that is how React tears
+   * a deleted subtree down — parent first, asserted in `FeatureHost.registration.test.tsx`.
+   * So a resource the Runner acquired belongs in the Runner, and `cleanup` belongs to what
+   * the Runner never held.
+   */
+  cleanup?: () => void;
   /** Per-instance options for features built by a `create*Feature` factory. */
   options?: unknown;
 }
@@ -277,6 +336,70 @@ export type AnyPdfFeature = PdfFeature<any>;
 export const NO_FEATURES: readonly AnyPdfFeature[] = Object.freeze([]);
 
 /**
+ * The feature list in registration order: validated, and with every dependency before
+ * its dependents.
+ *
+ * Validation is the point. A duplicate id is not a cosmetic clash — the store, the
+ * toolbar and the runners all key on `id`, so two features under one id means a control
+ * whose state belongs to neither copy and a reader who loses their marks without ever
+ * being told. A missing dependency is a feature that will read a peer that never
+ * publishes. A cycle is a list that cannot be initialised at all. Each therefore fails
+ * with §3.6's `CONFIGURATION_ERROR`, naming the feature and the problem, and the shell
+ * calls this before it renders, so nothing has mounted by the time it throws.
+ *
+ * Ordering is a stable topological sort: the only moves are a dependency stepping ahead
+ * of a dependent that was written before it, so a list nobody has dependencies in comes
+ * back as the *same array*, which is what keeps `features` a stable memo dependency for
+ * every host that never declares one.
+ */
+export function orderFeatures(
+  features: readonly AnyPdfFeature[],
+): readonly AnyPdfFeature[] {
+  const byId = new Map<string, AnyPdfFeature>();
+  for (const feature of features) {
+    if (byId.has(feature.id)) {
+      throw new PdfError('CONFIGURATION_ERROR', `feature id "${feature.id}" is registered twice; one id cannot hold two features' state`, {
+        details: { problem: 'duplicate-id', feature: feature.id },
+      });
+    }
+    byId.set(feature.id, feature);
+  }
+
+  for (const feature of features) {
+    for (const dependency of feature.dependsOn ?? []) {
+      if (byId.has(dependency)) continue;
+      throw new PdfError('CONFIGURATION_ERROR', `feature "${feature.id}" depends on "${dependency}", which is not in the list`, {
+        details: { problem: 'missing-dependency', feature: feature.id, dependency },
+      });
+    }
+  }
+
+  const ordered: AnyPdfFeature[] = [];
+  const emitted = new Set<string>();
+  const stack: string[] = [];
+  const visiting = new Set<string>();
+  const visit = (feature: AnyPdfFeature): void => {
+    if (emitted.has(feature.id)) return;
+    if (visiting.has(feature.id)) {
+      const cycle = [...stack.slice(stack.indexOf(feature.id)), feature.id];
+      throw new PdfError('CONFIGURATION_ERROR', `features ${cycle.map((id) => `"${id}"`).join(' → ')} form a dependency cycle, which cannot be initialised`, {
+        details: { problem: 'dependency-cycle', feature: feature.id, cycle },
+      });
+    }
+    visiting.add(feature.id);
+    stack.push(feature.id);
+    for (const dependency of feature.dependsOn ?? []) visit(byId.get(dependency)!);
+    stack.pop();
+    visiting.delete(feature.id);
+    emitted.add(feature.id);
+    ordered.push(feature);
+  };
+  for (const feature of features) visit(feature);
+
+  return features.some((feature) => feature.dependsOn?.length) ? ordered : features;
+}
+
+/**
  * True when two publications carry the same values one level deep.
  *
  * The compare is what stops a Runner that rebuilds its published object on
@@ -294,7 +417,7 @@ export function samePublication(a: unknown, b: unknown): boolean {
   return ak.every((key) => Object.is((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]));
 }
 
-/** Merges each mounted feature's page contributions in list order. */
+/** Merges each mounted feature's page contributions in registration order, last one winning. */
 export function mergeFeaturePageProps(
   features: readonly AnyPdfFeature[],
   get: (id: string) => FeaturePublication,
@@ -322,8 +445,10 @@ export function replacedControlIds(features: readonly AnyPdfFeature[]): string[]
 /**
  * The first feature binding that claims this chord.
  *
- * List order decides the winner, so a feature installed later can override one
- * installed earlier — the same rule the toolbar applies to duplicate ids.
+ * Registration order decides the winner, so an earlier feature keeps a chord and a later one
+ * asking for the same key is never reached: taking a chord away from a mounted feature means
+ * being placed before it. `orderFeatures` is what produces that order, which is why a
+ * dependency claims its chords ahead of the features that depend on it.
  */
 export function findFeatureKey(
   features: readonly AnyPdfFeature[],

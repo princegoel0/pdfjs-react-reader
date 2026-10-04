@@ -14,7 +14,7 @@ const PROPS: [string, string, string][] = [
   ['rangeChunkSize', 'number', 'Bytes per range request; the engine’s default applies when omitted.'],
   ['disableRange', 'boolean', 'Fetch the whole file in one request instead of by byte range.'],
   ['disableStream', 'boolean', 'Turn off progressive streaming as the file arrives. Together with the row above, this is how a host on a metered or high-latency connection chooses whole-file download over progressive display.'],
-  ['retry', 'RetryPolicy | false', 'Bounded retries for a load failure that can heal: three attempts, a 250 ms first interval with full jitter, a 5 s ceiling. `false` fails on the first error. A 401, a 403, a 404, a corrupt file and an encrypted document are never retried — resubmitting the same credentials is not a recovery.'],
+  ['retry', 'RetryPolicy | false', 'Bounded retries for a load failure that can heal: three attempts, a 1 s first interval with full jitter, a 30 s ceiling. Every retryable attempt is reported, the last one included, with `willRetry: false` on it. `false` fails on the first error. A 401, a 403, a 404, a corrupt file and an encrypted document are never retried — resubmitting the same credentials is not a recovery.'],
   ['onRetryAttempt', '(info) => void', 'Fires before each wait with the attempt, the total, the delay and the status, so the UI can say “retrying (2 of 3)” instead of spinning.'],
   ['onProgress', '(report) => void', 'Bytes as they arrive. `percent` is null when the response did not say how long the file is — a chunked or gzipped body — rather than the `NaN` the engine reports. The shell draws no bar; this is the host’s channel.'],
   ['signal', 'AbortSignal', 'Stop the load from outside. Aborting runs exactly what an unmount would — the task is destroyed, the worker released, nothing reported as an error. Swapping the signal moves which signal we follow; it does not restart a load in progress.'],
@@ -25,7 +25,7 @@ const PROPS: [string, string, string][] = [
   ['defaultPageRotations', 'Record<number, number>', 'Per-page rotation in degrees, keyed by 0-based page index.'],
   ['defaultSidebarOpen', 'boolean', 'Show the sidebar on first render, on its first tab.'],
   ['gap', 'number', 'Vertical gap between pages in CSS pixels.'],
-  ['maxRenderPixels', 'number', 'Area ceiling per page canvas in device pixels. Defaults to pdf.js’s own limit, tightened for mobile — over it a browser paints a blank page rather than failing.'],
+  ['maxRenderPixels', 'number', 'Area ceiling per page canvas in device pixels. Constrains the budget rather than replacing it: the ceiling used is the minimum of this, the viewport working set, the probed platform ceiling and pdf.js’s own limit, tightened for mobile — over it a browser paints a blank page rather than failing. Unset, the limit is that minimum without this term.'],
   ['devicePixelRatio', 'number', 'Device pixels per CSS pixel for page canvases. Unset, this is the live window.devicePixelRatio, re-read when the display changes; passing a number pins it and a monitor switch then repaints nothing.'],
   ['enableWheelZoom', 'boolean', 'Ctrl/Cmd + wheel, which is also how browsers report trackpad pinch. Defaults to true.'],
   ['enablePinchZoom', 'boolean', 'Two-finger pinch through the engine’s touch manager. Defaults to true.'],
@@ -67,7 +67,7 @@ export function Shell() {
     <>
       <h1>The viewer shell</h1>
       <p className="doc-lede">
-        <code>PdfViewer</code> is the whole product in one element: toolbar, sidebar, search, ink and
+        <code>PdfViewer</code> is the whole product in one element: toolbar, sidebar, search and
         virtualized pages. What it can do <em>to</em> a document — print it, save it, fill it in — is
         a feature you import, so the viewer you ship is the viewer you named. It is uncontrolled by
         design: it owns its own state and tells you what changed through callbacks.
@@ -98,6 +98,13 @@ export function Viewer() {
         <code>&lt;PdfViewer src=&hellip; /&gt;</code>. Each feature is a separate entry and a separate
         stylesheet, so leaving one out leaves its bytes and its rules out of your bundle.{' '}
         <a href="#/features">Features</a> covers them, including writing your own.
+      </p>
+      <p>
+        Choosing a layout — continuous, one page at a time, a two-page spread — regroups the rows and moves
+        nothing else. A page keeps its element through the switch, so at a fixed zoom no canvas is painted
+        again and nothing the reader had done to a page is lost with it. In a fit mode the pages do repaint,
+        and that is correct rather than wasteful: fitting two pages into one width is a different fit than
+        fitting one.
       </p>
 
       <h2>Props</h2>
@@ -202,9 +209,10 @@ export function Viewer() {
       <p>
         Nothing is registered on <code>window</code> or <code>document</code>, and a gesture the viewer
         takes is prevented but still allowed to bubble — <code>event.defaultPrevented</code> is how your
-        own listener learns it was consumed, rather than never hearing about it. While the freehand tool
-        is armed the touch manager releases the sequence outright, so the drawing surface under the
-        finger keeps it. Every gesture has a route that is not a gesture: the zoom select and{' '}
+        own listener learns it was consumed, rather than never hearing about it. A surface that needs the
+        finger outright asks for it in CSS rather than winning a race: the annotation feature's own sheet
+        sets <code>touch-action: none</code> on its editor layer, which the browser reads before any
+        listener runs. Every gesture has a route that is not a gesture: the zoom select and{' '}
         <code>zoomTo</code>/<code>zoomBy</code>, the arrow and page keys on the focused region, the
         sidebar’s own scroll, and a <code>src</code> that is yours to set — the drop is a convenience
         over that, not the only way to change document.
@@ -218,7 +226,7 @@ export function Viewer() {
 
       <h2>Labels</h2>
       <p>
-        Every string in the shell — 144 of them, from <code>aria-label</code>s to the
+        Every string in the shell — 136 of them, from <code>aria-label</code>s to the
         “3 of 416 · p12” counter — lives in one typed catalog with an English default. Pass a partial
         object and only the keys you name change:
       </p>
@@ -379,7 +387,7 @@ import { DE_LABELS } from 'pdfjs-react-reader/locales/de';
       <p>
         Every control has an id, and <code>controls</code> speaks to the bar in those ids:{' '}
         <code>sidebar</code>, <code>prev</code>, <code>page</code>, <code>next</code>,{' '}
-        <code>search</code>, <code>draw</code>, <code>zoomOut</code>, <code>zoomCustom</code>,{' '}
+        <code>search</code>, <code>zoomOut</code>, <code>zoomCustom</code>,{' '}
         <code>zoomIn</code>, <code>fit</code>, <code>rotateCcw</code>, <code>rotateCw</code>,{' '}
         <code>rotatePage</code>, <code>fullscreen</code>, <code>layout</code>, <code>count</code>,{' '}
         <code>meta</code> — plus whatever id a mounted feature’s control declared, such as{' '}
@@ -401,7 +409,7 @@ const fullscreenToggle: ToolbarItem = {
   src="/contract.pdf"
   features={[printFeature]}
   controls={{
-    hide: ['draw', 'meta'],          // gone from the bar and the menu
+    hide: ['search', 'meta'],         // gone from the bar and the menu
     priorities: { layout: 2 },       // now it folds with the zoom cluster
     order: ['search', 'page'],       // these two lead; the rest keep their places
     add: [fullscreenToggle],         // an id that exists replaces it in place
@@ -507,7 +515,13 @@ export const ReadingView = forwardRef<PdfViewerHandle, PdfViewerProps>(function 
         default layout.
         Your own components inside
         it read the same state with <code>useViewer()</code>, which is how a host-written page counter
-        or a set of buttons needs no props passed to it.
+        or a set of buttons needs no props passed to it. The built-in parts are held to the same rule:
+        <code>ViewerToolbar</code>, <code>ViewerPages</code> and <code>ThumbnailList</code> take nothing
+        but a starting width, <code>OutlineView</code> takes nothing at all — it reads the bookmark tree
+        out of the outline tier’s publication in the same store — and <code>ViewerRoot</code> accepts a
+        <code>className</code> and a <code>style</code> of yours on top of the controller’s own. Give
+        <code>ViewerSidebar</code> children and it shows them with no tab strip, because a tab that
+        selects nothing is a control that lies.
       </p>
       <p>
         One more thing <code>useViewer()</code> carries, added for the edit tier and general in shape:{' '}

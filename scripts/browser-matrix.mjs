@@ -33,10 +33,27 @@ const engineVersion = JSON.parse(
 ).version;
 
 const args = process.argv.slice(2);
+/**
+ * Read `--flag value` or `--flag=value`.
+ *
+ * The `=` form is accepted because it is what everyone types; the old parser silently ignored
+ * `--engines=webkit` and ran the whole matrix instead, which is a surprising way to spend eleven minutes.
+ */
 const value = (flag, fallback) => {
+  const inline = args.find((arg) => arg.startsWith(`${flag}=`));
+  if (inline !== undefined) return inline.slice(flag.length + 1);
   const at = args.indexOf(flag);
   return at === -1 || at + 1 >= args.length ? fallback : args[at + 1];
 };
+const KNOWN_FLAGS = ['--engines', '--profiles', '--no-json'];
+for (const arg of args) {
+  const name = arg.split('=')[0];
+  if (name.startsWith('--') && !KNOWN_FLAGS.includes(name)) {
+    console.error(`FAIL  unknown flag ${name}; this script runs a matrix, and a mistyped filter must not` +
+      ` quietly run all of it instead. Known flags: ${KNOWN_FLAGS.join(', ')}`);
+    process.exit(2);
+  }
+}
 const ONLY_ENGINES = value('--engines', 'chromium,firefox,webkit').split(',');
 const ONLY_PROFILES = value('--profiles', 'desktop,mobile').split(',');
 
@@ -76,6 +93,93 @@ const PROFILES = {
     touch: true,
   },
 };
+
+/**
+ * The browser floors `PRD.md` §8 claims, as numbers this file can compare a launched engine against.
+ *
+ * They are the *engine's* floors, not ours: pdf.js 6.0 raised its minimum to Chrome 125 and Safari 18 and
+ * made `light-dark()`, the nesting selector and `:dir()` required, and §8 lists Firefox 124 as the
+ * provisional package floor. §8's own rule is that a stale WebKit "fails the engine rather than the page",
+ * so the comparison is a row of its own — a run on an engine below a floor is a red row, and a run whose
+ * engine cannot be identified is `na`, which is §8's "unverified, not passed".
+ */
+const FLOORS = { chromium: 125, firefox: 124, webkit: 18 };
+
+/**
+ * Compare the version an engine reports for itself against §8's floor for it.
+ *
+ * `launch.version()` is the browser's own answer, not a string this file maintains, which is the point: a
+ * runner that ships an older engine than the table claims has to be caught by the table's own instrument.
+ * An unparseable version is `na` — §8 treats an unverifiable row as unverified rather than letting a missing
+ * number read as a pass or as a defect in the viewer.
+ */
+function floorVerdict(engineName, version) {
+  const claimed = FLOORS[engineName];
+  const major = Number(/^(\d+)/.exec(version ?? '')?.[1] ?? NaN);
+  if (!Number.isFinite(claimed) || !Number.isFinite(major)) {
+    return { claimed: claimed ?? null, actual: version ?? null, status: 'na' };
+  }
+  return { claimed, actual: version, major, status: major >= claimed ? 'ok' : 'fail' };
+}
+
+for (const [kind, chosen, known] of [
+  ['--engines', ONLY_ENGINES, Object.keys(BROWSERS)],
+  ['--profiles', ONLY_PROFILES, Object.keys(PROFILES)],
+]) {
+  // A filter that names nothing is indistinguishable from a matrix that passed, and a mistyped
+  // `--engines=Cromium` would otherwise run zero cells and exit 0.
+  const unknown = chosen.filter((name) => !known.includes(name));
+  if (unknown.length || !chosen.length) {
+    console.error(
+      `FAIL  ${kind} asked for [${chosen.join(', ')}]; this script knows ${known.join(', ')}` +
+        (unknown.length ? '' : ' — and an empty selection is not a pass'),
+    );
+    process.exit(2);
+  }
+}
+
+/**
+ * The §8 row each engine's floor is read from, so the table above stays a copy of the contract rather than a
+ * second opinion on it. A row renamed there is a loud failure here, because a matrix that checks engines
+ * against numbers nobody maintains has stopped being the evidence §8 points at.
+ */
+const FLOOR_ROWS = { chromium: 'Chrome / Chromium', firefox: 'Firefox', webkit: 'Safari (macOS)' };
+
+/**
+ * The minimum-version column of every §8 environment row, keyed by the row's label.
+ *
+ * The table's fourth column carries values like `124 provisional package floor` and `125-equivalent
+ * Chromium engine`, so the leading number is the floor and the rest is its reason.
+ */
+function contractFloors() {
+  const found = new Map();
+  for (const line of readFileSync(join(repo, 'PRD.md'), 'utf8').split('\n')) {
+    if (!line.startsWith('| ')) continue;
+    const cells = line.split('|').map((cell) => cell.trim());
+    if (cells.length < 6) continue;
+    const version = /^(\d+)(?:\.\d+)*/.exec(cells[4]);
+    if (version) found.set(cells[1], Number(version[1]));
+  }
+  return found;
+}
+
+for (const [engine, rowLabel] of Object.entries(FLOOR_ROWS)) {
+  const fromTable = contractFloors().get(rowLabel);
+  if (fromTable === undefined) {
+    console.error(`FAIL  §8 has no "${rowLabel}" row with a version to read — FLOORS.${engine} is unchecked`);
+    process.exit(2);
+  }
+  if (fromTable !== FLOORS[engine]) {
+    console.error(
+      `FAIL  FLOORS.${engine} is ${FLOORS[engine]} while §8's "${rowLabel}" row claims ${fromTable}. ` +
+        'One of the two is wrong; this matrix is the evidence for that row, so it may not disagree with it.',
+    );
+    process.exit(2);
+  }
+}
+console.log(
+  `§8 floors read from PRD.md: ${Object.entries(FLOORS).map(([e, v]) => `${e} ${v}`).join(', ')}`,
+);
 
 /** A check's three outcomes: a measured detail, a gap in the engine, or a failure. */
 const SKIP = Symbol('skip');
@@ -263,17 +367,39 @@ const CHECKS = [
       const mounted = await page.locator('.pjsr-page-slot').count();
       const height = await page.evaluate(() => document.querySelector('.pjsr-viewport')?.scrollHeight ?? 0);
       const how = await jumpTo(total);
+      // 90s rather than 30, the elapsed time printed, and the scroll position reported on failure, because this
+      // row came up red on WebKit desktop (stuck at page 733, no further movement for the whole window) in one
+      // run and green in the next. The red one was a harness artifact: two matrix processes sharing one dev-server
+      // port. Re-run alone, WebKit desktop reaches page 999 in 0.1s and WebKit mobile page 1000 in 0.1s, so there
+      // is no engine defect here to file — and what the long ceiling plus the extra detail buy is the ability to
+      // say which of those two things happened, from the log line, without re-running anything.
+      const walked = Date.now();
       const line = await waitFor(async () => {
         const latest = await log('onPageChange');
         return Number(latest.replace(/\D+/g, '')) >= total - 3 ? latest : null;
-      }, 30_000);
-      if (line === null) fail(`${how}, but the reader never reached the end of ${total} pages`);
+      }, 90_000);
+      const seconds = ((Date.now() - walked) / 1000).toFixed(1);
+      if (line === null) {
+        // The bare "never reached the end" message said nothing about *how* it failed, and a row that is red in
+        // one run and green in the next has to be diagnosable from its own line. Where the reader stopped, how
+        // far the scroll got and how many slots are mounted are what tell a contended port from a stalled walk.
+        const stuck = await log('onPageChange');
+        const { top, height } = await page.evaluate(() => {
+          const el = document.querySelector('.pjsr-viewport');
+          return { top: el?.scrollTop ?? -1, height: el?.scrollHeight ?? -1 };
+        });
+        fail(
+          `${how}, but the reader never reached the end of ${total} pages in ${seconds}s — last onPageChange ` +
+            `"${stuck}", scrollTop ${top} of ${height}px, ${await page.locator('.pjsr-page-slot').count()} ` +
+            'slots mounted',
+        );
+      }
       const landed = Number(line.replace(/\D+/g, ''));
       const ink = await pollInk(page, '.pjsr-page-canvas');
       const after = await page.locator('.pjsr-page-slot').count();
       if (!ink || ink.ratio < 0.0005) fail(`page ${landed} never painted`);
       if (Math.max(mounted, after) > 40) fail(`${mounted} then ${after} page slots mounted — not virtualizing`);
-      return `${total} pages, ${how}, ${mounted}→${after} slots mounted, scroll height ${height}px, page ${landed} at ${(ink.ratio * 100).toFixed(2)} % ink`;
+      return `${total} pages, ${how}, ${mounted}→${after} slots mounted, scroll height ${height}px, page ${landed} at ${(ink.ratio * 100).toFixed(2)} % ink, reached in ${seconds}s`;
     },
   },
   {
@@ -391,15 +517,47 @@ const CHECKS = [
     mobileOnly: true,
     run: async ({ page, log, viewportBox, load }) => {
       await load('page-order-sample.pdf', 20);
-      const touch = await page.evaluate(() => ({
-        constructors: typeof Touch === 'function' && typeof TouchEvent === 'function',
-        coarse: matchMedia('(pointer: coarse)').matches,
-        points: navigator.maxTouchPoints ?? 0,
-      }));
+      const touch = await page.evaluate(() => {
+        // Ask the second question too. WebKit reports `typeof Touch === "function"` and then throws
+        // `TypeError: Illegal constructor` on the construction, so probing the global alone turned an engine
+        // that cannot synthesise the event into a failing check — a gap in the evidence reading as a defect
+        // in the viewer, which is the one mistake this matrix exists to avoid.
+        let synthesiable = false;
+        try {
+          const el = document.querySelector('.pjsr-viewport');
+          const one = new Touch({ identifier: 1, target: el, clientX: 0, clientY: 0, screenX: 0, screenY: 0 });
+          synthesiable = new TouchEvent('touchstart', { touches: [one] }) instanceof TouchEvent;
+        } catch {
+          synthesiable = false;
+        }
+        return {
+          constructors: synthesiable,
+          coarse: matchMedia('(pointer: coarse)').matches,
+          points: navigator.maxTouchPoints ?? 0,
+        };
+      });
       if (!touch.constructors) return skip('no Touch/TouchEvent constructor to synthesise from');
       const box = await viewportBox();
       const scale = async () => Number((await log('onScaleChange')).match(/[\d.]+$/)?.[0] ?? NaN);
-      const before = await scale();
+      /**
+       * The scale once two reads agree.
+       *
+       * Each pinch step posts a React state update, and the playground's log line lands on the render after
+       * it, so reading the log the first time it differs can catch a middle step. Comparing the pan's final
+       * scale against that middle step made this row fail on Chromium about one run in three with nothing
+       * changed but the timing — the drift was 0.62 against 0.61, the last two steps of the same spread.
+       */
+      const settledScale = async () => {
+        let previous = await scale();
+        for (let step = 0; step < 40; step += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          const now = await scale();
+          if (Number.isFinite(now) && now === previous) return now;
+          previous = now;
+        }
+        return Number.isFinite(previous) ? previous : null;
+      };
+      const before = await settledScale();
       const cx = box.x + box.width / 2;
       const cy = box.y + box.height / 2;
       // Two fingers spreading: the span changes on every move, which is the only thing that separates a
@@ -437,11 +595,9 @@ const CHECKS = [
         [cx, cy],
       );
       if (!spread) fail('the synthetic gesture did not dispatch');
-      const pinched = await waitFor(async () => {
-        const now = await scale();
-        return Number.isFinite(now) && now !== before ? now : null;
-      }, 8_000);
-      if (pinched === null) fail(`two fingers spreading left the scale at ${before}`);
+      const pinched = await settledScale();
+      if (pinched === null) fail('the scale never reported a value the pinch could be compared against');
+      if (pinched === before) fail(`two fingers spreading left the scale at ${before}`);
       // Same two fingers, same span, travelling together: that is a scroll, and the zoom must not move.
       // Room is given first — `onPanning` subtracts the midpoint delta from `scrollTop`, so at the top of a
       // document the gesture clamps to a no-op and would read as broken wiring rather than as position.
@@ -483,7 +639,7 @@ const CHECKS = [
         const now = await page.evaluate(() => document.querySelector('.pjsr-viewport').scrollTop);
         return now !== top ? now : null;
       }, 8_000);
-      const held = await scale();
+      const held = await settledScale();
       if (panned === null) fail('a two-finger pan moved neither the page nor the scroll position');
       if (held !== pinched) fail(`the pan also zoomed (${pinched} → ${held})`);
       return `pointer:coarse ${touch.coarse}, maxTouchPoints ${touch.points}: spread ${before} → ${pinched}, two-finger drag scrolled to ${panned} and held ${held}`;
@@ -722,7 +878,18 @@ async function runCell(engineName, profileName, baseUrl) {
 
   await context.close();
   await launch.close();
-  return { engine: engineName, version: launch.version(), profile: profileName, started: true, results };
+  const version = launch.version();
+  return {
+    engine: engineName,
+    version,
+    profile: profileName,
+    started: true,
+    // A cell-level verdict rather than a fourteenth check: §8's own row counts are quoted in that table and
+    // in this file's header, and the floor is a statement about the engine the cell ran on, not about a
+    // property of the viewer.
+    floor: floorVerdict(engineName, version),
+    results,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -756,6 +923,16 @@ for (const engineName of ONLY_ENGINES) {
       };
     }
     cells.push(cell);
+    if (cell.floor) {
+      const mark = cell.floor.status === 'ok' ? '  ok  ' : cell.floor.status === 'na' ? ' n/a  ' : ' FAIL ';
+      const detail =
+        cell.floor.status === 'ok'
+          ? `${cell.engine} ${cell.floor.major} is at or above §8's floor ${cell.floor.claimed}`
+          : cell.floor.status === 'na'
+            ? `${cell.engine} reported "${cell.floor.actual}" — no version to compare against §8's ${cell.floor.claimed}`
+            : `${cell.engine} ${cell.floor.actual} is below §8's floor ${cell.floor.claimed} — §8: a stale engine fails the engine row, not the page`;
+      console.log(`  ${mark} ${'engine-floor'.padEnd(28)} ${detail}`);
+    }
     for (const r of cell.results) {
       const mark = r.status === 'ok' ? '  ok  ' : r.status === 'skip' ? ' skip ' : r.status === 'na' ? ' n/a  ' : ' FAIL ';
       console.log(`  ${mark} ${r.check.padEnd(28)} ${r.detail}`);
@@ -766,8 +943,11 @@ for (const engineName of ONLY_ENGINES) {
 await server.close();
 
 const tally = (status) => cells.reduce((n, c) => n + c.results.filter((r) => r.status === status).length, 0);
+/** Floor verdicts are cell-level, so they are counted on their own axis rather than folded into `tally`. */
+const floors = (status) => cells.filter((c) => c.floor?.status === status).length;
 console.log(
-  `\n${cells.length} engine×profile cells on pdfjs-dist ${engineVersion}: ${tally('ok')} ok, ${tally('skip')} skipped, ${tally('na')} not runnable, ${tally('fail')} failed.`,
+  `\n${cells.length} engine×profile cells on pdfjs-dist ${engineVersion}: ${tally('ok')} ok, ${tally('skip')} skipped, ${tally('na')} not runnable, ${tally('fail')} failed` +
+    `; engine floors vs §8: ${floors('ok')} at or above, ${floors('fail')} below, ${floors('na')} unreadable.`,
 );
 
 // An engine that never started leaves its §8 row unbacked, and a summary that only counts failures would
@@ -793,5 +973,8 @@ if (!args.includes('--no-json')) {
 }
 
 // A cell that could not be run is not a pass: §8's own rule is that a row is not tested until the job named
-// as its evidence runs, so an engine that never started has to fail the run rather than shrink it.
-process.exit(tally('fail') || tally('na') ? 1 : 0);
+// as its evidence runs, so an engine that never started has to fail the run rather than shrink it. The floor
+// comparison is in the same family — an engine older than the number the table claims makes every row in
+// that cell evidence about the wrong version — and neither is reported through `results`, because a summary
+// that counts only check rows would let both read as a shorter matrix rather than a missing one.
+process.exit(tally('fail') || tally('na') || floors('fail') || floors('na') ? 1 : 0);

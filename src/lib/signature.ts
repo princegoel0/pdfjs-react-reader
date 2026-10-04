@@ -1,4 +1,4 @@
-import type { PdfPoint } from './ink';
+import type { PdfPoint } from './layout';
 
 /**
  * The geometry between a drawing pad and a signature field.

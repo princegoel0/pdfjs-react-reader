@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import type { OutlineEntry } from '../lib/outline';
+import type { OutlineEntry, PdfDestinationPosition } from '../lib/outline';
 import { formatLabel } from '../lib/labels';
+import { OUTLINE_FEATURE_ID } from '../lib/feature-ids';
 import { useLabels } from './labels-context';
+import { useViewer } from './ViewerContext';
 
-export interface OutlineViewProps {
-  entries: OutlineEntry[] | null;
+/** What the outline tier publishes from its Runner — read here, never passed in. */
+interface OutlinePublication {
+  entries?: OutlineEntry[] | null;
   loading?: boolean;
-  onSelectPage: (pageNumber: number) => void;
 }
 
 function OutlineNode({
@@ -16,7 +18,7 @@ function OutlineNode({
 }: {
   entry: OutlineEntry;
   depth: number;
-  onSelectPage: (pageNumber: number) => void;
+  onSelectPage: (pageNumber: number, position?: PdfDestinationPosition) => void;
 }) {
   const labels = useLabels();
   const [open, setOpen] = useState(!entry.collapsed);
@@ -61,7 +63,7 @@ function OutlineNode({
           disabled={entry.pageIndex === null}
           title={entry.title}
           onClick={() => {
-            if (entry.pageIndex !== null) onSelectPage(entry.pageIndex + 1);
+            if (entry.pageIndex !== null) onSelectPage(entry.pageIndex + 1, entry.position ?? undefined);
           }}
         >
           {title}
@@ -78,8 +80,29 @@ function OutlineNode({
   );
 }
 
-export function OutlineView({ entries, loading = false, onSelectPage }: OutlineViewProps) {
+/**
+ * The bookmark tree, reading the viewer it sits in.
+ *
+ * Two things used to arrive as props and are now taken: the destination a click resolves to, from the
+ * controller, and the entries, from the outline tier's publication in that controller's store — which is
+ * why a host writing their own layout puts `<OutlineView/>` in it and stops. The store hands back an empty
+ * object for a feature that is not mounted, so without `outlineFeature` this is the empty row rather than a
+ * crash or a invented prop.
+ *
+ * A click carries the place the bookmark names along with its page. That is what makes a link to the middle
+ * of a page land in the middle, and `followDestination` is the shell's own resolution of it: a viewer that
+ * has the place and does not use it is the reason a document's carefully authored bookmarks feel broken.
+ */
+export function OutlineView() {
   const labels = useLabels();
+  const { store, shellApi } = useViewer();
+  const published = store.get(OUTLINE_FEATURE_ID) as OutlinePublication;
+  const entries = published.entries ?? null;
+  const loading = Boolean(published.loading);
+
+  const select = (pageNumber: number, position?: PdfDestinationPosition) =>
+    shellApi.followDestination(pageNumber, position ?? null);
+
   if (loading) {
     return (
       <div className="pjsr-outline-empty" role="status">
@@ -96,7 +119,7 @@ export function OutlineView({ entries, loading = false, onSelectPage }: OutlineV
     // correct list semantics the markup already has.
     <ul className="pjsr-outline-tree">
       {entries.map((entry, i) => (
-        <OutlineNode key={i} entry={entry} depth={0} onSelectPage={onSelectPage} />
+        <OutlineNode key={i} entry={entry} depth={0} onSelectPage={select} />
       ))}
     </ul>
   );

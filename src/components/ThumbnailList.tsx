@@ -1,34 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PdfThumbnail } from './PdfThumbnail';
-
-export interface ThumbnailListProps {
-  doc: PDFDocumentProxy;
-  numPages: number;
-  /** 1-based page highlighted as current. */
-  currentPage: number;
-  rotation?: number;
-  /** Extra rotation for individual pages, keyed by 0-based index. */
-  pageRotations?: Record<number, number>;
-  /** Fallback thumbnail width in CSS pixels before the list has measured. */
-  width?: number;
-  onSelectPage: (pageNumber: number) => void;
-}
+import { useViewer } from './ViewerContext';
 
 // Mirrors the grid in viewer.css: `repeat(auto-fill, minmax(96px, 1fr))`, gap 12.
 const MIN_COLUMN = 96;
 const GAP = 12;
 const MAX_WIDTH = 168;
 
-export function ThumbnailList({
-  doc,
-  numPages,
-  currentPage,
-  rotation = 0,
-  pageRotations,
-  width = 132,
-  onSelectPage,
-}: ThumbnailListProps) {
+/**
+ * The page strip.
+ *
+ * What it draws is the viewer's own state — the document, its page count, the page on screen, the rotation
+ * of each one, and where a click goes — so none of that is a prop: §5.3's shape is a part that reads the
+ * controller it sits under, because a host who has already supplied the controller has nothing to add by
+ * wiring the same numbers a second time, to each part, by hand. `width` stays: it is a layout decision the
+ * controller does not own, and it is only the starting value — the list measures its own column and follows
+ * what it finds.
+ */
+export function ThumbnailList({ width = 132 }: { width?: number } = {}) {
+  const { doc, numPages, currentPage, rotation, pageRotations, scrollToPage } = useViewer();
   const listRef = useRef<HTMLDivElement | null>(null);
   const [measured, setMeasured] = useState<number | null>(null);
 
@@ -55,6 +45,8 @@ export function ThumbnailList({
     el?.scrollIntoView({ block: 'nearest' });
   }, [currentPage]);
 
+  if (!doc) return null;
+
   return (
     <div ref={listRef} className="pjsr-thumbnail-list">
       {Array.from({ length: numPages }, (_, i) => (
@@ -65,7 +57,7 @@ export function ThumbnailList({
           width={measured ?? width}
           rotation={rotation + (pageRotations?.[i] ?? 0)}
           active={currentPage === i + 1}
-          onSelect={onSelectPage}
+          onSelect={scrollToPage}
         />
       ))}
     </div>

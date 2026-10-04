@@ -1,7 +1,7 @@
 import { OutlineView } from '../components/OutlineView';
-import { usePdfFeaturePublish, usePdfFeatureShell, usePdfFeatureState } from '../components/FeatureHost';
+import { usePdfFeaturePublish, usePdfFeatureShell } from '../components/FeatureHost';
 import { usePdfOutline } from '../headless/usePdfOutline';
-import { OUTLINE_FEATURE_ID } from './ids';
+import { OUTLINE_FEATURE_ID } from '../lib/feature-ids';
 import type { PdfFeature } from '../lib/features';
 import type { OutlineEntry } from '../lib/outline';
 
@@ -17,17 +17,7 @@ function OutlineRunner() {
   return null;
 }
 
-function OutlinePanel() {
-  const shell = usePdfFeatureShell();
-  const state = usePdfFeatureState<OutlineFeatureState>();
-  return (
-    <OutlineView
-      entries={state.entries ?? null}
-      loading={state.loading}
-      onSelectPage={shell.scrollToPage}
-    />
-  );
-}
+/** The feature owns the reading; `OutlineView` is the shell's own part, and finds this publication by id. */
 
 /**
  * The bookmark tree as a sidebar panel — the reference example of a feature with
@@ -35,10 +25,11 @@ function OutlinePanel() {
  */
 export const outlineFeature: PdfFeature<OutlineFeatureState> = {
   id: OUTLINE_FEATURE_ID,
+  stylesheets: ['pdfjs-react-reader/outline.css'],
   Runner: OutlineRunner,
   panel: {
     id: OUTLINE_FEATURE_ID,
     label: (labels) => labels.outlineTab,
-    render: OutlinePanel,
+    render: OutlineView,
   },
 };

@@ -3,6 +3,11 @@
  * without importing that peer's code: `download` asks `forms` whether the
  * document has unsaved edits, and a string import must not drag the form engine
  * into a bundle that did not ask for it.
+ *
+ * It is in `lib/` rather than `features/` for the same reason the contract module is: the shell's parts
+ * read a tier's publication by id too — `OutlineView` asks the store for what `outlineFeature` published —
+ * and `src/lib/feature-boundary.test.ts` forbids a shell module importing from `src/features/` at all,
+ * which is the rule that keeps a feature out of a bundle that never asked for it.
  */
 export const PRINT_FEATURE_ID = 'print';
 export const DOWNLOAD_FEATURE_ID = 'download';

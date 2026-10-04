@@ -18,8 +18,16 @@
  *    would need before relying on the name; an untagged-by-omission "experimental" with nothing behind it
  *    is how a temporary state becomes permanent.
  *
- * It also runs itself against six synthetic violations (`--no-selftest` turns that off), because a check
- * that has never seen a bad input is a check nobody has proved.
+ * A withdrawal is not an edit, and the file says so in `removed` rather than losing the name: §5.5 allows a
+ * public name to leave only in a major version, and FR-18 requires that every removed name be listed in
+ * `CHANGELOG.md` and have carried a tag first. So each entry keeps the tag it held, the version that dropped
+ * it and the changelog section that announced it, and the audit checks all three — against the built surface
+ * for the first, against the version's shape for the second, and against the text of the changelog for the
+ * third. A removal that is only a deletion is the failure mode this exists for: nothing downstream can tell a
+ * withdrawn name from a name that was never there.
+ *
+ * It also runs itself against synthetic violations, three of them about removals (`--no-selftest` turns that
+ * off), because a check that has never seen a bad input is a check nobody has proved.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -32,15 +40,34 @@ const STATES = ['stable', 'experimental', 'internal', 'deprecated'];
 /** The shortest note worth reading. Below this the "reason" is a shrug. */
 const MIN_NOTE = 40;
 
+/** §5.5: a public name leaves in a major version, so the removed-in number has to look like one. */
+const isMajorVersion = (version) =>
+  typeof version === 'string' && /^\d+\.0\.0(?:-\d{4}-\d{2}-\d{2})?$/.test(version);
+
+/**
+ * The text of one `## [label]` section of `CHANGELOG.md`, or null when there is no such heading.
+ *
+ * Matching the heading rather than searching the whole file is the point: an entry that names a removed
+ * export somewhere — in an unrelated "Fixed" line three releases down — has not announced it.
+ */
+function changelogSection(text, label) {
+  if (typeof label !== 'string' || label === '') return null;
+  const start = text.indexOf(`## [${label}]`);
+  if (start === -1) return null;
+  const next = text.indexOf('\n## ', start + 1);
+  return text.slice(start, next === -1 ? text.length : next);
+}
+
 /**
  * Compare a manifest against a published surface. Pure, so the self-test can feed it violations the real
  * build has none of.
  *
  * @param {{entries: Record<string, {name: string}[]>, missing: string[]}} published
- * @param {{states: string[], tags: Record<string, string>, notes: Record<string, string>}} manifest
+ * @param {{states: string[], tags: Record<string, string>, notes: Record<string, string>, removed?: Record<string, {tag: string, removedIn: string, announcedIn: string}>}} manifest
+ * @param {string} changelog the text of `CHANGELOG.md`, which is where a removal has to be announced
  * @returns {string[]} one line per problem, empty when the two agree
  */
-export function audit(published, manifest) {
+export function audit(published, manifest, changelog = '') {
   const problems = [];
   const names = new Set();
   for (const [entry, list] of Object.entries(published.entries)) {
@@ -78,33 +105,115 @@ export function audit(published, manifest) {
     if (manifest.tags[name] === 'stable') problems.push(`${name} is stable and so must not carry a note`);
     if (!names.has(name)) problems.push(`${name} has a note but is not published`);
   }
+
+  /*
+   * FR-18's removal clause, stated as three questions about every name in `removed`: is it really gone, did
+   * it hold a tag while it was there, and did the changelog say so. A deletion alone answers none of them,
+   * which is why the ledger exists — a reader of the artifact cannot tell a withdrawn name from one that was
+   * never published, and neither can a build check.
+   */
+  for (const [name, entry] of Object.entries(manifest.removed ?? {})) {
+    if (names.has(name)) problems.push(`${name} is recorded as removed and is still published`);
+    if (name in manifest.tags) {
+      problems.push(`${name} is tagged and recorded as removed at the same time — one name, two states`);
+    }
+    if (!STATES.includes(entry?.tag)) {
+      problems.push(`${name} was removed while tagged "${entry?.tag}", which §5.5 does not define`);
+    }
+    if (!isMajorVersion(entry?.removedIn)) {
+      problems.push(
+        `${name} is removed in "${entry?.removedIn}", and §5.5 lets a public name leave only in a major version`,
+      );
+    }
+    const section = changelogSection(changelog, entry?.announcedIn);
+    if (section === null) {
+      problems.push(`${name} cites [${entry?.announcedIn}] as its announcement and CHANGELOG.md has no such section`);
+    } else if (!section.includes(name)) {
+      problems.push(`${name} is announced in [${entry?.announcedIn}] and that section does not name it`);
+    }
+  }
   return problems;
 }
 
 /** The violations the real manifest must never contain, each checked against `audit` itself. */
 function selfTest() {
   const published = { entries: { 'pdfjs-react-reader': [{ name: 'A', type: false }] }, missing: [] };
+  /*
+   * A changelog with two sections, one of which names the withdrawn `Zed` and neither of which names `Gone`.
+   * The removal rules read text, so the fixture has to be text and not an object.
+   */
+  const log =
+    '## [Unreleased]\n\n- `Zed` is withdrawn here.\n\n## [1.2.0] — 2026-01-01\n\n- A line about something else.\n';
+  const removed = (name, patch = {}) => ({
+    [name]: { tag: 'stable', removedIn: '2.0.0', announcedIn: 'Unreleased', ...patch },
+  });
+  const manifest = (patch = {}) => ({ states: STATES, tags: {}, notes: {}, ...patch });
   const bad = [
-    ['an untagged export', { states: STATES, tags: {}, notes: {} }, 'A is exported and untagged'],
-    ['a stale tag', { states: STATES, tags: { A: 'stable', Gone: 'stable' }, notes: {} }, 'Gone is tagged but no longer published'],
-    ['an invented state', { states: STATES, tags: { A: 'frozen' }, notes: {} }, 'the state "frozen"'],
-    ['`internal` on a published name', { states: STATES, tags: { A: 'internal' }, notes: {} }, 'tagged internal but is reachable'],
-    ['an experimental name with no reason', { states: STATES, tags: { A: 'experimental' }, notes: {} }, 'is experimental with no note'],
-    ['a reason too short to be one', { states: STATES, tags: { A: 'experimental' }, notes: { A: 'new' } }, 'under 40 characters'],
-    ['a note on a stable name', { states: STATES, tags: { A: 'stable' }, notes: { A: 'a fine reason, long enough to satisfy the check on its own' } }, 'is stable and so must not carry a note'],
-    ['a missing declaration file', { states: STATES, tags: { A: 'stable' }, notes: {} }, 'declaration file missing'],
+    ['an untagged export', manifest({ tags: {} }), 'A is exported and untagged'],
+    [
+      'a stale tag',
+      manifest({ tags: { A: 'stable', Gone: 'stable' } }),
+      'Gone is tagged but no longer published',
+    ],
+    ['an invented state', manifest({ tags: { A: 'frozen' } }), 'the state "frozen"'],
+    ['`internal` on a published name', manifest({ tags: { A: 'internal' } }), 'tagged internal but is reachable'],
+    [
+      'an experimental name with no reason',
+      manifest({ tags: { A: 'experimental' } }),
+      'is experimental with no note',
+    ],
+    [
+      'a reason too short to be one',
+      manifest({ tags: { A: 'experimental' }, notes: { A: 'new' } }),
+      'under 40 characters',
+    ],
+    [
+      'a note on a stable name',
+      manifest({ tags: { A: 'stable' }, notes: { A: 'a fine reason, long enough to satisfy the check on its own' } }),
+      'is stable and so must not carry a note',
+    ],
+    ['a missing declaration file', manifest({ tags: { A: 'stable' } }), 'declaration file missing'],
+    [
+      'a name removed and still published',
+      manifest({ tags: { A: 'stable' }, removed: removed('A') }),
+      'recorded as removed and is still published',
+    ],
+    [
+      'a removal with no state behind it',
+      manifest({ removed: removed('Gone', { tag: 'retired' }) }),
+      'tagged "retired", which §5.5 does not define',
+    ],
+    [
+      'a removal in a minor version',
+      manifest({ removed: removed('Gone', { removedIn: '1.1.0' }) }),
+      'only in a major version',
+    ],
+    [
+      'a removal whose announcement does not name it',
+      manifest({ removed: removed('Gone') }),
+      'that section does not name it',
+    ],
+    [
+      'a removal citing a section that does not exist',
+      manifest({ removed: removed('Gone', { announcedIn: '0.0.0' }) }),
+      'has no such section',
+    ],
   ];
   const failures = [];
-  for (const [what, manifest, expect] of bad) {
-    const input = what.includes('declaration file') ? { ...published, missing: ['dist/gone.d.ts'] } : published;
-    const found = audit(input, manifest).some((line) => line.includes(expect));
+  for (const [what, input, expect] of bad) {
+    const pub = what.includes('declaration file') ? { ...published, missing: ['dist/gone.d.ts'] } : published;
+    const found = audit(pub, input, log).some((line) => line.includes(expect));
     if (!found) failures.push(`the audit did not catch ${what}`);
   }
-  const clean = audit(published, {
-    states: STATES,
-    tags: { A: 'experimental' },
-    notes: { A: 'a reason long enough to clear the bar this check sets for itself.' },
-  });
+  const clean = audit(
+    published,
+    manifest({
+      tags: { A: 'experimental' },
+      notes: { A: 'a reason long enough to clear the bar this check sets for itself.' },
+      removed: removed('Zed', { tag: 'experimental' }),
+    }),
+    log,
+  );
   if (clean.length) failures.push(`the audit flagged a sound manifest: ${clean.join('; ')}`);
   return failures;
 }
@@ -115,8 +224,9 @@ function selfTest() {
  */
 function main() {
   const manifest = JSON.parse(readFileSync(join(root, 'api-maturity.json'), 'utf8'));
+  const changelog = readFileSync(join(root, 'CHANGELOG.md'), 'utf8');
   const published = publishedNames();
-  const problems = audit(published, manifest);
+  const problems = audit(published, manifest, changelog);
 
   const tally = {};
   const seen = new Set();
@@ -131,7 +241,8 @@ function main() {
 
   console.log(
     `api-maturity.json: ${seen.size} published names — ` +
-      Object.entries(tally).map(([t, n]) => `${n} ${t}`).join(', '),
+      Object.entries(tally).map(([t, n]) => `${n} ${t}`).join(', ') +
+      `, ${Object.keys(manifest.removed ?? {}).length} withdrawn and recorded`,
   );
 
   if (!process.argv.includes('--no-selftest')) {
@@ -140,7 +251,7 @@ function main() {
       for (const line of teeth) console.error(`FAIL  the check is not a check: ${line}`);
       process.exit(1);
     }
-    console.log('  ok    9 synthetic violations and 1 sound manifest, all classified correctly');
+    console.log('  ok    13 synthetic violations and 1 sound manifest, all classified correctly');
   }
 
   if (problems.length) {
@@ -151,7 +262,8 @@ function main() {
 
   const movable = [...seen].filter((name) => manifest.tags[name] !== 'stable').length;
   console.log(
-    `  ok    every published name tagged, no stale tags, every non-stable name with a reason` +
+    `  ok    every published name tagged, no stale tags, every non-stable name with a reason, ` +
+      `every withdrawal named in a changelog section and dated to a major` +
       ` (${movable} names this package may still change in a minor)`,
   );
 }

@@ -8,7 +8,7 @@ import {
 } from 'pdfjs-dist';
 import { normalizeSource, type PdfSource } from '../lib/source';
 import { pdfAssetUrls, type AssetUrl } from '../lib/assets';
-import { onAbort } from '../lib/abort';
+import { onAbort, waitOrAbort } from '../lib/abort';
 import { PdfError, toPdfError } from '../lib/errors';
 import { backoffDelay, classifyLoadError, resolveAttempts } from '../lib/retry';
 import type { RetryAttemptInfo, RetryPolicy } from '../lib/retry';
@@ -20,10 +20,13 @@ import type {
   PdfPasswordRequest,
 } from '../lib/status';
 import {
+  claimWorkerSrc,
+  configuredWorkerSrc,
   createPdfWorker,
   ensureWorker,
   workerAutoDetectionFailed,
   type OwnedPdfWorker,
+  type WorkerSrcClaim,
 } from '../lib/worker';
 
 export interface UsePdfDocumentOptions {
@@ -88,7 +91,8 @@ export interface UsePdfDocumentOptions {
   onProgress?: (progress: PdfLoadProgress) => void;
   /**
    * Bounded retries for a load failure that can heal. Defaults to three attempts with full-jitter
-   * exponential backoff; pass `false` to fail on the first error.
+   * exponential backoff — the first wait one second, no wait longer than thirty — passing `false` instead
+   * fails on the first error.
    *
    * Only genuinely transient failures are retried. A 401 or 403 is surfaced immediately and never
    * attempted again, because retrying a refused credential turns one denied request into several — and a
@@ -97,9 +101,10 @@ export interface UsePdfDocumentOptions {
    */
   retry?: RetryPolicy | false;
   /**
-   * Called before each retry wait, so a host can report "retrying (2 of 3)" rather than leaving a spinner
-   * that implies the first attempt is still running. Held in a ref like the other callbacks, so an inline
-   * arrow cannot restart the load.
+   * Called after every failed attempt that was worth retrying, the last one included — where `willRetry` is
+   * false and `delayMs` is 0 — so a host can report "retrying (2 of 3)" and then "gave up" rather than
+   * leaving a spinner that implies the first attempt is still running. Held in a ref like the other
+   * callbacks, so an inline arrow cannot restart the load.
    */
   onRetryAttempt?: (info: RetryAttemptInfo) => void;
   /**
@@ -267,6 +272,14 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
     let cancelled = false;
     let task: PDFDocumentLoadingTask | null = null;
     let owned: OwnedPdfWorker | null = null;
+    let claim: WorkerSrcClaim | null = null;
+    /*
+     * This load's own stop signal, aborted by whatever aborts the load — an unmount, a superseded source, or
+     * the host's signal arriving through `cancelRef`. It exists for one reason: the backoff wait below is the
+     * only part of a retry that is not network work, and a reader who closes the viewer during a
+     * thirty-second interval should not leave a timer running for the remainder of it (FR-35).
+     */
+    const halted = new AbortController();
     // The error a host submitted to dismiss a password prompt, if any. Kept by identity so the catch below
     // can tell "the reader dismissed the prompt" from "the origin refused us" and code it accordingly.
     let passwordDismissal: unknown;
@@ -277,6 +290,22 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
     (async () => {
       try {
         await ensureWorker(workerSrc);
+        /*
+         * FR-02: pdf.js holds one worker URL per realm, so a second viewer configured with a
+         * different one is not getting its own worker — it is re-pointing the first's, and the
+         * page that pays for it is whichever one scrolls in afterwards. Claim the URL for the
+         * lifetime of this load and refuse the load that cannot have it, which is the only place
+         * the conflict can be attributed to the viewer that caused it. An empty URL is not a
+         * claim: that is pdf.js's own fallback, and two viewers with no URL agree.
+         */
+        const configured = configuredWorkerSrc();
+        if (configured) {
+          claim = claimWorkerSrc(configured);
+          if (!claim.ok) {
+            if (!cancelled) setLoad({ status: 'error', error: claim.error });
+            return;
+          }
+        }
         const normalized = await normalizeSource(srcRef.current, {
           allowedSources: allowedSourcesRef.current,
         });
@@ -399,22 +428,32 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
             }
 
             const verdict = classifyLoadError(err);
-            // Anything not positively transient, and the last allowed attempt,
-            // both fall through to the outer handler — which is where the failure
-            // becomes the reader's problem rather than ours.
-            if (!verdict.retry || attempt >= attempts) throw err;
-
-            const delayMs = backoffDelay(attempt, policy);
-            report?.({
-              attempt,
-              attempts,
-              delayMs,
-              status: verdict.status,
-              reason: verdict.reason,
-              error: err instanceof Error ? err : new Error(String(err)),
-            });
-            await new Promise((resolve) => setTimeout(resolve, delayMs));
-            if (cancelled) return;
+            // A failure that is not transient falls through to the outer handler, which is where it becomes
+            // the reader's problem rather than ours. A transient one is reported even when it is the last
+            // attempt allowed: silence after two reports is indistinguishable from a hang, and the host
+            // cannot decide between "gave up" and "still waiting" without being told which it is.
+            if (!verdict.retry) throw err;
+            const exhausted = attempt >= attempts;
+            const delayMs = exhausted ? 0 : backoffDelay(attempt, policy);
+            // Reported only where a retry was ever on the table — which, since `exhausted` means
+            // `attempt >= attempts`, is the same as "more than one attempt was allowed". A host that passed
+            // `retry: false` gets the failure once, through the error channel, and does not also need to be
+            // told that the single attempt it asked for was attempt 1 of 1.
+            if (attempts > 1) {
+              report?.({
+                attempt,
+                attempts,
+                willRetry: !exhausted,
+                delayMs,
+                status: verdict.status,
+                reason: verdict.reason,
+                error: err instanceof Error ? err : new Error(String(err)),
+              });
+            }
+            if (exhausted) throw err;
+            // Wakes early if the load was stopped while we were waiting, and the timer is cleared either
+            // way, so an aborted reader is not a background requester with a schedule to keep.
+            if ((await waitOrAbort(delayMs, halted.signal)) === 'aborted' || cancelled) return;
           }
         }
       } catch (err) {
@@ -446,7 +485,10 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
     // only the host-initiated path writes `cancelled`.
     const teardown = (byHost = false) => {
       cancelled = true;
+      halted.abort();
       setLoad(byHost ? { status: 'cancelled' } : { status: 'destroyed' });
+      // FR-02: the realm's worker URL is only free for the next viewer once this load is over.
+      if (claim?.ok) claim.release();
       // A worker handed to `getDocument` is not owned by the loading task, so it
       // has to be released here or every reload leaks one.
       void task?.destroy().finally(() => owned?.dispose());

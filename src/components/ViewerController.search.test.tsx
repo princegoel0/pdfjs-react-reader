@@ -66,6 +66,7 @@ vi.mock('../headless/usePdfSearch', async (importOriginal) => ({
       counts: [],
       pagesWithMatches: 0,
       patternError: null,
+      patternKind: null,
       activeIndex: -1,
       activeSeq: 0,
       complete: true,

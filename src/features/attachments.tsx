@@ -2,7 +2,7 @@ import type { PdfError } from '../lib/errors';
 import { AttachmentsView } from '../components/AttachmentsView';
 import { usePdfFeaturePublish, usePdfFeatureShell, usePdfFeatureState } from '../components/FeatureHost';
 import { usePdfAttachments } from '../headless/usePdfAttachments';
-import { ATTACHMENTS_FEATURE_ID } from './ids';
+import { ATTACHMENTS_FEATURE_ID } from '../lib/feature-ids';
 import type { AttachmentInfo } from '../lib/attachments';
 import type { PdfFeature } from '../lib/features';
 
@@ -48,6 +48,7 @@ function AttachmentsPanel() {
  */
 export const attachmentsFeature: PdfFeature<AttachmentsFeatureState> = {
   id: ATTACHMENTS_FEATURE_ID,
+  stylesheets: ['pdfjs-react-reader/attachments.css'],
   Runner: AttachmentsRunner,
   panel: {
     id: ATTACHMENTS_FEATURE_ID,

@@ -19,26 +19,21 @@ export { PdfPage, type PdfPageProps } from './components/PdfPage';
 export {
   Toolbar,
   ZOOM_LEVELS,
-  INK_COLORS,
-  INK_WIDTHS,
   type ToolbarControls,
   type ToolbarItem,
   type ToolbarProps,
 } from './components/Toolbar';
 export { SearchBox, type SearchBoxProps } from './components/SearchBox';
 export { Sidebar, type SidebarProps, type SidebarTab } from './components/Sidebar';
-export {
-  ThumbnailList,
-  type ThumbnailListProps,
-} from './components/ThumbnailList';
+export { ThumbnailList } from './components/ThumbnailList';
 export { PdfThumbnail, type PdfThumbnailProps } from './components/PdfThumbnail';
-export { OutlineView, type OutlineViewProps } from './components/OutlineView';
-export { InkLayer, type InkLayerProps } from './components/InkLayer';
+export { OutlineView } from './components/OutlineView';
 export { PasswordPrompt, type PasswordPromptProps } from './components/PasswordPrompt';
 export {
   findFeatureKey,
   mergeFeaturePageProps,
   NO_FEATURES,
+  orderFeatures,
   samePublication,
   type AnyPdfFeature,
   type FeaturePageProps,
@@ -96,6 +91,7 @@ export {
   type UsePdfVirtualizerOptions,
   type UsePdfVirtualizerResult,
   type VirtualSlot,
+  type VirtualSlotPage,
 } from './headless/usePdfVirtualizer';
 export {
   usePdfSearch,
@@ -114,7 +110,6 @@ export {
   type UsePdfFormValuesOptions,
   type UsePdfFormValuesResult,
 } from './headless/usePdfFormValues';
-export { usePdfInk, type UsePdfInkOptions, type UsePdfInkResult } from './headless/usePdfInk';
 export { usePdfPageLabels } from './headless/usePdfPageLabels';
 export {
   usePdfPrint,
@@ -129,6 +124,8 @@ export {
   type UsePdfDownloadOptions,
   type UsePdfDownloadResult,
   type PdfDownloadOptions,
+  type PdfDownloadOutcome,
+  type PdfSaveRefusal,
 } from './headless/usePdfDownload';
 export {
   clearFormValues,
@@ -147,18 +144,6 @@ export {
   type FormWidget,
 } from './lib/form';
 export {
-  createStrokeId,
-  drawInkStrokes,
-  pointsBounds,
-  simplifyPoints,
-  strokeBounds,
-  strokePathD,
-  type InkSettings,
-  type InkStroke,
-  type PdfPoint,
-  type ViewportPoint,
-} from './lib/ink';
-export {
   createPdfLinkService,
   type CreatePdfLinkServiceOptions,
   type PdfLinkService,
@@ -173,6 +158,7 @@ export {
   convertMatchRanges,
   convertMatches,
   countPerPage,
+  DEFAULT_MAX_PATTERN_UNITS,
   escapeRegExp,
   extractAllText,
   buildTextIndex,
@@ -185,6 +171,7 @@ export {
   type ExternalPageText,
   type ExternalTextIndex,
   type FindPlan,
+  type FindPlanError,
   type PageMatch,
   type PageTextIndex,
   type ResolvedSearchOptions,
@@ -193,9 +180,13 @@ export {
 } from './lib/search';
 export {
   parseDestination,
+  parseDestinationPosition,
+  resolveDestination,
   resolveDestinationPageIndex,
+  type DestinationKind,
   type DestinationRef,
   type OutlineEntry,
+  type PdfDestinationPosition,
 } from './lib/outline';
 export {
   BYTES_PER_PIXEL,
@@ -265,11 +256,18 @@ export {
   MAX_RENDER_PIXELS,
   MAX_RENDER_PIXELS_MOBILE,
   MAX_RENDER_SIDE,
+  MIN_RENDER_SCALE,
+  ensureCanvasCeiling,
   isMobileCanvasEnvironment,
   maxRenderPixelsFor,
+  probedCanvasCeiling,
   readCanvasEnvironment,
+  resolveCanvasBudget,
   resolveRenderScale,
+  type CanvasBudget,
+  type CanvasCeilingSource,
   type CanvasEnvironment,
+  type CanvasProbeOptions,
   type RenderScale,
   type RenderScaleOptions,
 } from './lib/canvas';
@@ -289,6 +287,8 @@ export {
   type ScaleMode,
   type LayoutResult,
   type VisibleRange,
+  type PdfPoint,
+  type ViewportPoint,
 } from './lib/layout';
 export {
   formatPageLabel,

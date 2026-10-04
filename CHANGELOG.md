@@ -7,10 +7,132 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-`0.12` Prove (FR-41, FR-48–FR-51) is in progress. Four of its five requirements are built and the fifth is
-partly: FR-48 has a harness that ran on one of its three engines here, FR-49 has two of its four profiles.
+`0.12` Prove (FR-41, FR-48–FR-51) is in progress. All five are built and three are still open on evidence
+rather than on code: FR-48's harness has run through all three engines here, FR-49 now has all four of its
+profiles and a committed record, and the proof that only a clean runner can give — the `packaging`, `browser`,
+`react` and `examples` jobs — has still not been produced. The register stands at **42 met, 15 partial,
+1 absent** of 58, on a suite of 1,019 tests in 107 files (the 58th row of this pass deletes a guard, so the count went down by one and that is the honest direction for a test whose reason stopped being true).
 
 ### Added
+
+- **The Node floor stopped being a sentence and became a checked value.** `engines.node` is `>=22.13.0`, which
+  is what `PRD.md` §8's two Node rows have said since the lock: the peer's own `engines` begins at `22.13.0`
+  (`6.2.108`, `6.3.289` and `6.4.299` all declare `>=22.13.0 || >=24` — read from the registry, not recalled),
+  and `require(esm)` — without which a CommonJS host cannot load an ESM-only peer at all — became unflagged at
+  `22.12.0`. What made this a requirement rather than a number was that three places used to state it
+  independently and two of them were wrong: `package.json` said `>=20`, the `verify` and `packaging` matrices
+  tested Node 20, and `scripts/tarball-check.mjs` recorded `ERR_REQUIRE_ESM` as a *tolerable* outcome, which is
+  "we promise `require()`" spelled as "we hope the runner is new enough". Now the floor is read out of §8 by
+  `npm run check:packaging`, which requires both Node rows to agree with each other, requires `engines.node` to
+  equal them, requires the installed engine's own floor not to sit above ours, and walks every `node-version`
+  pin and matrix entry in both workflow files for anything below it. The matrices are `22.13.0 / 22 / 24` — the
+  floor, the LTS, the next major — the old patch that predates `require(esm)` is gone because the contract
+  excludes it, and `ERR_REQUIRE_ESM` fails the run. Each of those four rules was fed its own counterfactual (a
+  manifest floor of `99.0.0`, a CI pin at `20.9.0`, a table edited to `22.14.0`, a published subpath pointing at
+  a file that does not exist), each fired with a message naming the place and the number, and each file came
+  back by md5.
+- **The two remaining peer axes are matrices rather than prose, and they were measured.** `react` runs
+  majors **18 and 19 at both their minimum advertised patch and their latest** — `>=18.0.0 <20.0.0` promises the
+  first page of every major, and a matrix of floating majors measures only the newest patch and leaves `18.0.0`,
+  the version an old lockfile actually installs, unmeasured — and asserts that the `react` and `react-dom`
+  majors it ended up with match, because an install that quietly resolves them apart leaves the job proving two
+  trees at once. `consumer` runs **`6.2.108` and `6.4.299`**, the two ends of `^6.2.108` rather than a caret. All
+  four React cells were then run locally: `typecheck`, `test` (985 tests) and `build` pass on 18.0.0, 19.0.0,
+  18.3.1 and 19.3.0 — and the first attempt at that measurement failed in every cell for a reason that was not
+  React, which is its own finding and is in *Verified* below.
+- **`PRD.md` §8's browser floors are now part of the harness's output.** `scripts/browser-matrix.mjs` parses the
+  Chromium / Firefox / Safari minimums out of the table, compares each one against the version the launched
+  engine reports, prints it as its own line in every engine×profile cell, counts it in a tally of its own, and
+  **exits 2 if the table and the script disagree** — so a floor edited in the document without moving the harness
+  stops the run instead of becoming a quiet sentence in a table. Setting Chromium's floor to 126 proved it
+  (`FLOORS.chromium is 126 while §8's "Chrome / Chromium" row claims 125`), and the file came back by md5.
+  Unknown flags, an unknown engine and an empty selection also exit 2 now, because `--engines=Cromium` running
+  zero cells and exiting 0 is indistinguishable from a pass.
+
+- **A removal now has a record, and the record is enforced.** `api-maturity.json` gained a `removed` ledger,
+  because §5.5's promise that a public name leaves only in a major version is worth nothing if a deleted
+  export simply disappears — a reader of the artifact cannot tell a withdrawn name from one that was never
+  published, and neither could the build. Each of the fifteen names records the maturity tag it held, the
+  version that drops it, the changelog section that announces it and what supersedes it, and
+  `npm run check:maturity` fails if such a name is published again, if its tag is outside the four states, if
+  the version it left in is not a major, or if the section it cites does not name it. The check's synthetic
+  half grew from nine violations to thirteen to carry them, and one of the new rules met a real artifact
+  before any fixture did: run against the stale pre-removal `dist/`, the check reported thirty problems,
+  fifteen of them "recorded as removed and is still published". Two more assertions came out of the same row:
+  `check:packaging` now
+  requires `sideEffects` to exempt CSS and forbid JavaScript (FR-22's asymmetry, stated in the manifest but
+  never tested, in either direction), and `check:size` computes core-sheet purity — every `.pjsr-*` class that
+  only a feature's own source renders must be absent from the built `styles.css`, which is 29 classes today and
+  was proved by feeding the gate a `.pjsr-annotate-swatch` rule it then refused. The published surface goes
+  from 335 names to 320 and the label catalog from 147 keys to 136, both counts pinned by tests that name the
+  requirement.
+
+- **`npm run check:examples`, which is §5.6 and was the last part of FR-52 with no mechanism at all.**
+  It runs `npm pack`, extracts the tarball into a throwaway project's `node_modules`, and type-checks
+  every fenced `tsx`/`ts` block in `PRD.md` and `README.md`, plus the docs site's five live examples, with
+  **no `paths` mapping** — because `tsconfig.json` maps `pdfjs-react-reader` onto `src/` here, which means
+  every other check in the repository resolves the package the way no consumer does. Two things fall out of
+  that construction rather than being asserted separately: a name that is not exported cannot resolve, and
+  neither can a subpath the export map does not publish. The archive is read in-process, not with shell
+  `tar`, because the `tar` a spawned shell finds on Windows is GNU tar and it reads `C:/…` as a remote
+  filename. **16 examples compile.** Six of them did not on the first run, and the reasons were all real:
+  one README block imported `PdfPage` from `/headless`, which exports no components, and five were a line of
+  JSX with no imports — now components rather than exemptions, because §5.6 allows exactly one kind of
+  exemption and this check prints it, with the file, the line and the requirement each skip waits on.
+  A second printed skip is the React 18 type contract: one `@types/react` is installed per checkout, so the
+  pass runs against the one it has and says which major it could not reach; the CI `react` job has both.
+  The check runs inside `npm run verify` and as its own CI step, and its two failure modes were verified by
+  perturbing an example — an unpublished name and an unpublished subpath, each restored by hash afterwards.
+  It also classifies the export map: 25 keys into the eight groups §4.10 lists, with a wildcard key, a
+  `./types` entry, an unclassifiable key and any target outside `dist/` all failing `check:packaging`.
+
+- **§6.1's budget engine, which is what FR-57 was still asking for**: the effective canvas ceiling is
+  now the minimum of four things — the package default for the detected class, the viewport working
+  set, the platform ceiling the runtime can actually allocate, and the host's own number — computed by
+  `resolveCanvasBudget`, which also says which of them won. The platform term is measured rather than
+  assumed: `ensureCanvasCeiling` allocates upward until a painted pixel stops coming back, and caches
+  the answer for the realm. That signal is the whole design, because an over-limit canvas in Chromium
+  keeps the width it was given and hands back a live-looking 2D context — a null context would have
+  been easy to detect and would have caught nothing. The search stops at the ceiling already in force
+  (a bigger answer cannot change a minimum), it starts two frames after mount and allocates **one surface
+  per frame** after that — measured in Chromium, a synchronous ladder of rungs pushed the page's first
+  paint from ~270 ms to ~2 s, which is exactly the cost §6.1's "runs off the render path and never delays
+  a first paint" is about — and when the answer is lower than what pages were painted under, the shell
+  redraws them. `npm run probe:canvas` is the harness for all of it: it imports the module under test
+  through the dev server, reads the frame every surface landed on, and fails the run if two share one, if
+  the search starts before the page paints, or if a rung allocates above the ceiling in force. It printed
+  3,072,000 px on a 1280×800 @1× page (that page's own working set, which is below the desktop default —
+  so the probe confirmed the ceiling rather than raising it), 5,242,880 under an iPad user agent on a
+  390×844 @3× screen, and ~80 ms for the shell's whole search.
+  `MIN_RENDER_SCALE` is now published and enforced: the renderer lowers toward 0.25 and stops, and a
+  page that cannot be represented at or above it is refused with `RESOURCE_LIMIT` carrying the page,
+  its box and the budget — because a canvas that size paints blank while the text layer sits over it
+  as though it had content, which is a worse page than no page.
+
+- **§3.7's registration contract, which is what FR-21 and FR-56 were still asking for**: `PdfFeature`
+  gained `dependsOn`, `stylesheets` and `cleanup`, and `orderFeatures` is the call that makes them rules.
+  A duplicate feature id, a dependency that is not in the list and a dependency cycle each throw a
+  `PdfError` coded `CONFIGURATION_ERROR` naming the feature and the problem, with the kind of problem in
+  `details.problem`, and they throw *before any Runner mounts* — a duplicated feature is one whose
+  published state belongs to neither copy, and that is discovered by losing annotations rather than by an
+  error. The same call puts every dependency ahead of its dependents and leaves everything else in the
+  order the host wrote, and the shell applies that one order wherever it breaks a tie: Runner
+  initialisation, which feature has the last word on a page contribution, which equal-priority control
+  survives the fold, which feature claims a chord. A list with no dependencies comes back as the same
+  array, so no host that wrote none pays a re-render. Stylesheets are now read off the feature value,
+  which is what §3.7 asks for and what lets an application see what registering a tier will pull into the
+  page, and the built-ins' declarations are cross-checked against the package's export map, so a sheet
+  that is named but not published, or needed but not named, fails the build. The layering rule the
+  feature boundary has always relied on is now asserted in the test project rather than only measured in
+  the bundle: no core, hook or shell module imports a tier, no tier imports the shell parts, and no tier
+  imports another tier — a peer is named by its id and read through `usePdfFeaturePeer`.
+
+- **`VirtualSlot.pages`, and the `VirtualSlotPage` type that describes it**: where each page of a row sits —
+  `index`, `pageNumber`, `left`, `top`, `width`, `height`, in content pixels. The row keeps `indices`, `width`,
+  `height` and `offsetTop` exactly as they were, so a host reading rows is unaffected; the new field is what a
+  host needs to place pages as *siblings* of the row rather than as its children, which is the shape `FR-08`
+  requires and the shell now uses. The measurement of 2026-09-29 settled the repaint half of that clause in a
+  browser; the geometry needed to settle the identity half was not published until now.
 
 - **`FR-41`: the package can be `require()`d.** `tsup` now emits `esm` **and** `cjs`, so every published
   path is four files — `x.js`, `x.cjs`, `x.d.ts`, `x.d.cts` — and the export map answers `import` and
@@ -76,8 +198,185 @@ partly: FR-48 has a harness that ran on one of its three engines here, FR-49 has
   stopped load landed on `destroyed`, a departure from §3.5 — and the page model gained the re-queue it names:
   `retryPage(page)` on the handle and `retryToken` on `PdfPage`, one counter per page, so a second retry of
   the same page is still a change.
+- **§6's four benchmark profiles are four, and its report is a tracked file.** `scripts/make-vector-pdf.mjs`
+  generates `vector-sample.pdf` for profile C — four A1 sheets, each a 24×14 grid of cells where every cell is
+  a `q … re W n … Q` clip around 26 hatch lines, a decagon and four curves: 36,031 path tokens the generator
+  wrote and **12,922 operators the engine reports** reading them back, in 0.51 MB of Flate. Profile D runs on a
+  committed harness — 412×915 at dpr 3 with an Android user agent, so `isMobileCanvasEnvironment` binds the
+  5.24 MP package default by itself, and 6× CPU throttling over CDP — and it reaches that ceiling by zooming to
+  300 % through the toolbar's overflow menu, because on a phone that is the only place the zoom control is. The
+  canvas came back at 2012×2604, which is the mobile ceiling to two decimal places, painted at **1.10× instead
+  of 3×** and still showing 27.7 % ink: degraded, not dead. `playground/raw.html` is the engine-only half
+  profile C asks for — the same page at the same box with none of the viewer in the way — and the pair is
+  reported as a pair. The record itself is now `benchmarks/latest.json`, tracked: machine model, OS release,
+  memory, Node, the Chromium version read from the live browser, engine version, the git revision, the run date,
+  each fixture's byte count and sha256, and for every sampled number its sample count, p50, p95 and max, with
+  p99 reported for the two sweeps that have 100+ samples and `null` for the five-sample cold pages.
+  `src/lib/benchmark-record.test.ts` (6 tests, FR-49) fails on a missing field, a `"chromium"` with no version,
+  a hash that no longer matches the bytes on disk, a p99 handed to five samples, a maximum below its own p95, a
+  committed record containing a broken bar, or a profile that measured nothing and says nothing about it — and
+  all nine of those perturbations were fed to it and fired. Two of the harness's own instruments were wrong
+  before this: frame-gap percentiles were taken over the array in **time order** rather than sorted, which
+  printed `p50 16.7 ms … max 16.6 ms` (a maximum below the median is the arithmetic announcing itself), and
+  "cold page" waited for ink on *the first canvas in the DOM*, which during a jump is a page other than the one
+  being waited for — so the wait returned at once and the timing measured the jump. Page-scoped, the number
+  moved from a reported 100 ms to a measured **147 ms median in the committed run** (124–199 ms over five
+  samples) — and 224 ms in an earlier run of the identical build on the identical machine an hour before it.
+  Both are above §6's 100 ms bar, and the gap between the two is its own finding: a cold page on one laptop
+  moves by half again between runs, which is precisely the thing §6 refuses to let a baseline promise.
+- **A file carried by an annotation is listed and saved like one the catalog names** (FR-25).
+  `collectAnnotationAttachments` walks the pages for `FileAttachment` annotations and `mergeAttachments` folds
+  the two lists into one, deduped on filename with the name-tree entry winning and a missing description filled
+  in from the other copy. This was found by measuring rather than by reading: on
+  `attachments-ocg-sample.pdf` — a fixture this repository has had since `0.5` and wired into nothing —
+  `getAttachments()` returns the three files the catalog names and not the note hanging off page 2, while the
+  annotation's own `fileId` (`attachmentRef:23R`) reads back byte-exact through `getAttachmentContent()`. The
+  list clause was therefore passing by accident on documents where the engine folds both kinds into one map.
+  Four tests now run the product's real path against that file — listed, described, saved the same way, and
+  **zero contents read to show four names** — and pin the premise at the byte level, asserting that
+  `/EmbeddedFiles` does *not* name the carried file, because a future edit moving it into the tree would let all
+  four keep passing while measuring one list twice. Because the walk is now per page rather than one call, the
+  hook takes the `signal` FR-36 asks for and the walk stops with it. Cost: 0.06 kB of core.
+- **Five requirements gained the assertion their rows described, and one gained the mechanism.**
+  `PdfThumbnail.test.tsx` (8 tests, FR-11) covers the measured-width-times-dpr buffer, the 132 px card in the
+  list's column arithmetic, the visible-range observers, the scroll that follows the current page, the
+  cancellation that hands the buffer back and the accessible name. `PdfPage.textlayer.test.tsx` (4, FR-06)
+  counts `build()` and `update()` on a recording layer and proves a zoom step re-lays-out rather than
+  re-builds — one build, two updates, one text extraction, zero cancels, and the same `<span>` still in the
+  DOM — after a measurement corrected the premise: the extra update straight after the build is pdf.js's own
+  no-op, so the assertion counts from there rather than from zero. `PdfPage.rotation.test.tsx` (5) and
+  `ViewerController.rotation.test.tsx` (3) hold FR-09's second half, which nothing had asserted: the text,
+  annotation, editor, draw and XFA layers each re-render into the *same* element for the *same* page index with
+  the same layer object handed to the editor, no layer appears twice, and the destroyed ones are the ones that
+  were replaced. `usePdfSearch.yield.test.tsx` (4, FR-13) is the "one gained the mechanism": the bounded yield
+  lived in `extractAllText`, which nothing in `src/` calls, so the path the shell indexes through had no timed
+  yield at all. It now has one on the supplied-index branch — a worker read already yields by round-tripping, a
+  supplied read is a microtask, and five hundred supplied pages is one unbroken block — and a rAF ticker counts
+  a fresh frame on every fifth page. Sixteen perturbations across these five files each fired exactly on the
+  test that owns the clause. `scripts/make-oversize-pdf.mjs` then closed FR-51's last computed row with
+  `oversize-sample.pdf`: three boxes the engine reports as 612×792, 12,000×9,000 and 200,000×600 pt, which come
+  out as uncapped, clamped by the *area* ceiling at 0.56×, and refused below the 0.25 minimum by the *side*
+  ceiling — the distinction read off a file. The generator reads the three ceilings out of `src/lib/canvas.ts`
+  and refuses to emit a page whose verdict has drifted from them, so a raised `MAX_RENDER_SIDE` stops the build
+  of the fixture rather than quietly invalidating what it proves.
 
 ### Changed
+
+- **The composed parts read the viewer they sit in, which is the shape PRD §5.3 drew and could not
+  compile** (FR-28). `ViewerRoot` takes a host `className` and `style` beside the frame classes the
+  controller writes; `ViewerSidebar` takes `children`, and when it does the tab strip is not rendered,
+  because a tab that selects nothing is a control that lies; `ThumbnailList` reads the document, the page
+  count, the page on screen and the rotation from `useViewer()` and keeps only its starting width as a
+  prop; `OutlineView` reads the bookmark tree from the outline tier's publication in that same store and
+  follows a click's destination through the shell, so it takes nothing. **Breaking** for anyone who used
+  them directly: `OutlineViewProps` and `ThumbnailListProps` are gone, and `Sidebar`'s `extraTabs` became
+  `tabs` (omit it for a tab-less panel). Nothing published has ever carried those names to a consumer, but
+  `0.1.2`'s root entry did export the components. `src/features/ids.ts` moved to
+  `src/lib/feature-ids.ts` so a shell part can name a tier's publication without the shell importing from
+  `src/features/` — which the boundary test now forbids with no exception left in it.
+
+- **`renderPixels` and `maxRenderPixels` now constrain the renderer instead of replacing it** (FR-57). the renderer instead of replacing it** (FR-57).
+  A host that passed a number larger than the platform or viewport ceiling used to get that number,
+  which is the one outcome a safety budget cannot allow: the canvas comes back blank, not broken. What
+  a host gets instead is `renderBudget` — the ceiling in force, which candidate set it, and what each
+  of the others asked for — so the difference between a cap and a bug is readable without a debugger.
+  A value below the ceiling behaves exactly as it did, and `0` keeps its pdf.js meaning of "render at
+  CSS resolution".
+- **A second viewer with a different worker URL now fails its load** (FR-02, FR-55). pdf.js holds
+  `GlobalWorkerOptions.workerSrc` per realm, so two viewers with different worker code is not two
+  configurations — the later load re-points the earlier one, and the page that pays for it is whichever
+  scrolls in afterwards. The second viewer now reports `CONFIGURATION_ERROR` naming both origins, and
+  the first keeps running. Two viewers that agree on the URL, or that configure nothing at all, are
+  unaffected; a relative URL and its absolute spelling count as the same worker, because that is what
+  pdf.js fetches.
+
+- **The worker's "absent" state turned out to be two states** (FR-02). Measured on `pdfjs-dist@6.3`,
+  `GlobalWorkerOptions.workerSrc` starts as `''` in a browser and `'./pdf.worker.mjs'` in Node, because the
+  engine assigns it from its own `isNodeJS`. So `ensureWorker` probes in every browser realm and in no Node
+  one — which is what README's "works in Vite, webpack and Rollup without a line of configuration" rests
+  on, and the opposite of it had been written into this package's own comments. `worker.default.test.tsx`
+  pins the Node row against the real engine (no probe, no write, and no detection-failure advice the package
+  never earned), and `npm run probe:worker` pins the browser row in Chromium, failing the run if the engine
+  ever stops starting empty. `scripts/browser-matrix.mjs` and the four `worker.fallback.*` files were
+  already right about this; the comments are what changed.
+
+- **`FR-33`: the refused XFA save now says why, in the API rather than in a sentence.** `download()` resolves
+  `{ fileName, committed, refused }`, the hook publishes `refused`, and `onRefused` is there for a caller that
+  does not await. A refusal is not a failure, so it never reaches `onError`; the file still arrives, because a
+  reader whose edits cannot be kept should not also lose the document. The built-in control moves the reason
+  into its own accessible name — the one place a reader looks at the moment the difference matters — and that
+  string is in the catalog, so German, Spanish and French carry it too. What this replaces is a silent
+  fallback: `saveEdits: true` on a pure-XFA document has always taken the loaded bytes instead of calling the
+  `saveDocument()` that rejects, and nobody was ever told the file they were holding had no edits in it. Two
+  clauses of the same row also gained the assertions they never had: a viewport change now provably *updates*
+  the XFA layer rather than re-appending it (a re-append doubles the page and loses the focused field), and a
+  search mark provably lands on the XFA tree rather than on the text layer a pure-XFA page never builds. Both
+  were measured in a browser during `0.6`–`0.8` and recorded in comments; removing either mechanism now fails
+  a test.
+
+- **`FR-36`: an already-aborted signal performs no work, on the three paths that were still starting it.**
+  Every effect in `PdfPage` opened with its work and asked about the signal afterwards, so a page mounted
+  under a signal that had already fired still fetched its proxy from the worker, still allocated a canvas,
+  still built a text layer — three costs paid for a page nobody will show; each of the seven now starts with
+  one check, and the guard counts the `getPage` that does not happen. `usePdfDownload` read the signal between
+  the byte await and the write, which produced no file but had already paid for the bytes, so the check moved
+  to the top of the call — and the test that recorded the old boundary as “the honest limit” now asserts the
+  clause instead. And the edit tier, the one place a write is long enough to want cancelling, called all four
+  writer passes with no signal at all even though every one of them checks one: the panel now owns an
+  `AbortController` for its mount, `createEditFeature({ signal })` gives a host the same lever, and a
+  cancelled pass produces no document and no error report, because §3.6 says a cancellation is not a failure.
+  Two limits stay as they were and are the clause’s own exceptions rather than gaps: a `getData` already in
+  flight cannot be recalled, and a writer loop stops before its *next* page rather than undoing the one it
+  changed. Signals are still not merged into one — each effect owns a cancellation of its own lifetime — but
+  see the #203 entry below for why the *test* that policed that no longer exists.
+
+- **`FR-10`: a bookmark click lands where the bookmark points.** `OutlineEntry` carries a `position` now — the
+  `/XYZ`, `/FitH`, `/FitV` or `/FitR` values the destination actually held, plus the magnification — and the
+  shell scrolls to it instead of to the top of the page. `parseDestinationPosition`, `resolveDestination`,
+  `DestinationKind` and `PdfDestinationPosition` are published alongside it, and `OutlineView`’s `onSelectPage`
+  gained a second argument, which a host already written can ignore. Three things had to be true for that to be
+  a sentence worth writing. **The fixture changed first:** every destination in every fixture here read
+  `/XYZ null null null`, which names a page and no place, so the clause could be implemented and tested against
+  an array typed into a test without ever meeting a document that had one. **The offset is asked of the engine,
+  not derived here** — `viewport.convertToViewportPoint` at the live scale with the page’s `/Rotate` and the
+  reader’s rotation folded in — because the axis flip and the rotation are pdf.js’s business, and a viewer that
+  guessed them would be wrong on a turned page. **And a destination that asks for a magnification changes the
+  scale *before* it measures**, since its point is a distance down the page as displayed: the click parks the
+  destination for one render, then scrolls. Measured in Chromium on the fixture at 100 %: “1. Introduction”
+  (`/XYZ 72 660`) lands at 132 px — the subtitle line, 132 pt down a 792 pt page; “2. Sections” (`/Fit`) lands
+  at page 2’s top; “3. Conclusion”, reached through the name tree with a 2× ask, takes 200 % and lands 344 px
+  into page 3. The same resolver now backs an in-page link click too, which had been dropping the same half of
+  the destination.
+
+- **`FR-08`: a row is a box the shell paints, not a parent the pages live in.** Switching layout used to
+  destroy pages. Rows were keyed by their first page, so the moment a page stopped being a row head — page 3 in
+  the switch from continuous to spread — its row vanished, and a page inside a vanished row goes with it: React
+  cannot move a mounted component between parents. The reader watched every other page fall back to blank and
+  repaint on a change that moved nothing but a border, and anything held inside one (an open annotation popup,
+  an armed editor, ink mid-stroke) went with it. Pages are now siblings of the row, keyed by page index, placed
+  from `slot.pages`; the row keeps its white sheet, its shadow and its forced-colours outline, and the page
+  boxes land where the flexbox used to put them. `ROADMAP`'s 2026-09-29 row proved the *pixels* survived a
+  switch at a fixed zoom — that measurement is why the requirement was restated rather than dropped — but it
+  did not count mounts, and a canvas can keep its pixels while the component that painted it is rebuilt. The two
+  new test files count both, and their first versions passed against the broken code: jsdom's viewport shows
+  two rows, and across two rows the continuous heads (1, 2) and the spread heads (1, 2) coincide. A guard for a
+  clause about *regrouping* needs a window wide enough for the two groupings to disagree.
+
+- **`FR-01`: two refusals that were clauses in the requirement and accidents in the code.** A source string
+  is now refused when its scheme cannot name a document (`javascript:`, `vbscript:`, `about:`, `chrome://`,
+  `chrome-extension://`, `view-source:` and their neighbours → `unsupported-scheme`), and when it is relative
+  and there is no document base to resolve it against (`/files/a.pdf` in Node, a worker or a server render →
+  `no-base-url`). Before this, `javascript:alert(1)` was refused only because it happens to contain no slash —
+  the bare-word rule caught it — and `chrome://settings` classified as a url because a scheme with slashes
+  looked like a path. Neither answer was a rule. The scheme list is deliberately a list of **refusals**, not
+  an allowlist of every scheme: an allowlist would refuse `my-app://documents/a.pdf`, which a host's own
+  desktop shell registers, and would need a release for each new document scheme. **This changes what a
+  server render sees**: `normalizeSource('/files/a.pdf')` used to return that string for the engine to resolve
+  against no origin at all, and now throws `INVALID_SOURCE` naming the missing base — which is the honest
+  failure, and the reason the refusal carries its own reason code rather than arriving as a corrupt-document
+  error four steps later. A refused scheme's message names the scheme and repeats nothing after the colon, so
+  a `javascript:` payload does not reach a log line. Both rules are asserted as pairs: the same relative
+  string classifies as `url` once a page exists.
 
 - **`signFields` refuses a field that holds a signature value by failing the call.** It already refused; the
   refusal was a name in `refused`, the same list that holds fields the document does not have at all, and the
@@ -102,26 +401,152 @@ partly: FR-48 has a harness that ran on one of its three engines here, FR-49 has
   per-feature ceiling in `scripts/check-size.mjs`, so `npm run verify` fails until either the writer's routing
   shrinks or the ceiling is reviewed and moved deliberately — FR-23 allows exactly those two answers and no
   third. Both numbers are here rather than only in a failing gate because the second is the one that matters:
-  a tier that has to parse the file it is showing is the reason that ceiling moved once already.
+  a tier that has to parse the file it is showing is the reason that ceiling moved once already. **W2 moved
+  them again** — core **30.01 kB → 31.15 kB**, `edit` over core **6.25 kB → 6.42 kB** — for five rows of
+  correctness, the refusal strings, the per-page row geometry and the destination position; the same two
+  answers are still the only ones on offer and neither has been taken.
+- **A supplied text index no longer indexes in one block** (FR-13). Walking a host's own pages used to be a run
+  of microtasks with no turn between them — the worker path yields by round-tripping, a supplied read does not
+  — so `usePdfSearch` now hands the loop a turn every `YIELD_PAGES` (5) pages of a supplied-index walk. No API
+  moved and no result changed; a long search over a host-supplied index gets a few more frames of slack, which
+  is what the clause asks for.
+- **The attachment list can now name a file the catalog never listed** (FR-25). Hosts reading
+  `usePdfAttachments().files` may see more entries on documents that carry files in `FileAttachment`
+  annotations, and `getAttachments()` is no longer the whole of the source. The hook also gained the `signal`
+  option FR-36 asks of every async path, because the walk is now per page and a host that navigates away
+  mid-list should stop paying for pages it will never show.
+- **`ViewerController.rotate()` lost its private copy of the rotation rule** (FR-09). It had its own modulo
+  arithmetic beside `normalizeRotation`, which is how a perturbation of the shared reducer appeared to change
+  nothing: the document-wide control was answering a different implementation. The duplication is gone and the
+  behaviour is what it already was — measured before and after on all four inputs — so the reducer is now the
+  only place the rule lives.
+- **The benchmark stopped writing to a directory git cannot see, and stopped claiming a number §6 does not
+  give.** `.spike/benchmark.json` is now `benchmarks/latest.json`, tracked, because FR-58 counts this as release
+  evidence and a gitignored file cannot be evidence however accurate its numbers are. In the same file, profile
+  C's in-script target had been restating "cold page under 120 ms" — a bar §6's table does not contain for that
+  profile — and now quotes the row instead: engine time separate, main-thread work attributable to our layer
+  under 200 ms, cold page measured but not offered as a package-only latency promise. Committing a changed
+  record is a deliberate act: the run prints that, and a test fails if the committed one no longer matches the
+  fixtures it claims to have measured.
+- **#203, the post-lock sweep: five documents were still describing the pre-lock contract.** §8 raised the
+  floors to Chrome and Edge 125, Safari and iOS Safari 18, Firefox 124 (provisional) and Node 22.13.0 at the
+  October lock, and `docs/src/pages/Introduction.tsx`, `docs/src/pages/Compatibility.tsx`, this README's
+  browser section, `src/styles/viewer.css`'s container-query note and `CODE_REFERENCE.md`'s `engines` row were
+  still stating 90 / 14 / 90 / 20 — including one row that said `engines: node >= 20` was "the only engine
+  statement the package makes", which stopped being true the day `check:packaging` began reading §8. The
+  numbers were restated and the *reasons attached to them* were re-derived rather than transcribed, which is
+  where the interesting part is: the CSS ships a `@media` branch beside every `@container` rule and avoids
+  `:has()` and `dvh` because Safari 14 could not do them, and against a floor of 18 that is margin, not
+  requirement — `:has()` is Safari 15.4, `@container` and `overflow: clip` are 16, read off MDN's
+  browser-compat-data rather than recalled — so the documents now say the fallbacks are unexercised leftovers
+  instead of dressing a stale constraint up as a decision. `CODE_REFERENCE.md` also claimed `PRD.md` §5.2
+  still shows a slots form labelled "not the shipped API"; the rewrite deleted that example, so the decline is
+  no longer a disagreement with the specification, and its §17 heading said 76 files / 770 tests where the
+  suite is 107 files and 1,019 tests.
+  **One guard came out with this sweep, and it is worth being exact about why.** `abort.test.ts` grepped
+  `abort.ts` for `AbortSignal.any` on the stated ground that the call was newer than every advertised floor.
+  That was true when it was written (Chrome 116 against a floor of 90) and false from the lock onward — and
+  §5.6's platform baseline rule says a guard written to avoid an API the floors now admit *is* the defect. The
+  test is gone, along with the `readFileSync` that fed it. No behaviour changed: nothing in the package ever
+  called `AbortSignal.any` and nothing calls it now. What remains is the design reason, which was always the
+  real one — each effect owns a cancellation of its own lifetime, so merging a host signal into a composed one
+  would make a scale change look like an abandonment — and that belongs in the module header, not in a string
+  search for a platform API.
+  **The rest of the sweep was arithmetic, and it did not survive being re-measured.** §22 of
+  `CODE_REFERENCE.md` tells a reader to run the commands rather than trust the document, so this pass ran them
+  and wrote down what the document had gotten wrong. `engines` was recorded as `node >= 20` and as "the only
+  engine statement the package makes" — both stopped being true at W7. The per-entry name counts were
+  234 / 187 / 32 / 9 where `node scripts/inventory.mjs` reads **239 / 197 / 36 / 13** today, because FR-54
+  re-exported the error contract onto the two writer tiers and nobody re-ran the command; the same four figures
+  are on the docs API page, now corrected. The maturity row still said 315 names / 272 stable / 43 experimental
+  where the manifest holds **320 / 263 / 57** plus 15 withdrawn. The label catalog was quoted as 144 strings in
+  four places when `src/locales/locales.test.ts` asserts **136** — the trail is 123 → 131 → 134 → 144 → 147 →
+  136, the last step being FR-18 taking the ink strings back out, and the test had been updated while the
+  documents had not. §5 claimed "all 35 props" and named 34 of the interface's **44**: the whole `0.9` group —
+  `httpHeaders`, `withCredentials`, `rangeChunkSize`, `disableRange`, `disableStream`, `retry`,
+  `onRetryAttempt`, `onProgress`, `signal` — was absent, so §5 gained a transport-and-cancellation table and
+  three callback lines written from the props' own doc comments, and §6 gained `retryPage(page)`. The
+  repo-shape paragraph still said the specification has 51 requirements and that
+  `0.1.2` was "committed and deliberately never published" — the registry, read with
+  `npm view pdfjs-react-reader versions`, has had 0.1.2 since 2026-09-25, so that sentence was the opposite of
+  the truth. Finally the citation probe itself: 315 path citations across the five long documents, every one of
+  them resolving except three that name scratch harnesses the text marks as temporary and one that named
+  `lib/ink.ts` in the present perfect, now dated. What the sweep cannot fix is the reason all of it was
+  possible: §22 tells a reader to run the commands instead of trusting the document, and nothing runs them on
+  anyone's behalf, so the numbers were correct when typed and stale by the fourth package after. That is
+  **#213**.
+
+### Removed
+
+- **The core freehand ink surface (FR-18), withdrawn from `.` and `/headless`.** The shell could draw, and
+  `annotateFeature` could draw, and only one of those two paths survives a save: the core's strokes were an
+  SVG overlay that printed and never reached the document, so a reader who picked the wrong pen lost their
+  mark without being told. Two ink paths meant one of them was a trap, so there is now one. Fifteen
+  published names leave the surface:
+
+  `usePdfInk`, `UsePdfInkOptions`, `UsePdfInkResult`, `InkLayer`, `InkLayerProps`, `InkStroke`,
+  `InkSettings`, `createStrokeId`, `simplifyPoints`, `strokePathD`, `pointsBounds`, `strokeBounds`,
+  `drawInkStrokes`, `INK_COLORS`, `INK_WIDTHS`
+
+  With them go the surfaces that only that capability used: `PdfPageProps`'s `inkStrokes`, `inkDrawing`,
+  `inkSettings` and `onInkCommit`; `ToolbarProps`'s `drawMode`, `onDrawToggle`, `inkSettings`,
+  `onInkSettingsChange`, `onInkUndo`, `onInkClear` and `inkCanUndo`, and the `draw` control id the toolbar
+  planned around; `UsePdfPrintOptions.getInkStrokes`, so a print job carries persisted marks and nothing
+  drawn in-session (FR-19's "no transient core drawing capability"); the shell contract's
+  `inkStrokesForPage` and the controller's `ink` and `commitFor`; eleven `PdfViewerLabels` keys
+  (`drawOnDocument`, `exitDrawingMode`, `drawingTools`, `drawLabel`, `drawWithColor`, `penWidth`,
+  `undoStroke`, `clearAllDrawings`, `penThin`, `penMedium`, `penThick`) and their three locale catalogs —
+  `undoLabel` and `clearLabel` stay, because the edit tier's buttons are their only remaining users; the
+  `.pjsr-ink*` and `.pjsr-annotation-layer--inert` rules and the `--pjsr-swatch` / `--pjsr-swatch-hit`
+  tokens, which were the core sheet's drawing chrome (FR-22).
+
+  `PdfPoint` and `ViewportPoint` do **not** leave the surface: they describe a point in a page or on a
+  viewport, the signature and page-edit paths need both, and they moved to the layout module instead of
+  being deleted, so the import a host already writes is unchanged.
+
+  What the removal is *not* is a silent one: each name is recorded in `api-maturity.json` under `removed`
+  with the maturity tag it held, the release that drops it and the section of this file that announces it,
+  and `npm run check:maturity` fails if a removed name is still published, if an entry loses its tag or its
+  announcement, or if the version it was removed in is not a major (§5.5). The warning is here rather than
+  in a released minor because §5.5 plans none between `0.1.2` and `1.0.0` — `0.2`–`0.12` are internal
+  milestones — so `1.0.0` is the first artifact a consumer can install without them.
 
 ### Verified, and what that verification did not reach
 
 The run's own honesty is the requirement, so the gaps are in the record rather than implied by a green
-count. On this Windows host **two of the three engines never started**: Playwright's validator refuses
-Firefox for a `mozglue.dll` that is present (662 KB) and survived a fresh 122 MB `install --force firefox`,
-and `firefox.exe --version` run straight from its own folder exits `0xC0000142` — DLL initialisation failed,
-no output. WebKit's launcher exits the same way. `mf.dll`, `mfplat.dll` and both `vcruntime140` files are in
-System32, so the missing-redistributable and N-edition explanations do not fit, and *why* the loader refuses
-these two is not established. No code of ours ran in either case, so §8's Firefox, Safari and iOS rows are
-neither passed nor failed here — they are unbacked, and the sixth CI job (`browser`, `ubuntu-latest` with
-`npx playwright install --with-deps`) is the instrument that has to answer them. It has never run.
+count. **All three engines start on this Windows host and every check runs in all of them** — the 2026-10-04
+solo pass is six engine×profile cells, **67 ok, 5 skipped, 0 failed, 0 not runnable**, at 1280×900 dpr 1 and
+375×812 dpr 2: Chromium 153 and Firefox 155 take 12 ok on desktop and 10 ok with 2 skips on mobile, WebKit 26
+the same, and each cell also reports its engine against §8's floor (153 vs 125, 155 vs 124, 26 vs 18 — six of
+six at or above). Two claims this section used to make have been measured out of it. The first was that
+Firefox and WebKit would not launch here at all; they do now, and the change is recorded rather than explained,
+because nothing in this repository made it happen and the earlier `0xC0000142` diagnosis was accurate against
+the build it saw. The second is worse and is ours: an intermediate run of this same command reported that
+Firefox's own URL input "resolves to a node that never becomes interactive", which was the reason for 10 of its
+12 failures. A probe against a lone dev server fills that input and drives the page without trouble, and the
+failures reproduced only when a second `npm run test:browsers` was running against the same port. **The
+contention was the defect, not the engine** — and the WebKit-desktop "1,000-page stall at page 733" filed from
+the same run is likewise gone: alone, WebKit reaches page 999 in 0.1 s and paints it. The 90 s ceiling and the
+scroll-position detail stay in the harness, because a row that has been red once has to be diagnosable from its
+own line.
 
-Two measured gaps belong to emulation rather than to the viewer: Chromium's mobile profile delivers **no
-wheel events at all** to the page, so the wheel check reports `skip` with what the engine was offered
-(`""`) instead of a pass; and the pinch is a **synthetic `TouchEvent` sequence**, which proves the
-`onPinching`/`onPanning` split (a spreading pair took the scale 0.55 → 0.61, a same-span drag scrolled to
-160 px and held it) and proves nothing about a digitizer. That is why §8 lists a real-device pass beside the
-emulated one instead of underneath it.
+The engine range produced two findings of its own, from measuring the CI matrix axes locally before letting a
+runner discover them. `npm i --no-save` on the React axis re-resolves the *peer* as well, because
+`devDependencies` advertises `^6.2.108`, so every cell type-checked against `6.4.299` and reported one error —
+and that error was real and ours: `src/lib/search.parity.test.ts` was writing a bare string into
+`annotationStorage`, while a text widget writes `{ value: … }`, which is what `form.ts`'s `storedValue` has read
+back out all along and what `6.4`'s `setValue(key, value: object)` now says. The test writes the widget's shape
+and passes on `6.3.289` and `6.4.299`; with the engine pinned, all four React cells pass `typecheck`, `test` and
+`build`. The other finding is not ours to fix: **`6.2.108`, the advertised peer floor, is a browser-only
+release.** `await import('pdfjs-dist')` at that version dies in the engine's module scope with `ReferenceError:
+DOMMatrix is not defined` and prints "Please use the `legacy` build in Node.js environments" (Node 24.21.0 has
+no `DOMMatrix` global, so this is the build, not the harness); `6.3.289` and `6.4.299` import 62 names cleanly.
+In a browser it loads and 22 of the 23 Chromium checks pass, but `pinch-vs-pan` fails with *"a two-finger pan
+moved neither the page nor the scroll position"* — that release's `TouchManager` has no `onPanning` at all, zero
+occurrences in its build and in its `.d.ts`, so FR-47's pan half has nothing to be handed to. Two consequences
+are recorded as gaps on their own requirements (FR-46, FR-47) and one is an open proposal to the owner (#211):
+either the floor moves to `^6.3.289`, which still excludes the CVE band and makes every promise testable, or
+three promises get an engine-version asterisk. Nothing was coded to pretend the floor works meanwhile.
 - **`FR-50`: every published name carries a maturity state, and the build says so.** `api-maturity.json`
   holds all **315** distinct names reachable from the twelve JS entry points — **272 stable, 43
   experimental, none deprecated** — and `npm run check:maturity` is the last step of `npm run verify`: it
@@ -179,14 +604,21 @@ emulated one instead of underneath it.
   stays bounded, off-screen canvases are genuinely gone rather than merely off screen, the render caps bind
   where they are supposed to — and a **measure** is a timing, printed with the machine it came from and
   never failed on, because "a maximum observed on one device does not become a promise that a slower
-  reader's machine will break". Measured here: profile A's cold page reached ink in **100 ms**, which is *at*
-  §6's bar and not under it; four canvases and four slots were the most mounted anywhere in a forty-step
-  pass; profile B's pages paint at **25 % ink** where a text page manages 0.5 %. The most useful number is
-  the one about which ceiling applies: at dpr 2 and 500 % zoom a letter page would want 48.5 MP, the
+  reader's machine will break". Measured here: four canvases and four slots were the most mounted anywhere in a
+  forty-step pass; profile B's pages paint at **25 % ink** where a text page manages 0.5 %. The most useful
+  number is the one about which ceiling applies: at dpr 2 and 500 % zoom a letter page would want 48.5 MP, the
   screen-relative cap on a 1280×900 display says 13.8 MP, the canvas came back at 13.8 MP rendered at
   **1.07× instead of 2×**, and the page still painted — degradation, not a dead tab. The script reads all
   three ceilings out of `src/lib/canvas.ts` rather than copying them, because a benchmark that hard-codes the
   ceiling it checks would pass the day someone lowers it.
+  **One number in that paragraph was wrong, and this is where the correction is recorded rather than in a
+  silently edited line.** The cold page was reported at 100 ms — exactly §6's bar, which should have been the
+  first clue. The harness was watching the first canvas in the DOM for ink, and during a jump to page 500 that
+  is a page other than the one under test; the wait returned as soon as *anything* had pixels on it, so the
+  timing recorded how long the jump took and not how long the render did. Measured page-scoped on 2026-10-04,
+  profile A's cold page is a **147 ms median (124–199 ms of five samples)** in the committed record, above
+  §6's 100 ms bar on this machine, and it is written into the record as a miss beside the bar it missed.
+  Nothing about the bar changed: a baseline is not a target, and this one does not even reach it.
 - **`scan-sample.pdf`, generated.** Twelve pages, each one 2550×3300 DeviceRGB scan drawn onto a letter box
   — 0.82 MB tracked, 8.4 MP per page once decoded, and **no text operators at all**, which `scan.test.ts`
   asserts through the engine rather than trusting the generator: a fixture that quietly grew a text layer
@@ -202,8 +634,28 @@ emulated one instead of underneath it.
   third of a scroll failed on profile A for a reason that was not a leak — its pages have three different
   boxes, so the later third simply had bigger canvases; the count of canvases still held is the
   box-independent shape of the claim.
-- **Still open:** profiles C (vector-heavy) and D (low-memory device) have no fixture, and the report prints
-  that as a note per profile rather than leaving the section silent.
+- **Profiles C and D have fixtures now, and the notes that said they did not are gone.** What remains open on
+  this section is the part that cannot be run from here: §6 asks profile D for a real mobile-device validation
+  beside the harness (tasks #141, #156), and every number above came from one Windows laptop with a
+  13th/14th-generation Core i5 in it — the `browser` job that would run `npm run bench` on a runner has still
+  never executed (#194). A committed record from one machine is honest evidence about that machine, which is
+  exactly what §6 allows and no more.
+- **What W8 fed to its own guards, and what came back.** Thirty-two perturbations, each one the negation of a
+  clause this pass claims to prove, each applied alone and the file restored and md5-verified afterwards: four
+  against the thumbnail card (the measured width, the pixel ratio, the leave-visible cancellation, the label),
+  two against the text layer's rebuild counter, four against rotation (the layer identity, the double-render,
+  the destroy set, the reducer), two against the yield bound, four against the attachment fixture, seven
+  against the oversize row — including removing the minimum-scale check from `resolveRenderScale` itself and
+  shrinking the fixture's 200,000-point page to one that fits — and nine against the benchmark record, down to
+  deleting the file so the message that comes back is "run `npm run bench`". Every one fired on the test that
+  owns it, and two of them fired on a *premise* rather than a behaviour: the generator refusing to emit a page
+  whose verdict its own ceilings no longer imply, and the same refusal for a sheet under the operator floor.
+  Both new generators were run twice and byte-compared, because a fixture that drifts between runs cannot carry
+  a hash worth checking. The suite is **1,019 tests in 107 files** (from 985 in 100 — #203 takes one back out), `typecheck`, `build`,
+  `check:packaging`, `check:examples`, `check:maturity` and `check:fr-evidence` all pass, and `npm run verify`
+  stops at `size` for the one reason it is meant to: core at 30.68 kB against the accepted 29.09 kB baseline
+  and `edit` at 6.43 kB of its 6 kB ceiling, which is decision #208 and not something a gate should be talked
+  out of.
 
 ## [0.11.0] — 2026-10-01
 

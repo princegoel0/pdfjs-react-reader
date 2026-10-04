@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { formatLabel } from '../lib/labels';
 import { FeaturePart, FeatureRunners } from './FeatureHost';
 import { LabelsContext } from './labels-context';
@@ -20,8 +20,24 @@ import { useViewer } from './ViewerContext';
  * out of step with the shell's state.
  */
 
-/** The viewer frame. Everything else in a layout belongs inside this. */
-export function ViewerRoot({ children }: { children: ReactNode }) {
+/**
+ * The viewer frame. Everything else in a layout belongs inside this.
+ *
+ * `className` and `style` are the two props a part is allowed to take, because they are the arrangement the
+ * host owns and the controller cannot know: the shell's own frame classes and theme tokens stay, and what
+ * the host passes is added to them — the style last, so a host laying the frame out as a grid gets a grid.
+ * `PdfViewer` reaches the same two fields through its own props; a part is the same door with the knobs the
+ * layout needed.
+ */
+export function ViewerRoot({
+  children,
+  className,
+  style,
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}) {
   const {
     labels,
     features,
@@ -40,8 +56,8 @@ export function ViewerRoot({ children }: { children: ReactNode }) {
     <LabelsContext.Provider value={labels}>
       <div
         ref={rootRef}
-        className={rootClassName}
-        style={rootStyle}
+        className={className ? `${rootClassName} ${className}` : rootClassName}
+        style={style ? { ...rootStyle, ...style } : rootStyle}
         onKeyDown={onKeyDown}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -79,7 +95,6 @@ export function ViewerToolbar() {
     pageLayout,
     setPageLayout,
     rotate,
-    ink,
     docLabel,
     zoomLabel,
     featureItems,
@@ -115,13 +130,6 @@ export function ViewerToolbar() {
       pageLayout={pageLayout}
       onPageLayoutChange={setPageLayout}
       onRotate={rotate}
-      drawMode={ink.drawing}
-      onDrawToggle={() => ink.setDrawing(!ink.drawing)}
-      inkSettings={ink.settings}
-      onInkSettingsChange={ink.updateSettings}
-      onInkUndo={ink.undo}
-      onInkClear={ink.clear}
-      inkCanUndo={ink.strokes.length > 0}
       docLabel={docLabel}
       zoomLabel={zoomLabel}
       featureItems={featureItems}
@@ -133,15 +141,17 @@ export function ViewerToolbar() {
   );
 }
 
-/** The sidebar: thumbnails, or whatever panel the mounted features contribute. */
-export function ViewerSidebar() {
+/**
+ * The sidebar: the shell's tabbed panel, or whatever a host puts in it.
+ *
+ * With no children the tabs are the viewer's own — thumbnails, then every mounted feature's panel — and
+ * which one is open is controller state, so a host does not track it. With children the host has said what
+ * the sidebar holds, so there is nothing to switch between and the strip is not drawn; the region name, the
+ * close control and Escape are still the shell's, which is the part worth having a component for.
+ */
+export function ViewerSidebar({ children }: { children?: ReactNode } = {}) {
   const {
-    doc,
-    numPages,
-    currentPage,
-    rotation,
-    pageRotations,
-    scrollToPage,
+    labels,
     sidebarOpen,
     setSidebarOpen,
     sidebarTab,
@@ -152,25 +162,24 @@ export function ViewerSidebar() {
     store,
   } = useViewer();
 
+  if (children !== undefined) {
+    return (
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
+        {children}
+      </Sidebar>
+    );
+  }
+
   return (
     <Sidebar
       open={sidebarOpen}
+      tabs={[{ id: 'thumbnails', label: labels.thumbnailsTab }, ...featurePanels]}
       tab={sidebarTab}
       onTabChange={setSidebarTab}
       onClose={() => setSidebarOpen(false)}
-      extraTabs={featurePanels}
     >
       {sidebarTab === 'thumbnails' ? (
-        doc && (
-          <ThumbnailList
-            doc={doc}
-            numPages={numPages}
-            currentPage={currentPage}
-            rotation={rotation}
-            pageRotations={pageRotations}
-            onSelectPage={(page) => scrollToPage(page)}
-          />
-        )
+        <ThumbnailList />
       ) : activePanelFeature && ActivePanel ? (
         <FeaturePart feature={activePanelFeature} store={store}>
           <ActivePanel />
@@ -195,7 +204,6 @@ export function ViewerPages() {
     resolvedScale,
     rotation,
     pageRotations,
-    gap,
     devicePixelRatio,
     renderPixels,
     contentVersion,
@@ -207,8 +215,6 @@ export function ViewerPages() {
     activeLocalByPage,
     navigateToActiveAt,
     pageProps,
-    ink,
-    commitFor,
     handlePageError,
     pageRetries,
     passwordPrompt,
@@ -253,48 +259,64 @@ export function ViewerPages() {
           className="pjsr-spacer"
           style={{ height: totalHeight, width: `max(100%, ${Math.ceil(maxRowWidth)}px)` }}
         >
+          {/*
+           * FR-08: a row is a box the shell paints, not a parent the pages live in.
+           *
+           * They used to be children of the row, and a layout switch then destroyed pages: switching to a
+           * spread moves page 2 out of the row keyed 2 and into the row keyed 1, and React cannot move a
+           * mounted component between parents — so the canvas it had rendered, its editor state and its
+           * scroll anchor went with the old element, and a reader who picked two-up watched every other page
+           * go blank and repaint. Now the row is an empty sheet-sized box and the pages are its siblings,
+           * keyed by page index, which is the one identity a regrouping never changes. The geometry the
+           * browser used to do with flexbox comes from the virtualizer as numbers.
+           */}
           {virtualSlots.map((slot) => (
             <div
-              key={slot.indices[0]}
+              key={slot.pageNumber}
               className="pjsr-page-slot"
               style={{
                 width: slot.width,
                 height: slot.height,
                 transform: `translate(-50%, ${slot.offsetTop}px)`,
               }}
-            >
-              <div className="pjsr-page-row" style={{ gap }}>
-                {slot.indices.map((index) => (
-                  <div key={index} className="pjsr-page">
-                    <PdfPage
-                      doc={doc}
-                      pageNumber={index + 1}
-                      scale={resolvedScale}
-                      rotation={rotation + (pageRotations[index] ?? 0)}
-                      devicePixelRatio={devicePixelRatio}
-                      maxRenderPixels={renderPixels}
-                      contentVersion={contentVersion}
-                      optionalContentConfig={optionalContentConfig}
-                      className="pjsr-page-canvas"
-                      highlights={matchesByPage.get(index)}
-                      activeHighlight={activeLocalByPage.get(index) ?? -1}
-                      navigateToActiveAt={navigateToActiveAt}
-                      linkService={linkService}
-                      {...pageProps}
-                      inkStrokes={ink.strokesForPage(index)}
-                      inkDrawing={ink.drawing}
-                      inkSettings={ink.settings}
-                      onInkCommit={commitFor(index)}
-                      onBaseDimensions={reportPageDims}
-                      // Before `{...pageProps}`, so a host writing their own retry state keeps it.
-                      retryToken={pageRetries[index + 1] ?? 0}
-                      onError={handlePageError}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+            />
           ))}
+          {virtualSlots.flatMap((slot) =>
+            slot.pages.map((page) => (
+              <div
+                key={page.index}
+                className="pjsr-page"
+                style={{
+                  width: page.width,
+                  height: page.height,
+                  transform: `translate(calc(-50% + ${
+                    page.left + page.width / 2 - slot.width / 2
+                  }px), ${slot.offsetTop + page.top}px)`,
+                }}
+              >
+                <PdfPage
+                  doc={doc}
+                  pageNumber={page.pageNumber}
+                  scale={resolvedScale}
+                  rotation={rotation + (pageRotations[page.index] ?? 0)}
+                  devicePixelRatio={devicePixelRatio}
+                  maxRenderPixels={renderPixels}
+                  contentVersion={contentVersion}
+                  optionalContentConfig={optionalContentConfig}
+                  className="pjsr-page-canvas"
+                  highlights={matchesByPage.get(page.index)}
+                  activeHighlight={activeLocalByPage.get(page.index) ?? -1}
+                  navigateToActiveAt={navigateToActiveAt}
+                  linkService={linkService}
+                  {...pageProps}
+                  onBaseDimensions={reportPageDims}
+                  // Before `{...pageProps}`, so a host writing their own retry state keeps it.
+                  retryToken={pageRetries[page.pageNumber] ?? 0}
+                  onError={handlePageError}
+                />
+              </div>
+            )),
+          )}
         </div>
       )}
     </div>

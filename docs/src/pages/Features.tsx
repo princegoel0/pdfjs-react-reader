@@ -71,7 +71,9 @@ export function Features() {
               <code>pdfjs-react-reader/features/outline</code>
             </td>
             <td>
-              The bookmarks sidebar tab. Without it the sidebar has one tab, not two disabled ones.
+              The bookmarks sidebar tab. A click lands where the bookmark points, not merely on the page it
+              names — the destination’s own position, and its magnification when it asks for one. Without this
+              feature the sidebar has one tab, not two disabled ones.
             </td>
             <td>
               <code>pdfjs-react-reader/outline.css</code>
@@ -119,8 +121,8 @@ export function Features() {
               three tools — highlight, free text, ink — a highlight colour from the engine&apos;s own
               palette, and a Delete enabled only while a mark is selected. The marks are PDF
               annotations, so they go back into the file on save and survive zoom, rotation and
-              scrolling a page out of the way. It takes the shell&apos;s freehand toggle&apos;s place
-              in the bar rather than sitting next to it, because this is the ink that saves.
+              scrolling a page out of the way. It is the only ink the package draws (FR-18 withdrew the core freehand
+              surface), and this is the one that saves.
             </td>
             <td>
               <code>pdfjs-react-reader/annotate.css</code>
@@ -225,7 +227,9 @@ const edit = createEditFeature({ fileName: 'contract-edited.pdf' });
       <p>
         A <code>create*Feature</code> factory exists for each feature with a knob:{' '}
         <code>{'scale'}</code> for print, <code>{'fileName'}</code> for download and for the edit tier,{' '}
-        <code>{'onChange'}</code> for forms. Options are
+        <code>{'onChange'}</code> for forms, and <code>{'signal'}</code> for the edit tier — an{' '}
+        <code>AbortSignal</code> that stops a writer pass between its pages, which is the one operation long
+        enough to want it. Options are
         plain data on the feature value, so the component the shell mounts stays
         the same component between renders.
       </p>
@@ -242,6 +246,7 @@ const edit = createEditFeature({ fileName: 'contract-edited.pdf' });
       <pre>
         <code>{`type PdfFeature<S> = {
   id: string;              // keys the Runner, and the name peers look you up by
+  dependsOn?: string[];    // features this one requires, validated before anything mounts
   Runner?: ComponentType;  // the only place a feature may call hooks
   controls?: Array<{       // toolbar items, folded by the same planner as the built-ins
     id: string;
@@ -250,9 +255,12 @@ const edit = createEditFeature({ fileName: 'contract-edited.pdf' });
     available?(state, shell): boolean;
     render: ComponentType;
   }>;
+  replaces?: string[];     // built-in control ids this feature takes over
   panel?: { id: string; label(labels, state): string; render: ComponentType };
   keys?: Array<{ key: string; ctrl?: boolean; when?(state, shell): boolean; run(state, shell, event) }>;
   pageProps?(state): FeaturePageProps;  // merged into every rendered page
+  stylesheets?: string[];  // the sheets your chrome needs, declared rather than assumed
+  cleanup?(): void;        // releases what the Runner never held
 }`}</code>
       </pre>
 
@@ -282,7 +290,7 @@ const edit = createEditFeature({ fileName: 'contract-edited.pdf' });
       <ul>
         <li>
           <code>usePdfFeatureShell()</code> — the document, page, zoom and rotation,{' '}
-          <code>scrollToPage</code>, the ink on each page, <code>reportError</code>, the resolved labels,
+          <code>scrollToPage</code>, <code>reportError</code>, the resolved labels,
           and <code>documentLabel</code>.
         </li>
         <li>
@@ -341,6 +349,73 @@ export const progressFeature: PdfFeature = {
         and the styles silently missing. <code>{'sideEffects: ["**/*.css"]'}</code> is what exempts them
         from the shaking.
       </p>
+
+      <h2>Registration is validated, not hoped over</h2>
+      <p>
+        A feature list is checked before a single Runner mounts, and three shapes of list are refused
+        with <code>PdfError</code> whose <code>code</code> is <code>CONFIGURATION_ERROR</code>: two
+        features under one <code>id</code>, a <code>dependsOn</code> naming a feature that is not in the
+        list, and a dependency cycle. The message names the feature and the problem, and{' '}
+        <code>details.problem</code> says which of the three it was — <code>{'duplicate-id'}</code>,{' '}
+        <code>{'missing-dependency'}</code>, <code>{'dependency-cycle'}</code> — so a host can branch on
+        it without reading prose.
+      </p>
+      <p>
+        The refusal throws rather than calling <code>onError</code>, because it is a mistake in a
+        component tree rather than something that happened to a document: the viewer renders nothing, and
+        the error reaches your error boundary with the feature id in it. A duplicate is refused rather
+        than resolved because two features under one id leave a control reading state that belongs to
+        neither copy, and that is discovered by losing work rather than by an error.
+      </p>
+      <pre>
+        <code>{`import { orderFeatures } from 'pdfjs-react-reader';
+
+// The shell does this itself. You need it only to build your own bar, or your own
+// mergeFeaturePageProps call, from the same order the Runners were mounted in.
+const list = [markupFeature, formsFeature, printFeature]; // markupFeature: dependsOn ['forms']
+
+orderFeatures(list);
+// → [forms, markup, print]: the dependency first, and everything else in the order written.
+// A list with no dependencies at all comes back as the very array you passed.`}</code>
+      </pre>
+      <p>
+        Registration order is the order the shell resolves every tie in: which Runner initialises first,
+        which feature has the last word on a page contribution (the later one), which of two
+        equal-priority controls stays in the bar when it folds, and which feature claims a chord both of
+        them bind (the first one). Where two features have no dependency between them, that order is the
+        order you wrote.
+      </p>
+
+      <h2>Lifecycle, stylesheets, and what a feature may import</h2>
+      <ul>
+        <li>
+          <strong>A feature&apos;s stylesheet is declared, not discovered.</strong>{' '}
+          <code>stylesheets</code> on the value lists the published specifiers its chrome needs —
+          <code>pdfjs-react-reader/annotate.css</code> and so on, never the core sheet, which every shell
+          consumer imports anyway. The shell does not load them: CSS has no runtime import a bundler can
+          tree-shake, so the application does, and the field exists so that decision can be read off the
+          list before anything is registered. The built-ins are cross-checked against the package&apos;s
+          export map, so a declaration that names an unpublished sheet — or a tier that stops declaring
+          one it needs — fails the build.
+        </li>
+        <li>
+          <strong>Cleanup is for what outlives the component.</strong> The shell calls{' '}
+          <code>cleanup</code> once when a feature leaves the list or the viewer unmounts, after retiring
+          the state peers read. It runs <em>before</em> that feature&apos;s Runner effect cleanups,
+          because that is how React tears a deleted subtree down, so a resource the Runner acquired
+          belongs in the Runner and <code>cleanup</code> belongs to what it never held — an object URL
+          kept across documents, a module-level table. None of the built-ins needs one.
+        </li>
+        <li>
+          <strong>A feature cannot reach upward, and cannot reach sideways.</strong> No module under{' '}
+          <code>src/lib</code>, <code>src/headless</code> or <code>src/components</code> imports a tier,
+          which is what keeps an unused feature out of your bundle; <code>npm run size</code> proves it
+          from the built artifact and a source test names the import if it ever appears. And a feature
+          never imports another feature: peers are read by <code>id</code> through{' '}
+          <code>usePdfFeaturePeer</code>, with <code>src/lib/feature-ids.ts</code> as the string-only module
+          that makes naming a peer possible without pulling it in.
+        </li>
+      </ul>
 
       <h2>The Pages tab, in its own words</h2>
       <p>

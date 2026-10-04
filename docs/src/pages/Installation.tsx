@@ -25,7 +25,11 @@ npm install @cantoo/pdf-lib`}</code>
         <a href="#/compatibility">Versions &amp; compatibility</a> for why v4 is excluded and why the
         6.x floor is 6.2.108. React 18 or 19 is required. The build is dual —{' '}
         <code>"type": "module"</code> with a <code>.cjs</code> and a <code>.d.cts</code> beside every{' '}
-        <code>.js</code> — so a <code>require()</code> host and an <code>import</code> host both resolve
+        <code>.js</code> — so a <code>require()</code> host and an <code>import</code> host both resolve,
+        on Node <code>&gt;=22.13.0</code>. That floor is where both halves of the promise come from: every
+        <code>pdfjs-dist</code> release in the advertised range declares <code>engines.node</code> starting
+        at <code>22.13.0</code> itself, and loading an ESM-only peer from <code>require()</code> stopped
+        needing a flag at <code>22.12.0</code>, one minor before the floor.
         it (see <a href="#/compatibility">Versions &amp; compatibility</a> for the one limit that belongs
         to Node rather than to this package).
       </p>
@@ -67,7 +71,7 @@ import 'pdfjs-react-reader/edit.css';`}</code>
       <h2>Optional capabilities</h2>
       <p>
         <code>{'<PdfViewer src="/a.pdf" />'}</code> is a viewer that reads: pages, selectable text,
-        search, thumbnails, ink, zoom and rotation. Print, save, fillable form widgets, the bookmarks
+        search, thumbnails, zoom and rotation. Print, save, fillable form widgets, the bookmarks
         tab, the layers panel, the attachments panel, marking the document up, moving or flattening
         whole pages, and reading a tagged document's structure tree are features you add,
         because they are imports and an import is the only thing

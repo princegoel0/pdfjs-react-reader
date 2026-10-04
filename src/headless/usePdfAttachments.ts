@@ -1,12 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PdfError, toPdfError } from '../lib/errors';
-import { attachmentMimeType, normalizeAttachments, type AttachmentInfo } from '../lib/attachments';
+import {
+  attachmentMimeType,
+  collectAnnotationAttachments,
+  mergeAttachments,
+  normalizeAttachments,
+  type AttachmentInfo,
+} from '../lib/attachments';
 import { downloadBytes } from '../lib/download';
 
 export interface UsePdfAttachmentsOptions {
   doc: PDFDocumentProxy | null;
   onError?: (error: PdfError) => void;
+  /**
+   * Stops the walk over the pages. Listing the files a document carries became a per-page operation the day
+   * FR-25's annotation-carried clause had to be met, and an operation whose length belongs to the document is
+   * one a host must be able to end — FR-36's rule, on the one read in this package that had no long form.
+   */
+  signal?: AbortSignal;
 }
 
 export interface UsePdfAttachmentsResult {
@@ -43,25 +55,33 @@ export function usePdfAttachments(options: UsePdfAttachmentsOptions): UsePdfAtta
     if (!doc) return;
     let cancelled = false;
     setLoading(true);
+    // The host's token and this effect's own teardown become one signal, so a walk abandoned either way stops
+    // at the page it is on rather than at the end of the document.
+    const controller = new AbortController();
+    const stop = () => controller.abort();
+    if (options.signal?.aborted === true) stop();
+    else options.signal?.addEventListener('abort', stop, { once: true });
 
-    doc
-      .getAttachments()
-      .then((result) => {
-        if (cancelled) return;
-        setFiles(normalizeAttachments(result));
-        setLoading(false);
-      })
+    (async () => {
+      const named = normalizeAttachments(await doc.getAttachments());
+      const carried = await collectAnnotationAttachments(doc, controller.signal);
+      if (cancelled) return;
+      setFiles(mergeAttachments(named, carried));
+      setLoading(false);
+    })()
       .catch((reason: unknown) => {
-        if (cancelled) return;
+        if (cancelled || controller.signal.aborted) return;
         setError(toPdfError(reason));
         setFiles(null);
         setLoading(false);
-      });
+      })
+      .finally(() => options.signal?.removeEventListener('abort', stop));
 
     return () => {
       cancelled = true;
+      stop();
     };
-  }, [doc]);
+  }, [doc, options.signal]);
 
   const download = useCallback(
     (id: string) => {

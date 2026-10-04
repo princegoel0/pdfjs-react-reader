@@ -2,7 +2,7 @@ import type { PdfError } from '../lib/errors';
 import { LayersView } from '../components/LayersView';
 import { usePdfFeaturePublish, usePdfFeatureShell, usePdfFeatureState } from '../components/FeatureHost';
 import { usePdfOptionalContent } from '../headless/usePdfOptionalContent';
-import { LAYERS_FEATURE_ID } from './ids';
+import { LAYERS_FEATURE_ID } from '../lib/feature-ids';
 import type { PdfFeature } from '../lib/features';
 import type { OptionalContentRow } from '../lib/optional-content';
 
@@ -51,6 +51,7 @@ function LayersPanel() {
  */
 export const layersFeature: PdfFeature<LayersFeatureState> = {
   id: LAYERS_FEATURE_ID,
+  stylesheets: ['pdfjs-react-reader/layers.css'],
   Runner: LayersRunner,
   panel: {
     id: LAYERS_FEATURE_ID,

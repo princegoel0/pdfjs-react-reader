@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  The engine-only harness page, opened by `npm run bench` for §6's profile C.
+
+  Profile C's target asks for "engine render time reported separately" from "viewer main-thread work
+  attributable to our layer", and the only way to separate two costs is to run one of them alone. This page is
+  that run: the same fixture, the same engine, the same canvas, and none of the viewer. `src/raw-render.ts`
+  writes what it measured to `window.__rawEngine`; nothing here is a product surface, and nothing in the
+  product imports it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>pdfjs-react-reader — engine-only harness</title>
+    <style>
+      body {
+        margin: 0;
+        background: #525659;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="sheet"></canvas>
+    <script type="module" src="/src/raw-render.ts"></script>
+  </body>
+</html>

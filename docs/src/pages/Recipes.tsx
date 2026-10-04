@@ -13,7 +13,7 @@ export function Recipes() {
         <code>{`import { usePdfDocument, usePdfPrint } from 'pdfjs-react-reader/headless';
 
 const { doc } = usePdfDocument({ src });
-const print = usePdfPrint({ doc, getInkStrokes });
+const print = usePdfPrint({ doc });
 
 <button disabled={!print.supported || print.isPrinting} onClick={() => print.print({ range: [1, 5] })}>
   {print.isPrinting ? \`Rendering \${Math.round(print.progress * 100)}%\` : 'Print pages 1–5'}
@@ -24,7 +24,7 @@ print.cancel();`}</code>
       </pre>
       <p>
         Each page is rendered at <code>intent: 'print'</code> into a canvas inside a body-level{' '}
-        <code>.pjsr-print</code> container, with freehand ink drawn on top and stored form values
+        <code>.pjsr-print</code> container, with the annotation marks a feature persisted and stored form values
         included. Resolution is chosen from a canvas memory budget rather than hardcoded, because
         every page keeps a live canvas until the dialog closes. The container is torn down and each
         canvas zeroed afterwards — the thing that stops mobile Safari crashing on long documents.
@@ -46,6 +46,14 @@ download.download();
 // Incremental update carrying what is in the annotation storage.
 download.download({ saveEdits: true });`}</code>
       </pre>
+      <p>
+        On a pure-XFA document the commit is <em>refused</em> rather than attempted: the engine’s{' '}
+        <code>saveDocument()</code> cannot rebuild an XFA packet, and it says so by rejecting. The file that
+        arrives is therefore the original, and{' '}
+        <code>{'{ fileName, committed, refused }'}</code> — or <code>onRefused</code>, or the published{' '}
+        <code>refused</code> the built-in control puts in its own name — is what makes that a fact somebody
+        knows instead of a difference nobody notices.
+      </p>
       <p>
         <code>saveEdits</code> uses <code>saveDocument()</code>, which produces an editable form — the{' '}
         <code>/AcroForm</code> dictionary survives, values are written as <code>/V</code> with

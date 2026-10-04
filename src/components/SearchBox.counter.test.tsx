@@ -38,6 +38,7 @@ function stub(over: Partial<PdfFindController>): PdfFindController {
     counts: [0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1],
     pagesWithMatches: 3,
     patternError: null,
+    patternKind: null,
     activeIndex: 0,
     activeSeq: 1,
     complete: true,

@@ -115,31 +115,38 @@ export function HeadlessExample() {
           {error && <p style={{ color: '#ffb4a8', padding: 12 }}>{error.message}</p>}
           {doc && (
             <div style={{ position: 'relative', height: totalHeight }}>
-              {virtualSlots.map((slot) => (
-                <div
-                  key={slot.indices[0]}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: '50%',
-                    transform: `translate(-50%, ${slot.offsetTop}px)`,
-                    display: 'flex',
-                    gap: 10,
-                  }}
-                >
-                  {slot.indices.map((index) => (
-                    <div key={index} style={pageShadow}>
-                      <PdfPage
-                        doc={doc}
-                        pageNumber={index + 1}
-                        scale={resolvedScale}
-                        onBaseDimensions={reportPageDims}
-                        onStatusChange={onPageStatus}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ))}
+              {/*
+               * One element per page, keyed by the page, placed from `slot.pages`. The rows are the
+               * grouping, and a layout switch changes it — a page that is a child of a row changes parent
+               * with it and paints itself again, which is the thing a host gets for free from the shell and
+               * would lose by nesting `PdfPage` inside the row here.
+               */}
+              {virtualSlots.flatMap((slot) =>
+                slot.pages.map((page) => (
+                  <div
+                    key={page.index}
+                    style={{
+                      ...pageShadow,
+                      position: 'absolute',
+                      top: 0,
+                      left: '50%',
+                      width: page.width,
+                      height: page.height,
+                      transform: `translate(calc(-50% + ${
+                        page.left + page.width / 2 - slot.width / 2
+                      }px), ${slot.offsetTop + page.top}px)`,
+                    }}
+                  >
+                    <PdfPage
+                      doc={doc}
+                      pageNumber={page.pageNumber}
+                      scale={resolvedScale}
+                      onBaseDimensions={reportPageDims}
+                      onStatusChange={onPageStatus}
+                    />
+                  </div>
+                )),
+              )}
             </div>
           )}
         </div>

@@ -5,8 +5,8 @@
  * puts `PdfPage` on screen and `PdfPage` wants a page proxy the harness has never been able to invent —
  * that is `#175`, still open. But the page component alone takes a proxy directly, and jsdom runs pdf.js's
  * real `TextLayer` well enough to build its spans, so the subtree an assistive technology actually walks
- * can be audited here: the page's own name, the text layer that sits over it, the marks a search leaves in
- * that layer, and the ink the reader drew. What is *not* real in this file is the engine's annotation and
+ * can be audited here: the page's own name, the text layer that sits over it, and the marks a search leaves
+ * in that layer. What is *not* real in this file is the engine's annotation and
  * structure markup, both faked by the page proxy they are handed — the first answers no annotations, the
  * second is the element `FakeBuilder` builds — so their accessibility belongs to the browser pass that
  * mounted the true ones and to the `0.12` matrix.
@@ -131,18 +131,6 @@ function mountPage() {
           linkService={createPdfLinkService()}
           highlights={[match(0, 0, 0, 7), match(1, 1, 5, 12)]}
           activeHighlight={1}
-          inkStrokes={[
-            {
-              id: 's1',
-              pageIndex: 2,
-              points: [{ x: 10, y: 10 }, { x: 40, y: 30 }],
-              color: '#b42318',
-              width: 2,
-            },
-          ]}
-          inkSettings={{ color: '#b42318', width: 2 }}
-          inkDrawing={false}
-          onInkCommit={vi.fn()}
         />
       </div>
     </div>,

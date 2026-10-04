@@ -9,13 +9,37 @@ export interface SearchOptions {
    * Implies no word-splitting: `^` and `$` mean what the reader wrote.
    */
   regex?: boolean;
+  /**
+   * Ceiling on a regex pattern's length, in UTF-16 code units. Defaults to `DEFAULT_MAX_PATTERN_UNITS`.
+   * Applies to regex mode only, where the pattern is compiled and then run over every page on this thread.
+   */
+  maxPatternUnits?: number;
 }
 
 export interface ResolvedSearchOptions {
   caseSensitive: boolean;
   wholeWord: boolean;
   regex: boolean;
+  /**
+   * Optional here rather than resolved because the trio above is what the shell's toggles become; absent
+   * means `DEFAULT_MAX_PATTERN_UNITS` applies, which `planFind` decides in one place.
+   */
+  maxPatternUnits?: number;
 }
+
+/**
+ * The default bound on a regex pattern, in UTF-16 code units (FR-27).
+ *
+ * Regex execution here is cancellable but neither isolated nor timed: no dedicated worker, no per-page
+ * deadline, because neither is in the `1.0.0` contract. What stops a reader's `(a+)+$` from freezing the
+ * tab is therefore the size of what may be compiled, checked before compilation — a blunt instrument, and
+ * the honest trade for matching on the main thread. Hosts that want a different trade set
+ * `maxPatternUnits`.
+ */
+export const DEFAULT_MAX_PATTERN_UNITS = 256;
+
+/** Why a regex never became a pattern. Two different answers, and a host should not read prose to split them. */
+export type FindPlanError = 'too-long' | 'invalid';
 
 /** A match on a single page, expressed in text-item coordinates. */
 export interface PageMatch {
@@ -123,33 +147,54 @@ export interface FindPlan {
   terms: string[];
   /** The compiled expression, regex mode only. */
   pattern: RegExp | null;
-  /** Set when `pattern` could not be compiled: the one error a search can produce. */
+  /** Set when no pattern was produced: the one error a search can produce. */
   error: string | null;
+  /**
+   * Which kind of error, so a UI can say "too long" and "not a valid expression" differently without
+   * matching on the wording in `error` — which is ours to rephrase.
+   */
+  errorKind: FindPlanError | null;
   /** Carried so a page scan honours case and word settings without re-deriving them. */
   options: ResolvedSearchOptions;
 }
 
 export function planFind(query: string, options: ResolvedSearchOptions): FindPlan {
-  if (query.length === 0) return { terms: [], pattern: null, error: null, options };
+  if (query.length === 0) {
+    return { terms: [], pattern: null, error: null, errorKind: null, options };
+  }
 
   if (options.regex) {
+    const max = options.maxPatternUnits ?? DEFAULT_MAX_PATTERN_UNITS;
+    // `String.length` is the UTF-16 code-unit count this bound is written in. An astral character counts
+    // twice, which is the conservative direction: the limit is about how much work a compiled pattern can
+    // be asked to do, not about how many letters a reader typed.
+    if (query.length > max) {
+      return {
+        terms: [],
+        pattern: null,
+        errorKind: 'too-long',
+        error: `A regular expression is limited to ${max} characters; this one is ${query.length}.`,
+        options,
+      };
+    }
     const flags = options.caseSensitive ? 'g' : 'gi';
     try {
       // No `u` flag: it rejects escapes readers legitimately write, such as an
       // unbraced `{|`, and a search box is not the place to relitigate Annex B.
-      return { terms: [], pattern: new RegExp(query, flags), error: null, options };
+      return { terms: [], pattern: new RegExp(query, flags), error: null, errorKind: null, options };
     } catch (reason) {
       return {
         terms: [],
         pattern: null,
         error: reason instanceof Error ? reason.message : String(reason),
+        errorKind: 'invalid',
         options,
       };
     }
   }
 
   const terms = query.split(/\s+/).filter((term) => term.length > 0);
-  return { terms, pattern: null, error: null, options };
+  return { terms, pattern: null, error: null, errorKind: null, options };
 }
 
 /** All extents of `needle` in `haystack`, with whole-word edges checked by hand. */
@@ -377,8 +422,30 @@ export function invalidatePageText(doc: PDFDocumentProxy, pages?: readonly numbe
 }
 
 /**
- * Extracts text for every page, reporting progress (0..1) and yielding to the
- * event loop periodically so the UI can paint progress updates.
+ * How many pages either index walk reads before it hands the thread back.
+ *
+ * One constant for both paths on purpose. The whole-document utility yielded every five pages and the shell's
+ * scan yielded never, which is the same sentence in two places drifting apart — and the shell's path has a case
+ * where no yield happens at all: a host-supplied index (FR-40) answers each page read from a plain object, so
+ * every `await` in the walk is on an *already-resolved* promise. Those continue in microtasks, and a chain of
+ * microtasks never lets a macrotask run, so a 1,000-page supplied index could hold the thread through the whole
+ * scan while reporting progress nobody got to paint.
+ */
+export const YIELD_PAGES = 5;
+
+/**
+ * Give the event loop one turn: a `setTimeout(0)`, which is a macrotask boundary rather than a microtask hop.
+ *
+ * Internal to the package — it is exported because both walks need the same one, not because a host does: a host
+ * that wants the boundary can await the progress callback it is already given.
+ */
+export function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * Extracts text for every page, reporting progress (0..1) and yielding to the event loop periodically so the UI
+ * can paint progress updates.
  */
 export async function extractAllText(
   doc: PDFDocumentProxy,
@@ -395,7 +462,7 @@ export async function extractAllText(
     if (signal?.aborted) throw abortError('Text indexing was aborted.', 'SEARCH_CANCELLED');
     out[i] = await extractPageText(doc, i);
     onProgress?.((i + 1) / numPages);
-    if (i % 5 === 4) await new Promise((resolve) => setTimeout(resolve, 0));
+    if ((i + 1) % YIELD_PAGES === 0) await yieldToEventLoop();
   }
   return out;
 }

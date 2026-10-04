@@ -61,7 +61,10 @@ export interface PdfViewerProps {
    * document are never retried.
    */
   retry?: RetryPolicy | false;
-  /** Called before each retry wait, so the UI can say "retrying (2 of 3)" instead of spinning. */
+  /**
+   * Called after every retryable failure, last one included, so the UI can say "retrying (2 of 3)" —
+   * and say "gave up" — instead of spinning.
+   */
   onRetryAttempt?: (info: RetryAttemptInfo) => void;
   /**
    * Bytes as they arrive, for a bar that says how far. The shell does not draw one — this is the host's
@@ -169,7 +172,7 @@ export interface PdfViewerProps {
   /** Initial per-page rotation in degrees, keyed by 0-based page index. */
   defaultPageRotations?: Record<number, number>;
   /**
-   * Remove, re-order or add toolbar controls by id — `{ hide: ['draw'],
+   * Remove, re-order or add toolbar controls by id — `{ hide: ['search'],
    * priorities: { layout: 2 }, add: [myControl] }`. The bar's contents are the
    * last thing a host has to take as given, and this is the seam for it.
    * See {@link ToolbarControls}.

@@ -17,7 +17,7 @@ const TOKENS: [string, string, string][] = [
   ['--pjsr-icon', '16px (20px on coarse pointers)', 'Glyph size; tracks control height'],
   ['--pjsr-cluster-gap', '6px (8px on coarse pointers)', 'Gap between toolbar controls'],
   ['--pjsr-row-h', '30px', 'Sidebar tab and outline row height'],
-  ['--pjsr-swatch-hit / --pjsr-caret-w', '32px / 20px', 'Ink swatch tap box, outline caret'],
+  ['--pjsr-caret-w', '20px (32px on coarse pointers)', 'Outline disclosure caret width'],
 ];
 
 export function Theming() {
@@ -120,7 +120,7 @@ export function Theming() {
         Everything is prefixed <code>pjsr-</code> and flat — no CSS modules, no hashed class names —
         so you can also target parts directly when a token is not enough:
         <code>.pjsr-toolbar</code>, <code>.pjsr-page</code>, <code>.pjsr-text-layer</code>,{' '}
-        <code>.pjsr-ink-layer</code>, <code>.pjsr-editor-layer</code>, <code>.pjsr-xfa-layer</code>,{' '}
+        <code>.pjsr-editor-layer</code>, <code>.pjsr-xfa-layer</code>,{' '}
         <code>.pjsr-sidebar</code>, <code>.pjsr-thumbnail</code>,{' '}
         <code>.pjsr-overflow-menu</code>. The print container is <code>.pjsr-print</code> and its
         rules live under <code>@media print</code> in <code>print.css</code>; there is deliberately no{' '}

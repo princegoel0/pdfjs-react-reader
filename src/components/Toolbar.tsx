@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { PageLayout, ScaleMode } from '../lib/layout';
-import type { InkSettings } from '../lib/ink';
 import { planToolbarOverflow } from '../lib/toolbar';
 import type { ToolbarControlConfig } from '../lib/toolbar';
 import { applyControlConfig, mergeToolbarItems } from '../lib/toolbar';
@@ -14,19 +13,17 @@ import {
   parseZoomPercent,
   ZOOM_LEVELS,
 } from '../lib/zoom';
-import { formatLabel, type PdfViewerLabels } from '../lib/labels';
+import { formatLabel } from '../lib/labels';
 import { formatPageLabel, labelsDifferFromNumbers, resolvePageInput } from '../lib/page-labels';
 import { useLabels } from './labels-context';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
-  CloseIcon,
   MaximizeIcon,
   MinimizeIcon,
   MinusIcon,
   MoreIcon,
   PanelLeftIcon,
-  PenIcon,
   PlusIcon,
   RotateCcwIcon,
   RotateCwIcon,
@@ -36,19 +33,6 @@ import {
 export type { PageLayout, ScaleMode };
 
 export { ZOOM_LEVELS } from '../lib/zoom';
-export const INK_COLORS = ['#d92d20', '#4f46e5', '#067647', '#181d27'];
-
-/**
- * The pen widths on offer, each naming the catalog key that words it. The names
- * live in the catalog and not here so that a translated shell has no English
- * fallback left in the control — which also means a fourth entry has to bring
- * its own key rather than a literal.
- */
-export const INK_WIDTHS: { value: number; labelKey: keyof PdfViewerLabels }[] = [
-  { value: 1.5, labelKey: 'penThin' },
-  { value: 3, labelKey: 'penMedium' },
-  { value: 6, labelKey: 'penThick' },
-];
 
 export interface ToolbarProps {
   currentPage: number;
@@ -71,13 +55,6 @@ export interface ToolbarProps {
   pageLayout?: PageLayout;
   onPageLayoutChange?: (layout: PageLayout) => void;
   onRotate?: (delta: number) => void;
-  drawMode?: boolean;
-  onDrawToggle?: () => void;
-  inkSettings?: InkSettings;
-  onInkSettingsChange?: (patch: Partial<InkSettings>) => void;
-  onInkUndo?: () => void;
-  onInkClear?: () => void;
-  inkCanUndo?: boolean;
   /** Document name shown in the bar at wide sizes. */
   docLabel?: string;
   /** Effective zoom as a percentage, e.g. "124%". */
@@ -117,7 +94,7 @@ export interface ToolbarItem {
  * What the application says about the bar's contents.
  *
  * Everything keys on a control's `id`. The built-ins are `sidebar`, `prev`,
- * `page`, `next`, `search`, `draw`, `zoomOut`, `zoomCustom`, `zoomIn`, `fit`,
+ * `page`, `next`, `search`, `zoomOut`, `zoomCustom`, `zoomIn`, `fit`,
  * `rotateCcw`, `rotateCw`, `rotatePage`, `fullscreen`, `layout`, `count` and
  * `meta`; a mounted feature adds its own control id, which is whatever its
  * `controls[].id` says (`print`, `download`, …). An id that is not present —
@@ -171,13 +148,6 @@ export function Toolbar({
   pageLayout = 'continuous',
   onPageLayoutChange,
   onRotate,
-  drawMode = false,
-  onDrawToggle,
-  inkSettings,
-  onInkSettingsChange,
-  onInkUndo,
-  onInkClear,
-  inkCanUndo = false,
   docLabel,
   zoomLabel,
   featureItems,
@@ -378,26 +348,6 @@ export function Toolbar({
           onClick={onSearchToggle}
         >
           <SearchIcon />
-        </button>
-      ),
-    });
-  }
-
-  if (onDrawToggle) {
-    items.push({
-      id: 'draw',
-      priority: 6,
-      label: labels.drawLabel,
-      node: (
-        <button
-          type="button"
-          className="pjsr-button"
-          aria-label={labels.drawOnDocument}
-          aria-pressed={drawMode}
-          title={labels.drawOnDocument}
-          onClick={onDrawToggle}
-        >
-          <PenIcon />
         </button>
       ),
     });
@@ -772,64 +722,6 @@ export function Toolbar({
       )}
 
       {searchOpen && searchContent && <div className="pjsr-search">{searchContent}</div>}
-
-      {drawMode && inkSettings && onInkSettingsChange && (
-        <div className="pjsr-ink" role="group" aria-label={labels.drawingTools}>
-          <span className="pjsr-ink-label">{labels.drawLabel}</span>
-          <div className="pjsr-ink-colors">
-            {INK_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                className={`pjsr-ink-swatch${inkSettings.color === color ? ' pjsr-ink-swatch--active' : ''}`}
-                aria-label={formatLabel(labels.drawWithColor, { color })}
-                aria-pressed={inkSettings.color === color}
-                onClick={() => onInkSettingsChange({ color })}
-              >
-                <span className="pjsr-ink-swatch-dot" style={{ background: color }} />
-              </button>
-            ))}
-          </div>
-          <select
-            className="pjsr-zoom-select"
-            aria-label={labels.penWidth}
-            value={String(inkSettings.width)}
-            onChange={(e) => onInkSettingsChange({ width: Number(e.target.value) })}
-          >
-            {INK_WIDTHS.map((option) => (
-              <option key={option.value} value={String(option.value)}>
-                {labels[option.labelKey]}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="pjsr-button pjsr-button--text"
-            aria-label={labels.undoStroke}
-            disabled={!inkCanUndo}
-            onClick={() => onInkUndo?.()}
-          >
-            {labels.undoLabel}
-          </button>
-          <button
-            type="button"
-            className="pjsr-button pjsr-button--text"
-            aria-label={labels.clearAllDrawings}
-            onClick={() => onInkClear?.()}
-          >
-            {labels.clearLabel}
-          </button>
-          <button
-            type="button"
-            className="pjsr-button"
-            aria-label={labels.exitDrawingMode}
-            title={labels.exitDrawingMode}
-            onClick={onDrawToggle}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-      )}
 
       {sizer}
     </div>

@@ -26,6 +26,7 @@ export {
   type UsePdfVirtualizerOptions,
   type UsePdfVirtualizerResult,
   type VirtualSlot,
+  type VirtualSlotPage,
 } from './headless/usePdfVirtualizer';
 export {
   usePdfSearch,
@@ -44,7 +45,6 @@ export {
   type UsePdfFormValuesOptions,
   type UsePdfFormValuesResult,
 } from './headless/usePdfFormValues';
-export { usePdfInk, type UsePdfInkOptions, type UsePdfInkResult } from './headless/usePdfInk';
 export {
   usePdfPrint,
   isPrintSupported,
@@ -58,6 +58,8 @@ export {
   type UsePdfDownloadOptions,
   type UsePdfDownloadResult,
   type PdfDownloadOptions,
+  type PdfDownloadOutcome,
+  type PdfSaveRefusal,
 } from './headless/usePdfDownload';
 export { usePdfPageLabels } from './headless/usePdfPageLabels';
 export {
@@ -88,18 +90,6 @@ export {
   type FormWidget,
 } from './lib/form';
 export {
-  createStrokeId,
-  drawInkStrokes,
-  pointsBounds,
-  simplifyPoints,
-  strokeBounds,
-  strokePathD,
-  type InkSettings,
-  type InkStroke,
-  type PdfPoint,
-  type ViewportPoint,
-} from './lib/ink';
-export {
   HIGHLIGHT_COLORS,
   HIGHLIGHT_COLOR_PARAM,
   HIGHLIGHT_PALETTE_STRING,
@@ -118,6 +108,7 @@ export {
   convertMatchRanges,
   convertMatches,
   countPerPage,
+  DEFAULT_MAX_PATTERN_UNITS,
   escapeRegExp,
   extractAllText,
   buildTextIndex,
@@ -130,6 +121,7 @@ export {
   type ExternalPageText,
   type ExternalTextIndex,
   type FindPlan,
+  type FindPlanError,
   type PageMatch,
   type PageTextIndex,
   type ResolvedSearchOptions,
@@ -138,9 +130,13 @@ export {
 } from './lib/search';
 export {
   parseDestination,
+  parseDestinationPosition,
+  resolveDestination,
   resolveDestinationPageIndex,
+  type DestinationKind,
   type DestinationRef,
   type OutlineEntry,
+  type PdfDestinationPosition,
 } from './lib/outline';
 export {
   flattenOptionalContent,
@@ -207,11 +203,18 @@ export {
   MAX_RENDER_PIXELS,
   MAX_RENDER_PIXELS_MOBILE,
   MAX_RENDER_SIDE,
+  MIN_RENDER_SCALE,
+  ensureCanvasCeiling,
   isMobileCanvasEnvironment,
   maxRenderPixelsFor,
+  probedCanvasCeiling,
   readCanvasEnvironment,
+  resolveCanvasBudget,
   resolveRenderScale,
+  type CanvasBudget,
+  type CanvasCeilingSource,
   type CanvasEnvironment,
+  type CanvasProbeOptions,
   type RenderScale,
   type RenderScaleOptions,
 } from './lib/canvas';
@@ -231,6 +234,8 @@ export {
   type ScaleMode,
   type LayoutResult,
   type VisibleRange,
+  type PdfPoint,
+  type ViewportPoint,
 } from './lib/layout';
 export {
   formatPageLabel,

@@ -8,14 +8,12 @@
  * what a host asks: can I `require()` every published path, can I `import` them, do the two give me the same
  * names, and does TypeScript find declarations for both.
  *
- * The `require` answer has a boundary that is not ours, and the script reports it rather than asserting one.
- * `pdfjs-dist` is an ESM-only peer — no `exports` map of its own, `main` at `build/pdf.mjs` — so a
- * `require()` that reaches it depends on Node's own support for loading ESM from CommonJS, which landed in
- * a 20.x and a 22.x patch and is not a date to quote from memory. A failure with `ERR_REQUIRE_ESM` is
- * therefore recorded as the peer boundary and the run still passes; anything else — a missing file, a bad
- * specifier, a path that resolves and exports nothing — is a real failure. Which Node versions produce which
- * outcome is what the `packaging` CI job measures across its matrix; the summary line is written to be
- * grepped out of that job's log.
+ * The floor is the contract's, and this script enforces it rather than exploring around it. `pdfjs-dist` is
+ * an ESM-only peer — no `exports` map of its own, `main` at `build/pdf.mjs` — so a `require()` that reaches
+ * it depends on Node's support for loading ESM from CommonJS. That support is unflagged in every version
+ * §8's floor is at or above, so inside the contract an `ERR_REQUIRE_ESM` is a defect and fails the run, and
+ * below the contract the run refuses to happen: a result from Node 20 says nothing about a package that
+ * does not support Node 20, and a check cannot print both "not supported" and a green row for it.
  *
  * The declaration check is the half that a bundler will never tell you about: `types.mts` and `types.cts`
  * hold identical source, and under `NodeNext` the extension alone decides which export condition TypeScript
@@ -35,6 +33,34 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const work = join(root, '.spike', 'tarball-check');
 const consumer = join(work, 'consumer');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+
+/**
+ * Refuse a runtime the package does not support, before it can produce evidence that means nothing.
+ *
+ * Read out of `engines.node` rather than restated here: the floor is one number with three claims on it —
+ * the manifest, §8's table and the CI matrices — and `check:packaging` is what keeps them equal.
+ */
+const floor = /(\d+)\.(\d+)\.(\d+)/.exec(pkg.engines?.node ?? '');
+if (!floor) {
+  console.error(`FAIL  engines.node is ${JSON.stringify(pkg.engines?.node)}, which names no X.Y.Z floor`);
+  process.exit(1);
+}
+const asTuple = (v) => v.split('.').map(Number);
+const [floorMajor, floorMinor, floorPatch] = asTuple(floor[0]);
+const running = asTuple(process.versions.node);
+const below =
+  running[0] < floorMajor ||
+  (running[0] === floorMajor &&
+    (running[1] < floorMinor || (running[1] === floorMinor && running[2] < floorPatch)));
+if (below) {
+  console.error(
+    `FAIL  this is node ${process.versions.node} and the contract floor is ${floor[0]}\n` +
+      `      FR-41 excludes it, so a result from here is not evidence either way. Run on a supported\n` +
+      `      version, or fix the matrix that put you here.`,
+  );
+  process.exit(1);
+}
+console.log(`node ${process.versions.node} is at or above the ${floor[0]} floor`);
 
 /** The specifier a host writes for an export-map key: `"."` is the bare package name. */
 const specifier = (subpath) =>
@@ -130,17 +156,14 @@ const { writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 const cases = ${JSON.stringify(specs, null, 1)};
 const seen = [];
-let boundary = 0;
 for (const specifier of cases) {
   let mod;
   try {
     mod = require(specifier);
   } catch (error) {
-    if (error.code === 'ERR_REQUIRE_ESM') {
-      boundary += 1;
-      console.log('BOUNDARY require(' + specifier + '): ' + error.code + ' from the ESM-only peer');
-      continue;
-    }
+    // Inside the contract floor there is no tolerated require failure. ERR_REQUIRE_ESM here would mean the
+    // floor is wrong — the version this ran on cannot in fact load the package — and that is a finding about
+    // the contract, not a boundary to report politely.
     console.error('FAIL require(' + specifier + '): ' + (error.code ?? '') + ' ' + error.message);
     process.exitCode = 1;
     continue;
@@ -154,10 +177,7 @@ for (const specifier of cases) {
   seen.push(specifier + ' ' + names.join(','));
 }
 writeFileSync(join(__dirname, 'names.cjs.txt'), seen.join('\\n'));
-console.log(
-  '  ' + (boundary ? 'part' : 'ok  ') + '    require(): ' + seen.length + '/' + cases.length + ' paths' +
-    (boundary ? ', ' + boundary + ' stopped at the peer boundary' : ''),
-);
+if (!process.exitCode) console.log('  ok      require(): ' + seen.length + '/' + cases.length + ' paths');
 `,
 );
 
@@ -234,26 +254,41 @@ const fromRequire = readNames('names.cjs.txt');
 const fromImport = readNames('names.esm.txt');
 
 /*
- * The question is whether the two formats disagree. A path the CommonJS probe skipped at the peer boundary
- * is skipped here too, and reported on the summary line instead of treated as a difference.
+ * The question is whether the two formats disagree. There is no third answer any more: a path either
+ * resolves both ways or the run has already failed in the probe, so every path is compared rather than
+ * excused. The size checks are the defensive half — a probe that wrote a short file would otherwise look
+ * like agreement between the paths it did write.
  */
 let drift = 0;
 for (const [spec, esmList] of fromImport) {
   const cjsList = fromRequire.get(spec);
-  if (cjsList === undefined) continue;
+  if (cjsList === undefined) {
+    console.error(`FAIL  ${spec} resolved through import but not through require`);
+    drift += 1;
+    continue;
+  }
   if (cjsList !== esmList) {
     console.error(`FAIL  ${spec} exports differ by format:\n  require: ${cjsList}\n  import:  ${esmList}`);
     drift += 1;
   }
 }
+for (const spec of fromRequire.keys()) {
+  if (!fromImport.has(spec)) {
+    console.error(`FAIL  ${spec} resolved through require but not through import`);
+    drift += 1;
+  }
+}
+if (fromRequire.size !== subpaths.length || fromImport.size !== subpaths.length) {
+  console.error(
+    `FAIL  ${fromRequire.size} required and ${fromImport.size} imported of ${subpaths.length} published paths`,
+  );
+  drift += 1;
+}
 if (drift) process.exit(1);
 
+console.log(`  ok    ${fromRequire.size}/${subpaths.length} paths identical between the two formats`);
 console.log(
-  `  ok    ${fromRequire.size}/${subpaths.length} paths identical between the two formats` +
-    (fromRequire.size === subpaths.length ? '' : ' (the rest stopped at the peer boundary)'),
-);
-console.log(
-  `require-esm-support=${fromRequire.size === subpaths.length ? 'yes' : 'partial'} ` +
-    `(${fromRequire.size}/${subpaths.length} on node ${process.version})`,
+  `require-esm-support=yes (${subpaths.length}/${subpaths.length} on node ${process.versions.node}) — ` +
+    'the floor this ran on is the version that claim is made at',
 );
 console.log(`\nFR-41 proven against ${tarball}: both formats resolve, and declarations resolve in both modes.`);

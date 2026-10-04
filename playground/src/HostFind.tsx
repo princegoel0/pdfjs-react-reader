@@ -73,6 +73,7 @@ export function useHostIndexFind(): PdfFindController {
     counts,
     pagesWithMatches: counts.filter((count) => count > 0).length,
     patternError: null,
+    patternKind: null,
     activeIndex: results.length === 0 ? -1 : Math.min(Math.max(activeIndex, 0), results.length - 1),
     activeSeq,
     search,

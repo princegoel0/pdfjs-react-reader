@@ -13,9 +13,6 @@ export interface PdfViewerLabels {
   nextPage: string;
   pageNumber: string;
   searchDocument: string;
-  drawOnDocument: string;
-  exitDrawingMode: string;
-  drawingTools: string;
   /** Group name for the tools the annotate feature contributes. */
   annotationTools: string;
   highlightTool: string;
@@ -39,13 +36,8 @@ export interface PdfViewerLabels {
   highlightAdded: string;
   freeTextAdded: string;
   inkAdded: string;
-  drawLabel: string;
-  drawWithColor: string;
-  penWidth: string;
-  undoStroke: string;
   undoLabel: string;
-  clearAllDrawings: string;
-  /** The short form on the button; `clearAllDrawings` is its accessible name. */
+  /** The word on a reset button, which is also that button's accessible name. */
   clearLabel: string;
   zoomIn: string;
   zoomOut: string;
@@ -53,6 +45,8 @@ export interface PdfViewerLabels {
   rotateCounterclockwise: string;
   rotateClockwise: string;
   downloadDocument: string;
+  /** Why the saved file will not carry the reader's edits, on a document that cannot take them. */
+  saveRefusedXfa: string;
   /** The `edit` tier's control: save the document with its form values made part of the page. */
   flattenDocument: string;
   printDocument: string;
@@ -191,9 +185,6 @@ export interface PdfViewerLabels {
   overflowRotate: string;
   overflowDownload: string;
   overflowDocument: string;
-  penThin: string;
-  penMedium: string;
-  penThick: string;
 
   // Fullscreen
   enterFullscreen: string;
@@ -217,9 +208,6 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   nextPage: 'Next page',
   pageNumber: 'Page number',
   searchDocument: 'Search document',
-  drawOnDocument: 'Draw on document',
-  exitDrawingMode: 'Exit drawing mode',
-  drawingTools: 'Drawing tools',
   annotationTools: 'Annotation tools',
   highlightTool: 'Highlight',
   freeTextTool: 'Add text',
@@ -229,12 +217,7 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   highlightAdded: 'Highlight added',
   freeTextAdded: 'Text added',
   inkAdded: 'Drawing added',
-  drawLabel: 'Draw',
-  drawWithColor: 'Draw with {color}',
-  penWidth: 'Pen width',
-  undoStroke: 'Undo stroke',
   undoLabel: 'Undo',
-  clearAllDrawings: 'Clear all drawings',
   clearLabel: 'Clear',
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
@@ -242,6 +225,7 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   rotateCounterclockwise: 'Rotate counterclockwise',
   rotateClockwise: 'Rotate clockwise',
   downloadDocument: 'Download document',
+  saveRefusedXfa: 'Edits cannot be saved into this document — its form is XFA.',
   flattenDocument: 'Flatten and download',
   printDocument: 'Print document',
   cancelPrinting: 'Cancel printing',
@@ -353,9 +337,6 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   overflowRotate: 'Rotate',
   overflowDownload: 'Download',
   overflowDocument: 'Document',
-  penThin: 'Thin',
-  penMedium: 'Medium',
-  penThick: 'Thick',
 
   enterFullscreen: 'Enter fullscreen',
   exitFullscreen: 'Exit fullscreen',

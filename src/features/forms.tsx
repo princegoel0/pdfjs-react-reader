@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { usePdfFeatureOptions, usePdfFeaturePublish, usePdfFeatureShell } from '../components/FeatureHost';
 import { usePdfFormValues } from '../headless/usePdfFormValues';
-import { FORMS_FEATURE_ID } from './ids';
+import { FORMS_FEATURE_ID } from '../lib/feature-ids';
 import type { PdfFeature } from '../lib/features';
 import type { AnnotationValueStore, FormValue } from '../lib/form';
 
@@ -61,6 +61,7 @@ function FormsRunner() {
 
 export const formsFeature: PdfFeature<FormFeatureState> = {
   id: FORMS_FEATURE_ID,
+  stylesheets: ['pdfjs-react-reader/forms.css'],
   Runner: FormsRunner,
   pageProps: (state) => ({
     renderForms: true,

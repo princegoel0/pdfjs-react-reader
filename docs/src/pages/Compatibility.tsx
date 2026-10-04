@@ -193,12 +193,14 @@ export function Compatibility() {
               <code>.cjs</code> with a <code>.d.ts</code> and a <code>.d.cts</code> beside them, and the
               export map answers <code>import</code> and <code>require</code> separately. So a{' '}
               <code>require()</code>-only toolchain — Jest without ESM enabled, an older Node build
-              script — resolves the package instead of failing to. One limit is Node&apos;s rather than
-              ours: <code>pdfjs-dist</code> is an ESM-only peer with no <code>exports</code> map, so a{' '}
-              <code>require()</code> that reaches it works only on a Node new enough to load ESM from
-              CommonJS. The <code>packaging</code> CI job measures which versions those are, on a matrix,
-              and prints <code>require-esm-support=…</code>; nothing here quotes a version that job has
-              not confirmed.
+              script — resolves the package instead of failing to. The one limit is Node&apos;s rather
+              than ours: <code>pdfjs-dist</code> is an ESM-only peer with no <code>exports</code> map, so
+              a <code>require()</code> that reaches it needs a Node that can load ESM from CommonJS. That
+              stopped being a question at <code>22.12.0</code>, which is why the floor below excludes
+              everything older: inside the advertised range, <code>require()</code> works, and{' '}
+              <code>npm run check:tarball</code> proves it by installing the published tarball into a
+              CommonJS project and resolving every path both ways —<code>ERR_REQUIRE_ESM</code> fails
+              that check rather than being excused.
             </td>
           </tr>
           <tr>
@@ -219,9 +221,13 @@ export function Compatibility() {
             </td>
           </tr>
           <tr>
-            <td>Node (developing only)</td>
+            <td>Node (build toolchain and host-side import)</td>
             <td>
-              <code>&gt;=20</code>. Not a runtime requirement — the library is browser code.
+              <code>&gt;=22.13.0</code>. The library is browser code, so this is not a claim about where
+              it renders: it is where <code>require()</code> of an ESM-only peer works without a flag and
+              where the engine itself says it runs. Node 20 and 22.0–22.12 are outside the promise, and{' '}
+              <code>npm run check:packaging</code> fails if <code>package.json</code>, this document&apos;s
+              floor and the CI matrices ever state three different numbers.
             </td>
           </tr>
           <tr>
@@ -250,8 +256,8 @@ export function Compatibility() {
 
       <h2>Browsers</h2>
       <p>
-        The support targets are Chrome ≥ 90, Safari ≥ 14, Firefox ≥ 90 and Edge ≥ 90. Be aware of
-        what that does and does not mean:
+        The floors are <code>PRD.md</code> §8&apos;s: Chrome and Edge 125, Safari and iOS Safari 18, Firefox
+        124 (provisional). Be aware of what that does and does not mean:
       </p>
       <table className="doc-table">
         <thead>
@@ -271,30 +277,59 @@ export function Compatibility() {
               <code>ArrowRight</code> exemption, wheel zoom against plain scroll, pinch against two-finger
               pan, forced colours, and uncaught errors — through Chromium 153 at 1280×900 and 375×812 dpr 2:{' '}
               <strong>23 ok, 1 skip</strong>, and the skip is that mobile emulation gives the page no wheel
-              events at all. Every responsive, printing and form check in the log was run here too.
+              events at all. Every responsive, printing and form check in the log was run here too. The engine
+              is Chromium 153 against §8&apos;s floor of 125, so this is the current build passing, not the
+              floor pinned.
             </td>
           </tr>
           <tr>
-            <td>WebKit / Safari 14+</td>
+            <td>WebKit / Safari 18</td>
             <td>
-              Targeted, not verified. The CSS ships <code>@media</code> fallbacks alongside every{' '}
-              <code>@container</code> rule precisely because Safari 14 has no container queries, and{' '}
-              <code>overflow: clip</code> has a <code>hidden</code> fallback for the same reason.
+              Runs now, and passes. WebKit 26 takes the same thirteen claims through <code>npm run
+              test:browsers</code>: <strong>12 ok</strong> at 1280×900 — including forced colours and the
+              1,000-page walk — and <strong>10 ok, 2 skip</strong> at 375×812, where both skips belong to the
+              emulation rather than the viewer: the profile dispatches no wheel events and exposes no{' '}
+              <code>Touch</code> constructor to synthesise a pinch from. That is not the floor §8 claims
+              either. Its Safari row asks for a reproducible Safari 18 / WebKit runner, and its own policy is
+              that a current browser passing the suite does not certify an older floor — and a Linux WebKit is
+              not macOS Safari. The <code>@media</code> fallbacks beside every <code>@container</code> rule and
+              the <code>overflow: clip</code> → <code>hidden</code> fallback were written for a Safari 14 target
+              that the 2026-10-02 lock replaced: at a floor of 18, container queries and <code>overflow: clip</code>
+              are both available, so those branches are margin rather than requirement, and nothing in this
+              matrix or in any test exercises them either way.
             </td>
           </tr>
           <tr>
-            <td>Gecko / Firefox 90+</td>
-            <td>Targeted, not verified.</td>
+            <td>Gecko / Firefox 124</td>
+            <td>
+              Runs now, and passes: Firefox 155 takes <strong>12 ok</strong> in the desktop profile and{' '}
+              <strong>10 ok, 2 skip</strong> in the mobile one, with the same two skips and the same reasons.
+              §8&apos;s floor is 124, which no runner here produces — Playwright installs its current build —
+              so by that table&apos;s execution policy the floor is still unverified even though the engine has
+              finally started. A screen-reader pass with NVDA (FR-45) is Firefox evidence of a different kind
+              and has not happened.
+            </td>
+          </tr>
+          <tr>
+            <td>Edge 125</td>
+            <td>
+              Nothing. Edge is inside the contract above and §8 keeps its own row for it, unverified: no check has
+              ever run in Edge, on any machine, here or on CI. Its engine is Chromium&apos;s, which is the
+              reason the Chromium results suggest it works and not the reason to say so.
+            </td>
           </tr>
         </tbody>
       </table>
       <div className="doc-callout">
-        If you are evaluating this for a Safari-critical product, treat the WebKit row as the thing
-        to test first. The layout code avoids <code>:has()</code> and <code>dvh</code> without a
-        fallback for exactly that reason, but no measurement has been taken there.{' '}
-        <code>npm run test:browsers</code> is written for all three engines and a CI job runs it on
-        Linux, where WebKit and Firefox do start; locally neither of them would launch, so those two
-        rows are still a target rather than a result, and the job behind them has never run.
+        If you are evaluating this for a Safari-critical product, the WebKit row is the closest thing to
+        evidence you will find here, and it is still not a device pass. The layout code avoids{' '}
+        <code>:has()</code> and <code>dvh</code> without a fallback — a leftover from the 90/14 target rather
+        than something the 125/18 floors ask for, since both features are older than Safari 18, and no test
+        would notice if either were used, and the{' '}
+        <code>npm run test:browsers</code> job — locally and, once it runs, on CI&apos;s Linux runner — drives
+        all three engines and classifies a browser that cannot start as <code>unverified</code> rather than
+        passed. What remains outside it is what a Linux runner cannot produce: a pinned old-version floor,
+        macOS Safari, Edge, and iOS or Android hardware.
       </div>
 
       <h2>Bundle size</h2>
@@ -476,9 +511,9 @@ export function Compatibility() {
               an English word.
             </td>
             <td>
-              Quote a phrase if you want a phrase. If you render the pen widths yourself, read{' '}
-              <code>labels[option.labelKey]</code> — the array no longer holds text you can show, which
-              is the point: it never held your language.
+              Quote a phrase if you want a phrase. The pen-width half no longer applies: FR-18 withdrew the
+              core pen and <code>INK_WIDTHS</code> with it, and the widths on offer belong to{' '}
+              <code>annotateFeature</code>.
             </td>
           </tr>
           <tr>

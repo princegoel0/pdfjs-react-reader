@@ -54,9 +54,6 @@ export function Introduction() {
           paints no operators.
         </li>
         <li>
-          <strong>Freehand ink.</strong> Core, and it goes to the printer with the page.
-        </li>
-        <li>
           <strong>Encrypted documents.</strong> A built-in password prompt, or take over the UI
           entirely.
         </li>
@@ -167,7 +164,7 @@ export function Introduction() {
         <tbody>
           <tr>
             <td>
-              <code>PdfViewer</code> alone — pages, text, search, ink, thumbnails, chrome
+              <code>PdfViewer</code> alone — pages, text, search, thumbnails, chrome
             </td>
             <td>29.09 kB</td>
             <td>—</td>
@@ -336,7 +333,12 @@ export function Introduction() {
       </p>
 
       <h2>Browser support</h2>
-      <p>Chrome ≥ 90, Safari ≥ 14, Firefox ≥ 90, Edge ≥ 90, and modern mobile browsers.</p>
+      <p>
+        The contract floors are <code>PRD.md</code> §8&apos;s: Chrome and Edge 125, Safari and iOS Safari 18,
+        Firefox 124 (provisional), Node 22.13.0. What has actually been measured for each of them is the other
+        column of that table, and the honest summary is on the <a href="#/compatibility">Compatibility</a>{' '}
+        page: one engine current-build matrix, no pinned floor, no device.
+      </p>
     </>
   );
 }

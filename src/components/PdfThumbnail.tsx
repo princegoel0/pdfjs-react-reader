@@ -169,7 +169,8 @@ export function PdfThumbnail({
       host.inert = true;
       for (const field of div.querySelectorAll<HTMLElement>('input, select, textarea, button, a[href]')) {
         field.tabIndex = -1;
-      }    })().catch(() => {
+      }
+    })().catch(() => {
       // A thumbnail that cannot compose its form leaves the card blank, as it was.
     });
 

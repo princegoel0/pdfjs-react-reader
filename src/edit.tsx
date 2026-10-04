@@ -13,6 +13,7 @@ import {
   usePdfFeatureShell,
   usePdfFeatureState,
 } from './components/FeatureHost';
+import { isCancellation } from './lib/abort';
 import { toPdfError } from './lib/errors';
 import { downloadBytes, pdfFileName } from './lib/download';
 import { formatLabel } from './lib/labels';
@@ -32,10 +33,10 @@ import {
   signFields,
 } from './lib/pdf-write';
 import { isSignable, padToBox } from './lib/signature';
-import { EDIT_FEATURE_ID } from './features/ids';
+import { EDIT_FEATURE_ID } from './lib/feature-ids';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import type { PdfPoint } from './lib/ink';
+import type { PdfPoint } from './lib/layout';
 import type { PagePlan } from './lib/page-plan';
 import type { PdfFlattenResult, PdfSignatureField } from './lib/pdf-write';
 import type { PdfFeature } from './lib/features';
@@ -51,6 +52,14 @@ const SIGNATURE_PAD = { width: 240, height: 64 };
 export interface EditFeatureOptions {
   /** Name for the saved file; defaults to the document's own name. */
   fileName?: string;
+  /**
+   * Abandon a writer pass this tier started.
+   *
+   * The panel already stops on unmount; this is the host's own lever, for a viewer that knows the reader
+   * walked away. A synchronous loop inside the writer stops before its next page and never returns bytes —
+   * it cannot undo a page already changed inside the writer, which is the honest limit §3.6 states.
+   */
+  signal?: AbortSignal;
 }
 
 /** What the panel should tell a screen reader just happened, in words the host can translate. */
@@ -162,12 +171,47 @@ async function committedBytes(doc: PDFDocumentProxy): Promise<Uint8Array> {
  * makes undo cheap enough to offer at all, since a permutation is a handful of bytes while a
  * real document is megabytes.
  */
+/*
+ * FR-36: the lifetime that owns a writer pass this tier starts is the component's own.
+ *
+ * One controller per mount, aborted when it goes away, and a host `signal` folded in by aborting the same
+ * controller rather than by combining two — `AbortSignal.any` is newer than every floor this package
+ * advertises, and the guard in `src/lib/abort.test.ts` is what keeps that a fact rather than a memory. The
+ * writer functions already stop between pages, so what this adds is the *stop*: until now a reader who closed
+ * the viewer mid-split left the writer running to the end of a file nobody would show.
+ */
+function useWriterSignal(host?: AbortSignal) {
+  const writes = useRef<AbortController | null>(null);
+  writes.current ??= new AbortController();
+  const hostRef = useRef<AbortSignal | undefined>(host);
+  hostRef.current = host;
+
+  useEffect(() => {
+    const controller = writes.current;
+    if (!controller || !host) return;
+    const stop = () => controller.abort(host.reason);
+    if (host.aborted) stop();
+    else host.addEventListener('abort', stop);
+    return () => host.removeEventListener('abort', stop);
+  }, [host]);
+
+  useEffect(() => {
+    const controller = writes.current;
+    return () => controller?.abort();
+  }, []);
+
+  /** The signal to hand a writer pass: the host's if it has already given up, this mount's otherwise. */
+  return (): AbortSignal | undefined =>
+    hostRef.current?.aborted ? hostRef.current : writes.current?.signal;
+}
+
 function EditRunner() {
   const shell = usePdfFeatureShell();
   const options = usePdfFeatureOptions<EditFeatureOptions>();
   const [isBusy, setBusy] = useState(false);
   const [lastResult, setLastResult] = useState<PdfFlattenResult | null>(null);
   const busy = useRef(false);
+  const writeSignal = useWriterSignal(options?.signal);
 
   const [plan, setPlan] = useState<PagePlan | null>(null);
   const [history, setHistory] = useState<PagePlan[]>([]);
@@ -307,12 +351,14 @@ function EditRunner() {
           const plan = plans[index];
           if (!plan) return false;
           const folded = withViewRotations(plan, viewRotationsRef.current);
-          const result = await arrangePages(base, folded);
+          const result = await arrangePages(base, folded, { signal: writeSignal() });
           sink(result.bytes, index);
         }
         return true;
       } catch (err) {
-        onErrorRef.current(toPdfError(err));
+        // FR-36: a cancellation is not a failure. Someone asked for this — the host's signal, or the panel
+        // going away mid-split — and the reader is not told something broke.
+        if (!isCancellation(err)) onErrorRef.current(toPdfError(err));
         return false;
       } finally {
         busy.current = false;
@@ -414,10 +460,11 @@ function EditRunner() {
     busy.current = true;
     setBusy(true);
     try {
-      const result = await flattenBytes(await committedBytes(doc));
+      const result = await flattenBytes(await committedBytes(doc), { signal: writeSignal() });
       setLastResult(result);
       return result;
     } catch (err) {
+      if (isCancellation(err)) return null;
       const next = toPdfError(err);
       onErrorRef.current(next);
       return null;
@@ -445,7 +492,7 @@ function EditRunner() {
       // bytes `saveDocument()` commits — and the file the swap shows is the one with all
       // three in it.
       const base = await committedBytes(doc);
-      const result = await signFields(base, [{ field, points }]);
+      const result = await signFields(base, [{ field, points }], { signal: writeSignal() });
       if (!result.signed.length) {
         setNotice({ kind: 'sign-failed', field });
         return false;
@@ -458,8 +505,12 @@ function EditRunner() {
       setNotice({ kind: 'signed', field, boxes: result.signed.length });
       return true;
     } catch (err) {
-      onErrorRef.current(toPdfError(err));
-      setNotice({ kind: 'sign-failed', field });
+      // A cancelled sign is not a failed one: the notice the panel would otherwise show says "the signature
+      // did not go in", which is true but not the reason, and the reader did not do this.
+      if (!isCancellation(err)) {
+        onErrorRef.current(toPdfError(err));
+        setNotice({ kind: 'sign-failed', field });
+      }
       return false;
     } finally {
       busy.current = false;
@@ -741,6 +792,9 @@ function PagesPanel() {
 function SignatureSection() {
   const shell = usePdfFeatureShell();
   const state = usePdfFeatureState<EditFeatureState>();
+  // The scan is a writer pass over the file's bytes — it loads the document in the peer to read its fields —
+  // so it is cancellable on the same terms as the sign that follows it.
+  const writeSignal = useWriterSignal();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pointsRef = useRef<PdfPoint[]>([]);
   const drawingRef = useRef(false);
@@ -813,7 +867,9 @@ function SignatureSection() {
     setScanning(true);
     void (async () => {
       try {
-        setFields(await findSignatureFields(new Uint8Array(await doc.getData())));
+        setFields(
+          await findSignatureFields(new Uint8Array(await doc.getData()), { signal: writeSignal() }),
+        );
       } catch {
         setFields([]);
       } finally {
@@ -976,6 +1032,7 @@ function SignatureSection() {
  */
 export const editFeature: PdfFeature<EditFeatureState> = {
   id: EDIT_FEATURE_ID,
+  stylesheets: ['pdfjs-react-reader/edit.css'],
   Runner: EditRunner,
   panel: {
     id: EDIT_FEATURE_ID,

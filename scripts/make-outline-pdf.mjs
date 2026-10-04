@@ -19,15 +19,22 @@ objects[6] = pageDict(16);
 objects[7] = pageDict(17);
 // Named destinations live in a NameTree under Catalog.Names/Dests (pdf.js only
 // treats that location as a name tree; a bare Catalog.Dests is read as a flat map).
-objects[9] = '<< /Names [(concl) [7 0 R /Fit]] >>';
+//
+// The destinations carry real positions on purpose. Every fixture in this repository used to write
+// `/XYZ null null null`, which is a destination that names a page and no place — so FR-10's "and a position"
+// could not be measured on any of them, only asserted against an array typed into a test. Each of the three
+// that name one now points at a line the page actually draws: the title sits at y 700 and the subtitle at
+// y 660 of a 792-high page, so 660 is 132 pt down from the top and 620 is 172. `/concl` also asks for 2×,
+// which is the third thing a destination can say and the one a viewer is most likely to drop.
+objects[9] = '<< /Names [(concl) [7 0 R /XYZ null 620 2]] >>';
 objects[18] = '<< /Dests 9 0 R >>';
 objects[10] = '<< /Type /Outlines /First 11 0 R /Last 13 0 R /Count 4 >>';
 objects[11] =
-  '<< /Title (1. Introduction) /Parent 10 0 R /Next 12 0 R /Dest [5 0 R /XYZ null null null] >>';
+  '<< /Title (1. Introduction) /Parent 10 0 R /Next 12 0 R /Dest [5 0 R /XYZ 72 660 null] >>';
 objects[12] =
   '<< /Title (2. Sections) /Parent 10 0 R /Prev 11 0 R /Next 13 0 R /First 14 0 R /Last 14 0 R /Count 1 /Dest [6 0 R /Fit] >>';
 objects[13] = '<< /Title (3. Conclusion) /Parent 10 0 R /Prev 12 0 R /Dest /concl >>';
-objects[14] = '<< /Title (2.1 Deep dive) /Parent 12 0 R /Dest [6 0 R /FitH null] >>';
+objects[14] = '<< /Title (2.1 Deep dive) /Parent 12 0 R /Dest [6 0 R /FitH 400] >>';
 
 const streamText = (label) =>
   `BT /F1 28 Tf 72 700 Td (${label}) Tj ET\nBT /F1 14 Tf 72 660 Td (pdfjs-react-reader Phase 4 fixture) Tj ET`;

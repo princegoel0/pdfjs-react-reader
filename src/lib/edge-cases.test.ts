@@ -8,26 +8,34 @@
  * this file is the matrix, in one place, with its rows named after the shapes in the requirement rather
  * than after the modules that happen to hold the code.
  *
- * Four of the six rows are re-established here against the real engine, in this process. Two are not, and
- * the reason is a property of the harness rather than an excuse:
+ * Five of the six rows are re-established here against the real engine, in this process. One is not, and the
+ * reason is a property of the harness rather than an excuse:
  *
  *  - **a wrong password** cannot be loaded beside the others. The engine re-asks inside the same microtask
  *    chain, and a case that answers every ask from inside the callback loops at ~27,000 asks a second and
  *    starves everything after it — which is why `encrypted.reprompt.test.ts` is its own file.
- *  - **an over-large page** has no fixture. The ceilings are arithmetic (`canvas.test.ts` measures them
- *    against a 3060×3960 and a 40,000×1000 box), and inventing a giant page here would assert the same
- *    numbers with extra steps rather than the thing arithmetic cannot reach: what the engine reports for a
- *    page that big. That needs a generated fixture, and the task is open.
+ *
+ * **An over-large page** used to be the second exception, and it is the one this pass closed: the row was
+ * proved by arithmetic (`canvas.test.ts` measures the ceilings against a box typed into a test), which
+ * establishes the formula and leaves open the only thing a formula cannot invent — what the engine reports
+ * for a page that size. `oversize-sample.pdf` now answers that, with three pages whose boxes land on the
+ * three different verdicts §6.1 admits, so the row states a distinction it measured.
  *
  * What the guard tests are for: a table a reader can delete rows from is a table that quietly stops being
  * evidence. So the six row keys are pinned against the requirement's own list, every cited test must still
- * exist with the title cited (a rename breaks the suite on purpose), and the four in-process rows record
+ * exist with the title cited (a rename breaks the suite on purpose), and the five in-process rows record
  * that they actually ran — which an `it.skip` cannot hide.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PasswordResponses, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
+import {
+  MAX_RENDER_PIXELS,
+  MAX_RENDER_SIDE,
+  MIN_RENDER_SCALE,
+  resolveRenderScale,
+} from './canvas.js';
 import { classifyLoadError } from './retry.js';
 
 /** The three things a reader can be told, and the only three this suite admits. */
@@ -37,7 +45,7 @@ interface Case {
   /** The shape as `FR-51` words it, so the table reads against the requirement. */
   key: string;
   outcome: Outcome;
-  /** Where the mechanism is proved. Every row cites a file and a test title; four also run here. */
+  /** Where the mechanism is proved. Every row cites a file and a test title; five also run here. */
   proof: { file: string; title: string };
   ran?: boolean;
 }
@@ -74,7 +82,12 @@ const CASES: Case[] = [
   {
     key: 'over-large page',
     outcome: 'recovers',
-    proof: { file: 'src/lib/canvas.test.ts', title: 'clamps to the area ceiling before the canvas can go blank' },
+    // The mechanism is `canvas.test.ts`'s clamp-and-refuse arithmetic; what was missing was a page the engine
+    // itself reports at that size, and that is what the cited test in this file now reads out of the fixture.
+    proof: {
+      file: 'src/lib/edge-cases.test.ts',
+      title: 'reads the over-large page off the engine, and gets the two verdicts apart',
+    },
   },
 ];
 
@@ -158,6 +171,65 @@ describe('the six ways a document can be wrong', () => {
     ran.add('rotated page');
   });
 
+  /*
+   * The row that used to be arithmetic. `oversize-sample.pdf` carries three boxes chosen against the shipped
+   * ceilings, and the point of reading them from the engine is that a test which types a box in can type in a
+   * box that no parser would ever hand it: a 200 000-point page is a real thing a real file can declare, and
+   * whether pdf.js reports it, truncates it or refuses the document at all is not knowable from here.
+   *
+   * The three boxes produce the three verdicts §6.1 admits, and the distinction between them is what FR-51
+   * asks this suite to assert: an ordinary page paints, a 108-megapixel page paints *softer*, and a page that
+   * cannot be represented even at the 0.25 minimum is refused rather than painted as a blank strip.
+   */
+  it('reads the over-large page off the engine, and gets the two verdicts apart', async () => {
+    const doc = await load(fixture('oversize-sample.pdf'));
+    expect(doc.numPages).toBe(3);
+
+    const boxes: Array<{ width: number; height: number }> = [];
+    for (let page = 1; page <= doc.numPages; page += 1) {
+      const proxy = await doc.getPage(page);
+      const viewport = proxy.getViewport({ scale: 1 });
+      boxes.push({ width: viewport.width, height: viewport.height });
+    }
+    expect(
+      boxes,
+      'the fixture no longer reports the three boxes it was generated to carry, so the verdicts below are unfixed',
+    ).toEqual([
+      { width: 612, height: 792 },
+      { width: 12_000, height: 9_000 },
+      { width: 200_000, height: 600 },
+    ]);
+
+    // The same call `PdfPage` makes before it allocates a canvas, at a display ratio of 1 and the shipped
+    // ceilings: what changes between the three rows is the box, and the box came out of a file.
+    const budget = (box: { width: number; height: number }) =>
+      resolveRenderScale({ ...box, devicePixelRatio: 1, maxPixels: MAX_RENDER_PIXELS, maxSide: MAX_RENDER_SIDE });
+    const [letter, drawing, banner] = boxes.map(budget);
+
+    expect(letter).toMatchObject({ capped: false, refused: false, scale: 1 });
+
+    expect(drawing?.refused, 'a 108 MP page was refused, which §6 forbids while it fits above the floor').toBe(false);
+    expect(drawing?.capped).toBe(true);
+    expect(drawing?.limitedBy).toBe('pixels');
+    expect(drawing!.scale).toBeLessThan(1);
+    expect(drawing!.scale).toBeGreaterThanOrEqual(MIN_RENDER_SCALE);
+    // The clause in one line: the result fits inside the ceiling it was clamped by.
+    const drawingBox = boxes[1]!;
+    expect(drawingBox.width * drawingBox.height * drawing!.scale ** 2).toBeLessThanOrEqual(MAX_RENDER_PIXELS + 1);
+
+    expect(banner?.refused, 'a page wider than 32 767/0.25 points can be painted at nothing').toBe(true);
+    expect(banner?.limitedBy).toBe('side');
+    expect(banner!.scale, 'a refusal reports the floor, never a scale to paint at').toBe(MIN_RENDER_SCALE);
+    // Why it refuses, in the fixture’s own number: no side this long fits the ceiling at the minimum scale.
+    const bannerBox = boxes[2]!;
+    expect(bannerBox.width).toBeGreaterThan(MAX_RENDER_SIDE / MIN_RENDER_SCALE);
+
+    // And the two are genuinely different documents to a reader: one paints softly, one is not painted.
+    expect(drawing?.refused).not.toBe(banner?.refused);
+    await doc.cleanup();
+    ran.add('over-large page');
+  });
+
   /* --- the guards. They are tests because a table with no teeth is documentation. --- */
 
   it('covers exactly the six shapes the requirement names', () => {
@@ -187,9 +259,9 @@ describe('the six ways a document can be wrong', () => {
     }
   });
 
-  it('runs the four rows that can run in this process', () => {
-    const inProcess = CASES.filter((c) => c.key !== 'wrong password' && c.key !== 'over-large page');
-    expect(inProcess).toHaveLength(4);
+  it('runs the five rows that can run in this process', () => {
+    const inProcess = CASES.filter((c) => c.key !== 'wrong password');
+    expect(inProcess).toHaveLength(5);
     expect([...ran].sort()).toEqual(inProcess.map((c) => c.key).sort());
   });
 });

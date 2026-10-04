@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnnotationEditorType, AnnotationEditorUIManager } from 'pdfjs-dist';
 import { HighlightIcon, PenIcon, TextIcon, TrashIcon } from '../components/icons';
 import { usePdfFeaturePublish, usePdfFeatureShell, usePdfFeatureState } from '../components/FeatureHost';
-import { ANNOTATE_FEATURE_ID } from './ids';
+import { ANNOTATE_FEATURE_ID } from '../lib/feature-ids';
 import {
   DEFAULT_HIGHLIGHT_COLOR,
   HIGHLIGHT_COLORS,
@@ -366,22 +366,20 @@ function AnnotateToolsControl() {
 }
 
 /**
- * FR-18 authoring: the annotation editors, as a feature.
+ * FR-29 authoring: the annotation editors, as a feature.
  *
  * Mounting it is what makes pages build an editor layer at all — `<PdfViewer>`
  * without it renders annotations read-only and costs nothing for this code.
  *
- * The ink tool here is *not* the shell's `draw` control, which paints an SVG
- * overlay that prints but is never written into the document. This one produces a
- * real `/Ink` annotation that survives a download — see the tool list for what
- * the engine will and will not author.
+ * This is the only ink the package draws (FR-18): its strokes become a real
+ * `/Ink` annotation that survives a download, and the tool list says what the
+ * engine will and will not author. There is no second pen in the core bar to
+ * tell it apart from.
  */
 export const annotateFeature: PdfFeature<AnnotateFeatureState> = {
   id: ANNOTATE_FEATURE_ID,
+  stylesheets: ['pdfjs-react-reader/annotate.css'],
   Runner: AnnotateRunner,
-  // The shell's freehand toggle, whose strokes print but never reach a download.
-  // Two ink tools in one bar is one too many, and this is the one that saves.
-  replaces: ['draw'],
   pageProps: (state) => ({
     annotationEditorUIManager:
       (state.uiManager as AnnotationEditorUIManager | null | undefined) ?? null,
@@ -390,8 +388,8 @@ export const annotateFeature: PdfFeature<AnnotateFeatureState> = {
   controls: [
     {
       id: 'annotate',
-      // With the shell's own drawing toggle at 6: both are authoring, so both
-      // leave the bar together rather than stranding one tool per row.
+      // Authoring shares the bar's 6: a reader with a narrow window loses the pen
+      // and the highlighter together rather than being left one tool of a pair.
       priority: 6,
       label: (labels) => labels.annotationTools,
       available: (state, shell) =>

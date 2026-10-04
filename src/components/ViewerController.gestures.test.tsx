@@ -152,21 +152,6 @@ describe('pinch and pan arbitration', () => {
     expect(scale()).toBe(before);
   });
 
-  it('gives the fingers to the drawing layer while freehand is armed', () => {
-    const { el } = viewport();
-    const before = scale();
-    act(() => {
-      controller?.ink.setDrawing(true);
-    });
-
-    const last = pinch(el, { id: 0, x: 50, y: 50 }, { id: 1, x: 150, y: 50 }, 100);
-
-    expect(scale()).toBe(before);
-    // `isPinchingDisabled` is consulted before the engine claims anything, so the sequence is released:
-    // the host page and the `touch-action: none` surface under the finger both still get it.
-    expect(last.defaultPrevented).toBe(false);
-  });
-
   it('lets the first finger of a tap reach the widget it landed on', () => {
     const { el } = viewport();
     const widget = document.createElement('button');

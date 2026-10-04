@@ -19,16 +19,13 @@
   --pjsr-radius: 8px;
   --pjsr-radius-lg: 12px;
   --pjsr-control-h: 32px;
-  /* Row height for sidebar tabs / outline entries, gap inside control clusters,
-     and the ink colour dot plus its larger transparent tap box. The compact
-     blocks below raise these to touch sizes without touching desktop density. */
+  /* Row height for sidebar tabs / outline entries and gap inside control
+     clusters. The compact blocks below raise these to touch sizes without touching desktop density. */
   --pjsr-row-h: 30px;
   /* Horizontal gap between toolbar controls. The overflow planner measures this
      so its width arithmetic matches the row the browser actually lays out. */
   --pjsr-cluster-gap: 6px;
   --pjsr-caret-w: 20px;
-  --pjsr-swatch: 22px;
-  --pjsr-swatch-hit: 32px;
   /* Glyph size tracks the control height so buttons do not read as big empty
      boxes at touch size. */
   --pjsr-icon: 16px;
@@ -62,9 +59,9 @@
 
 /* ---------- toolbar ---------- */
 
-/* Removes the ~300ms tap delay on touch without disabling pinch-zoom. The ink
-   layer overrides this with `touch-action: none` so drawing is not interrupted
-   by browser gestures. */
+/* Removes the ~300ms tap delay on touch without disabling pinch-zoom. The sheet
+   the annotation-authoring feature ships overrides this with `touch-action: none`
+   on its editor layer, so a drag there draws instead of scrolling. */
 .pjsr-viewer :is(button, input, select, a) {
   touch-action: manipulation;
 }
@@ -595,8 +592,8 @@
    * Declared, not left to a listener winning a race: the page area pans and nothing
    * else. `pinch-zoom` is absent because a two-finger gesture inside the viewer is
    * the viewer's zoom (FR-47), and a browser that also zoomed its own page would do
-   * it twice over; a descendant that needs the finger outright — the ink layer, an
-   * editor surface — still says `touch-action: none`, which the browser takes as the
+   * it twice over; a descendant that needs the finger outright — the annotation
+   * feature's editor surface — still says `touch-action: none`, which the browser takes as the
    * intersection of the chain rather than as an override of this line.
    */
   touch-action: pan-x pan-y;
@@ -622,15 +619,16 @@
   box-shadow: var(--pjsr-page-shadow);
 }
 
-.pjsr-page-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
-
+/*
+ * A sibling of the row box rather than its child (`FR-08`): a page holds one position in the content space
+ * however the rows are grouped, so switching layout moves a number instead of rebuilding a canvas. The
+ * centring is the row's own — `left: 50%` with the transform pulling it back by half its width — offset by
+ * where the page sits in its pair, which the virtualizer publishes rather than a flexbox deciding.
+ */
 .pjsr-page {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 50%;
   /* Used by pdf.js setLayerDimensions when CSS round() is supported. */
   --scale-round-x: 1px;
   --scale-round-y: 1px;
@@ -658,11 +656,6 @@
   z-index: 2;
   pointer-events: none;
   transform-origin: 0 0;
-}
-
-.pjsr-annotation-layer--inert,
-.pjsr-annotation-layer--inert section {
-  pointer-events: none !important;
 }
 
 /* The layer is transparent to the pointer, but each annotation box is not —
@@ -757,89 +750,6 @@
 .pjsr-annotation-layer .popup > .header > .title {
   display: inline;
   font-weight: 600;
-}
-
-/* ---------- ink layer (freehand drawing) ---------- */
-
-.pjsr-ink-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 3;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.pjsr-ink-layer[data-drawing] {
-  pointer-events: auto;
-  cursor: crosshair;
-  touch-action: none;
-}
-
-/* ---------- drawing toolbar ---------- */
-
-.pjsr-ink {
-  display: flex;
-  flex-wrap: wrap;
-  order: 1;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 100%;
-  min-width: 0;
-  /* 520, not the search bar's 440: label + 4 swatches + width select + Undo +
-     Clear + close measure ~436 at desktop and ~494 at 44px controls. */
-  max-width: 520px;
-}
-
-.pjsr-ink-label {
-  color: var(--pjsr-muted-fg);
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.pjsr-ink-colors {
-  display: flex;
-  align-items: center;
-  gap: var(--pjsr-cluster-gap);
-}
-
-/* The button is the tap target and the span inside is the visible dot, so the
-   colour chip stays compact while the hit area grows to touch size. */
-.pjsr-ink-swatch {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: var(--pjsr-swatch-hit);
-  height: var(--pjsr-swatch-hit);
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-}
-
-.pjsr-ink-swatch-dot {
-  display: block;
-  width: var(--pjsr-swatch);
-  height: var(--pjsr-swatch);
-  border: 2px solid var(--pjsr-border);
-  border-radius: 50%;
-}
-
-.pjsr-ink-swatch--active .pjsr-ink-swatch-dot {
-  border-color: var(--pjsr-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pjsr-accent) 30%, transparent);
-}
-
-.pjsr-ink .pjsr-button {
-  font-size: 13px;
-  padding: 0 8px;
-}
-
-.pjsr-ink-swatch:focus-visible {
-  outline: 2px solid var(--pjsr-accent);
-  outline-offset: 1px;
 }
 
 /* ---------- sidebar (thumbnails / outline) ---------- */
@@ -1219,7 +1129,8 @@
    overlays and the viewer drops its frame only where there is no room for them,
    and the query field owns a row of its own on a phone bar. Each stays declared
    twice — `@media` for phones and for browsers without container queries
-   (Safari 14 is a stated target), `@container` for a squeezed viewer inside a
+   (written when Safari 14 was the target; the §8 floor is now 18, so the second
+   branch is margin rather than requirement), `@container` for a squeezed viewer inside a
    wide window, which `@media` structurally cannot see. A container block cannot
    style `.pjsr-viewer` itself, so tokens go on its children. */
 
@@ -1230,7 +1141,6 @@
     /* 8px is the published minimum gap between touch targets. */
     --pjsr-cluster-gap: 8px;
     --pjsr-caret-w: 32px;
-    --pjsr-swatch-hit: 44px;
     --pjsr-icon: 20px;
   }
 }
@@ -1361,12 +1271,4 @@
     outline-offset: -1px;
   }
 
-  /* The reader picked these colours; they are the value of the control and the ink of the mark, not chrome.
-     Forced to `CanvasText`, a palette becomes a row of identical dots and a drawn signature drawn in the
-     chosen colour loses it — while the page the ink sits on is a bitmap the palette cannot reach either,
-     so overriding here would break the thing it decorates. */
-  .pjsr-ink-swatch-dot,
-  .pjsr-ink-layer {
-    forced-color-adjust: none;
-  }
 }

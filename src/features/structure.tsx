@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toPdfError } from '../lib/errors';
 import { usePdfFeaturePublish, usePdfFeatureShell } from '../components/FeatureHost';
-import { STRUCTURE_FEATURE_ID } from './ids';
+import { STRUCTURE_FEATURE_ID } from '../lib/feature-ids';
 import type { PdfFeature, PdfStructTreeLayerBuilder } from '../lib/features';
 
 export interface StructureFeatureState {
@@ -111,6 +111,7 @@ function StructureRunner() {
  */
 export const structureFeature: PdfFeature<StructureFeatureState> = {
   id: STRUCTURE_FEATURE_ID,
+  stylesheets: ['pdfjs-react-reader/structure.css'],
   Runner: StructureRunner,
   /*
    * Both halves, from two sources: the extraction switch is static, and the builder is the published one

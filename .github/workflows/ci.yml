@@ -27,9 +27,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # engines requires >=20; 22 is the current LTS. Vite 7 refuses older
-        # majors, so a lower version here would fail for the wrong reason.
-        node: ['20', '22']
+        # The contract floor, the latest of its major, and the current LTS. Node 20 and 22.0–22.12 are
+        # deliberately absent: `PRD.md` §8 puts both Node rows at 22.13.0 and FR-41 names those versions as
+        # not supported, so a job running there measures a runtime the contract excludes — and
+        # `npm run check:packaging` now fails if a matrix here drops below the floor, because a green job on
+        # an unsupported runtime is how a range quietly widens itself.
+        node: ['22.13.0', '22', '24']
     steps:
       - uses: actions/checkout@v4
 
@@ -62,6 +65,12 @@ jobs:
       # outside `files` type-checks fine and only breaks after publishing.
       - name: Pack
         run: npm pack --dry-run
+
+      # §5.6: the examples a reader copies are compiled against the artifact rather than against `src/`.
+      # Every other job here resolves the package through `tsconfig.json`'s `paths`, so a documented name
+      # that is not actually published is invisible to all of them and fails only here.
+      - name: Examples compile against the packed artifact
+        run: npm run check:examples
 
   # Check-only. A push to `main` also starts docs.yml, which builds this same
   # site in order to publish it, so running the job there would duplicate work.
@@ -113,15 +122,22 @@ jobs:
   # nothing 19-only. The job is here so that stays true rather than because it
   # was doubtful today.
   react:
-    name: React ${{ matrix.react }}
+    name: React ${{ matrix.react }} (${{ matrix.pin }} patch)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        # Majors, not ranges: each is passed to `npm i` for both the runtime and
-        # its types, and @types/react carries the same major as react.
+        # Both axes at once: the majors are the peer range, and within each major the *minimum supported
+        # patch* and the *latest* are different claims. `>=18.0.0 <20.0.0` in `package.json` promises the
+        # first page of every major, so a matrix of floating majors proves only the newest patch of each and
+        # leaves `18.0.0` — the version a host on an older lockfile actually installs — unmeasured.
         react: ['18', '19']
+        pin: ['minimum', 'latest']
+    env:
+      # The minimum supported patch of a major is its `.0.0`; `latest` lets npm resolve the newest of the
+      # major, which is what `react@18` means to npm.
+      REACT_VERSION: ${{ matrix.pin == 'minimum' && format('{0}.0.0', matrix.react) || matrix.react }}
     steps:
       - uses: actions/checkout@v4
 
@@ -134,14 +150,28 @@ jobs:
         run: npm ci
 
       # `--no-save` keeps `package.json` and the lockfile out of the diff: this
-      # job proves the peer range, it does not redefine the development pin.
-      - name: Swap in React ${{ matrix.react }}
+      # job proves the peer range, it does not redefine the development pin. The types track the major, not
+      # the patch, because `@types/react` is versioned independently of the runtime and a `.0.0` pin of the
+      # types would be a version the types never shipped.
+      - name: Swap in React ${{ env.REACT_VERSION }} (${{ matrix.pin }} of ${{ matrix.react }}.x)
         run: |
           set -euo pipefail
           npm i --no-save --no-package-lock \
-            "react@${{ matrix.react }}" "react-dom@${{ matrix.react }}" \
+            "react@$REACT_VERSION" "react-dom@$REACT_VERSION" \
             "@types/react@${{ matrix.react }}" "@types/react-dom@${{ matrix.react }}"
-          node -e "console.log('react', require('react/package.json').version)"
+          # §8 pairs each React major with "the matching `react-dom` major", and an npm install that quietly
+          # resolves them apart would leave this job proving two different trees at once. The versions are
+          # printed because a matrix cell that does not say what it installed cannot be read back later.
+          node -e '
+            const react = require("react/package.json").version;
+            const dom = require("react-dom/package.json").version;
+            const major = (v) => v.split(".")[0];
+            console.log("react", react, "react-dom", dom);
+            if (major(react) !== major(dom)) {
+              console.error(`the DOM major ${dom} does not match react ${react}`);
+              process.exit(1);
+            }
+          '
 
       - name: Type check
         run: npm run typecheck
@@ -159,13 +189,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # A peer range we cannot actually build against is the mistake that shipped
-        # 0.1.0, so the matrix mirrors peerDependencies exactly. It is one entry
-        # since 0.6: `^6.2.108` rather than `^6`, so CI proves the CVE-2026-16633
-        # floor we advertise and not an unpatched 6.0/6.1, and v5 is gone because
-        # AnnotationEditorUIManager's positional arguments are ordered differently
-        # before 5.7 — see ROADMAP §Policy conflicts.
-        engine: ['^6.2.108']
+        # Two rows, because FR-48 asks for both ends of the range we advertise. The floor is
+        # `6.2.108` — `^6.2.108` rather than `^6` so CI proves the CVE-2026-16633 floor we advertise and not
+        # an unpatched 6.0/6.1 — and the second is the latest supported 6.x, pinned to an exact version so a
+        # green run means "this pair was built against", never "whatever npm served today". Refreshed at a
+        # release close, not opportunistically: v5 is absent because AnnotationEditorUIManager's positional
+        # arguments are ordered differently before 5.7 — see ROADMAP §Policy conflicts.
+        engine: ['6.2.108', '6.4.299']
     env:
       PDFJS_ENGINE: ${{ matrix.engine }}
     steps:
@@ -235,10 +265,12 @@ jobs:
 
   # FR-41's evidence. `verify` checks the source and the bundle; this checks the artefact, on a Node matrix,
   # because the one thing about dual output that is not ours to promise is whether `require()` can load it at
-  # all: the engine peer is ESM-only with no `exports` map of its own, so that answer belongs to Node.
-  # `scripts/tarball-check.mjs` prints `require-esm-support=yes|partial (n/15 on node X)` for exactly that
-  # reason — the job measures the boundary per version instead of asserting a version from documentation, and
-  # `PRD.md` §8's Node row cites whichever lines this produces.
+  # all: the engine peer is ESM-only with no `exports` map of its own, so that answer belongs to Node. The
+  # answer is already fixed by the contract rather than open to measurement: `require(esm)` is unflagged in
+  # every version §8 puts the floor at or above, so `scripts/tarball-check.mjs` treats an `ERR_REQUIRE_ESM`
+  # here as a failure and refuses to run at all below the floor — the line it prints,
+  # `require-esm-support=yes (15/15 on node X)`, is a record of which version certified that, not a probe of
+  # versions the contract excludes.
   packaging:
     name: Packaging (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
@@ -246,9 +278,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The floor and the current LTS, plus the old patch that predates Node's CommonJS-loading-ESM
-        # support — the version that decides whether the sentence in the README is a promise or a caveat.
-        node: ['20.9', '20', '22']
+        # The contract floor and the two LTS lines above it. `PRD.md` §8 puts both Node rows at 22.13.0 and
+        # FR-41 says flatly that Node 20 and 22.0–22.12 are not supported, so this job no longer measures
+        # them: a row below the floor can only produce a pass that means nothing or a failure that means
+        # nothing. The floor is where the promise starts, and `scripts/tarball-check.mjs` refuses to run
+        # under it rather than reporting a result it cannot stand behind.
+        node: ['22.13.0', '22', '24']
     steps:
       - uses: actions/checkout@v4
 

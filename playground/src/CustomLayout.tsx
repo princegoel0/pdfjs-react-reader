@@ -15,7 +15,7 @@ import type { PdfViewerHandle, PdfViewerProps, ToolbarItem } from 'pdfjs-react-r
  *
  * Same controller, different arrangement: the host's own page controls on top,
  * the pages in the middle, the stock toolbar along the bottom. Nothing here
- * re-implements document loading, virtualization, search, ink or features — it
+ * re-implements document loading, virtualization, search or features — it
  * only decides where things go, which is the half that used to mean forking the
  * shell. It takes the same ref as `PdfViewer`, because the handle comes from
  * the controller rather than from the component that renders it.

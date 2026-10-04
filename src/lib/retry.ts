@@ -24,21 +24,21 @@ const RETRYABLE_4XX = new Set([408, 425, 429]);
 
 export const DEFAULT_RETRY_POLICY = {
   attempts: 3,
-  baseDelayMs: 250,
-  maxDelayMs: 5_000,
+  baseDelayMs: 1_000,
+  maxDelayMs: 30_000,
   jitter: true,
 } as const;
 
 export interface RetryPolicy {
   /** Total attempts including the first, so `1` disables retrying. Defaults to 3. */
   attempts?: number;
-  /** First backoff interval in ms, before jitter. Defaults to 250. */
+  /** First backoff interval in ms, before jitter. Defaults to 1_000. */
   baseDelayMs?: number;
-  /** Ceiling on any single interval in ms. Defaults to 5_000. */
+  /** Ceiling on any single interval in ms. Defaults to 30_000. */
   maxDelayMs?: number;
   /**
    * Spread attempts out instead of synchronising them. Defaults to true, and should stay on: a fleet of
-   * browsers that all retry 250 ms after the same origin blip is what keeps the origin down.
+   * browsers that all retry one second after the same origin blip is what keeps the origin down.
    */
   jitter?: boolean;
 }
@@ -52,16 +52,26 @@ export interface RetryVerdict {
 }
 
 /**
- * Reported before each wait, so a host can say "retrying (2 of 3)" instead of showing a spinner that
- * implies the first attempt is still running. Carries the engine's own error untouched — the status and
- * the reason are ours, the message is not, and a host logging it should log what actually happened.
+ * Reported after every failed attempt that was worth retrying, including the last, so a host can say
+ * "retrying (2 of 3)" instead of showing a spinner that implies the first attempt is still running — and can
+ * say "gave up" when there is no attempt left. Carries the engine's own error untouched: the status and the
+ * reason are ours, the message is not, and a host logging it should log what actually happened.
+ *
+ * Deliberately not reported when the failure is not transient (a 401, a corrupt file). That attempt is not
+ * part of a retry story, and the failure reaches the host through the error channel with its code instead.
  */
 export interface RetryAttemptInfo {
   /** The attempt that just failed, 1-based. */
   attempt: number;
   /** Total attempts allowed, so a host can render "n of m". */
   attempts: number;
-  /** How long we are about to wait before the next one. */
+  /**
+   * Whether another attempt is coming. `false` on the last one, which is reported for the same reason the
+   * others are: a host that heard about attempt one and two and then hears nothing cannot tell an exhausted
+   * retry from a hung request, and those want different things on screen.
+   */
+  willRetry: boolean;
+  /** How long we wait before the next attempt; `0` when there is no next one. */
   delayMs: number;
   status: number | null;
   reason: string;

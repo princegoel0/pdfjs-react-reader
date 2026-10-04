@@ -14,15 +14,17 @@
  * back `incomplete` here and belong to the `0.12` browser matrix alongside the assistive-technology pass.
  */
 import { act, cleanup, render } from '@testing-library/react';
+import { useEffect } from 'react';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { InkLayer } from './InkLayer';
 import { OutlineView } from './OutlineView';
 import { PasswordPrompt } from './PasswordPrompt';
-import { ViewerProvider } from './ViewerContext';
+import { useViewer, ViewerProvider } from './ViewerContext';
 import { ViewerLayout } from './ViewerLayout';
 import { useViewerController, type ViewerController } from './ViewerController';
-import type { OutlineEntry } from '../lib/outline';
+import { OUTLINE_FEATURE_ID } from '../lib/feature-ids';
+import type { FeaturePublication } from '../lib/features';
+import type { OutlineEntry, PdfDestinationPosition } from '../lib/outline';
 import type { PasswordReason } from '../lib/status';
 
 // The toolbar and the virtualizer both measure with ResizeObserver, which jsdom does not implement; the
@@ -81,6 +83,35 @@ function Shell({ children }: { children?: React.ReactNode }) {
         <ViewerLayout controller={controller} />
       </ViewerProvider>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Stands where the outline tier's Runner would be.
+ *
+ * `OutlineView` reads the store now — that is FR-28's composed shape — so an audit that handed it `entries`
+ * as a prop would be auditing markup nothing in the package renders any more. This publishes the same two
+ * fields the tier publishes, and the tree the audit walks is the one a reader meets.
+ */
+function PublishOutline({ publication }: { publication: FeaturePublication }) {
+  const { store } = useViewer();
+  // Deps on the publication, not on every render: `publish` settles as soon as the values repeat, and an
+  // effect that writes the store on each commit re-renders the provider it is writing to.
+  useEffect(() => {
+    store.publish(OUTLINE_FEATURE_ID, publication);
+  }, [store, publication]);
+  return null;
+}
+
+function OutlineTree({ entries }: { entries: OutlineEntry[] }) {
+  controller = useViewerController({ src: '/fixtures/outline-sample.pdf' });
+  return (
+    <div className="pjsr-host">
+      <ViewerProvider controller={controller}>
+        <PublishOutline publication={{ entries, loading: false }} />
+        <OutlineView />
+      </ViewerProvider>
     </div>
   );
 }
@@ -155,38 +186,15 @@ describe('the primitives, audited on their own', () => {
       pageIndex: number,
       children: OutlineEntry[] = [],
       collapsed = false,
-    ): OutlineEntry => ({ title, pageIndex, children, collapsed });
+      // A place, not just a page: the tree the audit walks is the one the shell renders, and a bookmark that
+      // carries a position is the ordinary case rather than the interesting one.
+      position: PdfDestinationPosition | null = { kind: 'XYZ', left: 72, top: 660, zoom: null },
+    ): OutlineEntry => ({ title, pageIndex, position, children, collapsed });
     const entries: OutlineEntry[] = [
       entry('Summary', 0, [entry('Revenue', 1), entry('Costs', 2, [], true)]),
     ];
-    const { container } = render(<OutlineView entries={entries} onSelectPage={vi.fn()} />);
+    const { container } = render(<OutlineTree entries={entries} />);
     await expectClean(container, 'outline');
-  });
-
-  it('shows a stroke it has been given', async () => {
-    const { container } = render(
-      <InkLayer
-        strokes={[
-          {
-            id: 's1',
-            pageIndex: 0,
-            points: [{ x: 10, y: 10 }, { x: 40, y: 30 }],
-            color: '#000000',
-            width: 2,
-          },
-        ]}
-        viewport={{
-          width: 612,
-          height: 792,
-          convertToViewportPoint: (x: number, y: number) => [x, y],
-        } as never}
-        scale={1}
-        drawing={false}
-        settings={{ color: '#000', width: 2 }}
-        onCommit={vi.fn()}
-      />,
-    );
-    await expectClean(container, 'ink layer');
   });
 
   it('asks for a credential it cannot see', async () => {
@@ -197,8 +205,8 @@ describe('the primitives, audited on their own', () => {
   });
 
   /*
-   * This one subtree stays a copy. `a11y.page.test.tsx` audits the real `PdfPage` — its text layer, its
-   * marks, its ink — against a page proxy it can hand directly, but the structure tree is built by the
+   * This one subtree stays a copy. `a11y.page.test.tsx` audits the real `PdfPage` — its text layer and its
+   * marks — against a page proxy it can hand directly, but the structure tree is built by the
    * engine's own `StructTreeLayerBuilder`, which lives in `pdfjs-dist/web/pdf_viewer.mjs`, and that module
    * does not boot under jsdom at all (the 0.10 pass tried). So the markup below is what the browser pass
    * measured — the tree the engine renders beside the canvas, with the ids the spans really carry — written

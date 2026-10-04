@@ -11,7 +11,7 @@ const HOOKS: [string, string][] = [
   ],
   [
     'usePdfSearch({ doc, onError?, signal?, focusPage?, index? })',
-    'Search with a 200 ms debounce in the shell and cancellation of stale runs. `search(query, { caseSensitive?, wholeWord?, regex? })` — several words mean a page holding all of them, `regex` treats the query as an expression. Indexing is incremental and starts from `focusPage`, walking outward, so a first answer arrives before the document is finished; `index` takes a prebuilt `{version: 1, pages: [{text, itemEnds}]}` instead of extracting. Returns { status, progress, query, options, results, total, counts, pagesWithMatches, patternError, activeIndex, activeSeq, complete, pagesIndexed, pagesTotal, indexError, search, setActiveIndex, nextMatch, prevMatch, clear, invalidatePages }.',
+    'Search with a 200 ms debounce in the shell and cancellation of stale runs. `search(query, { caseSensitive?, wholeWord?, regex?, maxPatternUnits? })` — several words mean a page holding all of them, `regex` treats the query as an expression bounded at 256 UTF-16 code units unless you raise or lower `maxPatternUnits`. Indexing is incremental and starts from `focusPage`, walking outward, so a first answer arrives before the document is finished; `index` takes a prebuilt `{version: 1, pages: [{text, itemEnds}]}` instead of extracting. Returns { status, progress, query, options, results, total, counts, pagesWithMatches, patternError, patternKind, activeIndex, activeSeq, complete, pagesIndexed, pagesTotal, indexError, search, setActiveIndex, nextMatch, prevMatch, clear, invalidatePages }.',
   ],
   [
     'usePdfOptionalContent({ doc, config?, revision?, onChanged?, onError? })',
@@ -34,16 +34,12 @@ const HOOKS: [string, string][] = [
     'Returns { fields, widgets, values, isDirty, version, loading, refresh, storage, setValue, getFormData, setFormData, reset }.',
   ],
   [
-    'usePdfInk({ resetKey? })',
-    'Freehand strokes stored in PDF user space, so zoom and rotation both map correctly. Returns { strokes, settings, drawing, setDrawing, updateSettings, addStroke, undo, clear, strokesForPage, getDrawingData, setDrawingData }.',
-  ],
-  [
-    'usePdfPrint({ doc, rotation?, getInkStrokes?, onError? })',
+    'usePdfPrint({ doc, rotation?, onError? })',
     'Headless print pipeline. Returns { print, cancel, isPrinting, progress, error, supported }; `print()` takes { range?, scale? } and defaults to the whole document.',
   ],
   [
-    'usePdfDownload({ doc, fileName?, onError? })',
-    'Saves the file. Returns { download, isBusy, error }; `download()` takes { saveEdits? }, which writes an incremental save carrying what is in the annotation storage — field values and annotation marks both — instead of the bytes the document was loaded from.',
+    'usePdfDownload({ doc, fileName?, onError?, onRefused?, signal? })',
+    'Saves the file. Returns { download, isBusy, error, refused, fileName }; `download()` takes { saveEdits? }, which writes an incremental save carrying what is in the annotation storage — field values and annotation marks both — instead of the bytes the document was loaded from, and resolves { fileName, committed, refused } because a save that could not carry the edits has to say so to whoever asked for it. `refused` is ‘xfa’ for a document whose packet the writer cannot rebuild, and null otherwise; the file still arrives either way.',
   ],
   [
     'usePdfMerge({ sources, onError?, signal? })   // from pdfjs-react-reader/merge, not /headless',
@@ -86,31 +82,51 @@ export function Headless() {
 
       <h2>Rendering pages</h2>
       <p>
-        <code>PdfPage</code> draws one page: canvas, selectable text layer, annotation layer, ink
-        overlay, and — when a feature hands it an editor manager — the annotation editor layer. A pure
+        <code>PdfPage</code> draws one page: canvas, selectable text layer, annotation layer, and —
+        when a feature hands it an editor manager — the annotation editor layer. A pure
         XFA page is painted from its template instead of the text layer, and a search marks that text
         rather than finding it and showing nothing. The virtualizer hands you rows
         (<code>virtualSlots</code>) already grouped for the active layout, positioned by
-        <code>offsetTop</code>:
+        <code>offsetTop</code>, and each row says where <em>its pages</em> sit inside it
+        (<code>slot.pages</code>). Place the pages as siblings of the row rather than as its children:
+        switching layout regroups the rows, and a page that changes row while being a child of one is a
+        page that unmounts and paints itself again — which is the one thing the reader would notice.
       </p>
       <pre>
         <code>{`<div ref={containerRef} style={{ height: totalHeight, position: 'relative' }}>
+  {/* The sheet: what the row looks like. Empty, because the pages are not its children. */}
   {virtualSlots.map((slot) => (
     <div
-      key={slot.indices[0]}
-      style={{ position: 'absolute', top: 0, transform: \`translate(-50%, \${slot.offsetTop}px)\` }}
-    >
-      {slot.indices.map((index) => (
-        <PdfPage
-          key={index}
-          doc={doc}
-          pageNumber={index + 1}
-          scale={resolvedScale}
-          onBaseDimensions={reportPageDims}
-        />
-      ))}
-    </div>
+      key={slot.pageNumber}
+      style={{
+        position: 'absolute', top: 0, left: '50%', width: slot.width, height: slot.height,
+        transform: \`translate(-50%, \${slot.offsetTop}px)\`, background: '#fff',
+      }}
+    />
   ))}
+  {/* One element per page, keyed by the page — the identity no regrouping changes. */}
+  {virtualSlots.flatMap((slot) =>
+    slot.pages.map((page) => {
+      const x = page.left + page.width / 2 - slot.width / 2;
+      const y = slot.offsetTop + page.top;
+      return (
+        <div
+          key={page.index}
+          style={{
+            position: 'absolute', top: 0, left: '50%', width: page.width, height: page.height,
+            transform: \`translate(calc(-50% + \${x}px), \${y}px)\`,
+          }}
+        >
+          <PdfPage
+            doc={doc}
+            pageNumber={page.pageNumber}
+            scale={resolvedScale}
+            onBaseDimensions={reportPageDims}
+          />
+        </div>
+      );
+    }),
+  )}
 </div>`}</code>
       </pre>
       <p>
@@ -286,13 +302,46 @@ if (capabilities?.form === 'xfa' && !capabilities.renderedFromXfa) {
         thread without telling you. The name has to be one your directive already lists.
       </p>
       <p>
+        One worker configuration applies per JavaScript realm, because pdf.js keeps its URL in the
+        process-global <code>GlobalWorkerOptions.workerSrc</code>. Two viewers on one page may load
+        different documents from different origins — they may not use different worker code. The second
+        one to start is refused before the engine is touched, with <code>CONFIGURATION_ERROR</code>{' '}
+        naming both origins (origins only: a signed worker URL carries its credential in its query), and
+        the first keeps running. A relative URL and its absolute spelling are the same worker, and two
+        viewers that configure nothing agree on whatever that realm starts with — an empty field in a
+        browser, where the package’s own probe then fills it, or <code>./pdf.worker.mjs</code> in Node,
+        where pdf.js has already supplied one.
+      </p>
+      <p>
         Page canvases are capped too — pass <code>maxRenderPixels</code> and{' '}
-        <code>devicePixelRatio</code> to <code>PdfPage</code>, or leave them unset: the ceiling then comes
-        from <code>maxRenderPixelsFor(readCanvasEnvironment())</code>, the limit the engine uses, and the
-        density from the watched <code>window.devicePixelRatio</code>, which re-reads itself when the window
-        moves to another display — a <code>devicePixelRatio</code> you pass is a number that does not move,
-        and the pages stop answering the environment. An uncapped page at deep zoom asks for more pixels than
-        a browser will allocate, and the failure is a blank rectangle, not an exception.
+        <code>devicePixelRatio</code> to <code>PdfPage</code>, or leave them unset. The ceiling a page
+        actually gets is the <strong>minimum</strong> of four: the package default for the detected
+        class, the viewport working set, the platform ceiling the runtime can really allocate, and the
+        number you passed. Yours is a constraint, not an override — passing{' '}
+        <code>maxRenderPixels={'{'}200_000_000{'}'}</code> on a phone buys the phone’s ceiling, because
+        the budget exists to bound what the renderer allocates. An uncapped page at deep zoom asks for
+        more pixels than a browser will give it, and the failure is a blank rectangle, not an exception.
+      </p>
+      <p>
+        The platform term is <em>measured</em>, not read off the user-agent string:{' '}
+        <code>ensureCanvasCeiling()</code> allocates upward until a painted pixel stops coming back —
+        a surface over the limit keeps the width it was given and hands back a working-looking context,
+        so only a write-then-read catches it. It starts two frames after mount and allocates <em>one
+        surface per frame</em> after that — measured in Chromium at ~80 ms for the whole search, against
+        a synchronous ladder that was measured pushing the page’s first paint from ~270 ms to ~2 s, which
+        is the cost the &ldquo;never delays a first paint&rdquo; rule is about. The search stops at the
+        ceiling already in force, because a bigger answer could not change a minimum. When the answer is
+        lower than what pages were painted under, the shell redraws them.
+        <code>readCanvasEnvironment()</code> and <code>maxRenderPixelsFor()</code> give you the two terms
+        that need no measurement; <code>resolveCanvasBudget()</code> is the whole rule, and it reports
+        which candidate won — because &ldquo;this page is soft&rdquo; is only fixable if you can tell a
+        cap from a bug.
+      </p>
+      <p>
+        Below <code>MIN_RENDER_SCALE</code> (0.25) a page is not soft, it is unreadable: the text layer is
+        positioned against the CSS box while the canvas is a quarter-resolution copy of it. So{' '}
+        <code>resolveRenderScale</code> reports <code>refused</code>, <code>PdfPage</code> does not paint,
+        and the host is told with <code>RESOURCE_LIMIT</code> and the numbers in <code>details</code>.
       </p>
 
       <h2>Search without the shell</h2>
@@ -310,6 +359,18 @@ search.nextMatch();
 // Pass each page its slice of matches to highlight in the text layer:
 <PdfPage doc={doc} pageNumber={i + 1} scale={scale} highlights={byPage.get(i)} />`}</code>
       </pre>
+      <p>
+        A regular expression is bounded before it is compiled — 256 UTF-16 code units by default, raised or
+        lowered with <code>maxPatternUnits</code> — because matching runs on the page&apos;s main thread, and
+        neither a dedicated worker nor a fixed per-page deadline is part of the contract. The bound is the
+        only thing standing between a reader&apos;s <code>(a+)+$</code> and a tab that stops responding. When
+        a pattern is refused, <code>status</code> reads <code>&apos;error&apos;</code> rather than{' '}
+        <code>&apos;ready&apos;</code> and <code>patternKind</code> says which of the two problems it was,{' '}
+        <code>&apos;too-long&apos;</code> or <code>&apos;invalid&apos;</code>: a search that never ran must not
+        arrive as an empty result set, because that is a different answer and a wrong one. A literal query is
+        never bounded — its words are escaped and searched, so its cost is in the text being scanned, not in
+        what was typed.
+      </p>
       <p>
         Indexing starts at <code>focusPage</code> and walks outward — the page in view, then +1, −1, +2, −2 —
         publishing every 25 pages or 120 ms, so a query on a thousand-page document answers against what the
@@ -372,10 +433,14 @@ downloadBytes(result.bytes, 'merged.pdf');       // result.pages, result.taken, 
       <p>
         A source that arrives from an upload widget, a query parameter or a JSON payload is a string whose
         kind nothing has checked yet, and the loader has a rule about it that a host cannot guess: a long
-        pure-base64 run is bytes, anything else with a slash or a <code>.pdf</code> suffix is a path, and a
-        bare word is refused rather than fetched — because fetching <code>report</code> hands the parser
-        whatever this origin serves there, which arrives as a corrupt-document error with nothing pointing
-        at the typo. <code>classifySource</code> is that rule, asked out loud. It never throws, and it is
+        pure-base64 run is bytes, anything else with a slash or a <code>.pdf</code> suffix is a path — and a
+        rather than guessed at — a scheme that cannot name a document (<code>javascript:</code>,
+        <code>chrome://</code>, <code>about:</code>) is refused by name, and a bare word is refused rather
+        than fetched — because fetching <code>report</code> hands the parser whatever this origin serves
+        there, which arrives as a corrupt-document error with nothing pointing at the typo. What is
+        <em> not </em> refused is a custom scheme like <code>my-app://documents/a.pdf</code>, which a host’s
+        own desktop shell really can register: the rule lists the refusals, not the permissions.
+        <code>classifySource</code> is that rule, asked out loud. It never throws, and it is
         the same code <code>normalizeSource</code> runs, so a prediction and an outcome cannot disagree —
         the refusal even carries the sentence the loader would have thrown.
       </p>
@@ -386,6 +451,7 @@ const classified = classifySource(requested);
 // { kind: 'url',    url }    — the engine fetches it
 // { kind: 'bytes',  data }   — the string is the file: long base64, or a ;base64 data URL
 // { kind: 'refused', reason, message }   'empty' | 'bare-name' | 'windows-path' | 'bad-base64'
+//                                        | 'unsupported-scheme' | 'no-base-url'
 
 if (classified.kind === 'refused') {
   // reason is the branch a form message keys off; message is a sentence already worth showing.
@@ -425,7 +491,7 @@ if (target !== null) scrollToPage(target);`}</code>
         against it: <code>computeSlots</code>, <code>findVisibleRange</code>,{' '}
         <code>buildPageText</code>, <code>planFind</code>, <code>findPageMatches</code>,{' '}
         <code>countPerPage</code>, <code>planPrintPages</code>, <code>planPrintScale</code>,{' '}
-        <code>strokePathD</code>, <code>drawInkStrokes</code>, <code>parseDestination</code>,{' '}
+        <code>parseDestination</code>,{' '}
         <code>collectWidgets</code>, <code>readFormValues</code>, <code>resolveRenderScale</code>,{' '}
         <code>maxRenderPixelsFor</code>, <code>pdfAssetUrls</code>, <code>isAllowedSource</code>,{' '}
         <code>flattenOptionalContent</code>, <code>normalizeAttachments</code>,{' '}

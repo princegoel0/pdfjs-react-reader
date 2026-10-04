@@ -725,13 +725,12 @@ area with nothing behind it.
 
 ### 5.3 Composed shell example
 
-**Target API shape.** This block is the contract for FR-28's composed parts, not a description of today's
-props. It compiles once `ViewerRoot` accepts `style`/`className`, `ViewerSidebar` accepts children, and
-`OutlineView` and `ThumbnailList` read what they render from the controller context instead of demanding
-`entries`/`onSelectPage` and `doc`/`numPages`/`currentPage` from the host — which is the whole point of putting
-one controller behind a provider: a host that has already supplied the controller should not be asked to wire
-the same state a second time, by hand, to each part. Until then `npm run check:examples` skips this block and
-no documentation page may present it as available.
+This block is the shape FR-28's composed parts promise. A part takes the props a host must decide — the
+frame's own class names and layout — and reads everything the controller already knows from the provider
+that supplies it: the document, its page count, the page on screen, the bookmark tree the outline tier
+published into the store. A host that has supplied the controller is never asked to wire the same state a
+second time, by hand, to each part. `npm run check:examples` compiles this block against the packed
+artifact, as it compiles every unmarked example in this file and the README.
 
 ```tsx
 import {

@@ -4,7 +4,28 @@ import { normalizeSource, resolveSourceUrl } from './source';
 
 const PDF_MAGIC_BASE64 = 'JVBERi0xLjQK'; // "%PDF-1.4\n"
 
+const BASE = 'https://app.example/reports/index.html';
+
+/**
+ * A page to resolve a relative address against.
+ *
+ * The node project has no `document`, and FR-01 makes that matter: with no base there is nothing that turns
+ * `/files/doc.pdf` into something fetchable, so the loader refuses it. Tests about relative sources install a
+ * base; the base-less case is asserted on its own below rather than by leaving these to run in an
+ * environment they do not describe.
+ */
+function withDocumentBase() {
+  beforeEach(() => {
+    Reflect.set(globalThis, 'document', { baseURI: BASE });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'document');
+  });
+}
+
 describe('normalizeSource', () => {
+  withDocumentBase();
+
   it('passes through http(s) URLs', async () => {
     const result = await normalizeSource('https://example.com/doc.pdf');
     expect(result).toEqual({ kind: 'url', url: 'https://example.com/doc.pdf' });
@@ -78,15 +99,40 @@ describe('normalizeSource', () => {
   });
 });
 
-const BASE = 'https://app.example/reports/index.html';
+describe('normalizeSource with no document base (FR-01)', () => {
+  /**
+   * "Relative URLs resolve against the document base URL in a browser and are refused when no base URL
+   * exists." A server render, a worker and a Node import are all the second half of that sentence, and the
+   * honest failure is a refusal naming the missing base — not a request for `/files/doc.pdf` against whatever
+   * origin the runtime happened to be standing on, which is what handing the string to the engine does.
+   */
+  it.each([
+    '/files/doc.pdf',
+    './relative/doc.pdf',
+    '../up-one/doc.pdf',
+    '//cdn.example.com/a.pdf',
+    'documents/report.pdf',
+    'report.pdf',
+  ])('refuses the relative source %j', async (src) => {
+    const error = await normalizeSource(src).catch((err: unknown) => err);
+    expect(isPdfError(error, 'INVALID_SOURCE')).toBe(true);
+    expect((error as Error).message).toMatch(/no document base URL/);
+  });
+
+  it('still accepts every source that does not need a base', async () => {
+    expect(await normalizeSource('https://example.com/a.pdf')).toMatchObject({ kind: 'url' });
+    expect(await normalizeSource('blob:https://example.com/uuid')).toMatchObject({ kind: 'url' });
+    // A custom scheme is absolute on its own terms; nothing here resolves it against a page.
+    expect(await normalizeSource('my-app://documents/a.pdf')).toMatchObject({ kind: 'url' });
+    expect(await normalizeSource(new Uint8Array([1, 2, 3]))).toMatchObject({ kind: 'data' });
+    expect(await normalizeSource(`data:application/pdf;base64,${PDF_MAGIC_BASE64}`)).toMatchObject({
+      kind: 'data',
+    });
+  });
+});
 
 describe('allowedSources', () => {
-  beforeEach(() => {
-    Reflect.set(globalThis, 'document', { baseURI: BASE });
-  });
-  afterEach(() => {
-    Reflect.deleteProperty(globalThis, 'document');
-  });
+  withDocumentBase();
 
   it('does not restrict anything when unset', async () => {
     const result = await normalizeSource('https://anyone.example/doc.pdf');

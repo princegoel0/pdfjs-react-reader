@@ -30,6 +30,11 @@ vi.mock('../lib/worker', () => ({
   ensureWorker: vi.fn(async () => undefined),
   createPdfWorker: vi.fn(async () => null),
   workerAutoDetectionFailed: () => false,
+  // FR-02: the hook claims the realm's worker URL for the lifetime of a load. These tests
+  // are about something else, and an empty configuration has nothing to claim and nothing to
+  // conflict with.
+  configuredWorkerSrc: () => '',
+  claimWorkerSrc: () => ({ ok: true, release: () => {} }),
 }));
 
 const URL_SRC = 'https://files.example.com/contract.pdf';

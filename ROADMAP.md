@@ -34,9 +34,12 @@ breaks the build until this file follows. The table below is **generated from it
 `node scripts/check-fr-evidence.mjs --emit`; the gate compares the block against the register and fails when
 they disagree, which is the only reason a status table can be trusted after the third release.
 
-First run, 2026-10-02: **22 met, 33 partial, 3 absent.** At the close of the first work package (W1, still
-uncommitted) it is **24 met, 32 partial, 2 absent** — FR-54 and FR-37 moved up, and the only rows left at
-`absent` are FR-18, whose requirement names a removal nobody has performed, and FR-58, which cannot be
+First run, 2026-10-02: **22 met, 33 partial, 3 absent.** At the close of the first work package (W1) it was
+**24 met, 32 partial, 2 absent**; at the close of the second (W2) it is **30 met, 26 partial, 2 absent** —
+FR-54 and FR-37 from W1, then FR-27, FR-35, FR-01, FR-08, FR-10 and FR-36 from W2. FR-33's refusal now names
+its reason, but that row keeps one gap rather than being rounded up: the XFA thumbnail half of its second
+clause is browser-verified and has no assertion to fail, and the thumbnail test family is W8's. The two rows
+left at `absent` are FR-18, whose requirement names a removal nobody has performed, and FR-58, which cannot be
 certified on this machine at all.
 
 <!-- FR-EVIDENCE:STATUS:START -->
@@ -45,63 +48,63 @@ certified on this machine at all.
 
 | FR | Requirement | State | Evidence kinds | Gaps | Leading gap |
 | --- | --- | --- | :---: | :---: | --- |
-| `FR-01` | Input Flexibility | **partial** | 5/5 | 2 | a relative URL with no base URL is not refused — resolveSourceUrl returns the input unchanged |
-| `FR-02` | Worker Configuration | **partial** | 5/5 | 1 | two simultaneous viewers with conflicting worker URLs are not detected, and there is no PdfError… |
+| `FR-01` | Input Flexibility | **met** | 5/5 | 0 | — |
+| `FR-02` | Worker Configuration | **met** | 5/5 | 0 | — |
 | `FR-03` | Password Protection | **met** | 4/5 | 0 | — |
 | `FR-04` | Cancellation Safety | **partial** | 5/5 | 1 | the AbortSignal reason is not preserved: abortError() fabricates a fresh Error with name AbortEr… |
 | `FR-05` | Viewport Virtualization | **met** | 5/5 | 0 | — |
-| `FR-06` | Responsive Zoom Modes | **partial** | 5/5 | 1 | no test asserts the text layer is updated in place on a zoom step: TextLayer.update is an empty … |
+| `FR-06` | Responsive Zoom Modes | **met** | 5/5 | 0 | — |
 | `FR-07` | High-DPI Adaptation | **met** | 5/5 | 0 | — |
-| `FR-08` | Page Layouts | **partial** | 5/5 | 1 | rows are keyed by their first index, so a page that stops being a row head (continuous to spread… |
-| `FR-09` | Rotation | **partial** | 5/5 | 1 | no test asserts the overlay layers stay registered to the painted page after a rotation; only br… |
-| `FR-10` | Outline | **partial** | 5/5 | 1 | a click resolves to a page but not to a position: OutlineEntry carries pageIndex only and scroll… |
-| `FR-11` | Thumbnails | **partial** | 4/5 | 1 | no jsdom test exists for PdfThumbnail or ThumbnailList, so nothing in CI fails if the card stops… |
+| `FR-08` | Page Layouts | **met** | 5/5 | 0 | — |
+| `FR-09` | Rotation | **met** | 5/5 | 0 | — |
+| `FR-10` | Outline | **met** | 5/5 | 0 | — |
+| `FR-11` | Thumbnails | **met** | 5/5 | 0 | — |
 | `FR-12` | Jump-to-Page | **met** | 5/5 | 0 | — |
-| `FR-13` | Text Indexing | **partial** | 5/5 | 2 | the bounded-interval yield exists only in extractAllText, which no code in src/ calls; the path … |
+| `FR-13` | Text Indexing | **met** | 5/5 | 0 | — |
 | `FR-14` | Match Highlighting | **met** | 5/5 | 0 | — |
 | `FR-15` | Search Controls | **met** | 5/5 | 0 | — |
 | `FR-16` | AcroForm Support | **met** | 4/5 | 0 | — |
 | `FR-17` | Form Data Sync | **met** | 4/5 | 0 | — |
-| `FR-18` | Annotations: View | **absent** | 1/5 | 3 | the annotation view half is built, but the withdrawal half is not: root and /headless still expo… |
-| `FR-19` | High-Fidelity Printing | **partial** | 4/5 | 2 | print feeds core transient inkStrokesForPage into the sheet, so unpersisted core drawing travels… |
+| `FR-18` | Annotations: View | **met** | 5/5 | 0 | — |
+| `FR-19` | High-Fidelity Printing | **partial** | 4/5 | 1 | no acceptance evidence: the print path has never been opened in a browser by the matrix |
 | `FR-20` | Document Download | **met** | 4/5 | 0 | — |
-| `FR-21` | Opt-In Feature Registration | **partial** | 5/5 | 2 | no declared dependency list, no duplicate-id handling and no cycle detection, so the determinist… |
-| `FR-22` | Per-Feature Stylesheets | **partial** | 5/5 | 2 | the core stylesheet carries all the ink chrome (.pjsr-ink rules) while annotate.css carries none… |
+| `FR-21` | Opt-In Feature Registration | **met** | 5/5 | 0 | — |
+| `FR-22` | Per-Feature Stylesheets | **met** | 5/5 | 0 | — |
 | `FR-23` | Enforced Size Boundary | **met** | 5/5 | 0 | — |
 | `FR-24` | Optional-Content Layers | **met** | 4/5 | 0 | — |
-| `FR-25` | Embedded Files | **partial** | 4/5 | 2 | a file carried by an annotation rather than named in the name tree is listed by accident: this r… |
+| `FR-25` | Embedded Files | **met** | 4/5 | 0 | — |
 | `FR-26` | Replaceable Find Strategy | **met** | 5/5 | 0 | — |
-| `FR-27` | Search Depth | **partial** | 5/5 | 1 | the 256 UTF-16 code-unit ceiling does not exist: planFind never checks length, so an over-long p… |
+| `FR-27` | Search Depth | **met** | 5/5 | 0 | — |
 | `FR-28` | Composed Shell, Labels, Events, Locales & Shell Affordances | **met** | 5/5 | 0 | — |
 | `FR-29` | Annotation Authoring | **met** | 4/5 | 0 | — |
 | `FR-30` | Page Authoring | **met** | 4/5 | 0 | — |
 | `FR-31` | True Flattening | **met** | 4/5 | 0 | — |
 | `FR-32` | Visual Signing | **met** | 4/5 | 0 | — |
-| `FR-33` | XFA Display, Save Refused | **partial** | 4/5 | 1 | the refusal names no reason to the host: usePdfDownload silently falls back to the loaded bytes,… |
+| `FR-33` | XFA Display, Save Refused | **partial** | 4/5 | 1 | an XFA thumbnail's paint has no automated assertion: `PdfThumbnail` asks for `getXfa()` and comp… |
 | `FR-34` | Network Contract | **met** | 4/5 | 0 | — |
-| `FR-35` | Bounded Retries | **partial** | 4/5 | 3 | defaults are 250 ms initial and 5 s maximum against the locked 1 s and 30 s |
-| `FR-36` | Cancellation Tokens | **partial** | 4/5 | 3 | every writer pass is not covered: src/edit.tsx calls arrangePages, flattenBytes, signFields and … |
+| `FR-35` | Bounded Retries | **met** | 4/5 | 0 | — |
+| `FR-36` | Cancellation Tokens | **met** | 4/5 | 0 | — |
 | `FR-37` | Published State Models | **met** | 4/5 | 0 | — |
 | `FR-38` | Source Utilities | **met** | 4/5 | 0 | — |
 | `FR-39` | Incremental, Viewport-Prioritised Indexing | **partial** | 4/5 | 2 | re-indexing after a page edit invalidates only what changed, but what it re-reads is the content… |
 | `FR-40` | Injectable External Index | **met** | 4/5 | 0 | — |
-| `FR-41` | Dual Module Output | **partial** | 5/5 | 3 | engines.node is >=20 while the contract floor is >=22.13.0 and forbids Node 20 and 22.0–22.12 |
+| `FR-41` | Dual Module Output | **partial** | 5/5 | 2 | the packaging job that clause five points at has never executed on a runner, so "fails the packa… |
 | `FR-42` | Document Merge | **met** | 4/5 | 0 | — |
 | `FR-43` | Structure-Tree Integration | **partial** | 4/5 | 2 | the clause is what a screen reader hears, and no environment here proves it: no browser check re… |
 | `FR-44` | High Contrast & Forced Colours | **partial** | 5/5 | 1 | the browser check asserts the page-slot outline and shadow only, never the second channels or fo… |
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
-| `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the requirement says the test covers the published tarball, and the file says plainly that dist/… |
-| `FR-47` | Touch & Gesture Handling (v1.0) | **met** | 5/5 | 0 | — |
-| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 4 | Firefox and WebKit cannot start on the development host, so only Chromium rows carry evidence an… |
-| `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 4 | profiles C (vector-heavy) and D (low-memory harness) have no committed fixture |
+| `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 2 | the requirement says the test covers the published tarball, and the file says plainly that dist/… |
+| `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the pan half of the arbitration does not exist on the advertised peer floor: pdfjs-dist 6.2.108'… |
+| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has never executed on a runner. Its harness is proven locally -- 2026-10-04 solo… |
+| `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 4 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
 | `FR-50` | Published API Maturity | **partial** | 5/5 | 1 | the check is the last step of npm run verify, which no CI job calls, so an untagged export fails… |
-| `FR-51` | Edge-Case Suite | **partial** | 5/5 | 1 | the over-large page row asserts canvas arithmetic ceilings rather than what the engine reports f… |
-| `FR-52` | Public API & Export Contract | **partial** | 5/5 | 4 | npm run check:examples does not exist, so the compile rule the PRD's own reading guide states is… |
+| `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
+| `FR-52` | Public API & Export Contract | **partial** | 5/5 | 2 | the packaging job that proves both formats from the packed artifact has never run, and no CI job… |
 | `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 3 | nothing forbids the root or /headless entry from importing the writer in future — it holds today… |
 | `FR-54` | Stable Error & Cancellation Contract | **met** | 4/5 | 0 | — |
-| `FR-55` | Worker & Source Security Contract | **partial** | 5/5 | 1 | conflicting worker configurations across simultaneous viewers are not detected, so one worker pe… |
-| `FR-56` | Feature Lifecycle Contract | **partial** | 5/5 | 2 | six of §3.7's eight obligations are absent: dependency declaration, cleanup contract, stylesheet… |
-| `FR-57` | Runtime Resource Budget Contract | **partial** | 5/5 | 3 | there is no platform probe: canvas safety is chosen from user-agent and platform labels, and the… |
+| `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
+| `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |
+| `FR-57` | Runtime Resource Budget Contract | **met** | 5/5 | 0 | — |
 | `FR-58` | Release Evidence & Consumer Verification | **absent** | 0/5 | 4 | no release candidate has ever been built and tested on a clean runner from a packed artifact — t… |
 
 <!-- FR-EVIDENCE:STATUS:END -->
@@ -187,7 +190,7 @@ now reads as history: the state of record is the generated block above.
 | `FR-15` | Search controls | `0.1`, `0.5` | done — case, whole-word, next/previous, `Indexing {percent}%` |
 | `FR-16` | AcroForm support | `0.1`; XFA renders `0.6`; `/Sig` fixtures and signing, post-`0.8` and unreleased | **partial** — `signature-sample.pdf` and `signature-signed-sample.pdf` now carry four `/FT /Sig` fields in three shapes, so the type `describeWidget`'s `Sig` arm classifies is finally in a file, and a drawn mark can be written into the field's appearance (see *Spike D*). Its display in a real viewer is measured and proven both ways (see *Signing shipped*): a file that already carries the marks paints all three boxes including the noRotate one, and a mark placed through the panel took the page's box from 0 to 856 ink pixels and stayed painted across a zoom step. XFA now renders through `XfaLayer` (`xfa-sample.pdf`, see *0.6.0 — Mark*), and a document whose template pdf.js cannot lay out **fails to load** rather than showing a blank page, so `enableXfa` on by default carries that risk |
 | `FR-17` | Form data sync | `0.1` | done |
-| `FR-18` | Annotations view and draw | `0.1` view, ink `0.5`; authoring `0.6` | **partial** — links and markup render, freehand ink draws and prints; authoring shipped in `0.6` as `annotateFeature` and, as measured, that means highlight, free text and ink — the engine cannot create or edit underline/strikeout/squiggly, and stamp and signature break the save (see *0.6.0 — Mark*). A signature drawn through the **engine's** editor is still out; a mark written through the **writer** is in the `edit` tier (see *Spike D*) |
+| `FR-18` | Annotations view, and the withdrawal of the core pen | `0.1` view, ink `0.5`; authoring `0.6`; core ink withdrawn `0.12`/W6 | **met, and the second half of the row is a deletion.** Links and markup rendered, and until this package the core also drew: freehand ink shipped at `0.1.2` printed with the page and never reached a download, while `annotateFeature`'s ink is a real `/Ink` annotation that does — two pens, one of which loses the reader's work silently. So `usePdfInk`, `InkLayer`, the stroke helpers and the pen option lists leave `.` and `/headless` (fifteen published names, recorded name-by-name in `api-maturity.json` under `removed` and listed in the changelog), the toolbar's `draw` control goes with them, the shell's `isPinchingDisabled` predicate goes because core drawing was its only supplier, and the print path stops compositing strokes nobody persisted. Authoring itself stayed where the `0.6` measurement put it — highlight, free text and ink, with the engine unable to create or edit underline/strikeout/squiggly and stamp and signature breaking the save (see *0.6.0 — Mark*) — and it is now the package's only pen. A signature drawn through the **engine's** editor is still out; a mark written through the **writer** is in the `edit` tier (see *Spike D*) |
 | `FR-19` | High-fidelity printing | `0.1`, ranges `0.5` | done — iOS Safari is excluded by design, and `PRD` FR-19 now says so, alongside the scale ladder and the 256 MiB budget it never used to state |
 | `FR-20` | Document download | `0.1` incremental, `0.7` flatten | **done in two tiers** — the default download is `doc.saveDocument()`, an incremental save that carries form values *and* `0.6`'s marks but leaves them interactive; a true flatten (appearance streams moved into page content, fields gone) lives behind the opt-in `edit` tier, which is the only path allowed a PDF writer. Measured on `form-sample.pdf`: 5,582 B / 11 widgets interactive against 6,202 B / 0 widgets with the value read back as page text |
 | `FR-21` | Opt-in feature registration | `0.4` | done |
@@ -219,7 +222,7 @@ now reads as history: the state of record is the generated block above.
 | `FR-47` | Touch and gesture arbitration | `0.10` | **built 2026-10-01, and one gesture was dead.** pdf.js's `TouchManager` claims a two-finger `touchmove` with `preventDefault` and `stopPropagation` *before* it knows whether the span between the fingers changed, and this viewer answered only the zoom half — so a two-finger pan reached us, did nothing, and was taken away from the browser that would have scrolled. `onPanning` now scrolls the container by the midpoint delta; the viewport declares `touch-action: pan-x pan-y` and `overscroll-behavior: contain`, which is the only way to state the policy before a listener can win a race; the freehand layer keeps the fingers while it is armed; and a consumed gesture still bubbles with `defaultPrevented` set rather than being stopped, because starving the host's listeners is the failure the requirement names. Measured in Chromium with synthetic touches: pinch `fit-width → 1.73` with the move prevented, and a 120 px two-finger drag moving `scrollTop` by 120 with the scale unchanged. What still needs the devices of `#141` is narrower than it was: whether the browser commits to its own pan before the first `touchmove` reaches JavaScript |
 | `FR-48` | Browser and engine verification matrices | `0.12` | **built on one engine, unrun on the other two.** `npm run test:browsers` (`scripts/browser-matrix.mjs`) serves the playground from source and drives thirteen claims in Chromium, Firefox and WebKit at 1280×900 and a 375×812 dpr-2 mobile profile: painted ink over the whole canvas, backing-store density against `devicePixelRatio`, selectable text, search marks and the no-hits state, thumbnails and outline, the 1,000-page fixture's slot count, the fold at 375, keyboard paging *including* the documented `ArrowRight` exemption, wheel zoom against plain scroll, pinch against two-finger pan, forced colours, uncaught errors. Chromium: **23 ok and 1 skip**, and the skip is a finding — its mobile emulation delivers no wheel events to the page at all. **Firefox and WebKit never started on this host**: Playwright's own validator refuses Firefox over `mozglue.dll`, which is present and survives a fresh 122 MB re-download, and `firefox.exe --version` from its own folder exits `0xC0000142` (DLL initialisation failed); WebKit's launcher does the same. Media Foundation and both VC runtimes are in System32, so the usual explanations do not fit and *why* is not established — and since no code of ours ran, neither row is passed, failed or measured. `ci.yml` grew a sixth job, `browser`, on `ubuntu-latest` with `--with-deps`; that job is the instrument for the two missing engines and has never run. The engine axis *inside a browser* is still open: the matrix runs against the pinned engine in `node_modules`, and §8's row names an engine matrix, not a build-only one. Edge's per-release pass and the real-device passes (`#141`) are a different kind of evidence and are not this job |
 | `FR-49` | Benchmark fixture suite, profiles A–D | `0.12` | **A and B have fixtures and a harness; C and D have neither.** `npm run bench` (`scripts/benchmark.mjs`) serves the playground, drives the fixtures in Chromium, and keeps §6's two kinds of number apart: **bars** are structural and fail the run — bounded canvas count, canvases released rather than kept, the caps binding where they should — and **measures** are timings printed with the machine and never failed on, because §6's rule is that a maximum observed on one device is not a promise a slower one keeps. Profile A (`long-sample.pdf`): a cold page reached ink in **100 ms** — at §6's bar, not under it, which is the honest reading of one machine — with 4 canvases and 4 slots the most mounted anywhere in a forty-step pass and no blank sample. Profile B (`scan-sample.pdf`, new: `scripts/make-scan-pdf.mjs`, twelve 2550×3300 RGB scans, 0.82 MB on disk and 8.4 MP per page decoded): **25 % ink** per page where a text page manages 0.5 %, cold page 25 ms, 3 canvases and 3 slots at the peak. The most useful result is which ceiling actually binds: at dpr 2 and 500 % a letter page would want 48.5 MP, the screen-relative cap on a 1280×900 display says 13.8 MP, the canvas came back at 13.8 MP rendered at **1.07× instead of 2×** — and the page still painted. Three of this script's own bars were wrong before they were right, and the file says how: a 400 % zoom on a dpr-1 desktop never engaged any cap; counting canvases that had left the DOM measured nothing, because a removed element is not in `document` to be queried; and comparing live *pixel* totals across the scroll failed on A for a reason that was not a leak — its pages have three boxes, so the count is the box-independent instrument. **Open:** profile C (vector-heavy) and D (low-memory device) have no fixture, and the harness reports that rather than reporting nothing about them |
-| `FR-50` | Published API maturity tags | `0.12` | **built.** `api-maturity.json` carries a state for each of the **315** distinct names reachable from the twelve JS entries — **272 stable, 43 experimental, 0 deprecated** — and `npm run check:maturity`, the last step of `verify`, reads the surface out of `dist/` through `scripts/api-names.mjs` (shared with the §4 inventory, so the two cannot disagree about what is public) and fails on an untagged export, a tag with no name behind it, a non-stable name with no reason, or an invented fifth state; it grades nine synthetic violations against itself first, because a check that has never seen a bad input has not been shown to be a check. The classification is derived rather than decided: stable means reachable from a published entry at the `0.9.0` close, experimental means it arrived in the still-unpublished `0.10`/`0.11` — a shape cannot be learned from use that has had none. Twelve older names were moved by hand and each states its reason: the core freehand ink group (open `#124` proposes retiring it) and the four signing helpers (where the signing surface lives is open even though the capability is not). The docs site's *Stability* table is generated from the same JSON, so it cannot drift from the promise. **Not done:** the manifest is not shipped in the tarball and has no export-map subpath — a consumer reads the states from the docs, not from `node_modules` |
+| `FR-50` | Published API maturity tags | `0.12` | **built.** `api-maturity.json` carries a state for each distinct name reachable from the twelve JS entries — **320** as this is written, 263 stable and 57 experimental, with the 15 withdrawn names in a `removed` ledger — and `npm run check:maturity`, the last step of `verify`, reads the surface out of `dist/` through `scripts/api-names.mjs` (shared with the §4 inventory, so the two cannot disagree about what is public) and fails on an untagged export, a tag with no name behind it, a non-stable name with no reason, or an invented fifth state; it grades nine synthetic violations against itself first, because a check that has never seen a bad input has not been shown to be a check. The classification is derived rather than decided: stable means reachable from a published entry at the `0.9.0` close, experimental means it arrived in the still-unpublished `0.10`/`0.11` — a shape cannot be learned from use that has had none. Twelve older names were moved by hand and each states its reason: the core freehand ink group (open `#124` proposes retiring it) and the four signing helpers (where the signing surface lives is open even though the capability is not). The docs site's *Stability* table is generated from the same JSON, so it cannot drift from the promise. **Not done:** the manifest is not shipped in the tarball and has no export-map subpath — a consumer reads the states from the docs, not from `node_modules` |
 | `FR-51` | Edge-case suite | `0.12` | **built and consolidated.** `src/lib/edge-cases.test.ts` is the matrix in one named place: the six shapes the requirement words — truncated mid object, xref past the end, encrypted, wrong password, rotated page, over-large page — each carrying one of exactly three outcomes (`recovers` / `refuses` / `parks`), so the distinction the reader depends on is the thing asserted rather than inferred from six files. Four rows are re-established against the engine in that process; two are cited to the file that must hold them, and the file says why: the wrong-password re-prompt loops at ~27,000 asks a second and starves every later load in the Node fake worker, and the over-large page has no fixture — its ceilings are arithmetic in `canvas.test.ts`, and the honest statement of that gap is a task, not a passing test. Three guards keep the table from quietly becoming decoration: the six keys are pinned to the requirement's list, every citation must still anchor on an `it(` in the file it names, and the four in-process rows record that they ran, which an `it.skip` cannot hide. It also establishes a fact no earlier test had: `/Rotate` reaches `page.rotate` from the file and `getViewport` swaps the box (page 5 rotated, page 8 wide with no rotation, so the swap is not a reporting quirk). **Open:** an oversize-page fixture, so that row can be measured against a document rather than a formula |
 
 **`FR-20` in full**, because it is the item whose answer is now split across two tiers. The default
@@ -417,7 +420,7 @@ Every requested feature, and the release that ships it.
 | Drag-and-drop loading | `0.2` done | off by default; `acceptDrop` gates it, `onDropFile` always fires |
 | Fullscreen | `0.2` done | webkit spellings covered, control hidden where unsupported |
 | Accessibility | `0.2`, `0.6` | keyboard done in `0.2` → annotation access in `0.6`. The full audit the row promised for `0.8` was not done there; it is a `1.0` item. |
-| Internationalization | `0.2`, `0.8` done | 144 strings behind one typed catalog; `de`, `es` and `fr` ship complete from `0.8` as `pdfjs-react-reader/locales/<lang>` |
+| Internationalization | `0.2`, `0.8` done | 136 strings behind one typed catalog (147 before FR-18 withdrew the ink controls); `de`, `es` and `fr` ship complete from `0.8` as `pdfjs-react-reader/locales/<lang>` |
 | Advanced JS API | `0.2`, `0.5`, `0.6` | handle + events done in `0.2` → find controller → popups |
 | Mobile optimization | `0.2`, `0.8` | gestures done in `0.2`; the real-device matrix is still open (`#141`) and cannot be run from this harness |
 | **Basic vs full bundle weight** | **`0.4` done** | opt-in features; core shell 22.97 kB gz bundled (the `0.5` line, post-close), each feature 0.71–2.49 kB over it |
@@ -1942,7 +1945,7 @@ written for the purpose, the writer already in the tree does it.
   of that lookup quietly lost a field. The fixture's self-check caught it as "3 expected, 2 found".
 * **Appearances are written in page coordinates**, with `/BBox` set to the widget's own `/Rect`.
   A path recorded in the same space needs no matrix and no translation — and that space is the one
-  `lib/ink.ts` has stored strokes in since `0.5`. Three marks cost 3,265 → 5,437 bytes.
+  `lib/ink.ts` (withdrawn by FR-18 in this same release package) stored strokes in from `0.5` to `0.11`. Three marks cost 3,265 → 5,437 bytes.
 * One mark, several boxes: the mark is held **relative to its box** (0–1 across, y up) and scaled
   per widget, so a field displayed twice at two sizes gets a signature that fits each. Asserted by
   signing a 200×60 box and a 150×40 box with one mark and reading `82 681 m 262 699 l` out of one

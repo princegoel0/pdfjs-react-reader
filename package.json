@@ -220,19 +220,22 @@
     "test": "vitest run",
     "a11y": "vitest run src/components/a11y.audit.test.tsx src/components/a11y.page.test.tsx",
     "test:browsers": "node scripts/browser-matrix.mjs",
+    "probe:canvas": "node scripts/canvas-probe.mjs",
+    "probe:worker": "node scripts/worker-default-browser.mjs",
     "bench": "node scripts/benchmark.mjs",
     "typecheck": "tsc --noEmit",
     "size": "node scripts/check-size.mjs",
     "size:update": "node scripts/check-size.mjs --update",
     "check:packaging": "node scripts/check-packaging.mjs",
+    "check:examples": "node scripts/check-examples.mjs",
     "check:maturity": "node scripts/check-maturity.mjs",
     "check:fr-evidence": "node scripts/check-fr-evidence.mjs",
     "check:tarball": "node scripts/tarball-check.mjs",
-    "verify": "npm run typecheck && npm run test && npm run build && npm run size && npm run check:packaging && npm run check:maturity && npm run check:fr-evidence",
+    "verify": "npm run typecheck && npm run test && npm run build && npm run size && npm run check:packaging && npm run check:examples && npm run check:maturity && npm run check:fr-evidence",
     "prepublishOnly": "npm run verify"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "author": "Prince Goel",
   "peerDependencies": {

@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeaturePart, FeatureRunners, useFeatureStore, usePdfFeaturePublish } from '../components/FeatureHost';
 import { DEFAULT_LABELS } from '../lib/labels';
 import { downloadFeature } from './download';
-import { ANNOTATE_FEATURE_ID, FORMS_FEATURE_ID } from './ids';
+import { ANNOTATE_FEATURE_ID, FORMS_FEATURE_ID } from '../lib/feature-ids';
 import type { AnyPdfFeature, PdfViewerShell } from '../lib/features';
 
 const { download } = vi.hoisted(() => ({ download: vi.fn() }));

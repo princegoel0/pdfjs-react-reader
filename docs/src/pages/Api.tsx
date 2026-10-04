@@ -47,7 +47,7 @@ export function Api() {
             <td>
               <code>pdfjs-react-reader</code>
             </td>
-            <td>The viewer, its parts, the controller, the eight hooks the stock chrome needs, the feature contract and the library layer beneath them. 234 names.</td>
+            <td>The viewer, its parts, the controller, the eight hooks the stock chrome needs, the feature contract and the library layer beneath them. 239 names.</td>
           </tr>
           <tr>
             <td>
@@ -56,7 +56,7 @@ export function Api() {
             <td>
               Every hook — those eight plus <code>usePdfOptionalContent</code> and{' '}
               <code>usePdfAttachments</code> — and every library function, with no React components. For a
-              host writing its own viewer. 187 names.
+              host writing its own viewer. 197 names.
             </td>
           </tr>
           <tr>
@@ -69,7 +69,7 @@ export function Api() {
             <td>
               <code>pdfjs-react-reader/edit</code>
             </td>
-            <td>The page-rearranging and flatten tier, the signing half of it, and one of the two modules in the package that may reach the optional peer. 32 names — <code>node scripts/inventory.mjs</code> prints that number from <code>dist/edit.d.ts</code>, so it moves when the surface does.</td>
+            <td>The page-rearranging and flatten tier, the signing half of it, and one of the two modules in the package that may reach the optional peer. 36 names — <code>node scripts/inventory.mjs</code> prints that number from <code>dist/edit.d.ts</code>, so it moves when the surface does.</td>
           </tr>
           <tr>
             <td>
@@ -77,7 +77,7 @@ export function Api() {
             </td>
             <td>
               Two documents, one new file: <code>mergeDocuments</code>, <code>describeMergeSources</code>,{' '}
-              <code>usePdfMerge</code> and the plan types — 9 names. The tier&apos;s other half is the picker,
+              <code>usePdfMerge</code> and the plan types — 13 names. The tier&apos;s other half is the picker,
               and it is deliberately not here: which documents may be merged, where they come from and what
               happens to the bytes are the host&apos;s business, so the package ships the writer, the state and
               <a href="#/recipes"> a recipe</a>. The output is always a third file; a source is never written.
@@ -126,7 +126,7 @@ export function Api() {
             <td>
               <code>useViewerController</code>
             </td>
-            <td>Every piece of viewer state — page, zoom, rotation, layout, sidebar, search, ink, features — with the same props as <code>PdfViewer</code>. The other half of a host-written layout.</td>
+            <td>Every piece of viewer state — page, zoom, rotation, layout, sidebar, search, features — with the same props as <code>PdfViewer</code>. The other half of a host-written layout.</td>
           </tr>
           <tr>
             <td>
@@ -149,13 +149,13 @@ export function Api() {
             <td>
               <code>ViewerRoot</code>
             </td>
-            <td>The frame: the element carrying the theme tokens, the keyboard and drop handlers and the mounted features’ runners.</td>
+            <td>The frame: the element carrying the theme tokens, the keyboard and drop handlers and the mounted features’ runners. Beside its children it takes the host’s own <code>className</code> and <code>style</code>, added to the controller’s rather than replacing them — the arrangement is the part a host owns.</td>
           </tr>
           <tr>
             <td>
               <code>ViewerToolbar</code>, <code>ViewerSidebar</code>, <code>ViewerPages</code>
             </td>
-            <td>The three regions, reading the controller around them. <code>ViewerPages</code> is the scroll host and the virtualised rows.</td>
+            <td>The three regions, reading the controller around them. <code>ViewerPages</code> is the scroll host and the virtualised rows; <code>ViewerSidebar</code> puts the shell’s tabs in by default and takes the host’s own content instead when it is given children, in which case no tab strip is drawn.</td>
           </tr>
           <tr>
             <td>
@@ -189,13 +189,13 @@ export function Api() {
             <td>
               <code>PdfPage</code>
             </td>
-            <td>One page: canvas, text layer, annotation layer, editor layer, XFA layer, ink overlay. The most expensive subtree in the library, so it is memoised and its props are the contract.</td>
+            <td>One page: canvas, text layer, annotation layer, and the editor and XFA layers when a feature hands them in. The most expensive subtree in the library, so it is memoised and its props are the contract.</td>
           </tr>
           <tr>
             <td>
               <code>Toolbar</code>
             </td>
-            <td>The bar, planned by priority: what does not fit folds into an overflow menu. <code>ZOOM_LEVELS</code>, <code>INK_COLORS</code> and <code>INK_WIDTHS</code> are the option lists it renders, exported so a host writing its own bar can offer the same choices rather than inventing a fourth pen width.</td>
+            <td>The bar, planned by priority: what does not fit folds into an overflow menu. <code>ZOOM_LEVELS</code> is the option list it renders, exported so a host writing its own bar can offer the same choices rather than inventing a fourth zoom step. The authoring tools are not in it: they arrive with <code>annotateFeature</code> and fold into the same plan.</td>
           </tr>
           <tr>
             <td>
@@ -207,25 +207,19 @@ export function Api() {
             <td>
               <code>Sidebar</code>
             </td>
-            <td>The tab strip and the panel body, whatever tabs a mounted feature has added to it.</td>
+            <td>The tab strip and the panel body. Its <code>tabs</code> list is the strip: omit it and there is no tab that selects nothing, which is the shape a host-written sidebar needs.</td>
           </tr>
           <tr>
             <td>
               <code>ThumbnailList</code>, <code>PdfThumbnail</code>
             </td>
-            <td>The thumbnails tab: the grid, and one card. A card paints its canvas, and for a page composed from a template it also composes the form over that canvas.</td>
+            <td>The thumbnails tab: the grid, and one card. The grid reads the document, its page count, the page on screen and the rotation of each from the controller, so the only thing to pass it is a starting width; a card paints its canvas, and for a page composed from a template it also composes the form over that canvas.</td>
           </tr>
           <tr>
             <td>
               <code>OutlineView</code>
             </td>
-            <td>The outline tree, with the disclosure buttons and the destination resolution.</td>
-          </tr>
-          <tr>
-            <td>
-              <code>InkLayer</code>
-            </td>
-            <td>The SVG overlay freehand strokes are drawn into, page-local and viewport-projected.</td>
+            <td>The bookmark tree, with the disclosure buttons and the destination resolution. It takes no props: the tree is the outline tier’s publication in the controller’s store, and a click follows the place the bookmark names.</td>
           </tr>
           <tr>
             <td>
@@ -294,19 +288,17 @@ export function Api() {
             <td>
               <code>usePdfOutline</code>
             </td>
-            <td>The outline tree and the destination each entry points at.</td>
+            <td>
+              The outline tree, with the page <em>and</em> the place each entry points at —{' '}
+              <code>position</code> carries what the destination’s <code>/XYZ</code>, <code>/FitH</code> or{' '}
+              <code>/FitR</code> named, including a magnification.
+            </td>
           </tr>
           <tr>
             <td>
               <code>usePdfFormValues</code>
             </td>
             <td>The AcroForm fields and the annotation storage they write into.</td>
-          </tr>
-          <tr>
-            <td>
-              <code>usePdfInk</code>
-            </td>
-            <td>Freehand strokes per page, the settings, undo and clear.</td>
           </tr>
           <tr>
             <td>
@@ -397,7 +389,7 @@ export function Api() {
           <tr>
             <td>Canvas limits</td>
             <td>
-              <code>resolveRenderScale</code>, <code>maxRenderPixelsFor</code>, <code>readCanvasEnvironment</code>, <code>isMobileCanvasEnvironment</code>, <code>MAX_RENDER_PIXELS</code>, <code>MAX_RENDER_PIXELS_MOBILE</code>, <code>MAX_RENDER_SIDE</code>, <code>CAP_AREA_FACTOR</code>
+              <code>resolveRenderScale</code>, <code>maxRenderPixelsFor</code>, <code>resolveCanvasBudget</code>, <code>readCanvasEnvironment</code>, <code>isMobileCanvasEnvironment</code>, <code>ensureCanvasCeiling</code>, <code>probedCanvasCeiling</code>, <code>MAX_RENDER_PIXELS</code>, <code>MAX_RENDER_PIXELS_MOBILE</code>, <code>MAX_RENDER_SIDE</code>, <code>CAP_AREA_FACTOR</code>, <code>MIN_RENDER_SCALE</code>, <code>T CanvasBudget</code>, <code>T CanvasCeilingSource</code>, <code>T CanvasProbeOptions</code>
             </td>
           </tr>
           <tr>
@@ -410,12 +402,6 @@ export function Api() {
             <td>Forms</td>
             <td>
               <code>collectWidgets</code>, <code>groupWidgets</code>, <code>describeWidget</code>, <code>readFormValues</code>, <code>writeFormValues</code>, <code>readInitialValues</code>, <code>clearFormValues</code>, <code>formValuesDiffer</code>
-            </td>
-          </tr>
-          <tr>
-            <td>Ink geometry</td>
-            <td>
-              <code>drawInkStrokes</code>, <code>simplifyPoints</code>, <code>pointsBounds</code>, <code>strokeBounds</code>, <code>strokePathD</code>, <code>createStrokeId</code>
             </td>
           </tr>
           <tr>
@@ -512,8 +498,8 @@ export function Api() {
       <h2>What you may not change</h2>
       <p>
         The three shipped catalogs are frozen objects, and writing to a frozen one throws in strict mode.{' '}
-        <code>DEFAULT_LABELS</code>, <code>INK_COLORS</code>, <code>INK_WIDTHS</code>,{' '}
-        <code>HIGHLIGHT_COLORS</code>, <code>ZOOM_LEVELS</code>, <code>PRINT_SCALES</code> and{' '}
+        <code>DEFAULT_LABELS</code>, <code>HIGHLIGHT_COLORS</code>, <code>ZOOM_LEVELS</code>,{' '}
+        <code>PRINT_SCALES</code> and{' '}
         <code>DEFAULT_PAGE_ESTIMATE</code> are not, yet — they have been published mutable since{' '}
         <code>0.2</code>, and freezing one is a change for anybody who currently writes to it, which is
         exactly the behaviour worth breaking. Until that happens, copy what you need to alter:

@@ -3,6 +3,7 @@ import {
   buildPageText,
   convertMatches,
   countPerPage,
+  DEFAULT_MAX_PATTERN_UNITS,
   escapeRegExp,
   findPageMatches,
   planFind,
@@ -175,6 +176,60 @@ describe('planFind', () => {
   it('plans nothing for an empty query', () => {
     const plan = planFind('', BASE);
     expect(plan.terms).toEqual([]);
+    expect(plan.pattern).toBeNull();
+  });
+});
+
+/*
+ * FR-27's ceiling, and why the check sits where it does. Matching runs on the viewer's main thread, so the
+ * size of what may be compiled is the only protection against a pattern that would not finish — neither
+ * isolation nor a per-page deadline is in the `1.0.0` contract. A test that only checked "long pattern
+ * refused" would pass on an implementation that compiled first and measured after, so the third case below
+ * feeds a pattern that is both over the limit and malformed: the kind reported is `too-long`, which is only
+ * true if the length gate ran before `new RegExp`.
+ */
+describe('the pattern ceiling (FR-27)', () => {
+  /** A valid pattern of exactly `units` UTF-16 code units. */
+  const validPattern = (units: number): string => 'a'.repeat(units - 1) + '$';
+
+  it('compiles a pattern of exactly the default limit', () => {
+    const plan = planFind(validPattern(DEFAULT_MAX_PATTERN_UNITS), { ...BASE, regex: true });
+    expect(plan.pattern).not.toBeNull();
+    expect(plan.error).toBeNull();
+    expect(plan.errorKind).toBeNull();
+  });
+
+  it('refuses one code unit past it, and says the limit and the length it saw', () => {
+    const tooLong = validPattern(DEFAULT_MAX_PATTERN_UNITS + 1);
+    const plan = planFind(tooLong, { ...BASE, regex: true });
+    expect(plan.pattern).toBeNull();
+    expect(plan.errorKind).toBe('too-long');
+    expect(plan.error).toMatch(new RegExp(`${DEFAULT_MAX_PATTERN_UNITS}.*${tooLong.length}`));
+  });
+
+  it('checks the length before compiling, not after', () => {
+    // `(` alone is uncompilable, so a check that ran after `new RegExp` would report `invalid` here.
+    const plan = planFind('a'.repeat(300) + '(', { ...BASE, regex: true });
+    expect(plan.errorKind).toBe('too-long');
+  });
+
+  it('is host-configurable in both directions', () => {
+    expect(planFind(validPattern(8), { ...BASE, regex: true, maxPatternUnits: 8 }).pattern).not.toBeNull();
+    const refused = planFind(validPattern(9), { ...BASE, regex: true, maxPatternUnits: 8 });
+    expect(refused.errorKind).toBe('too-long');
+    expect(refused.error).toContain('8');
+    // Raising it is as much the host's call as lowering it: the bound is a default, not a ceiling on the API.
+    expect(planFind(validPattern(4_000), { ...BASE, regex: true, maxPatternUnits: 4_000 }).pattern).not.toBeNull();
+  });
+
+  it('leaves the literal path alone, where a long query is a sentence rather than a program', () => {
+    const long = 'clause '.repeat(80);
+    const plan = planFind(long, BASE);
+    expect(plan.error).toBeNull();
+    expect(plan.errorKind).toBeNull();
+    expect(plan.terms).toEqual(new Array(80).fill('clause'));
+    // The literal path escapes each word and searches for it, so its cost is in the text being scanned,
+    // not in what was typed — which is why the bound has nothing to say about it.
     expect(plan.pattern).toBeNull();
   });
 });

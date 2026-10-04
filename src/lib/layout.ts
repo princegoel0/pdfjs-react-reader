@@ -1,3 +1,15 @@
+/** A point in PDF user space (unscaled, origin bottom-left). */
+export interface PdfPoint {
+  x: number;
+  y: number;
+}
+
+/** A point in CSS pixels within the rendered page box. */
+export interface ViewportPoint {
+  x: number;
+  y: number;
+}
+
 export interface PageDims {
   width: number;
   height: number;

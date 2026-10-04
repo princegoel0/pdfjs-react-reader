@@ -1,0 +1,7 @@
+# Fixtures are binary artifacts: a byte inside them is a byte of the document, not a
+# line ending. Without this, core.autocrlf=true rewrites every PDF git sniffs as text on a
+# Windows checkout, and the byte-level assertions in src/lib/attachments.fixture.test.ts and
+# src/lib/edge-cases.test.ts then read a document nobody generated.
+*.pdf binary
+*.png binary
+*.jpg binary

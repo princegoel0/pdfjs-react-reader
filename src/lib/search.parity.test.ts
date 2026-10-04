@@ -179,10 +179,12 @@ describe('what the index cannot see', () => {
 
     const [field] = await page.getAnnotations({ intent: 'any' });
     if (!field?.id) throw new Error('the form fixture stopped carrying a widget');
-    doc.annotationStorage.setValue(field.id, VALUE);
+    // The shape a widget writes, not a bare string: `form.ts`'s `storedValue` reads `{ value: … }` back out,
+    // and pdf.js 6.4's own `setValue` signature says `object` because that is what it stores.
+    doc.annotationStorage.setValue(field.id, { value: VALUE });
 
     // The value is in storage — that is where the editor puts it — and it is not in the page's text.
-    expect(doc.annotationStorage.getRawValue(field.id)).toBe(VALUE);
+    expect(doc.annotationStorage.getRawValue(field.id)).toEqual({ value: VALUE });
     expect(matchesFromIndex(await publishIndex(doc), VALUE)).toEqual([]);
     expect((await extractPageText(doc, 0)).text).not.toContain(VALUE);
   });

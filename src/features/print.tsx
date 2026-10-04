@@ -11,7 +11,7 @@ import { formatLabel } from '../lib/labels';
 import { printRangeFor } from '../lib/print';
 import type { PrintScope } from '../lib/print';
 import type { PdfFeature } from '../lib/features';
-import { PRINT_FEATURE_ID } from './ids';
+import { PRINT_FEATURE_ID } from '../lib/feature-ids';
 
 export type { PrintScope };
 
@@ -52,9 +52,6 @@ function PrintRunner() {
   const { print, cancel, isPrinting, progress, supported } = usePdfPrint({
     doc: shell.doc,
     rotation: shell.rotation,
-    // Ink lives in core chrome, and a print that dropped the reader's drawing
-    // would be a print that lies about what is on the page.
-    getInkStrokes: shell.inkStrokesForPage,
     onError: shell.reportError,
   });
 
@@ -200,6 +197,7 @@ function PrintScopeControl() {
  */
 export const printFeature: PdfFeature<PrintFeatureState> = {
   id: PRINT_FEATURE_ID,
+  stylesheets: ['pdfjs-react-reader/print.css'],
   Runner: PrintRunner,
   controls: [
     {

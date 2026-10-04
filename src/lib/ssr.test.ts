@@ -140,7 +140,10 @@ describe('importing the package without a DOM', () => {
       /* @vite-ignore */ pathToFileURL(sourceFor('dist/lib/source.js')).href
     );
     expect(resolveSourceUrl('/files/a.pdf')).toBe('/files/a.pdf');
-    expect(classifySource('/files/a.pdf')).toEqual({ kind: 'url', url: '/files/a.pdf' });
+    // The one answer that changes with the environment (FR-01): a relative source has no base to resolve it
+    // against here, so it is refused. The FR-46 half is *how* — a returned classification with a reason code,
+    // not an exception a server render would have to catch before it can tell the host why.
+    expect(classifySource('/files/a.pdf')).toMatchObject({ kind: 'refused', reason: 'no-base-url' });
     expect(base64ToBytes('AAAA')).toEqual(Uint8Array.from([0, 0, 0]));
     // The allowlist's server behaviour is the subtle one, so both halves are pinned. A relative string
     // cannot be resolved with no document to resolve it against, so it is compared as text — which is

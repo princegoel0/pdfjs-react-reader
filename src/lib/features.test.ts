@@ -137,7 +137,7 @@ describe('findFeatureKey', () => {
     expect(when).toHaveBeenCalledWith({ supported: false }, shell);
   });
 
-  it('lets a later feature override an earlier claim on the same chord', () => {
+  it('gives a chord two features both bind to the first of them in the list', () => {
     const features = [keyFeature('first', 'g'), keyFeature('second', 'g')];
     expect(findFeatureKey(features, states({}), shell, eventFor('g'))?.feature.id).toBe('first');
   });
@@ -147,19 +147,20 @@ describe('replacedControlIds', () => {
   const feature = (id: string, replaces?: string[]): AnyPdfFeature => ({ id, replaces });
 
   it('is empty for a feature list where nobody declares a takeover', () => {
-    // The counterfactual: without this the shell's `draw` control would vanish
-    // from some viewer no one configured that way.
+    // The counterfactual: without this a built-in control would vanish from some
+    // viewer no one configured that way. No built-in is superseded today, so this
+    // is the ordinary answer rather than the exceptional one.
     expect(replacedControlIds([feature('print'), feature('forms')])).toEqual([]);
     expect(replacedControlIds(NO_FEATURES)).toEqual([]);
   });
 
   it('collects the ids from the features that do', () => {
-    expect(replacedControlIds([feature('print'), feature('annotate', ['draw'])])).toEqual(['draw']);
+    expect(replacedControlIds([feature('print'), feature('custom', ['search'])])).toEqual(['search']);
   });
 
   it('says each id once when two features drop the same control', () => {
     expect(
-      replacedControlIds([feature('annotate', ['draw']), feature('ink2', ['draw', 'search'])]),
-    ).toEqual(['draw', 'search']);
+      replacedControlIds([feature('custom', ['search']), feature('other', ['search', 'layout'])]),
+    ).toEqual(['search', 'layout']);
   });
 });

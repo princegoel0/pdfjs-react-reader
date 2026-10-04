@@ -7,6 +7,19 @@ export type NormalizedSource = { kind: 'url'; url: string } | { kind: 'data'; da
 
 /** Schemes that can carry a document. A single letter followed by `:` is a Windows drive, not a scheme. */
 const KNOWN_SCHEME_RE = /^(?:https?|blob|file|data|ftp|ws|wss):/i;
+/** Any namespaced string, so it is not a path relative to a base — `my-app://documents/a.pdf` included. */
+const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
+/**
+ * Schemes refused by name (FR-01), which is deliberately a list of *refusals* and not an allowlist of every
+ * scheme: an allowlist would refuse `my-app://documents/a.pdf` — a custom protocol a host's own desktop shell
+ * really does register — and every new document scheme on the web would need a release here. These two do not
+ * have that problem. One class is code the browser would run rather than fetch (`javascript`, `livescript`,
+ * `vbscript`, `view-source`), the other is a surface that answers only the browser and never the network
+ * (`about`, `chrome`, `chrome-extension`, `moz-extension`, `browser`, `edge`, `msedge`, `devtools`,
+ * `resource`, `filesystem`, `jar`). Fetching either shape returns nothing, or worse than nothing.
+ */
+const UNSUPPORTED_SCHEME_RE =
+  /^(?:javascript|livescript|vbscript|view-source|about|chrome|chrome-extension|moz-extension|browser|edge|msedge|devtools|resource|filesystem|file-system|jar):/i;
 const PATH_START_RE = /^(?:\/|\.\/|\.\.\/)/;
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
@@ -46,7 +59,13 @@ function documentBase(): string | undefined {
   return g.document?.baseURI;
 }
 
-/** Absolute form of a source URL, or the input when there is nothing to resolve it against. */
+/**
+ * Absolute form of a source URL, or the input when there is nothing to resolve it against.
+ *
+ * The classifier, not this function, is what refuses a relative source with no base (FR-01). This one answers
+ * a narrower question — what does the allowlist compare against — and returning the input unchanged is the
+ * honest answer to "there is no base"; the refusal happens a step earlier, where a host can see it.
+ */
 export function resolveSourceUrl(url: string): string {
   const base = documentBase();
   if (!base) return url;
@@ -58,7 +77,8 @@ export function resolveSourceUrl(url: string): string {
 }
 
 /**
- * Why `classifySource` refused a string — the three ways an upload widget's value stops being a document.
+ * Why `classifySource` refused a string — the six ways a value handed over by an upload widget, a query
+ * parameter or a config field stops being a document.
  */
 export type PdfSourceRefusal =
   /** Empty, or whitespace only: there is nothing there to load. */
@@ -79,14 +99,29 @@ export type PdfSourceRefusal =
    * (`+` arrived as a space), or the wrong payload entirely. Refused rather than decoded into garbage,
    * because the whole purpose of asking first is not to hand the parser a half-file.
    */
-  | 'bad-base64';
+  | 'bad-base64'
+  /**
+   * A scheme that cannot name a document to fetch — a script scheme the page would run (`javascript:`,
+   * `vbscript:`) or a browser-internal surface that answers only the browser (`chrome://`,
+   * `chrome-extension://`, `about:`). See `UNSUPPORTED_SCHEME_RE` for why this is a named list and not an
+   * allowlist of every scheme.
+   */
+  | 'unsupported-scheme'
+  /**
+   * A relative address (`/files/a.pdf`, `./a.pdf`, `//cdn/a.pdf`) in an environment with no document base
+   * to resolve it against — Node, a worker, a page built without one. Resolving it is not a detail:
+   * fetching `'/files/a.pdf'` with no base asks for a path on an origin nobody named.
+   */
+  | 'no-base-url';
 
 /**
  * What `normalizeSource` will do with a string, decided without loading it:
  *
  * - `url` — the engine fetches it. Scheme-shaped (`https:`, `blob:`, `data:` …), a path
  *   (`/files/a.pdf`, `./a.pdf`, `//cdn/a.pdf`), or anything with a slash or a `.pdf` suffix that the
- *   loader treats as a path.
+ *   loader treats as a path. A path-form value only means something with a document base to resolve it
+ *   against: with none — Node, a worker, a server render — it is refused as `no-base-url` rather than
+ *   guessed at.
  * - `bytes` — the string *is* the document, and `data` is the decoded file: a long pure-base64 run
  *   (≥ 128 characters, a multiple of 4, no URL characters) or a `;base64` data URL.
  * - `refused` — neither, with the `reason` above and a `message` a host can show.
@@ -118,8 +153,16 @@ function describeSource(src: string): string {
   const trimmed = src.trim();
   if (!trimmed) return 'an empty string';
   if (/^data:/i.test(trimmed)) return 'a data: URL';
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || trimmed.startsWith('//')) return describeOrigin(trimmed);
-  if (trimmed.startsWith('/')) return 'the same origin';
+  // A refused scheme has no origin to name: `new URL('chrome://settings').origin` is the *string* "null", and
+  // a message about an origin called "null" reads as a bug. The scheme is the useful fact, and naming only the
+  // scheme keeps a `javascript:` payload out of the log line.
+  if (UNSUPPORTED_SCHEME_RE.test(trimmed)) return `the ${trimmed.slice(0, trimmed.indexOf(':') + 1)} scheme`;
+  if (/^[a-z][a-z0-9+.-]*:\//i.test(trimmed)) return describeOrigin(trimmed);
+  // A path-form address carries no origin of its own, and when the base is missing the whole refusal *is*
+  // that there is no origin — so naming "the same origin" here would be the one thing not true of it.
+  if (trimmed.startsWith('//') || (!SCHEME_RE.test(trimmed) && trimmed.includes('/'))) {
+    return 'a relative address';
+  }
   const head = trimmed.split(/[?#]/)[0] ?? '';
   // Quoted exactly as before: the message is a sentence a host may match or show, and re-quoting it would be
   // churn with no security or clarity behind it.
@@ -135,7 +178,11 @@ function refusalMessage(src: string, reason: PdfSourceRefusal): string {
         ? 'a backslash is a filesystem path, never a web path'
         : reason === 'bad-base64'
           ? 'a data URL that says base64 must carry base64'
-          : 'a bare word is not a path, and fetching one returns whatever this origin serves there';
+          : reason === 'unsupported-scheme'
+            ? 'that scheme cannot name a document to fetch'
+            : reason === 'no-base-url'
+              ? 'there is no document base URL to resolve it against, so nothing names the origin to fetch'
+              : 'a bare word is not a path, and fetching one returns whatever this origin serves there';
   return (
     `Unrecognized PDF source ${describeSource(src)}: ${why}. Expected a URL, a path, ` +
     'a base64 string, or an ArrayBuffer, Uint8Array or Blob of file bytes.'
@@ -170,7 +217,22 @@ export function classifySource(src: string): PdfSourceClassification {
     }
   }
 
-  if (KNOWN_SCHEME_RE.test(trimmed) || PATH_START_RE.test(trimmed) || trimmed.startsWith('//')) {
+  if (UNSUPPORTED_SCHEME_RE.test(trimmed)) {
+    return {
+      kind: 'refused',
+      reason: 'unsupported-scheme',
+      message: refusalMessage(src, 'unsupported-scheme'),
+    };
+  }
+
+  const schemeShaped = KNOWN_SCHEME_RE.test(trimmed);
+  if (schemeShaped || PATH_START_RE.test(trimmed) || trimmed.startsWith('//')) {
+    // A path-form string is relative, and a relative address names an origin only through the document base.
+    // With no base there is nothing to fetch, so this is the refusal FR-01 asks for rather than a guess at
+    // whatever origin the host happened to be standing on.
+    if (!schemeShaped && !documentBase()) {
+      return { kind: 'refused', reason: 'no-base-url', message: refusalMessage(src, 'no-base-url') };
+    }
     return { kind: 'url', url: trimmed };
   }
 
@@ -188,6 +250,12 @@ export function classifySource(src: string): PdfSourceClassification {
   const looksLikePath = trimmed.includes('/') || /\.pdf($|[?#])/i.test(trimmed);
   if (!looksLikePath) {
     return { kind: 'refused', reason: 'bare-name', message: refusalMessage(src, 'bare-name') };
+  }
+  // Path-shaped and scheme-less with no base is the same refusal as `/files/a.pdf`: `documents/report.pdf`
+  // resolves against a page, and here there is no page. A string carrying some other scheme (`my-app://…`)
+  // is absolute on its own terms and is left for the engine.
+  if (!SCHEME_RE.test(trimmed) && !documentBase()) {
+    return { kind: 'refused', reason: 'no-base-url', message: refusalMessage(src, 'no-base-url') };
   }
   return { kind: 'url', url: trimmed };
 }

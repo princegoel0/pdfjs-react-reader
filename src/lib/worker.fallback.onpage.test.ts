@@ -23,8 +23,9 @@ describe('FR-02 with the worker code already on the page', () => {
     // @ts-expect-error the worker module ships no types
     const { WorkerMessageHandler } = await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
     Reflect.set(globalThis, 'pdfjsWorker', { WorkerMessageHandler });
-    // The state `ensureWorker` leaves when every candidate 404s, written by hand because the browser
-    // entry cannot be imported in Node.
+    // The state a browser page is left in when every candidate 404s: pdf.js's own default there *is* the
+    // empty string, unlike Node, where the engine ships a relative one (`worker.default.test.tsx` holds
+    // that row). Written by hand because the browser entry cannot be imported in Node.
     pdfjs.GlobalWorkerOptions.workerSrc = '';
 
     const doc = await open(pdfjs);

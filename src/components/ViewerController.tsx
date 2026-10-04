@@ -5,17 +5,18 @@ import { usePdfDocument } from '../headless/usePdfDocument';
 import type { PdfError } from '../lib/errors';
 import { toPdfError } from '../lib/errors';
 import type { PasswordReason } from '../lib/status';
-import { usePdfInk } from '../headless/usePdfInk';
 import { usePdfPageLabels } from '../headless/usePdfPageLabels';
 import { usePdfSearch, type PdfFindController } from '../headless/usePdfSearch';
 import { usePdfVirtualizer } from '../headless/usePdfVirtualizer';
 import { applyRotation, type PageLayout, type ScaleMode } from '../lib/layout';
-import { maxRenderPixelsFor, readCanvasEnvironment } from '../lib/canvas';
+import { readCanvasEnvironment, resolveCanvasBudget } from '../lib/canvas';
+import type { CanvasBudget } from '../lib/canvas';
 import { DEFAULT_LABELS, formatLabel, type PdfViewerLabels } from '../lib/labels';
 import {
   findFeatureKey,
   mergeFeaturePageProps,
   NO_FEATURES,
+  orderFeatures,
   replacedControlIds,
   type AnyPdfFeature,
   type FeaturePageProps,
@@ -25,12 +26,12 @@ import { withReplacedControls } from '../lib/toolbar';
 import { FeaturePart, useFeatureStore } from './FeatureHost';
 import type { FeatureStore } from './FeatureHost';
 import { useDevicePixelRatio } from './useDevicePixelRatio';
+import { useCanvasCeiling } from './useCanvasCeiling';
 import type { PdfViewerHandle, PdfViewerProps } from './PdfViewer';
 import type { SidebarTab, SidebarTabSpec } from './Sidebar';
 import type { ToolbarControls, ToolbarItem } from './Toolbar';
 import type { PageMatch } from '../lib/search';
 import type { PdfAnnotationState } from '../lib/editing-state';
-import type { PdfPoint } from '../lib/ink';
 import {
   enterFullscreen,
   exitFullscreen,
@@ -40,7 +41,7 @@ import {
 } from '../lib/fullscreen';
 import { isEditableTarget, pageNavigationKey } from '../lib/keyboard';
 import { clampScale, pinchScale, wheelScale, zoomBy } from '../lib/zoom';
-import { resolveDestinationPageIndex } from '../lib/outline';
+import { resolveDestination, type PdfDestinationPosition } from '../lib/outline';
 import type { OptionalContentConfigHandle } from '../lib/optional-content';
 import { createPdfLinkService } from '../lib/link-service';
 
@@ -112,6 +113,15 @@ export interface ViewerController {
   gap: number;
   devicePixelRatio?: number;
   renderPixels: number;
+  /**
+   * §6.1's combination rule as it resolved for this viewer: the effective ceiling, which of
+   * the four candidates set it, and what each of the others asked for.
+   *
+   * Published because "this page is blurry" is only actionable if a host can tell a cap from a
+   * bug — a `capped` scale with `applied: 'viewport'` is the shell behaving as designed, and
+   * with `applied: 'host'` it is the application's own number.
+   */
+  renderBudget: CanvasBudget;
   maxRowWidth: number;
   scrollToPage: ReturnType<typeof usePdfVirtualizer>['scrollToPage'];
   reportPageDims: ReturnType<typeof usePdfVirtualizer>['reportPageDims'];
@@ -124,11 +134,6 @@ export interface ViewerController {
   matchesByPage: Map<number, PageMatch[]>;
   activeLocalByPage: Map<number, number>;
   navigateToActiveAt: number;
-
-  // ---- ink -----------------------------------------------------------------
-  ink: ReturnType<typeof usePdfInk>;
-  /** Stable per page, because `PdfPage` is memoised. */
-  commitFor: (index: number) => (points: PdfPoint[]) => void;
 
   // ---- chrome --------------------------------------------------------------
   sidebarOpen: boolean;
@@ -150,6 +155,11 @@ export interface ViewerController {
   labels: PdfViewerLabels;
 
   // ---- features ------------------------------------------------------------
+  /**
+   * The host's feature list as the shell registered it: validated, and with every
+   * dependency before its dependents. A host writing their own layout mounts these in
+   * this order, so their Runners initialise the same way the shell's do.
+   */
   features: readonly AnyPdfFeature[];
   store: FeatureStore;
   shellApi: PdfViewerShell;
@@ -247,8 +257,26 @@ export function useViewerController({
    * matches the `0.3` reading, and stays as it was.
    */
   const pixelRatio = useDevicePixelRatio();
-  const autoRenderPixels = useMemo(() => maxRenderPixelsFor(readCanvasEnvironment()), [pixelRatio]);
-  const renderPixels = maxRenderPixels ?? autoRenderPixels;
+  /*
+   * FR-57 / §6.1: the effective canvas ceiling is the **minimum** of the package default, the
+   * viewport working set, the probed platform ceiling and the host's own budget, so a host
+   * value *constrains* the renderer rather than replacing it. Reading `maxRenderPixels ?? auto`
+   * instead — which is what this line used to be — let `renderPixels: 200_000_000` raise the
+   * ceiling on a device whose real limit is a fifth of that, which is the one thing a safety
+   * budget must never do.
+   */
+  const canvasEnv = useMemo(() => readCanvasEnvironment(), [pixelRatio]);
+  const platformCeiling = useCanvasCeiling(canvasEnv);
+  const renderBudget = useMemo(
+    () =>
+      resolveCanvasBudget({
+        env: canvasEnv,
+        hostPixels: maxRenderPixels,
+        platformPixels: platformCeiling,
+      }),
+    [canvasEnv, maxRenderPixels, platformCeiling],
+  );
+  const renderPixels = renderBudget.maxPixels;
   const [scaleMode, setScaleMode] = useState<ScaleMode>(defaultScale);
   const [searchOpen, setSearchOpen] = useState(false);
   const [rotation, setRotation] = useState(defaultRotation);
@@ -256,11 +284,25 @@ export function useViewerController({
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('thumbnails');
   // Bumped to redraw every page without changing any input that would otherwise
-  // rebuild it. Two things need it: a layer switched in the sidebar, and a
+  // rebuild it. Three things need it: a layer switched in the sidebar, a
   // `SetOCGState` action fired by an annotation — both change what the engine
-  // paints while leaving the viewport, the scale and the document identical.
+  // paints while leaving the viewport, the scale and the document identical — and
+  // the canvas probe answering below the ceiling pages were already painted under.
   const [contentVersion, setContentVersion] = useState(0);
   const repaint = useCallback(() => setContentVersion((version) => version + 1), []);
+  /*
+   * FR-57: the probe runs after the first paint, so the first pass is always under the assumed
+   * ceiling. When the measured one turns out to be lower, the pages on screen are holding
+   * buffers the platform may never have allocated — a blank page with a live text layer over it,
+   * which is the exact failure the ceiling exists to prevent. Repaint on the way down only: the
+   * probe answers once per realm, so there is nothing here to oscillate.
+   */
+  const appliedCeiling = useRef(renderPixels);
+  useEffect(() => {
+    const previous = appliedCeiling.current;
+    appliedCeiling.current = renderPixels;
+    if (renderPixels < previous) repaint();
+  }, [renderPixels, repaint]);
   // One `OptionalContentConfig` per document, shared by the layers panel, the
   // `SetOCGState` annotation handler and every page render. It has to be one object:
   // pdf.js rebuilds a fresh config from cached worker data on each
@@ -367,27 +409,6 @@ export function useViewerController({
     onAnnotationChangeRef.current?.(state);
   }, []);
 
-  // Always called, even when a host supplies its own: hooks cannot be conditional,
-  // and an unused built-in stays idle because nothing here calls its `search`.
-  const ink = usePdfInk({ resetKey: effectiveSrc });
-
-  // One commit handler per page, kept for the life of the viewer. PdfPage is
-  // memoised, so an inline `(points) => ink.addStroke(index, points)` here would
-  // hand every visible page a new prop identity on any chrome change — which is
-  // exactly the render this avoids. The ref keeps it correct across a document
-  // switch, when `ink.addStroke` itself is replaced.
-  const commitCache = useRef(new Map<number, (points: PdfPoint[]) => void>());
-  const addStrokeRef = useRef(ink.addStroke);
-  addStrokeRef.current = ink.addStroke;
-  const commitFor = useCallback((index: number) => {
-    let fn = commitCache.current.get(index);
-    if (!fn) {
-      fn = (points: PdfPoint[]) => addStrokeRef.current(index, points);
-      commitCache.current.set(index, fn);
-    }
-    return fn;
-  }, []);
-
   const {
     containerRef,
     virtualSlots,
@@ -412,6 +433,9 @@ export function useViewerController({
    * in view and walks outward, so the first answer comes from the part of the document they can see.
    * `focusPage` is read when a search starts and never watched — a search that restarted on every scroll
    * would never finish on the documents this is for.
+   *
+   * Always called, even when a host supplies its own: hooks cannot be conditional,
+   * and an unused built-in stays idle because nothing here calls its `search`.
    */
   const builtInSearch = usePdfSearch({
     doc,
@@ -509,6 +533,12 @@ export function useViewerController({
     [docLabel],
   );
 
+  // Declared below the shell object with the rest of the destination code; the shell reaches it the way the
+  // handle reaches `rotatePage`, through a ref, so the memo can name it before it exists.
+  const followDestinationRef = useRef<(pageNumber: number, position: PdfDestinationPosition | null) => void>(
+    () => {},
+  );
+
   const shellApi = useMemo<PdfViewerShell>(
     () => ({
       doc,
@@ -523,6 +553,8 @@ export function useViewerController({
       labels: resolvedLabels,
       labelsOverride: labels,
       scrollToPage,
+      followDestination: (pageNumber, position) =>
+        followDestinationRef.current(pageNumber - 1, position),
       setScaleMode,
       setLayout: setPageLayout,
       // Read through the ref: `rotatePage` is declared below the shell object, and calling
@@ -530,7 +562,6 @@ export function useViewerController({
       rotatePage: (page, degrees) => rotatePageRef.current(page, degrees),
       reportError: handlePageError,
       reportAnnotationChange: handleAnnotationChange,
-      inkStrokesForPage: ink.strokesForPage,
       repaint,
       contentVersion,
       optionalContentConfig,
@@ -558,7 +589,6 @@ export function useViewerController({
       scrollToPage,
       handlePageError,
       handleAnnotationChange,
-      ink.strokesForPage,
       repaint,
       contentVersion,
       optionalContentConfig,
@@ -569,14 +599,25 @@ export function useViewerController({
   // the shell itself imports no feature to do any of it.
   const store = useFeatureStore(shellApi);
 
+  /*
+   * FR-21/FR-56: the list the shell registers, which is the host's list validated and put
+   * in dependency order. This runs before the first child renders, so a duplicate id, a
+   * missing dependency or a cycle throws out of the viewer's own render rather than
+   * surfacing later as a control whose state belongs to neither of two features. Every
+   * place ordering is observable — Runner mount order, which page contribution wins, which
+   * feature claims a chord, the toolbar's fold — reads this one value, so they cannot
+   * disagree about what order the host asked for.
+   */
+  const registeredFeatures = useMemo(() => orderFeatures(features), [features]);
+
   const pageProps = useMemo(
-    () => mergeFeaturePageProps(features, store.get),
-    [features, store],
+    () => mergeFeaturePageProps(registeredFeatures, store.get),
+    [registeredFeatures, store],
   );
 
   const featureItems = useMemo<ToolbarItem[]>(() => {
     const items: ToolbarItem[] = [];
-    for (const feature of features) {
+    for (const feature of registeredFeatures) {
       const state = store.get(feature.id);
       for (const control of feature.controls ?? []) {
         if (control.available && !control.available(state, shellApi)) continue;
@@ -593,28 +634,28 @@ export function useViewerController({
       }
     }
     return items.sort((a, b) => a.priority - b.priority);
-  }, [features, store, shellApi, resolvedLabels]);
+  }, [registeredFeatures, store, shellApi, resolvedLabels]);
 
   // A feature that supersedes a built-in says so in `replaces`; hiding it here is
   // what lets the shell do that without importing the feature it is hiding.
   const toolbarControls = useMemo(
-    () => withReplacedControls(controls, replacedControlIds(features)),
-    [controls, features],
+    () => withReplacedControls(controls, replacedControlIds(registeredFeatures)),
+    [controls, registeredFeatures],
   );
 
   const featurePanels = useMemo<SidebarTabSpec[]>(    () =>
-      features
+      registeredFeatures
         .filter((feature) => feature.panel)
         .map((feature) => ({
           id: feature.panel!.id,
           label: feature.panel!.label(resolvedLabels, store.get(feature.id)),
         })),
-    [features, store, resolvedLabels],
+    [registeredFeatures, store, resolvedLabels],
   );
 
   const activePanel = featurePanels.find((entry) => entry.id === sidebarTab);
   const activePanelFeature = activePanel
-    ? features.find((feature) => feature.panel?.id === activePanel.id)
+    ? registeredFeatures.find((feature) => feature.panel?.id === activePanel.id)
     : undefined;
   const ActivePanel = activePanelFeature?.panel?.render;
 
@@ -663,7 +704,7 @@ export function useViewerController({
 
     // A mounted feature gets the chord first: Ctrl/Cmd+P belongs to print, and
     // print is only here because the application put it here.
-    const claimed = findFeatureKey(features, store.get, shellApi, event);
+    const claimed = findFeatureKey(registeredFeatures, store.get, shellApi, event);
     if (claimed) {
       event.preventDefault();
       claimed.binding.run(store.get(claimed.feature.id), shellApi, event);
@@ -704,8 +745,6 @@ export function useViewerController({
   // ---- wheel and pinch zoom ------------------------------------------------
   const resolvedScaleRef = useRef(resolvedScale);
   resolvedScaleRef.current = resolvedScale;
-  const drawingRef = useRef(ink.drawing);
-  drawingRef.current = ink.drawing;
 
   // Registered natively with `passive: false`: React attaches its own `wheel`
   // listener passively, so `preventDefault()` from an `onWheel` prop is a no-op
@@ -768,11 +807,6 @@ export function useViewerController({
           el.scrollLeft -= dx;
           el.scrollTop -= dy;
         },
-        // The freehand layer wants every finger while it is armed: a pinch that
-        // zoomed mid-stroke would move the page under the pen, and `#onTouchStart`
-        // bails on this predicate before it claims anything, which leaves the
-        // sequence to the layer's own `touch-action: none`.
-        isPinchingDisabled: () => drawingRef.current,
       });
     } catch {
       return;
@@ -842,6 +876,68 @@ export function useViewerController({
   const docRef = useRef(doc);
   docRef.current = doc;
 
+  // ---- destinations: a click lands on a page *and* at a place ----
+  const rotationRef = useRef(rotation);
+  rotationRef.current = rotation;
+  const pageRotationsRef = useRef(pageRotations);
+  pageRotationsRef.current = pageRotations;
+
+  /**
+   * The destination whose scroll is waiting for its own zoom to land.
+   *
+   * A `/XYZ` that names a magnification has to change the scale *first*, because its point is a distance down
+   * the page as displayed: scroll to the offset measured at the old scale and the heading the author aimed at
+   * arrives somewhere else in the page once the new one paints. So such a click parks its place here, and the
+   * effect below follows it the render after `resolvedScale` moves.
+   */
+  const pendingDestination = useRef<{ pageIndex: number; position: PdfDestinationPosition } | null>(null);
+
+  /** Scroll so the place a destination names meets the top of the viewport. */
+  const scrollToPlace = useCallback(async (pageIndex: number, position: PdfDestinationPosition) => {
+    const current = docRef.current;
+    const page = current ? await current.getPage(pageIndex + 1).catch(() => null) : null;
+    if (!page || position.top === null) {
+      // No proxy to ask, or a destination that names no vertical place: the top of the page — which is also
+      // what a bare `/Fit` asks for, and what every outline click did before the place was carried at all.
+      scrollToPageRef.current(pageIndex + 1);
+      return;
+    }
+    // The engine's own viewport is the only thing here that knows how a rotated page maps its user space onto
+    // the box the reader sees: `convertToViewportPoint` answers with y measured down from that box's top edge
+    // and already multiplied by the scale, which is exactly the offset `scrollToPage` takes.
+    const viewport = page.getViewport({
+      scale: resolvedScaleRef.current,
+      rotation: (page.rotate + rotationRef.current + (pageRotationsRef.current[pageIndex] ?? 0)) % 360,
+    });
+    const [, y] = viewport.convertToViewportPoint(position.left ?? 0, position.top);
+    scrollToPageRef.current(pageIndex + 1, 'auto', Math.max(0, Math.round(y)));
+  }, []);
+
+  /** Follow a resolved destination: the zoom it asks for if it asks for one, then the place. */
+  const followDestination = useCallback(
+    (pageIndex: number, position: PdfDestinationPosition | null) => {
+      const zoom = position?.zoom ?? null;
+      if (position && zoom !== null && Math.abs(zoom - resolvedScaleRef.current) > 1e-3) {
+        pendingDestination.current = { pageIndex, position };
+        setScaleMode(clampScale(zoom));
+        return;
+      }
+      void scrollToPlace(
+        pageIndex,
+        position ?? { kind: 'Unknown', left: null, top: null, zoom: null },
+      );
+    },
+    [scrollToPlace],
+  );
+  followDestinationRef.current = followDestination;
+
+  useEffect(() => {
+    const pending = pendingDestination.current;
+    if (!pending) return;
+    pendingDestination.current = null;
+    void scrollToPlace(pending.pageIndex, pending.position);
+  }, [resolvedScale, scrollToPlace]);
+
   // Resolve the document's one shared layer config. Fetched per document, kept in
   // state so pages re-render with it, and mirrored into a ref so the link service —
   // which is stable across renders — can mutate the same object the pages read.
@@ -892,8 +988,10 @@ export function useViewerController({
               return;
             }
           }
-          const index = await resolveDestinationPageIndex(current, target);
-          if (index !== null) scrollToPageRef.current(index + 1);
+          // One resolver for a bookmark and an in-page link, because a `/Dest` does not care which of the two
+          // carried it: both name a page *and* a place, and the second half used to be thrown away here too.
+          const found = await resolveDestination(current, target);
+          if (found) followDestination(found.pageIndex, found.position);
         },
         onSetOCGState: (action) => {
           // Mutate the shared config, then ask for a redraw. Fetching a config here
@@ -925,7 +1023,7 @@ export function useViewerController({
   );
 
   const rotate = useCallback((delta: number) => {
-    setRotation((r) => (((r + delta) % 360) + 360) % 360);
+    setRotation((r) => normalizeRotation(r + delta));
   }, []);
 
   // Ensure zoomed-in rows wider than the viewport stay reachable via
@@ -1003,6 +1101,7 @@ export function useViewerController({
     gap,
     devicePixelRatio,
     renderPixels,
+    renderBudget,
     maxRowWidth,
     scrollToPage,
     reportPageDims,
@@ -1013,8 +1112,6 @@ export function useViewerController({
     matchesByPage,
     activeLocalByPage,
     navigateToActiveAt,
-    ink,
-    commitFor,
     sidebarOpen,
     setSidebarOpen,
     sidebarTab,
@@ -1032,7 +1129,7 @@ export function useViewerController({
       percent: Math.round(resolvedScale * 100),
     }),
     labels: resolvedLabels,
-    features,
+    features: registeredFeatures,
     store,
     shellApi,
     pageProps,

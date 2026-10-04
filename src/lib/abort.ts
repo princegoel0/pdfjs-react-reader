@@ -17,12 +17,14 @@
  * also why there is no `composeAbort` here: nothing in the package needs two signals merged into one, and a
  * helper only its own tests call is surface area, not a feature.
  *
- * Worth recording while it is fresh: `AbortSignal.any` is Chrome 116, Safari 17.4 and Firefox 124. When this
- * module was written the advertised floors were Chrome 90 / Safari 14 / Firefox 90, so avoiding it was a
- * compatibility requirement. The 2026-10-02 lock raised the floors *past* it — and pdf.js 6.0 requires it
- * natively — so nothing here is a compatibility constraint any more. The guard in `abort.test.ts` still
- * forbids the call, and task #203 decides whether it stays for a different stated reason or comes out; until
- * it does, compose signals by hand, as `onAbort` below does.
+ * One more thing worth recording, because it changed. `AbortSignal.any` is Chrome 116, Safari 17.4 and
+ * Firefox 124. When this module was written the advertised floors were Chrome 90 / Safari 14 / Firefox 90, so
+ * avoiding it was a compatibility requirement and a test in `abort.test.ts` grepped for the call. The
+ * 2026-10-02 lock raised the floors *past* it — and pdf.js 6.0 requires it natively — so under §5.6's
+ * baseline rule the guard had become the defect and it is gone (#203). What has not changed is the design:
+ * signals are still not merged here, because each effect owns a cancellation of its own lifetime and a
+ * composed signal would make a scale change look like an abandonment. That is a reason about lifetimes, not
+ * about browser versions, and it lives in the paragraph above rather than in a guard.
  */
 
 import type { PdfErrorCode } from './errors';
@@ -109,6 +111,37 @@ export function onAbort(signal: AbortSignal | undefined, handler: () => void): (
   }
   signal.addEventListener('abort', handler, { once: true });
   return () => signal.removeEventListener('abort', handler);
+}
+
+/**
+ * Sleep for `ms`, or until `signal` fires — whichever happens first — and say which one it was.
+ *
+ * A backoff wait is the one place in the package where cancelling is not just stopping work but stopping
+ * *waiting*: a reader who closes the viewer during a thirty-second interval would otherwise leave a timer
+ * alive for the remainder of it, with the load resuming to make a fortieth attempt at an origin that has
+ * been down for half a minute. The timer is cleared when the signal wins, so nothing is left to fire.
+ *
+ * Never rejects. The caller decides what an abort means for its own operation, which keeps this reusable
+ * and keeps the cancellation code of the resulting error with the caller that knows it.
+ */
+export function waitOrAbort(ms: number, signal?: AbortSignal): Promise<'waited' | 'aborted'> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve('aborted');
+      return;
+    }
+    // Declared before the timer it is called from, so the timeout callback never reads an
+    // uninitialized binding; `onAbort` reassigns it a moment later, in the same synchronous block.
+    let dispose: () => void = () => undefined;
+    const timer = setTimeout(() => {
+      dispose();
+      resolve('waited');
+    }, ms);
+    dispose = onAbort(signal, () => {
+      clearTimeout(timer);
+      resolve('aborted');
+    });
+  });
 }
 
 /**

@@ -12,6 +12,9 @@ both are shown and the code wins. Nothing here is a goal, an intention, or a pro
 
 It was generated against `0.8.0` + the signing work (commit `0fc7273`). Re-run the commands in
 [Checking this document](#checking-this-document) any time you want to see whether it has drifted.
+Rows touched since carry their own date: the core freehand ink withdrawal (FR-18, 2026-10-04) rewrote the
+name lists, the toolbar control list, the constant table and the forced-colour inventory against the source
+as it stands, and the layer lists it changed are the ones `src/lib/core-ink.withdrawal.test.ts` now reads.
 
 ---
 
@@ -46,24 +49,24 @@ React DOM, `pdfjs-dist`, and one optional writer.
 
 | Thing | Number | Where it comes from |
 | --- | --- | --- |
-| Version in `package.json` | `0.11.0` — **not published**; npm only has `0.1.0`, `0.1.1`, and `0.2`–`0.11` go out together as `1.0.0` | `package.json:2` |
+| Version in `package.json` | `0.11.0` — **not published**. The registry has three versions, `0.1.0`, `0.1.1` and **`0.1.2`** (2026-09-25), and everything from `0.2` to `0.11` goes out together as `1.0.0` | `package.json:2`, and read from the registry on 2026-10-04 with `npm view pdfjs-react-reader versions time` |
 | Module system | **Both formats** (FR-41): `format: ['esm', 'cjs']` under `"type": "module"`, so every published path is `x.js` + `x.cjs` with `x.d.ts` + `x.d.cts`, and the export map answers `import` and `require` separately | `tsup.config.ts`, `package.json` `exports` |
 | Runtime dependencies | **none** | `package.json` `dependencies` |
 | Peer dependencies | `pdfjs-dist ^6.2.108`, `react ^18 \|\| ^19`, `react-dom ^18 \|\| ^19`, `@cantoo/pdf-lib ^2.11.1` (optional) | `package.json` `peerDependencies` |
-| `engines` field | `node >= 20` — the only engine statement the package makes | `package.json` `engines` |
+| `engines` field | `node >= 22.13.0`, and it is no longer the only engine statement the package makes: `npm run check:packaging` parses §8's two Node rows out of `PRD.md`, requires them to agree with each other and with this field, and refuses a CI pin below them | `package.json` `engines`, `scripts/check-packaging.mjs` |
 | Files published | `["dist"]` only — no `src/`, no playground, no docs | `package.json` `files` |
 | Importable subpaths | **25** (12 JS entries + 3 languages + 9 stylesheets + `package.json`) | `package.json` `exports` |
-| Names on the main entry | **234** | `node scripts/inventory.mjs`, over `dist/index.d.ts` |
-| Names on `/headless` | **187** | the same, over `dist/headless.d.ts` |
-| Names on `/edit` | **32**, on `/merge` **9** | `dist/edit.d.ts`, `dist/merge.d.ts` |
-| Distinct public names, by maturity | **315** — 272 stable, 43 experimental, 0 deprecated | `api-maturity.json`, audited by `npm run check:maturity` |
-| Source files (non-test) | **80**, 15,629 lines | `src/**` |
-| Test files / tests | **76 files / 770 tests**, in two projects (`node`, `dom`) | `npm run test` |
+| Names on the main entry | **239** | `node scripts/inventory.mjs`, over `dist/index.d.ts` — all four rows below were re-run against today's `dist` on 2026-10-04; the previous figures (234 / 187 / 32 / 9) predate the names `0.12`'s first six packages published |
+| Names on `/headless` | **197** | the same, over `dist/headless.d.ts` |
+| Names on `/edit` | **36**, on `/merge` **13** | `dist/edit.d.ts`, `dist/merge.d.ts` |
+| Distinct public names, by maturity | **320** — 263 stable, 57 experimental, 0 deprecated, plus **15** in the `removed` ledger (FR-18). The split is measured, not asserted: `npm run check:maturity` prints it, and whether 57 experimental names is the right number to carry into `1.0.0` is the owner's open decision **#207** | `api-maturity.json`, audited by `npm run check:maturity` |
+| Source files (non-test) | **79**, 16,997 lines | `src/**` |
+| Test files / tests | **107 files / 1,019 tests**, in two projects (`node`, `dom`) | `npm run test` |
 | Stylesheets | 9, from 24 to 1,372 lines | `src/styles/` |
-| Fixtures | 20 PDFs, produced by 16 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded | `playground/fixtures/`, `scripts/make-*.mjs` |
-| Benchmark | `npm run bench` measures §6's profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). A and B have fixtures and numbers; C and D report that they have neither | `scripts/benchmark.mjs`, `ROADMAP.md` §1 `FR-49` |
+| Fixtures | 22 PDFs, produced by 18 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded; `vector-sample.pdf` is the only one whose cost is operators — four A1 sheets, 336 clipped cells each, 12,922 engine-reported operators a page and 0.51 MB on disk; `oversize-sample.pdf` is the only one with a page no renderer may paint — 612×792, 12,000×9,000 and 200,000×600 pt, which is the edge-case suite's sixth shape and the 0.25-minimum refusal in 1,023 bytes | `playground/fixtures/`, `scripts/make-*.mjs` |
+| Benchmark | `npm run bench` measures §6's four profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). All four have committed fixtures: C is `vector-sample.pdf` with the engine's own time taken separately through `playground/raw.html`, and D is `scan-sample.pdf` on the committed low-memory harness — 412×915 at dpr 3 with an Android user agent and 6× CDP CPU throttling, zoomed through the toolbar's overflow menu. The report is **`benchmarks/latest.json`, tracked**: §6's environment fields, each fixture's sha256, and p50/p95/max per sampled number with p99 only where there are 100+ samples. `src/lib/benchmark-record.test.ts` is what keeps that file an evidence rather than an artifact of the last run | `scripts/benchmark.mjs`, `benchmarks/latest.json`, `ROADMAP.md` §1 `FR-49` |
 | CI | 6 jobs in `ci.yml` (`verify`, `docs`, `react`, `consumer`, `packaging` for FR-41 on a Node matrix, and `browser` for FR-48 across three engines; the axe audit is a step inside `verify`), 1 deploy workflow in `docs.yml` | `.github/workflows/` |
-| Browser evidence | **Chromium 153, desktop and mobile-emulated: 23 checks ok, 1 skipped** — and the skip is a finding, because that profile delivers no wheel events to the page at all. Firefox and WebKit do not start on this host (`0xC0000142`, DLL initialisation, before any of this package's code runs), so §8's Firefox, Safari and iOS rows wait for the CI `browser` job, which has never run | `scripts/browser-matrix.mjs`, `ROADMAP.md` §1 `FR-48` |
+| Browser evidence | **Three engines, six cells, 2026-10-04: 67 ok, 5 skipped, 0 failed, 0 not runnable.** Chromium 153 desktop 12 ok / mobile 11 ok + 1 skip; Firefox 155 and WebKit 26 desktop 12 ok / mobile 10 ok + 2 skips. Every skip is the emulation's — no wheel events on the 375 px profile, and no `Touch` constructor to synthesise a pinch from on Firefox and WebKit. Each cell also prints its engine against §8's floor (153 vs 125, 155 vs 124, 26 vs 18), and §8's own policy keeps those rows `unverified`: a current build passing does not certify an older floor. Two rows in this file used to claim Firefox and WebKit would not start on this host at all; both were measured out of it, the second by a run whose failures came from two matrix processes sharing one dev-server port | `scripts/browser-matrix.mjs`, `ROADMAP.md` §1 `FR-48` |
 
 ### Bundle size, gzipped, per what you import
 
@@ -72,7 +75,7 @@ reports the worse of the two. Decimal kB. Reproduced by `npm run size`.
 
 | What you import | Size | Over core |
 | --- | --- | --- |
-| `core` — `<PdfViewer>` alone: pages, text, search, ink, thumbnails, layout, toolbar, sidebar, virtualisation, worker | **29.09 kB** | — |
+| `core` — `<PdfViewer>` alone: pages, text, search, thumbnails, layout, toolbar, sidebar, virtualisation, worker | **29.09 kB** | — |
 | `+ printFeature` | 31.63 | +2.54 |
 | `+ downloadFeature` | 29.88 | +0.79 |
 | `+ formsFeature` | 31.10 | +2.00 |
@@ -145,10 +148,10 @@ if `require()` and `import()` expose different names.
 
 | You write | You get |
 | --- | --- |
-| `pdfjs-react-reader` | Everything: the shell, the toolbar, the hooks, the library layer (234 names) |
-| `pdfjs-react-reader/headless` | Hooks + pure logic, no shell (187 names) |
-| `pdfjs-react-reader/edit` | The page-editing / flatten / signing tier (32 names) |
-| `pdfjs-react-reader/merge` | The multi-document tier (9 names): `mergeDocuments`, `describeMergeSources`, `usePdfMerge` and the plan types — **a separate entry because a viewer that only displays PDFs has no reason to carry a page-copying writer. `edit` and `merge` are the only two modules that import `@cantoo/pdf-lib`, and neither the root entry nor `/headless` re-exports either of them.** |
+| `pdfjs-react-reader` | Everything: the shell, the toolbar, the hooks, the library layer (239 names) |
+| `pdfjs-react-reader/headless` | Hooks + pure logic, no shell (197 names) |
+| `pdfjs-react-reader/edit` | The page-editing / flatten / signing tier (36 names) |
+| `pdfjs-react-reader/merge` | The multi-document tier (13 names): `mergeDocuments`, `describeMergeSources`, `usePdfMerge` and the plan types — **a separate entry because a viewer that only displays PDFs has no reason to carry a page-copying writer. `edit` and `merge` are the only two modules that import `@cantoo/pdf-lib`, and neither the root entry nor `/headless` re-exports either of them.** |
 | `pdfjs-react-reader/features/print` | `printFeature`, `createPrintFeature`, `PrintScope`, 2 types |
 | `pdfjs-react-reader/features/download` | `downloadFeature`, `createDownloadFeature`, 2 types |
 | `pdfjs-react-reader/features/forms` | `formsFeature`, `createFormsFeature`, 2 types |
@@ -169,28 +172,38 @@ if `require()` and `import()` expose different names.
 ## 4. Every name you can import, grouped
 
 The full name list from the built `.d.ts` files, grouped by what it is for, and **current through the
-`0.11` work**: 234 names on this entry, 187 on `/headless`, 32 on `/edit`, 9 on `/merge` (§2 has the same
-figures from a different measurement). The names `FR-40` and `FR-42` added are the index pair
+`0.12`'s first packages**: 239 names on this entry, 197 on `/headless`, 36 on `/edit`, 13 on `/merge`
+(§2 has the same figures, and `node scripts/inventory.mjs` prints all of them from `dist`). The four added to
+each writer tier are the error contract FR-54 re-exported there; the names `FR-40` and `FR-42` added are the
+index pair
 (`ExternalTextIndex`, `ExternalPageText`, `TextItemLike`, `buildTextIndex`, `validateTextIndex`,
 `outwardPageOrder`) and the merge plan quartet (`MergeSource`, `MergePageRef`, `MergePlan`, `MergeResult`);
 `T` below marks a type-only export, and each hook's option/result pair is
 written once rather than twenty times. `node scripts/inventory.mjs` prints the flat list per entry, so a
 disagreement between this section and the build is a fact about this section.
 
-Across all twelve entries the surface is **315 distinct names** (487 name-slots; 171 names are reachable
-from more than one entry, which is what the barrels are for). Each of the 315 carries a maturity state in
-`api-maturity.json` — **272 stable, 43 experimental, none deprecated** — and this section deliberately does
-not repeat them: a tag copied into prose is a tag that can drift from the file that is checked. The
+Across all twelve entries the surface is **320 distinct names** (510 name-slots; 181 names are reachable
+from more than one entry, which is what the barrels are for) — measured 2026-10-04 by `node
+scripts/inventory.mjs`, the tool §22 tells a reader to run before believing this section. Each of the 320
+carries a maturity state in `api-maturity.json`, and the split belongs in that file and in the command's own
+output rather than here: a tag or a count copied into prose is a tag or a count that can drift from the thing
+that is checked, and this paragraph's own previous figures — 315 / 272 / 43, from before FR-18 took fifteen
+names out — are the demonstration. The
 exceptions, each with its reason, are on the docs site's *Stability* table and in the manifest; the rule
 that keeps them in step is `npm run check:maturity`.
 
 ### Shell components (you can compose these yourself)
 `PdfViewer` `ViewerProvider` `useViewer` `ViewerLayout` `ViewerRoot` `ViewerToolbar` `ViewerSidebar`
 `ViewerPages` `Toolbar` `T ToolbarProps` `T ToolbarItem` `T ToolbarControls` `SearchBox`
-`T SearchBoxProps` `Sidebar` `T SidebarProps` `T SidebarTab` `ThumbnailList` `T ThumbnailListProps`
-`PdfThumbnail` `T PdfThumbnailProps` `OutlineView` `T OutlineViewProps` `InkLayer` `T InkLayerProps`
+`T SearchBoxProps` `Sidebar` `T SidebarProps` `T SidebarTab` `ThumbnailList`
+`PdfThumbnail` `T PdfThumbnailProps` `OutlineView`
 `PdfPage` `T PdfPageProps` `PasswordPrompt` `T PasswordPromptProps` `LabelsContext` `useLabels`
 `T PdfViewerHandle` `T PdfViewerProps`
+
+`ThumbnailList` and `OutlineView` take no props but one layout measurement each: FR-28's composed shape is
+that a part reads the controller through `useViewer()`, and the bookmark tree comes from the outline tier's
+publication in the same controller's store. `ViewerRoot` takes `className`/`style` beside `children`, which
+are the host's own layout; `ViewerSidebar` takes `children` to replace the shell's tabbed panel.
 
 ### Controller
 `useViewerController` `T ViewerController`
@@ -198,13 +211,19 @@ that keeps them in step is `npm run check:maturity`.
 ### Feature contract (write your own feature)
 `T PdfFeature` `T AnyPdfFeature` `T PdfFeatureControl` `T PdfFeaturePanel` `T PdfFeatureKeyBinding`
 `T PdfViewerShell` `T FeaturePageProps` `T FeaturePublication` `T FeatureKeyEvent` `NO_FEATURES`
-`findFeatureKey` `mergeFeaturePageProps` `samePublication` — plus the authoring hooks
+`findFeatureKey` `mergeFeaturePageProps` `orderFeatures` `samePublication` — plus the authoring hooks
 `usePdfFeatureShell` `usePdfFeaturePublish` `usePdfFeatureState` `usePdfFeatureOptions`
 `usePdfFeaturePeer` `T FeatureStore`
 
+`orderFeatures` is §3.7's registration contract in one call: it refuses a duplicate id, a missing
+dependency and a dependency cycle with `CONFIGURATION_ERROR` before anything mounts, and returns the
+list with every dependency ahead of its dependents. `T PdfFeature` carries the three fields the contract
+added with it — `dependsOn`, `stylesheets` and `cleanup` — and the shell validates the list itself, so a
+host only calls it to build their own bar in the order the Runners were mounted.
+
 ### Headless hooks
 `usePdfDocument` `usePdfVirtualizer` `usePdfSearch` `usePdfOutline` `usePdfPrint` `usePdfDownload`
-`usePdfFormValues` `usePdfInk` `usePdfOptionalContent` `usePdfAttachments` `usePdfPageLabels` — with their
+`usePdfFormValues` `usePdfOptionalContent` `usePdfAttachments` `usePdfPageLabels` — with their
 option and result types (`T UsePdfDocumentOptions`, `T UsePdfDocumentResult`, … one pair per hook) and
 `T PdfCapabilities` `T PasswordReason` `T PasswordSubmit` `T PdfLoadProgress` `T PdfFindController` and
 the `PRD.md` §3.5
@@ -223,10 +242,29 @@ a module of types only, so neither entry pays bytes for them
 *Layout & zoom:* `computeLayout` `computeSlots` `findVisibleRange` `meanBox` `spreadSample`
 `scaledPageSize` `applyRotation` `automaticFitMode` `resolveRenderScale` `T LayoutResult`
 `T PageLayout` `T ScaleMode` `T RenderScale` `T RenderScaleOptions` `T PageDims` `T VirtualSlot`
-`T VisibleRange` `T PdfViewportRef` `T ViewportPoint` `DEFAULT_PAGE_ESTIMATE` `ZOOM_LEVELS`
+`T VirtualSlotPage` `T VisibleRange` `T PdfViewportRef` `T ViewportPoint` `DEFAULT_PAGE_ESTIMATE` `ZOOM_LEVELS`
 
 *Canvas caps:* `maxRenderPixelsFor` `isMobileCanvasEnvironment` `readCanvasEnvironment`
-`MAX_RENDER_PIXELS` `MAX_RENDER_PIXELS_MOBILE` `MAX_RENDER_SIDE` `CAP_AREA_FACTOR` `BYTES_PER_PIXEL`
+`resolveCanvasBudget` `ensureCanvasCeiling` `probedCanvasCeiling`
+`MAX_RENDER_PIXELS` `MAX_RENDER_PIXELS_MOBILE` `MAX_RENDER_SIDE` `CAP_AREA_FACTOR` `MIN_RENDER_SCALE`
+`BYTES_PER_PIXEL` `T CanvasBudget` `T CanvasCeilingSource` `T CanvasProbeOptions`
+
+§6.1's four ceilings now combine in one published call: `resolveCanvasBudget` returns the minimum of
+the package default, the viewport working set, the probed platform ceiling and the host's own number,
+together with which of them won. The platform term is measured by `ensureCanvasCeiling`, which allocates
+upward until a painted pixel stops coming back and caches the answer for the realm — one surface per
+frame, from the second onward; the shell starts it two frames after mount and redraws the pages if the
+answer is lower than the ceiling they were painted under. `npm run probe:canvas`
+(`scripts/canvas-probe.mjs`) re-measures all of that in Chromium and fails if two surfaces share a frame,
+if a surface is allocated before the page paints, or if a rung exceeds the ceiling in force; the numbers
+it printed on 2026-10-03 were 3,072,000 px on a 1280×800 @1× page (its own working set, which is *below*
+the desktop default, so the probe confirmed the ceiling rather than raising it), 5,242,880 under an iPad
+user agent on a 390×844 @3× screen, and ~80 ms spread over six frames for the shell's whole search.
+`renderPixels` is a *constraint* on the result, never a replacement for it.
+Below `MIN_RENDER_SCALE` a page is refused with `RESOURCE_LIMIT` rather than painted unreadable. The
+worker side of the same contract is not a published name: pdf.js holds one worker URL per realm, and a
+second viewer configured with a different one fails its load with `CONFIGURATION_ERROR` naming both
+origins — origins only, because a signed worker URL carries its credential in its query.
 
 *Text & search:* `extractPageText` `extractAllText` `buildPageText` `findPageMatches` `convertMatches`
 `convertMatchRanges` `countPerPage` `planFind` `findStartIndex` `escapeRegExp` `invalidatePageText`
@@ -240,13 +278,17 @@ which is `FR-39`'s reading order as a pure function so it can be tested without 
 `writeFormValues` `clearFormValues` `formValuesDiffer` `AnnotationValueStore` `T FormField`
 `T FormFieldOption` `T FormFieldType` `T FormValue` `T FormWidget`
 
-*Ink:* `drawInkStrokes` `strokePathD` `strokeBounds` `pointsBounds` `simplifyPoints` `createStrokeId`
-`INK_COLORS` `INK_WIDTHS` `T InkStroke` `T InkSettings` `T PdfPoint`
+*Page geometry:* `T PdfPoint` `T ViewportPoint` — the two types the ink helpers used to share with the
+signature and page-edit paths. They outlived them: FR-18 withdrew the fifteen ink names (`usePdfInk`,
+`InkLayer`, the stroke helpers, the pen option lists) and these two moved to `lib/layout` instead, so the
+import a host already writes is unchanged.
 
 *Editing state (what pdf.js has selected):* `readEditingState` `readEditingParams` `HIGHLIGHT_COLORS`
 `DEFAULT_HIGHLIGHT_COLOR` `HIGHLIGHT_COLOR_PARAM` `HIGHLIGHT_PALETTE_STRING` `T PdfAnnotationState`
 
-*Outline:* `parseDestination` `resolveDestinationPageIndex` `T OutlineEntry` `T DestinationRef`
+*Outline:* `parseDestination` `parseDestinationPosition` `resolveDestination`
+`resolveDestinationPageIndex` `T OutlineEntry` `T DestinationRef` `T DestinationKind`
+`T PdfDestinationPosition`
 
 *Optional content:* `T OptionalContentConfigHandle`-style helpers via `usePdfOptionalContent`
 (`T OptionalContentRow`, `T OptionalContentBundle`, `T OptionalContentGroupState`,
@@ -259,7 +301,8 @@ which is `FR-39`'s reading order as a pure function so it can be tested without 
 `isPrintSupported` `printRangeFor` `PRINT_SCALES` `PRINT_MEMORY_BUDGET` `PRINT_CONTAINER_CLASS`
 `T PrintOptions` `T PrintScope`
 
-*Download:* `downloadBytes` `pdfFileName` `formatBytes` `T PdfDownloadOptions`
+*Download:* `downloadBytes` `pdfFileName` `formatBytes` `T PdfDownloadOptions` `T PdfDownloadOutcome`
+`T PdfSaveRefusal`
 
 *Load retry (FR-35):* `classifyLoadError` `DEFAULT_RETRY_POLICY` `T RetryPolicy`
 `T RetryAttemptInfo` `T RetryVerdict`
@@ -275,26 +318,29 @@ which is `FR-39`'s reading order as a pure function so it can be tested without 
 
 *Labels:* `DEFAULT_LABELS` `formatLabel` `T PdfViewerLabels` `T PdfViewerLabelsOverride`
 
-### The `/merge` tier's 9 names
+### The `/merge` tier's 13 names
 Values: `mergeDocuments` `describeMergeSources` `usePdfMerge`
 Types: `T MergeSource` `T MergePageRef` `T MergePlan` `T MergeResult` `T UsePdfMergeOptions`
 `T UsePdfMergeResult`
+Error contract, re-exported so a tier's caller can classify a failure without importing the root entry
+(FR-54): `PdfError` `T PdfErrorCode` `isPdfError` `isCancellationCode`
 
 Nothing here is re-exported from the root entry or from `/headless`, and that is the point: the root entry
 must not reach `@cantoo/pdf-lib`, so a host that never imports `/merge` cannot pull the writer in by naming
 the wrong symbol.
 
-### The `/edit` tier's 32 names
+### The `/edit` tier's 36 names
 Values: `editFeature` `createEditFeature` `arrangePages` `flattenBytes` `findSignatureFields`
 `signFields` `initialPlan` `inversePlan` `isPristine` `movePlanned` `plannedPages` `removePlanned`
 `rotatePlanned` `boxToPage` `isSignable` `padToBox` `signatureContent`
 Types: `T EditFeatureOptions` `T EditFeatureState` `T PageEditNotice` `T PagePlan` `T PdfBytes`
 `T PdfArrangeResult` `T PdfFlattenResult` `T PdfPageArrangement` `T PdfSignResult`
 `T PdfSignatureField` `T PdfSignatureMark` `T SignatureStyle` `T BoxPoint` `T PageRect` `T PadSize`
+Error contract, re-exported for the same reason as `/merge`'s (FR-54): `PdfError` `T PdfErrorCode` `isPdfError` `isCancellationCode`
 
 ---
 
-## 5. `<PdfViewer />` — all 35 props, in plain words
+## 5. `<PdfViewer />` — all 44 props, in plain words
 
 From `src/components/PdfViewer.tsx`. Anything not marked required has a sensible default.
 
@@ -307,6 +353,20 @@ From `src/components/PdfViewer.tsx`. Anything not marked required has a sensible
 | `assetUrl` | Where cMaps and standard fonts live. Defaults to your own origin; a string or `{ cMaps, standardFonts }`. |
 | `allowedSources` | A security option: list of path prefixes `src` may be. Anything else is refused **before a request is made**. Does not apply to bytes you pass directly. |
 | `enableXfa` | LiveCycle form rendering. **On by default**, and that carries a risk: a document whose template pdf.js can't lay out fails to load instead of showing a blank page. |
+
+**Loading over a network you do not control** — the eight the `0.9` release added, absent from this section
+for the same reason every other drift in §21's log happened: the section was written against the props that
+existed at `0.8`.
+
+| Prop | What it means |
+| --- | --- |
+| `httpHeaders` | Request headers for a URL `src` — an `Authorization` bearer, a signed-URL token, a tenant id. Forwarded to the engine verbatim, **never logged and never echoed into an error**. Read when a load starts and never re-read, so an inline literal does not restart the load on every render; re-open the URL to apply new ones (FR-34). |
+| `withCredentials` | Send cookies and HTTP auth for a cross-origin `src` (FR-34). |
+| `rangeChunkSize` | Bytes per range request; the engine's own default applies when omitted (FR-34). |
+| `disableRange` | Fetch the whole file in one request instead of by byte range (FR-34). |
+| `disableStream` | Turn off progressive streaming as the file arrives (FR-34). |
+| `retry` | Bounded retries for a load failure that can heal — three attempts with full-jitter backoff by default, `false` to fail on the first error. A 401, a 403, a 404, a corrupt file and an encrypted document are **never** retried (FR-35). |
+| `signal` | Stop the load from outside. Aborting is an unmount's exact equivalent and reports no error, because §3.6 says a cancellation is not a failure (FR-36). |
 
 **Starting state**
 
@@ -323,7 +383,7 @@ monitor switch repainting these pages) ·
 
 **UI and language**
 
-`className` · `style` · `labels` (override any subset of the 144 strings) · `controls` (say which
+`className` · `style` · `labels` (override any subset of the 136 strings) · `controls` (say which
 toolbar items are hidden, reordered, re-prioritised, or added — §12) · `find` (a `PdfFindController` you
 provide, so *your* Ctrl-F drives *this* search) · `features` (the tiers you mounted)
 
@@ -338,13 +398,25 @@ provide, so *your* Ctrl-F drives *this* search) · `features` (the tiers you mou
 `onCapabilities({ hasJSActions, isAcroForm, isXfa, … })` — **fire once after load and never again**, so
 a warning banner can't flicker · `onFullscreenChange(active)` · `onAnnotationChange(state)` — only fires
 if `annotateFeature` or `editFeature` is mounted · `onError(error)` · `onPasswordRequired(submit, reason)`
-(replace the built-in prompt; call `submit('pw')` or `submit(new Error())` to abandon)
+(replace the built-in prompt; call `submit('pw')` or `submit(new Error())` to abandon) ·
+`onExternalLink(url)` — when provided, the browser's own navigation is prevented and the URL arrives here;
+the viewer never decides on its own whether a link is safe to follow ·
+`onRetryAttempt(info)` — after every retryable failure, **the last one included**, so a host can write
+"retrying (2 of 3)" and then "gave up" instead of spinning (FR-35) ·
+`onProgress(progress)` — bytes as they arrive, on the channel `usePdfDocument` publishes; the shell
+forwards it and draws no bar of its own, because `percent` is `number | null` and a host that binds it to a
+width gets an empty bar rather than a NaN one (FR-37)
 
 ## 6. The handle — `useRef<PdfViewerHandle>`
 
 `goToPage(page)` · `zoomTo(scale)` · `zoomBy(factor)` · `fitTo('width' | 'page' | 'automatic')` ·
-`setLayout(layout)` · `rotate(degrees)` · `rotatePage(page, degrees)` · `openSidebar(open, tab?)` ·
-`toggleFullscreen()` · `search(query, options?)`
+`setLayout(layout)` · `rotate(degrees)` · `rotatePage(page, degrees)` · `retryPage(page)` ·
+`openSidebar(open, tab?)` · `toggleFullscreen()` · `search(query, options?)`
+
+Eleven members, which is what `scripts/inventory.mjs` reads out of `dist/index.d.ts`; `retryPage(page)` is
+FR-37's, added with the page-state union because §3.5 names a page `error` state and a reader who is shown one
+needs a way back into it without remounting the page — one counter per page, so a second retry of the same
+page is still a change and a retry of another page is not.
 
 The viewer is **uncontrolled** — it holds its own state; the handle is how you drive it.
 
@@ -358,13 +430,13 @@ array position, because reordering a list would otherwise silently remount a sur
 
 | Import | `id` | Toolbar control(s) (priority) | Sidebar panel | Keys | What you can do with it |
 | --- | --- | --- | --- | --- | --- |
-| `features/print` | `print` | `print` (8), `print-pages` (11) | — | `Ctrl/Cmd+P` when printing is supported | Print all / current / a typed range at print intent, honouring stored form values and ink; memory-budgeted resolution; cancellable with a progress bar |
+| `features/print` | `print` | `print` (8), `print-pages` (11) | — | `Ctrl/Cmd+P` when printing is supported | Print all / current / a typed range at print intent, honouring stored form values and persisted annotation marks; memory-budgeted resolution; cancellable with a progress bar |
 | `features/download` | `download` | `download` (9) | — | — | Save the original bytes, or an incremental save carrying the edits — field values and annotation marks ride the same storage |
 | `features/forms` | `forms` | — | — | — | AcroForm widgets (text, checkbox, radio, choice, button) wired to pdf.js annotation storage; `createFormsFeature({ onChange })`; get/set/reset programmatically |
 | `features/outline` | `outline` | — | **Outline** tab | — | Document bookmarks; clicking one navigates |
 | `features/layers` | `layers` | — | **Layers** tab | — | Optional-content groups; switching one redraws every page (one shared `OptionalContentConfig`) |
 | `features/attachments` | `attachments` | — | **Attachments** tab | — | List embedded files, save any one |
-| `features/annotate` | `annotate` | `draw` (6) | — | — | pdf.js's own editor manager behind **three tools only**: highlight, free text, ink. Colour picker from the engine palette, Delete live while a mark is selected, undo/redo on published state |
+| `features/annotate` | `annotate` | - | — | — | pdf.js's own editor manager behind **three tools only**: highlight, free text, ink. Colour picker from the engine palette, Delete live while a mark is selected, undo/redo on published state |
 | `features/structure` | `structure` | — | — | — | The document's own structure tree, as accessibility structure. `pageProps` and nothing else: `structureLayer` (extract marked content) and, once `MarkInfo` says tagged and the lazy chunk has arrived, `structTreeLayerBuilder` |
 | `edit` | `edit` | — | **Pages** tab (with a **Sign** section when the file has signature fields) | — | Move / rotate / remove pages as a *plan* you can step back before writing; Apply; Extract planned pages as a new file; Split at any row; Flatten; sign a box |
 
@@ -383,10 +455,10 @@ Two rules inside that table are load-bearing and easy to break:
 
 ## 8. Toolbar vocabulary
 
-The bar is 17 built-in control ids, in this built-in order
+The bar is 16 built-in control ids, in this built-in order
 (`src/lib/toolbar.ts`, `src/components/Toolbar.tsx`):
 
-`sidebar` · `prev` · `page` · `count` · `next` · `search` · `draw` · `zoomOut` · `fit` · `zoomIn` ·
+`sidebar` · `prev` · `page` · `count` · `next` · `search` · `zoomOut` · `fit` · `zoomIn` ·
 `zoomCustom` · `rotateCcw` · `rotateCw` · `rotatePage` · `fullscreen` · `layout` · `meta`
 
 Plus whatever features add. You configure it with `controls`:
@@ -399,8 +471,10 @@ Plus whatever features add. You configure it with `controls`:
 
 **The overflow is measured against the container, not the viewport** — a 320 px-wide viewer inside a
 1600 px window must fold. Two `ResizeObserver`s drive it; folding tiers in CSS are container queries at
-640 px and 440 px (`@container pjsr (max-width: 640px)` and the same at `440px`, both in `viewer.css`), with an `@supports`/`:has()` fallback written for
-Safari 14 (**never measured on a real Safari — that's open, see §20**). Touch target size keys off
+640 px and 440 px (`@container pjsr (max-width: 640px)` and the same at `440px`, both in `viewer.css`), with an `@supports`/`:has()` fallback written when
+the target was Safari 14. §8's floor is now 18, and `:has()` (15.4) and container queries (16) are both older
+than that, so the fallback is margin rather than requirement — never executed on a real Safari either way,
+which is still open and in §20. Touch target size keys off
 pointer type, not viewport width.
 
 **The `page` control shows a page's name, which is not always its number.** `usePdfPageLabels` reads
@@ -421,8 +495,6 @@ spinner, because the table it answers with is `null`.
 | Name | Value | Meaning |
 | --- | --- | --- |
 | `ZOOM_LEVELS` | `0.25 0.33 0.5 0.66 0.75 0.9 1 1.1 1.25 1.5 1.75 2 2.5 3 4 5` | The zoom picker. Any percentage 25–500 also works via `zoomTo`, and `Automatic` fits a landscape page whole / a portrait one by width |
-| `INK_COLORS` | `#d92d20 #4f46e5 #067647 #181d27` | Core freehand pen colours |
-| `INK_WIDTHS` | `1, 3, 6` px (thin / medium / thick) | Core pen widths |
 | `HIGHLIGHT_COLORS` | Yellow `#FFFF00`, Green `#00FF00`, Pink `#FF0093`, Blue `#00FFFF`, Orange `#FFC800`, Red `#FF0000`, Purple `#800080` | The editor's highlight palette, straight from the engine's own list |
 | `DEFAULT_HIGHLIGHT_COLOR` | first of the above | |
 | `PRINT_SCALES` | `2, 1.5, 1` | Tried in that order against the memory budget |
@@ -432,6 +504,7 @@ spinner, because the table it answers with is `null`.
 | `MAX_RENDER_PIXELS_MOBILE` | 5,242,880 | Mobile/iPadOS cap |
 | `MAX_RENDER_SIDE` | 32,767 px | Hard engine limit on one canvas side |
 | `CAP_AREA_FACTOR` | `200` | `devicePixelRatio` is clamped down so area stays under the cap |
+| `MIN_RENDER_SCALE` | `0.25` | The renderer lowers toward this and stops; a page that cannot be painted at or above it is refused with `RESOURCE_LIMIT` |
 | `DEFAULT_PAGE_ESTIMATE` | `{ width: 612, height: 792 }` | US Letter, used before anything is measured |
 | `CDN_ASSET_ROOT` | `https://unpkg.com/pdfjs-dist@<installed version>/` | Version-pinned, so cMaps can't mismatch the engine |
 | `NO_FEATURES` | frozen `[]` | The default `features` prop — a shared constant, so identity is stable across renders |
@@ -456,6 +529,11 @@ Freezing them is a contract change deliberately held back for `1.0` (§20). The 
    * an explicit `workerSrc` always wins, and it writes pdf.js's **process-global**
      `GlobalWorkerOptions.workerSrc` — so a second viewer passing its own value changes what every
      *later* load resolves to, while already-open documents keep their worker;
+   * `ensureWorker` probes only when `GlobalWorkerOptions.workerSrc` is **empty**, and which realms start
+     that way is measured rather than assumed: every browser does, and no Node one does (`npm run
+     probe:worker`, `src/lib/worker.default.test.tsx`), because pdf.js assigns the field from its own
+     `isNodeJS`. So a browser load runs on the probe below and a Node load runs on the engine's own
+     `'./pdf.worker.mjs'`, untouched;
    * otherwise two candidate URLs are probed in order — **relative first** (`new URL('../../pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)`),
      bare second, because a bundler rewrites a bare specifier at build time but *not* while serving
      modules in dev. Getting this wrong is how `0.1.0` shipped a 404 worker;
@@ -501,7 +579,6 @@ overlay:
 | XFA layer | A `position: absolute` child, because pdf.js's own `XfaLayer` CSS is **not** shipped — we restate the rules we depend on. |
 | structure tree | Only when `structureFeature` is mounted, the document declares itself tagged, and the page's text layer has finished. `role`d elements that `aria-owns` the text spans, appended to the canvas wrapper — **not inside the canvas**, which is where pdf.js puts its own. Measured in Chromium: our canvas is `role="img"`, and `img` makes its descendants presentational, so a tree inside it is in the DOM and nowhere in the accessibility tree. pdf.js gets away with it because its canvas is `role="presentation"`, and taking that role instead would cost the page its name. The same instance also goes to the **annotation** and **editor** layers at construction, which is how a link gets the `aria-owns` of the words it is drawn over. |
 
-Plus our own ink overlay (`InkLayer`) for the core freehand path.
 
 Three behaviours here were measured, and they are the difference between a smooth 1,000-page document
 and a stuttering one:
@@ -551,7 +628,7 @@ the viewer is not ours to see. Inside it, the four claims are:
 | Ctrl/Cmd + wheel | the viewer, zooming | `passive: false` is required — React attaches its own `wheel` listener passively, and `preventDefault` from `onWheel` is a no-op that logs |
 | Two-finger pinch | the viewer, zooming | pdf.js's `TouchManager`, which claims the `touchmove` before it knows the gesture |
 | Two-finger pan | the viewer, scrolling | the same claim, answered by `onPanning` — without it the gesture dies, because the manager already prevented it |
-| One finger on a drawing surface | the surface | `touch-action: none` there, and `isPinchingDisabled` while freehand is armed |
+| One finger on a drawing surface | the surface | `touch-action: none` in the sheet the annotate feature ships; the core has had no drawing surface since FR-18, and no `isPinchingDisabled` predicate to hand it |
 
 A consumed gesture is prevented but **not** stopped from bubbling: `event.defaultPrevented` is how a host
 learns the viewer took it, which is the DOM's own protocol and the difference between arbitrating and
@@ -601,7 +678,7 @@ document**, `<body>` gets the `pjsr-printing` class, and `@media print` hides ev
 that container — which is why the print stylesheet must be loaded for printing to look right. Each page
 is drawn to an offscreen canvas at whichever of `PRINT_SCALES` (`2, 1.5, 1`) keeps the whole job under
 `PRINT_MEMORY_BUDGET` (256 MiB); when even scale 1 does not fit, the job is refused and the message
-names how many pages *would* fit. **Stored form values and ink travel with it**, because they live in
+names how many pages *would* fit. **Stored form values and the annotation marks a feature persisted travel with it**, because they live in
 one `annotationStorage`. `Ctrl/Cmd+P` prints the same selection as the button, but only while the print
 feature is mounted and able — the binding is a feature key with `when: supported === true`.
 `isPrintSupported` is false on iOS Safari, where the print call is blocked by design — the control
@@ -722,7 +799,7 @@ merge-only consumer path measures **0.78 kB**.
 
 ## 15. Languages
 
-`src/lib/labels.ts` is the source of truth: **one typed catalog of 144 strings**, every one of them
+`src/lib/labels.ts` is the source of truth: **one typed catalog of 136 strings** — the number `src/locales/locales.test.ts` asserts, every one of them
 English, every string in the shell coming from it (toolbar labels, `aria-label`s, the "3 of 416 · p12"
 counter, error messages). `{page}`-style slots are filled by `formatLabel`.
 
@@ -730,7 +807,8 @@ counter, error messages). `{page}`-style slots are filled by `formatLabel`.
 * Three complete languages ship: `locales/de`, `/es`, `/fr` — typed as the **complete** catalog, so a new
   key in English makes all three fail to build until it's answered; each frozen; each a separate entry.
 * `src/locales/locales.test.ts` asserts what a type can't: the key list matches exactly (the count is
-  asserted, and it moved 123 → 131 → 134 → **144** as tiers landed), no value is empty or padded, every
+  asserted, and it moved 123 → 131 → 134 → 144 → 147 → **136** as tiers landed and FR-18 took the ink
+  strings back out), no value is empty or padded, every
   `{slot}` survives with its name intact, and the catalog *translates* rather than echoing English back
   (four exceptions, each named in the test).
 * `labels` overrides are **read when the control renders**, not when the viewer mounts: a partial
@@ -773,9 +851,9 @@ alone. Authoring against that leaves three jobs, and each is done in one place:
   `viewer.css`, which is why no feature sheet needs a block to follow the theme — they read the tokens.
 * Separation that a shadow carried becomes an `outline`: the overflow menu, an annotation popup, the page
   sheet against its backdrop, the thumbnail frame. A `border` would change a box the engine sizes.
-* Four declarations opt out with `forced-color-adjust: none`, each with its reason beside it: the ink
-  swatches and the strokes drawn in them (`viewer.css`), the annotation colour plate (`annotate.css`), the
-  signature pad (`edit.css`). There the colour is the reader's own choice, not chrome. `forms.css` does the
+* Three declarations opt out with `forced-color-adjust: none`, each with its reason beside it: the text
+  layer, adapted from pdf.js with the reason upstream (`viewer.css`), the annotation colour plate
+  (`annotate.css`), the signature pad (`edit.css`). There the colour is the reader's own choice, not chrome. `forms.css` does the
   opposite job — its unfocused-field tint is an SVG inside a data URL, which the override cannot reach, so
   under forced colours the image is dropped, the tint is re-declared as a system colour, and the box gets
   the `CanvasText` edge it never had (its authored border is `transparent`).
@@ -792,14 +870,14 @@ for a high-contrast theme — and they survive one, because a width and a shape 
 
 ---
 
-## 17. Tests: 76 files, 770 tests, two projects
+## 17. Tests: 107 files, 1,019 tests, two projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
 from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library). Parenthesised counts are the
 files this section has ever itemised; the rest are named, not counted, so a stale figure cannot appear here.
 
 * Logic: `assets` `attachments` `canvas` `download` `editing-state` `features` `form` `fullscreen`
-  `ink` `keyboard` `labels` `layout` `link-service` `optional-content` `outline` `page-plan`
+  `keyboard` `labels` `layout` `link-service` `optional-content` `outline` `page-plan`
   `pdf-write` (30) `print` `search` (35) `signature` `source` (17) `toolbar` `worker` `zoom` `locales`
   (16) — plus `abort` (14) `retry` (29) `search.abort` (4) and **`source.classify` (39)**, the rule that
   `classifySource` and `normalizeSource` are the same heuristic, **`ssr` (19)**, which imports every
@@ -847,9 +925,9 @@ files this section has ever itemised; the rest are named, not counted, so a stal
   literal colour must say what `forced-colors` does with it, no `forced-colors` block may author a literal,
   and the colour-only signals must each carry a non-colour channel as a declaration (§16). A rule that
   deleted the mark's `border-bottom` passes every DOM test in the repository and fails this one
-* The audit (`FR-45`): **`a11y.audit` (12)** runs axe-core's WCAG 2.0/2.1/2.2 A-and-AA tags over the
+* The audit (`FR-45`): **`a11y.audit` (11)** runs axe-core's WCAG 2.0/2.1/2.2 A-and-AA tags over the
   loading, failed and password states, the sidebar on each of its four tabs, the open search bar, an
-  outline tree, an ink layer and the password prompt — and asserts its own blind spots as a list
+  outline tree and the password prompt — and asserts its own blind spots as a list
   (`color-contrast` and `aria-hidden-focus` come back `incomplete`, because jsdom has no layout), so the
   day axe can resolve geometry the assertion fails and someone re-reads the claim. **`a11y.page` (2)**
   audits the real `PdfPage` with the engine's own text layer and our marks inside it
@@ -902,30 +980,38 @@ that was wrong.
 | `npm run build` | `tsup` → ESM + `.d.ts`, then `scripts/copy-assets.mjs` minifies the CSS and prints the deltas |
 | `npm run build:docs` | Pure `vite build docs` — **never chain a server into a build step** (an earlier version hung a CI job for six hours) |
 | `npm run test` / `typecheck` / `size` / `size:update` | vitest / `tsc --noEmit` / the gate / re-accept the gate |
-| `npm run check:packaging` | FR-41 against `dist/`: both formats and both declaration files per path, then `require()` and `import()` of every entry must expose the same names |
+| `npm run check:packaging` | FR-41 against `dist/`: both formats and both declaration files per path, then `require()` and `import()` of every entry must expose the same names. Also FR-52's map shape: every key classified, no wildcard, no `./types`, no target outside `dist/` |
+| `npm run check:examples` | FR-52 / §5.6: packs, extracts the tarball into a throwaway project and type-checks every fenced example in `PRD.md` and `README.md` plus the docs site's live examples against **the artifact**, with no `paths` mapping — the only check here that resolves the package the way a host does. Prints each skip with the requirement it waits on; runs in `verify` and in CI |
 | `npm run check:maturity` | FR-50 against `dist/`: reads the published names through `scripts/api-names.mjs` and fails if one has no maturity state in `api-maturity.json`, if a state has no name behind it, if a non-stable name has no reason, or if the file invents a fifth state. Runs itself against nine synthetic violations first. Last step of `npm run verify` |
 | `npm run check:tarball` | FR-41 against the **artifact**: `npm pack`, install the tarball beside its real peers into a CommonJS project, resolve every path both ways, and typecheck one identical source file as `.mts` and as `.cts` under `NodeNext`. Needs the network, so it is not in `verify` |
 | `npm run test:browsers` | FR-48: §8's browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; exits non-zero if a check fails **or** if an engine never started, because a row with no job behind it is not a tested row |
 | `npm run bench` | FR-49: §6's profiles against their fixtures. Prints **bars** (structural — bounded canvas count, canvases actually released, the caps binding where they should) and **measures** (timings with the machine named, never failed on). C and D report that they have no fixture |
-| `npm run verify` | typecheck → test → build → size. Also `prepublishOnly` |
+| `npm run probe:canvas` | FR-57's "detection, not labels" in Chromium: imports `src/lib/canvas.ts` through the dev server and fails unless the platform probe answers with the ceiling in force, the shell probes without being asked, one surface lands per frame, no rung allocates above the limit, and the first surface comes after the page painted. Prints the numbers, not just the verdict |
+| `npm run probe:worker` | FR-02's browser premise: reads `GlobalWorkerOptions.workerSrc` in Chromium with the playground's own worker wiring blocked, and fails if a browser entry stops starting on the empty string — the state that is why the candidate probe runs in a browser and not in Node |
+| `npm run verify` | typecheck → test → build → size → packaging → examples → maturity → fr-evidence. Also `prepublishOnly` |
 
-**CI** (`.github/workflows/ci.yml`, read-only token, `concurrency` cancelling superseded runs):
-`verify` on Node 20 **and** 22 · `docs` (skipped on `main`, where `docs.yml` publishes instead) ·
-`react` installing majors **18 and 19** and running typecheck/test/build · `consumer`, which packs the
-tarball, installs it into a throwaway Vite app against `pdfjs-dist ^6.2.108`, type-checks the shipped
-`.d.ts`, builds, and asserts the worker was bundled *and* that the relative specifier survived.
-`docs.yml` publishes the site to GitHub Pages from `main`.
+**CI** (`.github/workflows/ci.yml`, read-only token, `concurrency` cancelling superseded runs), six jobs:
+`verify` on Node **22.13.0, 22 and 24** (the contract floor, the LTS, the next major) running typecheck,
+tests, the axe audit, build, size, `npm pack --dry-run` and `check:examples` · `docs` (skipped on `main`,
+where `docs.yml` publishes instead) · `react`, which swaps in majors **18 and 19** at both their
+**minimum-advertised and latest patches** — four runs, with the two `react`/`react-dom` majors asserted to
+match — and runs typecheck/test/build · `consumer`, which packs the tarball, installs it into a throwaway
+Vite app against **`pdfjs-dist@6.2.108` and `@6.4.299`** (the advertised floor and the current 6.x, so the
+range is proved at both ends), type-checks the shipped `.d.ts`, builds, and asserts the worker was bundled
+*and* that the relative specifier survived · `packaging` on the same Node matrix, running `check:packaging`
+and `check:tarball` · and `browser`, the only job that starts one: `playwright install --with-deps chromium
+firefox webkit`, then `npm run test:browsers` and `npm run bench`.
 
-**What has actually run.** Three of those four jobs have: GitHub Actions reports 22 runs, the last green on
-both `main` and `dev` at `5059bc7` on 2026-09-24, covering `verify` (Node 20 and 22), `docs` and `consumer`.
-Two limits on that evidence, and they are the ones that matter. First, **every job runs Node on
-`ubuntu-latest`; none of them starts a browser**, so no CI run has ever exercised a rendering path, a
-Safari, or a touch device — the compatibility matrix in the README is a support claim, not a tested one.
-Second, `react` was added locally on 2026-09-29 and **has not run**, and none of the four jobs has seen any
-of the local `0.2`–`0.9` commits (`git rev-list --count origin/dev..dev`). So the React-18 evidence is local: re-run on 2026-09-29 with `react`,
-`react-dom` and both `@types/*` at 18.3.1, then `npm run verify` end to end — typecheck, the 449 tests in
-38 files that made up the suite on that date, both bundles, the size gate — and 19.3.0 was put back
-afterwards, with `--no-save` both ways, which
+**What has actually run.** Three of those six jobs have, and not on their current content: GitHub Actions
+reports 22 runs, the last green on both `main` and `dev` at `5059bc7` on 2026-09-24, covering `verify` (Node
+20 **and** 22, a matrix this file no longer describes), `docs` and `consumer`. Twenty-four commits are
+unpushed and every line above differs from what ran. Two limits on that evidence, and they are the ones that
+matter. First, **no CI run has ever started a browser**: the `browser` job is written to and has never
+executed, so every rendering, touch and forced-colours number in this repository is still local-machine
+evidence. Second, `react` was added locally on 2026-09-29 and `packaging` with it, and **neither has run** —
+so the React-18 evidence is local: re-run on 2026-09-29 with `react`, `react-dom` and both `@types/*` at
+18.3.1, then `npm run verify` end to end — typecheck, the 449 tests in 38 files that made up the suite on
+that date, both bundles, the size gate — and 19.3.0 was put back afterwards, with `--no-save` both ways, which
 is why `package.json` and `package-lock.json` show no diff.
 
 Note what the consumer job exists for: every other job resolves the package from `src` through tsconfig
@@ -933,12 +1019,15 @@ paths, so a packaging defect can only surface against the installed tarball. Tha
 a worker URL no bundler could rewrite.
 
 **Repo shape.** `dev` is the integration branch, `main` only takes deliberate merges, and `main` is the
-default branch. Nothing in the `0.2`–`0.9` range is pushed; the sequence publishes together with `1.0.0`.
-Since 2026-09-29 the sequence does not stop at `0.8`: `PRD.md` became a target specification of **51**
-requirements and the owner decided `1.0.0` ships all of them, so `0.9` Reach, `0.10` Access, `0.11` Index
-& Assemble and `0.12` Prove are planned in `ROADMAP.md` §Releases and none is started. Consequences
-accepted: CI has not run on any of the local commits, and the published docs site still shows `0.1.x`
-content. `0.1.2` is committed and deliberately never published.
+default branch. `git rev-list --count origin/dev..dev` is the authority on how far ahead local `dev` is, and
+`npm view pdfjs-react-reader versions` (read 2026-10-04) returns `0.1.0`, `0.1.1` and **`0.1.2`** — so
+nothing since `0.1.2` has been pushed or published, and the live docs site still shows `0.1.x` content.
+`0.1.2` *was* published, on 2026-09-25; the frozen-don't-publish-a-broken-0.2 discipline above is why
+nothing after it has been, and `1.0.0` is the next release the registry will see. `PRD.md` has been a target
+specification of **58** requirements since the 2026-10-02 lock, and `1.0.0` ships all of them: `0.9` Reach,
+`0.10` Access and `0.11` Index & Assemble are closed and committed on local `dev`, `0.12` Prove is built —
+its first commit `f2e9448` and the rest of the pass uncommitted as this is written — and `ROADMAP.md` §1 is
+the dated record of each. CI has run on none of it.
 
 ---
 
@@ -957,6 +1046,17 @@ Peer range is **`^6.2.108`, v5 dropped**. Two independent reasons, both measured
 
 That floor is where the security and architecture evidence points; `ROADMAP.md` §Policy conflicts holds both measurements.
 
+**A third fact about that floor, measured on 2026-10-04 while building FR-48's engine axis: `6.2.108` is a
+browser-only release.** `await import('pdfjs-dist')` at that version throws `ReferenceError: DOMMatrix is not
+defined` from the engine's own module scope and prints "Please use the `legacy` build in Node.js environments";
+`6.3.289` and `6.4.299` — the only other releases that exist in `^6.2.108` — import 62 names cleanly on Node
+24.21.0, which has no `DOMMatrix` global of its own. In a browser `6.2.108` loads and 22 of the matrix's 23
+Chromium checks pass, but `pinch-vs-pan` fails because that release's `TouchManager` has no `onPanning` (zero
+occurrences in its `build/pdf.mjs` and in its `.d.ts`), so the second finger's `touchmove` is preventDefaulted
+and nothing is handed back. Two requirements carry that as a named gap — FR-46's Node-side import and FR-47's
+pan half — and the peer-range question itself is open (task #211: move the floor to `^6.3.289`, or scope those
+two promises and say where).
+
 The 5.x *data shapes* in `src/lib/attachments.ts` are still tolerated, by decision rather than
 oversight — deleting them would turn a graceful "nothing to fetch" into a throw inside pdf.js's click
 handler — but **no other 5.x surface is supported or tested**, and `PRD.md`'s FR-25 wording now says so.
@@ -967,18 +1067,18 @@ handler — but **no other 5.x surface is supported or tested**, and `PRD.md`'s 
 
 | Item | State |
 | --- | --- |
-| **Real-device matrix** (`#141`) | **Never run.** iOS Safari 14/15 and Android Chrome are stated targets; every frame number in every document is Chromium on one Windows machine at ~145 Hz. The `:has()` container-query fallback is written but has never executed on a Safari. Either it gets run or the device claims come out |
+| **Real-device matrix** (`#141`) | **Never run.** §8 puts iOS Safari 18 and Android Chrome 125 in the contract; every frame number in every document is Chromium on one Windows machine at ~145 Hz. The `:has()` container-query fallback is written but has never executed on a Safari. Either it gets run or the device claims come out |
 | **Accessibility audit** (`#143`) | **Built in `0.10`, and it earned its keep**: axe-core over the shell's three document states, the sidebar on each tab, the search bar, four primitives and the real `PdfPage`, in the suite and as a named CI step (§17). Its first run reported `aria-required-children` on the sidebar's tablist — a close button among the tabs — which eleven earlier accessibility test files had walked past. What is left is what no audit under jsdom can see: contrast and target size need a layout, and an assistive technology has to be the reader |
 | **Whether a screen reader sees the tree** | **Not established.** The DOM is verified in Chromium (14 role nodes across the fixture's two pages, every `aria-owns` resolving to a real element, the figure's `/Alt` as its name), but the accessibility snapshot available here *filters unnamed nodes*, and pdf.js's heading and list elements carry no name of their own — they own their text by reference. So "a screen reader announces these as headings" is a claim for the `0.12` device matrix with a real AT, not something this pass proved |
-| **Core freehand ink retirement** (`#124`) | Your call, still unanswered: the shell's own ink duplicates `annotate`'s, which is the one that saves |
+| **Core freehand ink retirement** (`#124`, executed as `#200`) | **Done at FR-18.** The shell's own ink duplicated `annotate`'s and only `annotate`'s survives a save, so the core surface is withdrawn: fifteen published names, the toolbar's `draw` control, the transient print composite and the core sheet's drawing chrome. Recorded in `api-maturity.json` under `removed`, listed in `CHANGELOG.md`, guarded by `src/lib/core-ink.withdrawal.test.ts` |
 | **Freezing the mutable exports** | Held for `1.0`'s breaking window (§9). Docs tell a host to spread instead, which is correct before and after |
 | **A worker holding the writer** | The real fix for the ~1,080 ms main-thread block when applying/extracting/splitting/flattening a 1,000-page document. Not attempted: today the mitigation is that nothing takes that path unless asked |
 | **Vendoring engine CSS** | Apache-2.0 licensing question, needs a real answer before anything is copied in |
 | **Repo settings** | The `main` ruleset, and whether `1.0.0` publishes with `--provenance`. Settings, not YAML |
 | **An XFA packet whose fields bind through `dataId`** | Still needed — `XfaLayer.setAttributes` has `case "dataId": break;`, so the key is consumed for the binding and never written to the DOM, which is why that question can't be answered from a page today |
-| **Named slots / `PdfViewer.Root`** | Not built, and `0.5` **declined** them: what shipped is `controls.order`/`hide`/`priorities` plus exported parts you compose by hand. `PRD.md` §5.2 shows the slots form and labels it "not the shipped API" |
+| **Named slots / `PdfViewer.Root`** | Not built, and `0.5` **declined** them: what shipped is `controls.order`/`hide`/`priorities` plus exported parts you compose by hand. The 2026-10-02 lock rewrite removed the slots example from `PRD.md` §5 entirely — §5.2 is now the plain `<PdfViewer>` shell and §5.3 is the composed-parts shape, which compiles and runs in `npm run check:examples`. So nothing in the specification sells slots any more, and the decline is no longer a documented disagreement but simply the design |
 | **The shell's page path under jsdom** | No test has mounted the real controller against a document that had finished loading — that combination hangs the harness, twice measured to a 60 s and a 120 s kill, and `0.10` did not need to try again: `a11y.page.test.tsx` mounts `PdfPage` with a page proxy handed to it directly, which is the part of that path worth auditing. So the shell end to end is still verified in a browser and around its parts in unit tests. Two blockers found on the way, both fixable and neither trivial: jsdom's `getContext('2d')` returning `null` (stubbed there) and the virtualizer needing a sized viewport before it will mount a slot |
-| **Nothing published since `0.1.1`** | The `0.2`-onward sequence lives on local `dev` only — `git log --oneline dev` is the authority on which releases are committed — and the whole of it publishes together as `1.0.0`. CI has never seen any of it, which §19 says plainly and every "verified" claim in these files is dated by |
+| **Nothing published since `0.1.2`** | The `0.2`-onward sequence lives on local `dev` only — `git log --oneline dev` is the authority on which releases are committed — and the whole of it publishes together as `1.0.0`. CI has never seen any of it, which §19 says plainly and every "verified" claim in these files is dated by |
 
 ---
 
@@ -995,6 +1095,7 @@ were **fixed toward the code** on 2026-09-28; the entries remain as the correcti
 | PRD FR-25 requires attachments on pdf.js 5.x | Floor is `^6.2.108`; no 5.x release fixes CVE-2026-16633 | Restated: 6.x supported, 5.x shape tolerated |
 | `attachments.ts` "the peer range allows both" | It hasn't since `0.6` | Comment corrected |
 | PRD §5.3 "measured at 20.61 kB" for core | 24.96 kB today | Restated with the `0.4` figure kept as history |
+| `PRD.md` §7 used to carry the retry intervals as **250 ms / 5 s** | The 2026-10-02 lock put them in FR-35 as **three attempts, 1 s initial, 30 s ceiling**, and `DEFAULT_RETRY_POLICY` (`src/lib/retry.ts:25`) is that pair — checked by `retry.test.ts`, which still injects 250 ms / 5 s *as a host policy* to prove a configured ceiling is honoured. Recorded so the surviving 250/5000 in a test file is not read as a disagreement with the locked default | Closed at W4 (#199); §7 no longer states numbers, by rule |
 | README "React 18.3.1 tested" | No job installed 18; the last check was manual, at `0.1` | Re-verified locally **and** a `react` CI matrix added |
 | README "19.3.0, **in CI**" | The `verify` job that ran on 2026-09-24 installed whatever `package-lock.json` pinned, and no job had ever installed 18; nothing since has run at all | Row rewritten to name the machine the measurement came from; the `react` matrix job is future protection, not present evidence |
 | README Status "signing work uncommitted" | Committed as `0fc7273` | Corrected |
@@ -1085,6 +1186,8 @@ grep -rc "" src/**/*.ts src/**/*.tsx            # file inventory (§2)
 npm run test                                    # 759 tests in 74 files (§2, §17)
 npm run a11y                                    # the axe audit on its own (FR-45); it also runs inside the line above
 npm run test:browsers                           # FR-48: the §8 browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; it exits non-zero if a check fails *or* if an engine never started, because a row with no job behind it is not a tested row
+npm run probe:canvas                            # FR-57: the §6.1 probe against real Chromium — the ceiling it answers with, the ceiling a mobile UA lowers it to, and the frame every surface landed on
+npm run probe:worker                            # FR-02: what `workerSrc` holds in a browser before anything configures it (empty) and so why the candidate probe runs there
 npx vitest run src/styles/forced-colors.test.ts # §16's stylesheet rules, read from src/styles rather than from a list
 node -e "const u=require('caniuse-lite/dist/unpacker/feature'),f=require('caniuse-lite/dist/unpacker/features').features;const s=u(f['css-media-resolution']).stats;console.log(s.safari['14'],s.safari['16.0'],s.chrome['90'],s.firefox['90'])"   # the §11 `resolution` support flags (caniuse-lite is transitive, via the toolchain, not a declared dependency)
 npm run size                                    # every size figure in §2, plus the two failing rules
@@ -1092,7 +1195,7 @@ node -e "console.log(Object.keys(require('./dist/index.js')).length)"   # names 
 node --input-type=module -e "const m = await import('pdfjs-dist/legacy/build/pdf.mjs'); console.log(m.GlobalWorkerOptions.workerSrc)"   # §10: pdf.js's own Node default, which an unset `workerSrc` leaves in place
 npx vitest run --project node src/lib/worker.fallback.test.ts src/lib/worker.fallback.onpage.test.ts src/lib/worker.fallback.nocode.test.ts src/lib/worker.fallback.deadurl.test.ts   # §10's four worker states, one process each
 npm run build && node scripts/inventory.mjs   # the grouped name lists in §4, straight from dist/*.d.ts
-node scripts/check-maturity.mjs               # §4's union and §2's maturity row: the 315 distinct names, their states, and the reasons behind every non-stable one
+node scripts/check-maturity.mjs               # §4's union and §2's maturity row: the distinct names it finds in dist, their states, and the reasons behind every non-stable one
 ls playground/fixtures/*.pdf | wc -l && ls scripts/make-*.mjs | wc -l && git ls-files playground/fixtures | wc -l   # §2's fixture row: on disk, generated, and tracked — the third number is the one that catches an uncommitted fixture
 npm run bench                                 # §2's benchmark row and README's "Behaviour under load" figures, measured rather than quoted
 grep -n "MAX_RENDER\|PRINT_MEMORY\|CAP_AREA" src/lib/canvas.ts src/lib/print.ts   # §9
@@ -1110,8 +1213,10 @@ npm run serve:auth &  curl -s -o /dev/null -w '%{http_code}\n' http://localhost:
 # the "defaults" number, because a `PdfViewer` at its defaults *is* the plain import, byte for byte.
 git ls-files playground/fixtures | wc -l   # must equal `ls playground/fixtures/*.pdf | wc -l`: a generated
 #                                           # fixture that is not tracked fails a fresh clone's `npm test`,
-#                                           # which has happened four times. All 19 fixtures are tracked, as the
-#                                           # `0.11` close re-checked.
+#                                           # which has happened four times. 22 on disk since W8 added
+#                                           # `vector-sample.pdf` and `oversize-sample.pdf`; 20 tracked today,
+#                                           # those two uncommitted with the rest of the pass, so the counts
+#                                           # match again at the commit that lands them.
 git log --oneline -1 && git status --porcelain | wc -l   # what is and isn't committed
 ```
 

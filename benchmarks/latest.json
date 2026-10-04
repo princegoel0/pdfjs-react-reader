@@ -1,0 +1,324 @@
+{
+  "schema": 1,
+  "environment": {
+    "machine": "Intel(R) Core(TM) i5-14450HX",
+    "arch": "x86_64",
+    "platform": "win32",
+    "osRelease": "10.0.26300",
+    "memoryGb": 23.6,
+    "node": "v24.21.0",
+    "browser": "chromium 153.0.8010.12",
+    "engine": "6.3.289",
+    "revision": "f2e94485b8387c333450031d8e61be04f7d56394",
+    "ranAt": "2026-10-04T05:42:46.606Z"
+  },
+  "caps": {
+    "maxPixels": 33554432,
+    "maxPixelsMobile": 5242880,
+    "maxSide": 32767,
+    "capAreaFactor": 200
+  },
+  "profiles": [
+    {
+      "id": "A",
+      "name": "text-heavy",
+      "target": "cold page under 100 ms; no frame over 16.7 ms; bounded canvas count",
+      "fixture": {
+        "name": "long-sample.pdf",
+        "bytes": 375178,
+        "sha256": "f887d87dee2f3fb45ecdc237a341dd1ca0fe669f4265ee85b46bfdd7d68c7fc2"
+      },
+      "bars": [
+        {
+          "label": "canvas count stays bounded",
+          "ok": true,
+          "detail": "peak 4 canvases and 4 slots over 40 steps across 1000 pages"
+        },
+        {
+          "label": "off-screen canvases are not kept",
+          "ok": true,
+          "detail": "4 canvases held at the peak of the first third and 4 at the peak of the last, whose canvases covered 4.6 MP in total"
+        },
+        {
+          "label": "no blank page during the scroll",
+          "ok": true,
+          "detail": "0 of 40 samples had nothing mounted"
+        },
+        {
+          "label": "no canvas exceeds the area cap",
+          "ok": true,
+          "detail": "largest single canvas 4.6 MP against the 33.6 MP absolute ceiling"
+        },
+        {
+          "label": "no canvas exceeds the side cap",
+          "ok": true,
+          "detail": "widest side 1290 px against 32767"
+        },
+        {
+          "label": "at dpr 2 / 500 % the cap bites and the page survives",
+          "ok": true,
+          "detail": "largest canvas 13.8 MP against the 13.8 MP ceiling that applies here (33.6 MP absolute, 13.8 MP at 1280×900 dpr 2 × 1+200%) — clamped; rendered at 1.07× instead of 2×, 0.42 % ink, side 4422 px"
+        }
+      ],
+      "measures": [
+        {
+          "label": "document open to first ink",
+          "detail": "median 696 ms of 5 samples (621–716 ms); dev-server transforms included, so this is not §6's cold-page number",
+          "distribution": {
+            "samples": 5,
+            "p50": 696,
+            "p95": 716,
+            "p99": null,
+            "max": 716
+          }
+        },
+        {
+          "label": "cold page",
+          "detail": "median 147 ms of 5 samples (124–199 ms) to ink on page 500, 0.52 % ink, longest main-thread block 68 ms in that load, against §6’s bar of under 100 ms",
+          "distribution": {
+            "samples": 5,
+            "p50": 147,
+            "p95": 199,
+            "p99": null,
+            "max": 199
+          }
+        },
+        {
+          "label": "frame gaps / main thread",
+          "detail": "p50 16.7 ms, p95 16.8 ms, max 33.4 ms over 385 frames; longest long task 67 ms. Headless has no vsync, so no frame rate is claimed.",
+          "distribution": {
+            "samples": 385,
+            "p50": 16.7,
+            "p95": 16.8,
+            "p99": 33.4,
+            "max": 33.4
+          }
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "B",
+      "name": "image-heavy / scanned",
+      "target": "60 FPS scrolling; strict release of off-screen buffers; the area and side caps hold without a blank page",
+      "fixture": {
+        "name": "scan-sample.pdf",
+        "bytes": 816275,
+        "sha256": "e92ea6fbe9a8142a64dfdb04441cb0706bb16f312a5cce97a93baff6a1a311a0"
+      },
+      "bars": [
+        {
+          "label": "canvas count stays bounded",
+          "ok": true,
+          "detail": "peak 2 canvases and 2 slots over 11 steps across 12 pages"
+        },
+        {
+          "label": "off-screen canvases are not kept",
+          "ok": true,
+          "detail": "2 canvases held at the peak of the first third and 2 at the peak of the last, whose canvases covered 3.8 MP in total"
+        },
+        {
+          "label": "no blank page during the scroll",
+          "ok": true,
+          "detail": "0 of 11 samples had nothing mounted"
+        },
+        {
+          "label": "no canvas exceeds the area cap",
+          "ok": true,
+          "detail": "largest single canvas 3.8 MP against the 33.6 MP absolute ceiling"
+        },
+        {
+          "label": "no canvas exceeds the side cap",
+          "ok": true,
+          "detail": "widest side 1571 px against 32767"
+        },
+        {
+          "label": "at dpr 2 / 500 % the cap bites and the page survives",
+          "ok": true,
+          "detail": "largest canvas 13.8 MP against the 13.8 MP ceiling that applies here (33.6 MP absolute, 13.8 MP at 1280×900 dpr 2 × 1+200%) — clamped; rendered at 1.07× instead of 2×, 22.25 % ink, side 4229 px"
+        }
+      ],
+      "measures": [
+        {
+          "label": "document open to first ink",
+          "detail": "median 873 ms of 5 samples (687–1028 ms); dev-server transforms included, so this is not §6's cold-page number",
+          "distribution": {
+            "samples": 5,
+            "p50": 873,
+            "p95": 1028,
+            "p99": null,
+            "max": 1028
+          }
+        },
+        {
+          "label": "cold page",
+          "detail": "median 416 ms of 5 samples (319–448 ms) to ink on page 12, 29.53 % ink, longest main-thread block 68 ms in that load; §6 sets no cold-page bar for this profile",
+          "distribution": {
+            "samples": 5,
+            "p50": 416,
+            "p95": 448,
+            "p99": null,
+            "max": 448
+          }
+        },
+        {
+          "label": "frame gaps / main thread",
+          "detail": "p50 16.7 ms, p95 16.7 ms, max 16.8 ms over 280 frames; longest long task 69 ms. Headless has no vsync, so no frame rate is claimed.",
+          "distribution": {
+            "samples": 280,
+            "p50": 16.7,
+            "p95": 16.7,
+            "p99": 16.8,
+            "max": 16.8
+          }
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "C",
+      "name": "vector-heavy",
+      "target": "viewer main-thread work attributable to our layer under 200 ms; engine render time reported separately; cold page measured but not a package-only latency promise",
+      "fixture": {
+        "name": "vector-sample.pdf",
+        "bytes": 512758,
+        "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+      },
+      "bars": [
+        {
+          "label": "the engine-only run drew the same page at the same box",
+          "ok": true,
+          "detail": "5 loads of vector-sample.pdf page 4 into 1214×857 device px (1214×857 CSS px) with the viewer removed; 82.86 % ink"
+        },
+        {
+          "label": "canvas count stays bounded",
+          "ok": true,
+          "detail": "peak 2 canvases and 2 slots over 3 steps across 4 pages"
+        },
+        {
+          "label": "off-screen canvases are not kept",
+          "ok": true,
+          "detail": "2 canvases held at the peak of the first third and 2 at the peak of the last, whose canvases covered 2.1 MP in total"
+        },
+        {
+          "label": "no blank page during the scroll",
+          "ok": true,
+          "detail": "0 of 3 samples had nothing mounted"
+        },
+        {
+          "label": "no canvas exceeds the area cap",
+          "ok": true,
+          "detail": "largest single canvas 2.1 MP against the 33.6 MP absolute ceiling"
+        },
+        {
+          "label": "no canvas exceeds the side cap",
+          "ok": true,
+          "detail": "widest side 1214 px against 32767"
+        },
+        {
+          "label": "at dpr 2 / 500 % the cap bites and the page survives",
+          "ok": true,
+          "detail": "largest canvas 13.8 MP against the 13.8 MP ceiling that applies here (33.6 MP absolute, 13.8 MP at 1280×900 dpr 2 × 1+200%) — clamped; rendered at 0.37× instead of 2×, 30.30 % ink, side 4423 px"
+        }
+      ],
+      "measures": [
+        {
+          "label": "document open to first ink",
+          "detail": "median 718 ms of 5 samples (613–801 ms); dev-server transforms included, so this is not §6's cold-page number",
+          "distribution": {
+            "samples": 5,
+            "p50": 718,
+            "p95": 801,
+            "p99": null,
+            "max": 801
+          }
+        },
+        {
+          "label": "cold page",
+          "detail": "median 241 ms of 5 samples (199–326 ms) to ink on page 4, 82.86 % ink, longest main-thread block 68 ms in that load; §6 sets no cold-page bar for this profile",
+          "distribution": {
+            "samples": 5,
+            "p50": 241,
+            "p95": 326,
+            "p99": null,
+            "max": 326
+          }
+        },
+        {
+          "label": "engine render, viewer absent",
+          "detail": "median 82.7 ms of 5 samples (79.1 ms–91.3 ms) in page.render(); document open 454.6 ms; longest long task 0.0 ms (pdf.js draws in chunks, so the engine's own work rarely crosses the 50 ms bar on its own)",
+          "distribution": {
+            "samples": 5,
+            "p50": 82.7,
+            "p95": 91.3,
+            "p99": null,
+            "max": 91.3
+          }
+        },
+        {
+          "label": "frame gaps / main thread",
+          "detail": "p50 16.7 ms, p95 16.8 ms, max 33.4 ms over 159 frames; longest long task 68 ms. Headless has no vsync, so no frame rate is claimed.",
+          "distribution": {
+            "samples": 159,
+            "p50": 16.7,
+            "p95": 16.8,
+            "p99": 33.4,
+            "max": 33.4
+          }
+        }
+      ],
+      "notes": [
+        {
+          "label": "profile C’s split, and how it was got",
+          "detail": "the viewer puts this page on screen in a median 241.0 ms and held the main thread for 68.0 ms at the longest; the engine alone at that box takes 82.7 ms. About 158.3 ms of the wait is therefore not the engine's render call — under §6's 200 ms for this profile. Two separate page loads subtracted, not one instrumented measurement: pdf.js draws on the main thread inside the same tasks as our layout, so anything finer needs a mark in the render path and none exists."
+        }
+      ]
+    },
+    {
+      "id": "D",
+      "name": "low-memory device",
+      "target": "no exhaustion crash; degraded resolution rather than a dead tab",
+      "fixture": {
+        "name": "scan-sample.pdf",
+        "bytes": 816275,
+        "sha256": "e92ea6fbe9a8142a64dfdb04441cb0706bb16f312a5cce97a93baff6a1a311a0"
+      },
+      "bars": [
+        {
+          "label": "the tab survives the low-memory harness",
+          "ok": true,
+          "detail": "3 canvases still mounted and 27.74 % ink on page 6 of scan-sample.pdf at dpr 3, 6x via CDP, zoomed through the zoom field behind the overflow menu"
+        },
+        {
+          "label": "the mobile ceiling is the one in force",
+          "ok": true,
+          "detail": "largest canvas 5.2 MP against the 5.2 MP package default for this class (33.6 MP on a desktop, 2604 px widest side) — clamped by it"
+        },
+        {
+          "label": "what gave way is resolution, not the page",
+          "ok": true,
+          "detail": "painted at 1.10× instead of 3× and still showing 27.74 % ink"
+        }
+      ],
+      "measures": [
+        {
+          "label": "cold page on the harness",
+          "detail": "8888 ms to ink on page 6 at 6x via CDP; longest long task 2515 ms since the document opened. A throttled desktop core is not a handset, and §6 also asks for the real-device pass.",
+          "distribution": {
+            "samples": 1,
+            "p50": 8888,
+            "p95": 8888,
+            "p99": null,
+            "max": 8888
+          }
+        }
+      ],
+      "notes": [
+        {
+          "label": "what profile D is and is not",
+          "detail": "a Chromium context with a Pixel-class user agent, 412×915 at dpr 3 and CDP CPU throttling — the committed harness, measuring the product’s own mobile ceiling. §6’s separate requirement for a real-device validation is not met by this and is open as tasks #141 and #156."
+        }
+      ]
+    }
+  ]
+}

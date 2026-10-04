@@ -1,6 +1,6 @@
 /**
  * Measures what a consumer actually downloads, per tier, and fails the build on
- * two different mistakes.
+ * three different mistakes.
  *
  * **The ratchet.** Every number is compared against `size-baseline.json`, and
  * growth of more than 2 % (plus 256 bytes of minifier noise) fails. A library
@@ -311,6 +311,83 @@ for (const tier of tierTargets) {
   if (over) failed = true;
   console.log(
     `  ${(over ? 'FAIL' : 'ok  ')}  ${tier.label.padEnd(9)} ${(tier.bytes / KB).toFixed(2).padStart(6)} kB gz of ${(tier.limit / KB).toFixed(0)} kB`,
+  );
+}
+
+/*
+ * FR-22's second clause, which no gate held before: the core stylesheet carries no rules for a feature the
+ * application did not request. JavaScript is tree-shaken and CSS is not, so one stray rule is bytes every
+ * consumer downloads whether or not they mounted the feature whose DOM it styles.
+ *
+ * The two sets come from the source that owns them. A class is *feature-only* when a module under
+ * `src/features/`, or the `edit`/`merge` entries, writes its name and no core module does — the shell's
+ * components, the lib, the headless hooks or either barrel. Shared primitives are not offenders by
+ * construction and that is deliberate: `pjsr-button` and `pjsr-canvas-wrapper` are the core's own vocabulary,
+ * and a feature extending one of them styles a node the core rendered, which is the clause permitting the
+ * rule rather than forbidding it.
+ *
+ * The count is printed rather than asserted alone, because an empty feature-only set would pass every rule
+ * below it for the wrong reason — a scanner that found nothing to check.
+ */
+const CSS_CLASS = /pjsr-[a-z][a-z0-9-]*/g;
+
+function listSource(dir, singles = []) {
+  const found = [];
+  if (existsSync(dir)) {
+    for (const item of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, item.name);
+      if (item.isDirectory()) found.push(...listSource(path));
+      else if (/\.tsx?$/.test(item.name) && !/\.test\.tsx?$/.test(item.name)) found.push(path);
+    }
+  }
+  return found.concat(singles);
+}
+
+function classesIn(files) {
+  const out = new Set();
+  for (const file of files) {
+    for (const match of readFileSync(file, 'utf8').matchAll(CSS_CLASS)) out.add(match[0]);
+  }
+  return out;
+}
+
+const coreRendered = classesIn(
+  listSource(join(root, 'src', 'components')).concat(
+    listSource(join(root, 'src', 'lib')),
+    listSource(join(root, 'src', 'headless')),
+    [join(root, 'src', 'index.ts'), join(root, 'src', 'headless.ts')],
+  ),
+);
+const featureOnly = [
+  ...[
+    ...classesIn(
+      listSource(join(root, 'src', 'features'), [
+        join(root, 'src', 'edit.tsx'),
+        join(root, 'src', 'merge.ts'),
+      ]),
+    ),
+  ]
+    .filter((name) => !coreRendered.has(name))
+    .sort(),
+];
+const coreSheet = existsSync(join(dist, 'styles.css'))
+  ? classesIn([join(dist, 'styles.css')])
+  : new Set();
+const leaked = featureOnly.filter((name) => coreSheet.has(name));
+
+if (featureOnly.length === 0) {
+  console.error('FAIL  no class is rendered only by a feature, so the core-sheet rule proved nothing');
+  failed = true;
+}
+for (const name of leaked) {
+  console.error(`FAIL  styles.css carries a rule for .${name}, which only a feature renders (FR-22)`);
+  failed = true;
+}
+if (!leaked.length && featureOnly.length) {
+  console.log(
+    `\nthe core stylesheet, FR-22\n` +
+      `  ok    styles.css carries none of the ${featureOnly.length} classes only a feature renders ` +
+      `(${featureOnly.slice(0, 4).join(', ')}, …)`,
   );
 }
 

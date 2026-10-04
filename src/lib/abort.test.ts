@@ -4,9 +4,15 @@
  * Two of these tests exist because of the failure modes that do not announce themselves: a late
  * subscription to an already-fired signal, and a disposer that is never called and so accumulates one
  * listener per mount on a signal the host keeps for the life of the page.
+ *
+ * A third test used to live here, grepping the module for `AbortSignal.any` on the stated ground that the
+ * call was newer than every advertised floor. That was true when it was written (Chrome 116 against a floor
+ * of 90) and false after the 2026-10-02 lock raised the floors past it, so §5.6's baseline rule made the
+ * guard itself the defect and #203 removed it. The reason this package still composes by hand is in
+ * `abort.ts`: each effect owns a cancellation of its own lifetime, and merging a host signal into one
+ * composed signal would make a scale change look like the whole page was abandoned. That is a design rule,
+ * and it has no business being enforced by a string search for a platform API.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ABORT_ERROR_NAME,
@@ -16,9 +22,6 @@ import {
   onAbort,
   throwIfAborted,
 } from './abort';
-
-/** Read from disk by the "never reaches for AbortSignal.any" guard below. */
-const source = readFileSync(join(__dirname, 'abort.ts'), 'utf8');
 
 function controller() {
   return new AbortController();
@@ -137,18 +140,5 @@ describe('throwIfAborted', () => {
       expect((error as Error).message).toBe('Reordering pages was aborted.');
       expect((error as Error).name).toBe('AbortError');
     }
-  });
-});
-
-describe('the abort module', () => {
-  it('never reaches for AbortSignal.any, which is newer than every floor we advertise', () => {
-    // A regression guard rather than a behaviour: `AbortSignal.any` is Chrome 116 / Safari 17.4 /
-    // Firefox 124, all past the Chrome 90 / Safari 14 / Firefox 90 PRD.md §8 claims. Nothing we run
-    // could ever catch it — every job in CI is Node on Linux — so this is the cheap substitute until
-    // FR-48 puts a real browser in the pipeline.
-    // Strip comments first: the module header *explains* why the call is avoided, and a guard that
-    // matched its own prose would fail for the wrong reason and get deleted as a nuisance.
-    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
-    expect(code).not.toContain('AbortSignal.any');
   });
 });

@@ -46,6 +46,31 @@ export interface VirtualSlot {
   offsetTop: number;
   width: number;
   height: number;
+  /** Where each page of the row sits inside it. */
+  pages: VirtualSlotPage[];
+}
+
+/**
+ * One page's box inside its row — published so the shell can place a page without putting it *in* the row.
+ *
+ * `FR-08` is the reason this is a number rather than a flex child: a layout switch regroups rows, and React
+ * cannot move a mounted component between two parents. So a page that went from being a row of its own to the
+ * right-hand half of a pair was unmounted and rebuilt — losing the canvas it had painted, its editor state and
+ * its place in the document — on a change that moved nothing but a border. The row is the box the shell
+ * paints; the pages are its siblings, positioned from these fields, and a page keeps one identity in every
+ * layout mode.
+ */
+export interface VirtualSlotPage {
+  /** 0-based index into the document: the identity a page keeps across a layout switch. */
+  index: number;
+  /** 1-based page number, the way the shell and pdf.js name a page. */
+  pageNumber: number;
+  /** X from the row's left edge, in content pixels. */
+  left: number;
+  /** Y from the row's top, which centres a short page beside a taller one. */
+  top: number;
+  width: number;
+  height: number;
 }
 
 /**
@@ -72,7 +97,11 @@ export interface UsePdfVirtualizerResult {
   resolvedScale: number;
   viewportWidth: number;
   viewportHeight: number;
-  scrollToPage: (pageNumber: number, behavior?: ScrollBehavior) => void;
+  /**
+   * Scroll so the page's row top (or, with `offsetInPagePx`, a point that far down the page) meets the top of
+   * the viewport. The offset is in content pixels at the current scale, not PDF points.
+   */
+  scrollToPage: (pageNumber: number, behavior?: ScrollBehavior, offsetInPagePx?: number) => void;
   /** Report a page's intrinsic (scale-1) dimensions once measured. */
   reportPageDims: (index: number, dims: PageDims) => void;
 }
@@ -312,17 +341,31 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
       const offsetTop = layout.offsets[s];
       const height = layout.heights[s];
       if (!indices || offsetTop === undefined || height === undefined) continue;
+      const pages: VirtualSlotPage[] = [];
       let width = (indices.length - 1) * gap;
+      let left = 0;
       for (const i of indices) {
-        width += scaledPageSize(dims.get(i), layoutEstimate, resolvedScale, rotationFor(i)).width;
+        const size = scaledPageSize(dims.get(i), layoutEstimate, resolvedScale, rotationFor(i));
+        pages.push({
+          index: i,
+          pageNumber: i + 1,
+          left,
+          // What `align-items: center` used to do in the row's own box, now that the row has no children:
+          // a pair of pages of different heights keeps the shorter one centred against the taller.
+          top: (height - size.height) / 2,
+          width: size.width,
+          height: size.height,
+        });
+        left += size.width + gap;
+        width += size.width;
       }
-      out.push({ indices, pageNumber: indices[0]! + 1, offsetTop, width, height });
+      out.push({ indices, pageNumber: indices[0]! + 1, offsetTop, width, height, pages });
     }
     return out;
   }, [visible, slots, layout, dims, layoutEstimate, resolvedScale, rotationFor, gap]);
 
   const scrollToPage = useCallback(
-    (pageNumber: number, behavior: ScrollBehavior = 'auto') => {
+    (pageNumber: number, behavior: ScrollBehavior = 'auto', offsetInPagePx = 0) => {
       const el = containerRef.current;
       if (!el || slots.length === 0) return;
       const clamped = Math.min(Math.max(1, Math.round(pageNumber)), numPages);
@@ -336,7 +379,10 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
       }
       const top = layout.offsets[slotIndex];
       if (top === undefined) return;
-      el.scrollTo({ top, behavior });
+      // A destination inside the page is measured from that page's own top edge, in content pixels — which is
+      // why it arrives already scaled rather than as PDF points: only the caller holding the page viewport can
+      // turn a `/XYZ` top into one, and the rotation is part of that answer.
+      el.scrollTo({ top: Math.max(0, top + offsetInPagePx), behavior });
     },
     [slots, layout, numPages],
   );

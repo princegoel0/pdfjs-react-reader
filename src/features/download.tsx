@@ -8,8 +8,9 @@ import {
   usePdfFeatureState,
 } from '../components/FeatureHost';
 import { usePdfDownload } from '../headless/usePdfDownload';
-import { ANNOTATE_FEATURE_ID, DOWNLOAD_FEATURE_ID, FORMS_FEATURE_ID } from './ids';
+import { ANNOTATE_FEATURE_ID, DOWNLOAD_FEATURE_ID, FORMS_FEATURE_ID } from '../lib/feature-ids';
 import type { PdfFeature } from '../lib/features';
+import type { PdfSaveRefusal } from '../headless/usePdfDownload';
 import type { AnnotateFeatureState } from './annotate';
 import type { FormFeatureState } from './forms';
 
@@ -21,6 +22,13 @@ export interface DownloadFeatureOptions {
 export interface DownloadFeatureState {
   download: () => void;
   isBusy: boolean;
+  /**
+   * Why the last save could not carry the reader's edits, or `null`.
+   *
+   * The built-in control puts the reason on its own name; a host writing one reads this instead, which is
+   * what `FR-33` asks for — a refusal that names its reason rather than a file that quietly lacks the edits.
+   */
+  refused: PdfSaveRefusal | null;
 }
 
 function DownloadRunner() {
@@ -31,7 +39,7 @@ function DownloadRunner() {
   // thing to save.
   const forms = usePdfFeaturePeer<FormFeatureState>(FORMS_FEATURE_ID);
   const annotate = usePdfFeaturePeer<AnnotateFeatureState>(ANNOTATE_FEATURE_ID);
-  const { download, isBusy } = usePdfDownload({
+  const { download, isBusy, refused } = usePdfDownload({
     doc: shell.doc,
     fileName: options?.fileName ?? shell.documentLabel,
     onError: shell.reportError,
@@ -54,19 +62,22 @@ function DownloadRunner() {
     void download({ saveEdits: hasEdits });
   }, [download, hasEdits]);
 
-  usePdfFeaturePublish<DownloadFeatureState>({ download: start, isBusy });
+  usePdfFeaturePublish<DownloadFeatureState>({ download: start, isBusy, refused });
   return null;
 }
 
 function DownloadControl() {
   const shell = usePdfFeatureShell();
   const state = usePdfFeatureState<DownloadFeatureState>();
+  // The reason goes on the control the reader just used, in the place their assistive technology reads
+  // first: a file that arrived without their edits is not a failure to report once and forget.
+  const name = state.refused === 'xfa' ? shell.labels.saveRefusedXfa : shell.labels.downloadDocument;
   return (
     <button
       type="button"
       className="pjsr-button"
-      aria-label={shell.labels.downloadDocument}
-      title={shell.labels.downloadDocument}
+      aria-label={name}
+      title={name}
       disabled={state.isBusy}
       aria-busy={state.isBusy || undefined}
       onClick={state.download}

@@ -152,7 +152,7 @@ export default function App() {
     onDropFile: (dropped) => note(`onDropFile ${dropped.name}`),
     controls: trim
       ? {
-          hide: ['draw', 'meta'],
+          hide: ['search', 'meta'],
           priorities: { layout: 2 },
           order: ['search', 'page', 'prev', 'next', 'layout'],
           add: [progressControl],

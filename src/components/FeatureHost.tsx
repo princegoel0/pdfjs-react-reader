@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { PdfError } from '../lib/errors';
 import type { AnyPdfFeature, FeaturePublication, PdfViewerShell } from '../lib/features';
-import { samePublication } from '../lib/features';
+import { orderFeatures, samePublication } from '../lib/features';
 
 /**
  * Where a feature's state lives while it is mounted (FR-21).
@@ -102,11 +102,16 @@ export function FeaturePart({ feature, store, children }: FeaturePartProps) {
 }
 
 /**
- * Mounts one Runner per feature, keyed by `feature.id`.
+ * Mounts one Runner per feature, keyed by `feature.id`, in registration order.
  *
  * Keying by position instead would remount the surviving feature whenever an
  * earlier sibling is dropped, discarding its state with no error — `features` is
  * expected to be rebuilt inline on every render.
+ *
+ * The list is put through `orderFeatures` here rather than trusted: this is the place
+ * runners mount, and §3.7's refusal has to arrive before that happens. A list with a
+ * duplicate id, a missing dependency or a cycle therefore throws without running a
+ * single Runner, and a valid one mounts its dependencies first.
  */
 export function FeatureRunners({
   features,
@@ -117,7 +122,7 @@ export function FeatureRunners({
 }) {
   return (
     <>
-      {features.map((feature) => (
+      {orderFeatures(features).map((feature) => (
         <FeatureMount key={feature.id} feature={feature} store={store} />
       ))}
     </>
@@ -127,9 +132,17 @@ export function FeatureRunners({
 function FeatureMount({ feature, store }: { feature: AnyPdfFeature; store: FeatureStore }) {
   const { Runner } = feature;
   const { retire } = store;
+  // Read the teardown off the current value, not the one that first mounted: the host
+  // pattern rebuilds the feature object on every render, and the effect below deliberately
+  // does not depend on it — re-running it would unregister a feature that never left.
+  const latest = useRef(feature);
+  latest.current = feature;
   useEffect(
     () => () => {
+      // Retire first: a peer that asks this feature whether the document is dirty must
+      // read `{}` while the teardown runs, not the last publication of a feature gone.
       retire(feature.id);
+      latest.current.cleanup?.();
     },
     [feature.id, retire],
   );

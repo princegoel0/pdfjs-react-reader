@@ -92,7 +92,7 @@ Core, in every import of the shell:
   area declares `touch-action: pan-x pan-y`, so the browser never pinch-zooms its own page underneath a
   zoom that is the viewer's to make, and a gesture the viewer consumes still reaches the host's listeners
   with `defaultPrevented` set — nothing outside the viewer's own container is claimed.
-- **Localisable** — every string in the shell lives in one typed catalog, 144 labels after the signing work; override
+- **Localisable** — every string in the shell lives in one typed catalog, 136 labels since `0.12` withdrew the ink controls; override
   the subset you need and the rest keeps its English default, or take a complete language from
   `pdfjs-react-reader/locales/de`, `/fr` or `/es` — 2.39–2.42 kB gzipped each, and a separate entry so
   importing the viewer never hands you a language you did not ask for.
@@ -171,14 +171,25 @@ the same call cannot configure an editor layer on both lines — and 5.7+, where
 has no release that fixes the CVE. Supporting it would mean advising a line we simultaneously tell you
 to leave.
 
+What the floor does not carry is measured, not assumed: `6.2.108` is a **browser-only** release. In a browser
+it loads and runs this package's checks; imported in Node it dies in the engine's own module scope with
+`ReferenceError: DOMMatrix is not defined` and prints "Please use the `legacy` build in Node.js environments",
+so an SSR or Jest host on exactly that version cannot import this package either — and its `TouchManager`
+exposes no `onPanning`, so the two-finger-pan half of touch handling has nothing to be handed. `6.3.289` and
+`6.4.299` — which, with `6.2.108`, are the only releases that exist in this range — do all of it. Whether the
+advertised floor should move to `^6.3.289` is an open decision; until it is made, the range above is what is
+promised and this paragraph is what is known about it.
+
 Your bundler needs to handle ESM and `exports` maps — Vite 5+, webpack 5+, Rollup 4+, esbuild and
 Turbopack all work. There is a CommonJS build beside it — `0.12`'s FR-41 — so every published path ships
 `index.js` and `index.cjs`, `index.d.ts` and `index.d.cts`, and the export map answers `import` and
-`require` separately, so `require('pdfjs-react-reader/headless')` resolves instead of throwing. One
-boundary is Node's rather than ours, and it is worth knowing before you rely on it: `pdfjs-dist` is an
-ESM-only peer with no `exports` map of its own, so a `require()` that reaches it loads only on a Node new
-enough to require ESM. Which versions those are is measured by the `packaging` CI job across a Node matrix
-— not asserted here from a version number nobody checked.
+`require` separately, so `require('pdfjs-react-reader/headless')` resolves instead of throwing. The floor is
+where that stops being a question: `pdfjs-dist` is an ESM-only peer with no `exports` map of its own, so a
+`require()` that reaches it needs a Node that can load ESM from CommonJS, which arrived unflagged in
+22.12.0, and the peer's own `engines` starts at 22.13.0. So `engines.node` is `>=22.13.0`, Node 20 and
+22.0–22.12 are not supported, and `npm run check:packaging` fails if the manifest, `PRD.md` §8's Node rows or
+the CI matrices ever disagree about that number — the floor is one value in three places, checked rather
+than repeated.
 
 ## Entry points
 
@@ -193,8 +204,10 @@ enough to require ESM. Which versions those are is measured by the `packaging` C
 
 ## Stability
 
-Every one of the **315** names this package publishes carries a maturity state, and the file that says so is
-[`api-maturity.json`](api-maturity.json): **272 stable, 43 experimental, none deprecated**. Stable means a
+Every one of the **320** names this package publishes carries a maturity state, and the file that says so is
+[`api-maturity.json`](api-maturity.json): **263 stable, 57 experimental, none deprecated**, plus a `removed`
+ledger of the 15 names FR-18 withdrew — read 2026-10-04 from `npm run check:maturity`, which is the command
+that recomputes it, because a count copied into a document is a count that goes stale. Stable means a
 breaking change needs a major version. Experimental means shipped, typed, and still being shaped by use — it
 may change in a minor, with a changelog line — and each experimental name records *why* it is in that state,
 which is what stops a temporary label from becoming permanent.
@@ -211,7 +224,8 @@ Build the entire interface yourself. This is a working viewer in about forty lin
 
 ```tsx
 import { useState } from 'react';
-import { PdfPage, usePdfDocument, usePdfVirtualizer } from 'pdfjs-react-reader/headless';
+import { PdfPage } from 'pdfjs-react-reader';
+import { usePdfDocument, usePdfVirtualizer } from 'pdfjs-react-reader/headless';
 
 export function CustomViewer({ src }: { src: string }) {
   const { doc, numPages, error } = usePdfDocument({ src });
@@ -256,17 +270,28 @@ Every failure that reaches you is a `PdfError`: a stable `code`, a `message` saf
 reader, optional `details` with the numbers, and the engine's own error as `cause`. Branch on the code —
 a message is wording, and wording is the part a library is allowed to improve.
 
-```ts
-import { isCancellationCode, isPdfError } from 'pdfjs-react-reader/headless';
+```tsx
+import { PdfViewer } from 'pdfjs-react-reader';
+import { isCancellationCode } from 'pdfjs-react-reader/headless';
 
-<PdfViewer
-  src="/contract.pdf"
-  onError={(error) => {
-    if (isCancellationCode(error.code)) return;         // the reader stopped it; not a fault
-    if (error.code === 'AUTH_ERROR') return signIn();
-    show(error.message);
-  }}
-/>
+export function ContractViewer({
+  signIn,
+  show,
+}: {
+  signIn: () => void;
+  show: (message: string) => void;
+}) {
+  return (
+    <PdfViewer
+      src="/contract.pdf"
+      onError={(error) => {
+        if (isCancellationCode(error.code)) return;   // the reader stopped it; not a fault
+        if (error.code === 'AUTH_ERROR') return signIn();
+        show(error.message);
+      }}
+    />
+  );
+}
 ```
 
 Eighteen codes ship, from `INVALID_SOURCE` to `UNKNOWN_ERROR`, and `PDF_ERROR_CODES` is the list. A code
@@ -285,12 +310,26 @@ thing that ends up in a log line.
 `PdfViewer` owns its own state, so it takes a ref instead of a pile of controlled props:
 
 ```tsx
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { PdfViewer, type PdfViewerHandle } from 'pdfjs-react-reader';
 
-const viewer = useRef<PdfViewerHandle>(null);
-
-<PdfViewer ref={viewer} src="/contract.pdf" onPageChange={setPage} onScaleChange={setZoom} />;
+export function ContractViewer() {
+  const viewer = useRef<PdfViewerHandle>(null);
+  const [page, setPage] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  return (
+    <>
+      <PdfViewer
+        ref={viewer}
+        src="/contract.pdf"
+        onPageChange={setPage}
+        onScaleChange={setZoom}
+      />
+      <button onClick={() => viewer.current?.goToPage(page + 1)}>next</button>
+    </>
+  );
+}
+```
 
 viewer.current?.goToPage(12);
 viewer.current?.zoomTo(1.5);        // any percentage, not just the presets
@@ -317,16 +356,30 @@ The bar's contents are configurable by control id — the built-ins (`sidebar`, 
 `zoomIn`, `layout`, `meta`, …) and each mounted feature's own id:
 
 ```tsx
-<PdfViewer
-  src="/contract.pdf"
-  features={[printFeature]}
-  controls={{
-    hide: ['draw', 'meta'],
-    priorities: { layout: 2 },   // what survives a narrow bar
-    order: ['search', 'page'],   // where controls sit while it is in it
-    add: [myControl],            // an existing id replaces it in place
-  }}
-/>
+import { PdfViewer, type ToolbarItem } from 'pdfjs-react-reader';
+import { printFeature } from 'pdfjs-react-reader/features/print';
+
+const myControl: ToolbarItem = {
+  id: 'count',
+  priority: 40,
+  label: 'Page count',
+  node: <span>of 12</span>,
+};
+
+export function ContractViewer({ src }: { src: string }) {
+  return (
+    <PdfViewer
+      src={src}
+      features={[printFeature]}
+      controls={{
+        hide: ['search', 'meta'],
+        priorities: { layout: 2 },   // what survives a narrow bar
+        order: ['search', 'page'],   // where controls sit while it is in it
+        add: [myControl],            // an existing id replaces it in place
+      }}
+    />
+  );
+}
 ```
 
 And the shell is a controller plus a layout, both exported, so a different arrangement is a few lines
@@ -339,9 +392,10 @@ import {
   ViewerRoot,
   ViewerToolbar,
   ViewerPages,
+  type PdfViewerProps,
 } from 'pdfjs-react-reader';
 
-function ReadingView(props) {
+export function ReadingView(props: PdfViewerProps) {
   const controller = useViewerController(props);
   return (
     <ViewerProvider controller={controller}>
@@ -415,8 +469,12 @@ the Node default and cause that second, worse failure — which is why the probe
 guessing.
 
 ```tsx
+import { PdfViewer } from 'pdfjs-react-reader';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-<PdfViewer src={src} workerSrc={workerUrl} />
+
+export function ContractViewer({ src }: { src: string }) {
+  return <PdfViewer src={src} workerSrc={workerUrl} />;
+}
 ```
 
 Pin it when you serve the worker from a CDN or copy it into a fixed location. Importing the package is
@@ -438,14 +496,34 @@ A string `src` you did not author is bounded by `allowedSources`, and one that i
 URL or a path throws rather than being fetched:
 
 ```tsx
-<PdfViewer src={userUrl} allowedSources={['/uploads/', 'https://cdn.example.com']} />
+import { PdfViewer } from 'pdfjs-react-reader';
+
+export function UploadsViewer({ userUrl }: { userUrl: string }) {
+  return <PdfViewer src={userUrl} allowedSources={['/uploads/', 'https://cdn.example.com']} />;
+}
 ```
 
 Once a document is open, `onCapabilities` says what it is, which is the only way to know a form will
 not fill in before the user types into it:
 
 ```tsx
-<PdfViewer src={src} onCapabilities={(c) => c.form /* 'none' | 'acroform' | 'xfa' | 'mixed' */} />
+import { PdfViewer } from 'pdfjs-react-reader';
+
+export function FormCheckViewer({
+  src,
+  show,
+}: {
+  src: string;
+  show: (fillable: boolean) => void;
+}) {
+  return (
+    <PdfViewer
+      src={src}
+      // `c.form` is 'none' | 'acroform' | 'xfa' | 'mixed' — the only way to know before a reader types.
+      onCapabilities={(c) => show(c.form !== 'none')}
+    />
+  );
+}
 ```
 
 On a page served with `require-trusted-types-for 'script'` pdf.js cannot start its worker at all — it
@@ -494,10 +572,10 @@ under `(pointer: coarse)`, 32 px with a mouse.
 - A document that declares a structure tree can have it read as one — headings, lists, tables and
   figures with their alternative text — by mounting `features/structure`. It is opt-in because the
   payload it needs is a peer module, fetched only for a document that says it is tagged.
-- Under `forced-colors` the chrome takes the system palette rather than arguing with it, and the four
-  places where a colour *is* the value keep theirs: the ink swatches, the strokes drawn in them, the
-  signature pad and the annotation colour plate. Separations a high-contrast theme drops with the shadow
-  (a menu's edge, a page's, a thumbnail's) come back as outlines, which cannot move a box.
+- Under `forced-colors` the chrome takes the system palette rather than arguing with it, and the three
+  places where the colour is the thing itself keep theirs: the annotation colour plate, the signature pad,
+  and the text layer whose spans are deliberately invisible. Separations a high-contrast theme drops with
+  the shadow (a menu's edge, a page's, a thumbnail's) come back as outlines, which cannot move a box.
 - Nothing that means something relies on colour alone. A search match carries a rule under it and the one
   you are on a ring around it plus `aria-current`; an armed control turns on the border it already had;
   the selected sidebar tab thickens its underline.
@@ -567,20 +645,40 @@ measures, at gzip level 9. So the engine dominates any viewer bundle regardless 
 
 Size is a ratchet. This is the requirement that is not: the viewer has to stay smooth while it is
 working, on documents big enough to make a mistake visible. `npm run bench` is the instrument (FR-49):
-it serves the playground, drives the fixtures, and separates the two kinds of
+it serves the playground, drives the fixtures, separates the two kinds of
 number §6 insists on keeping apart — a **bar** is structural and fails the run (canvas count bounded,
 off-screen canvases gone, the render caps binding where they should), a **measure** is a timing printed
 with the machine it came from and never failed on, because a maximum observed on one machine is not a
-promise a slower reader's device will keep. Measured here (Chromium, Windows, `pdfjs-dist` 6.3.289):
+promise a slower reader's device will keep — and writes the result to **`benchmarks/latest.json`, which is
+tracked**: the machine model, OS, browser and engine versions, the git revision, each fixture's sha256, and
+p50/p95/max for every sampled number. A test reads that file back and fails if a field goes missing or a
+fixture hash no longer matches the bytes on disk, so the record cannot drift from the documents it describes.
+Measured here (Chromium, Windows, `pdfjs-dist` 6.3.289, 2026-10-04):
 
 - **Profile A — text-heavy, `long-sample.pdf`, a thousand pages, three page sizes cycling so no single
-  estimate flatters it.** A page that had never been painted took **100 ms** to its first ink, which is at
-  §6's bar rather than under it, and that is the honest reading of one machine. Four page canvases and four
-  slots were the most mounted anywhere in a forty-step pass, and no sample along the way was blank. The
-  widest canvas reached 4.6 MP against a 33.6 MP absolute ceiling.
+  estimate flatters it.** A page that had never been painted took a median **147 ms** of five samples
+  (124–199 ms) to its first ink, which is *above* §6's 100 ms bar on this machine, and the record says so
+  rather than promoting a number into a requirement. Quoted beside it, because that is the reason §6 keeps
+  baselines out of the contract: an earlier run of the same build on the same machine measured **224 ms** for
+  the same page. Four page canvases and four slots were the most mounted anywhere in a forty-step pass, no
+  sample along the way was blank, the widest canvas reached 4.6 MP against a 33.6 MP absolute ceiling, and the
+  longest main-thread task in the run was 67 ms.
 - **Profile B — image-heavy, `scan-sample.pdf`, twelve pages each carrying one 2550×3300 RGB scan.** Pages
-  paint at **25 % ink** where a text page manages 0.5 %, and a cold page took 25 ms. Three canvases and
-  three slots at the peak of the scroll; 5.7 MP widest.
+  paint at **29.5 % ink** where a text page manages 0.5 %, and a cold page took a median 416 ms (319–448 ms
+  across the five, the work being the 25 MP decode each page carries). Two canvases and two slots at the peak
+  of the scroll; 3.8 MP largest, 1571 px widest.
+- **Profile C — vector-heavy, `vector-sample.pdf`, four A1 drawing sheets of 336 clipped cells each.** The
+  engine reports 12,922 operators per sheet, and this is the profile where the two costs are told apart: the
+  viewer took a median 241 ms to put sheet 4 on screen, and the same page at the same box with none of the
+  viewer in the way (`playground/raw.html`) rendered in a median 82.7 ms — so about 158 ms of the wait is
+  ours, which is under §6's 200 ms and reported as the difference of two loads rather than as a mark
+  inside one.
+- **Profile D — the low-memory harness.** The scans again, on a 412×915 phone context at dpr 3 with an
+  Android user agent and 6× CPU throttling, zoomed to 300 % through the toolbar's overflow menu because that
+  is where the control is on a bar that narrow. The canvas came back at 5.2 MP — the mobile package default,
+  to two decimal places — painted at **1.10× instead of 3×** and still showing 27.7 % ink, and the tab was
+  alive to report it. That is the clause: resolution gives way, not the page. A throttled desktop core is not
+  a handset, and §6's real-device pass is still open.
 - **The cap that actually binds is the screen-relative one.** At dpr 2 and 500 % zoom a letter page would
   want 48.5 MP; the ceiling that applies on a 1280×900 display is 13.8 MP, the canvas came back at 13.8 MP
   rendered at 1.07× instead of 2×, and the page still painted. Resolution degrades, the tab does not die —
@@ -602,18 +700,26 @@ writes files, and what is not allowed is work done without being asked for, twic
 
 ## Browser support
 
-Targets are Chrome ≥ 90, Safari ≥ 14, Firefox ≥ 90 and Edge ≥ 90, plus modern mobile browsers.
+The contract floors are `PRD.md` §8's: Chrome and Edge 125, Safari and iOS Safari 18, Firefox 124
+(provisional), Node 22.13.0, `pdfjs-dist` 6.2.108. Those are the *minimums the promise carries*; what has
+actually proved each of them is a different column of the same table, and it is mostly `unverified`.
 
 What is measured where: `npm run test:browsers` (FR-48) drives thirteen claims — a canvas that paints,
 backing-store density against `devicePixelRatio`, selectable text, search marks and the no-hits state,
 thumbnails and outline, the 1,000-page document's slot count, the toolbar fold at 375 px, keyboard paging,
 wheel zoom against plain scroll, pinch against two-finger pan, forced colours, uncaught errors — through
-Chromium, Firefox and WebKit at 1280×900 and 375×812 dpr 2. On Chromium the run is **23 ok and 1 skip**,
-and the skip is the finding: that emulation delivers no wheel events to the page at all. Safari and Firefox
-remain targets rather than results — neither engine would start on the machine this was written on, and the
-CI job that runs the same script on Linux has not run yet. The CSS ships `@media` fallbacks beside every
-`@container` rule and avoids `:has()` precisely because Safari 14 has no container queries. If Safari is
-critical to you, test that first.
+Chromium, Firefox and WebKit at 1280×900 and 375×812 dpr 2. **All three engines run on this host**: the
+2026-10-04 pass is **67 ok, 5 skipped, 0 failed** over six cells — Chromium 153 with 23 ok and 1 skip, Firefox
+155 and WebKit 26 with 22 ok and 2 skips each — and every skip belongs to the emulation rather than the
+viewer, which dispatches no wheel events on the small profile and, on Firefox and WebKit, exposes no `Touch`
+constructor to synthesise a pinch from. What that is *not* is floor evidence. §8 claims Chrome 125, Firefox
+124 and Safari 18, and its own execution policy says a current browser passing the suite does not certify an
+older floor; no Edge check has ever run anywhere, and no real device has been touched. The CI `browser` job
+that would run this script on a pinned Linux runner exists and has never executed. The CSS ships `@media`
+fallbacks beside every `@container` rule and avoids `:has()`. Both of those are written against a target that
+no longer exists: `@container` and `:has()` are older than the §8 floor of Safari 18, so the fallbacks are
+margin rather than requirement, nothing exercises them, and no test would fail if someone deleted them. If
+Safari is critical to you, test that first.
 
 ## Links
 
@@ -634,7 +740,8 @@ critical to you, test that first.
 npm run dev          # playground on :5199 with the repo's fixture PDFs
 npm run serve:auth   # the same fixtures on :5300, behind `Authorization: Bearer dev-token`
 npm run docs         # documentation site on :5200
-npm run verify       # typecheck + tests + build + size gate (prepublishOnly runs this)
+npm run verify       # typecheck + tests + build + size + packaging + examples + maturity + evidence
+npm run check:examples  # every documented example, type-checked against the packed artifact, not against src
 npm run size:update  # accept new baseline numbers after a deliberate growth
 node scripts/make-form-pdf.mjs       # AcroForm: text, checkbox, radio, choice, button
 node scripts/make-outline-pdf.mjs    # 3 pages, bookmarks, named destinations
@@ -650,6 +757,8 @@ node scripts/make-signature-pdf.mjs  # four /FT /Sig fields in three shapes, one
 node scripts/make-xfa-pdf.mjs        # pure XFA: single-stream /XFA packet, no /Fields
 node scripts/make-xfa-array-pdf.mjs  # the same packet in array form, and an AcroForm hybrid
 node scripts/make-long-pdf.mjs       # 1,000 pages in a nested tree, for the performance bar
+node scripts/make-vector-pdf.mjs     # four A1 drawing sheets, 336 clipped cells each: §6's profile C
+node scripts/make-oversize-pdf.mjs   # 612×792, 12,000×9,000 and 200,000×600 pt pages, for the caps
 ```
 
 `playground/` exercises the whole surface against generated fixtures (AcroForm, outline with named
@@ -670,7 +779,8 @@ development, against the built `dist` in CI.
 Version `0.11.0`, built on `dev` and **not pushed**: the `0.2`–`0.11` sequence lives on this machine
 only — `git rev-list --count origin/dev..dev` is where to read that number, and `git log` on `dev` which
 of these releases is committed, rather than from a sentence that goes stale one commit later. Nothing is
-published. npm has `0.1.0` and `0.1.1`; the pre-`1.0` releases publish together with `1.0.0`, which is the
+published. npm has `0.1.0`, `0.1.1` and `0.1.2` (the last one went out on 2026-09-25); everything from `0.2` 
+to `0.11` exists only on local `dev` and publishes together with `1.0.0`, which is the
 shipping rule in [`ROADMAP.md`](./ROADMAP.md) §Releases. So the tables above describe this working tree,
 not the tarball on npm. While the package is pre-1.0 a minor may break the API — `0.4` did, with six
 `PdfViewer` props becoming four feature imports — so pin exactly.

@@ -13,13 +13,14 @@
   "requirements": {
     "FR-01": {
       "title": "Input Flexibility",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/source.ts"
       ],
       "automated": [
         "src/lib/source.test.ts",
-        "src/lib/source.classify.test.ts"
+        "src/lib/source.classify.test.ts",
+        "src/lib/ssr.test.ts"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#nothing-came-from-a-cdn"
@@ -31,15 +32,12 @@
       "regressionGuard": [
         "src/lib/source.classify.test.ts"
       ],
-      "gaps": [
-        "a relative URL with no base URL is not refused — resolveSourceUrl returns the input unchanged",
-        "unsupported schemes are refused only by accident: javascript: is caught by the bare-name rule, while any scheme containing a slash (chrome://) classifies as a url"
-      ],
-      "note": "Every input kind and all four refusal reasons exist and are tested; the base-URL refusal and the scheme allowlist are clause-level holes rather than missing features."
+      "gaps": [],
+      "note": "Every clause of the row is answered and each refusal has an assertion: the six reasons are `empty`, `bare-name`, `windows-path`, `bad-base64`, `unsupported-scheme` and `no-base-url`. Two decisions worth keeping. The scheme rule is a list of **refusals**, not an allowlist of schemes — an allowlist would refuse `my-app://documents/a.pdf`, which a host’s own desktop shell registers, and would need a release for every new document scheme. And a relative address is refused only where there is no base: the same string classifies as `url` once a page exists, which is asserted as a pair rather than described. `describeSource` lost its \"the same origin\" subject with that rule, because a refused relative address is the one case where naming an origin would be a lie; a refused scheme names its scheme and echoes nothing after the colon, so a `javascript:` payload stays out of the log line."
     },
     "FR-02": {
       "title": "Worker Configuration",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/worker.ts",
         "src/headless/usePdfDocument.ts"
@@ -50,22 +48,26 @@
         "src/lib/worker.fallback.nocode.test.ts",
         "src/lib/worker.fallback.onpage.test.ts",
         "src/lib/worker.fallback.deadurl.test.ts",
-        "src/headless/usePdfDocument.worker.test.tsx"
+        "src/lib/worker.conflict.test.ts",
+        "src/lib/worker.default.test.tsx",
+        "src/headless/usePdfDocument.worker.test.tsx",
+        "src/headless/usePdfDocument.worker-conflict.test.tsx"
       ],
       "acceptance": [
-        "scripts/browser-matrix.mjs#nothing-came-from-a-cdn"
+        "scripts/browser-matrix.mjs#nothing-came-from-a-cdn",
+        "scripts/worker-default-browser.mjs"
       ],
       "documentation": [
         "README.md",
         "docs/src/pages/Compatibility.tsx"
       ],
       "regressionGuard": [
-        "src/lib/worker.fallback.nocode.test.ts"
+        "src/lib/worker.fallback.nocode.test.ts",
+        "src/lib/worker.conflict.test.ts",
+        "src/lib/worker.default.test.tsx"
       ],
-      "gaps": [
-        "two simultaneous viewers with conflicting worker URLs are not detected, and there is no PdfError with the CONFIGURATION_ERROR code naming both origins"
-      ],
-      "note": "Host URL, imported asset, CDN URL, probe-before-write and the no-worker fallback are each measured; only the conflict clause is unbuilt, and it depends on the error contract task."
+      "gaps": [],
+      "note": "The conflict clause is now enforced: a second viewer asking for a different worker URL is refused before its load starts, with a CONFIGURATION_ERROR that names both origins and nothing else, because a signed worker URL carries its credential in its query. \"When it is absent\" turns out to be two states, measured on 6.3 and now asserted separately: pdf.js ships './pdf.worker.mjs' in Node and '' in a browser (it assigns from its own isNodeJS), so in Node `ensureWorker` neither probes nor writes and the engine's default *is* the main-thread fallback, while in a browser the field starts empty and the candidate probe is what fills it — which is why README's no-configuration claim is about Vite/webpack/Rollup and not about Node. `worker.default.test.tsx` pins the Node row against the un-mocked engine; writing a probed URL over that default is the cost `worker.fallback.deadurl.test.ts` measures, so the short-circuit is the requirement's own \"leave pdf.js's own fallback reachable\"."
     },
     "FR-03": {
       "title": "Password Protection",
@@ -145,7 +147,7 @@
     },
     "FR-06": {
       "title": "Responsive Zoom Modes",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/zoom.ts",
         "src/lib/layout.ts",
@@ -153,7 +155,8 @@
       ],
       "automated": [
         "src/lib/zoom.test.ts",
-        "src/lib/layout.test.ts"
+        "src/lib/layout.test.ts",
+        "src/components/PdfPage.textlayer.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#wheel-zoom-and-scroll"
@@ -162,12 +165,11 @@
         "docs/src/pages/Shell.tsx"
       ],
       "regressionGuard": [
-        "src/components/PdfPage.structure.test.tsx"
+        "src/components/PdfPage.structure.test.tsx",
+        "src/components/PdfPage.textlayer.test.tsx"
       ],
-      "gaps": [
-        "no test asserts the text layer is updated in place on a zoom step: TextLayer.update is an empty mock, so the clause rests on code plus one browser measurement"
-      ],
-      "note": "Range, fit modes and automatic fit are implemented and tested, and the structure layer's no-rebuild clause is guarded; the text-layer half of the same clause is not."
+      "gaps": [],
+      "note": "Range, fit modes and automatic fit are tested; both overlay layers the zoom step touches — the structure layer and the text layer — are now asserted to take one build and N updates, with the new viewport on each update, so \"in place rather than rebuilding\" is a failing test and not a reading of the code. Measured on the way in: pdf.js itself asks for one update straight after build(), so the assertion counts from that baseline rather than from zero."
     },
     "FR-07": {
       "title": "High-DPI Adaptation",
@@ -195,41 +197,45 @@
     },
     "FR-08": {
       "title": "Page Layouts",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/layout.ts",
         "src/headless/usePdfVirtualizer.ts",
-        "src/components/ViewerParts.tsx"
+        "src/components/ViewerParts.tsx",
+        "src/styles/viewer.css"
       ],
       "automated": [
-        "src/lib/layout.test.ts"
+        "src/lib/layout.test.ts",
+        "src/components/ViewerPages.regroup.test.tsx",
+        "src/components/ViewerPages.paint.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#virtualizes-1000-pages"
       ],
       "documentation": [
-        "docs/src/pages/Shell.tsx"
+        "docs/src/pages/Shell.tsx",
+        "docs/src/pages/Headless.tsx"
       ],
       "regressionGuard": [
-        "src/lib/layout.test.ts"
+        "src/components/ViewerPages.regroup.test.tsx",
+        "src/components/ViewerPages.paint.test.tsx"
       ],
-      "gaps": [
-        "rows are keyed by their first index, so a page that stops being a row head (continuous to spread drops keys 2, 4, ...) unmounts and remounts — the no-remount clause fails and nothing tests it"
-      ],
-      "note": "Grouping lives in the virtualizer and repaint-on-fit-movement was measured, but the identity of a row across a layout switch is exactly what the current key destroys."
+      "gaps": [],
+      "note": "The clause that was a gap is now the shape of the DOM: a row is a box the shell paints and the pages are its siblings, keyed by page index, placed from `slot.pages`. `VirtualSlot` gained that field and `VirtualSlotPage` is its new published type; `indices`, `width`, `height` and `offsetTop` are unchanged, so a host that reads rows keeps working. Two decisions worth recording. The identity tests run over a whole document of rows rather than the two a jsdom viewport shows, because across two rows the continuous heads (1, 2) and the spread heads (1, 2) coincide and the remount is invisible — the first version of this guard passed against the broken code, and putting the pages back inside the row is what makes it fail. And the repaint half is asserted by counting `page.render()` calls and canvas backing stores at a fixed scale; the fit-mode half, where repainting is correct, cannot be asserted here because a fit scale resolves against a viewport that jsdom gives zero size, so that one stays the browser measurement of 2026-09-29 (scale 1.04 → 0.50, every canvas 792×1025 → 386×499) cited in `ROADMAP.md`."
     },
     "FR-09": {
       "title": "Rotation",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/components/PdfPage.tsx",
-        "src/components/ViewerController.tsx",
-        "src/components/InkLayer.tsx"
+        "src/components/ViewerController.tsx"
       ],
       "automated": [
         "src/lib/layout.test.ts",
         "src/edit.test.tsx",
-        "src/lib/edge-cases.test.ts"
+        "src/lib/edge-cases.test.ts",
+        "src/components/PdfPage.rotation.test.tsx",
+        "src/components/ViewerController.rotation.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#text-layer-selectable",
@@ -239,23 +245,26 @@
         "README.md"
       ],
       "regressionGuard": [
-        "src/lib/layout.test.ts"
+        "src/lib/layout.test.ts",
+        "src/components/PdfPage.rotation.test.tsx",
+        "src/components/ViewerController.rotation.test.tsx"
       ],
-      "gaps": [
-        "no test asserts the overlay layers stay registered to the painted page after a rotation; only browser checks observe it, and edge-cases.test.ts proves the viewport maths, not the layer"
-      ],
-      "note": "Per-page and document rotation work and every layer re-runs on rotation; the assertion that it registered correctly is missing."
+      "gaps": [],
+      "note": "Every overlay layer is asserted to stay registered to the painted page across a rotation — same element, same page index, same layer the editor was handed, one render per layer and no second canvas — and the controller's arithmetic (document-wide, per page, modulo 360, the two adding) is tested through the reducer rather than beside it."
     },
     "FR-10": {
       "title": "Outline",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/outline.ts",
         "src/headless/usePdfOutline.ts",
-        "src/components/OutlineView.tsx"
+        "src/components/OutlineView.tsx",
+        "src/components/ViewerController.tsx",
+        "src/features/outline.tsx"
       ],
       "automated": [
         "src/lib/outline.test.ts",
+        "src/components/ViewerController.destination.test.tsx",
         "src/components/a11y.audit.test.tsx"
       ],
       "acceptance": [
@@ -266,21 +275,23 @@
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
+        "src/lib/outline.test.ts",
+        "src/components/ViewerController.destination.test.tsx",
         "src/components/a11y.audit.test.tsx"
       ],
-      "gaps": [
-        "a click resolves to a page but not to a position: OutlineEntry carries pageIndex only and scrollToPage goes to the row top, discarding the destination's Y and zoom"
-      ],
-      "note": "Recursive parsing, named destinations, object-reference translation and a valid nested ARIA tree are all met and axe-audited; the destination's position is dropped on the floor."
+      "gaps": [],
+      "note": "Recursive parsing, named destinations, object-reference translation and the axe-audited ARIA tree were already met; what was missing was the second half of “a page and a position”. Three things had to happen for that to be more than a claim. `outline-sample.pdf` now carries real positions — every destination in every fixture used to read `/XYZ null null null`, which names a page and no place, so the clause could be written and tested against an array typed into a test and never meet a document that had one. The offset is asked of the engine (`viewport.convertToViewportPoint` at the live scale and the page’s own `/Rotate` plus the reader’s), not derived here, because the axis flip and the rotation are pdf.js’s business; the test that measures what it answers for the fixture’s own 660 pt runs against the real bytes. And a destination that asks for a magnification changes the scale *first* and measures the place after it lands, which is why the click parks a pending destination for one render. Measured in Chromium on the fixture: at 100 %, “1. Introduction” (`/XYZ 72 660`) puts the viewport at 132 px — the subtitle line, 132 pt down a 792 pt page — “2. Sections” (`/Fit`) goes to 808, page 2’s top, and “3. Conclusion”, reached through the name tree, takes 200 % and then lands at 3544, which is page 3’s top at that scale plus 344 px for its 620 pt. The published additions are additive: `OutlineEntry.position`, the four names around it, and a second argument to `OutlineView`’s `onSelectPage` that a host already written can ignore."
     },
     "FR-11": {
       "title": "Thumbnails",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/components/ThumbnailList.tsx",
         "src/components/PdfThumbnail.tsx"
       ],
-      "automated": [],
+      "automated": [
+        "src/components/PdfThumbnail.test.tsx"
+      ],
       "acceptance": [
         "scripts/browser-matrix.mjs#sidebar-thumbs-outline"
       ],
@@ -288,12 +299,11 @@
         "docs/src/pages/Api.tsx"
       ],
       "regressionGuard": [
-        "scripts/browser-matrix.mjs"
+        "scripts/browser-matrix.mjs",
+        "src/components/PdfThumbnail.test.tsx"
       ],
-      "gaps": [
-        "no jsdom test exists for PdfThumbnail or ThumbnailList, so nothing in CI fails if the card stops using the measured width, the pixel ratio or the visible-range tracking"
-      ],
-      "note": "The behaviour is implemented as written and proven in a browser only. A requirement guarded by a browser check that has never run outside Chromium is the weakest evidence in this register."
+      "gaps": [],
+      "note": "The card renders at the measured CSS width times the device ratio, tracks the visible range, scrolls the current page into view and gives its buffer back when it leaves — each of those is a failing test in CI now, from observers to the 132 px column arithmetic, and the browser check remains the third look rather than the only one."
     },
     "FR-12": {
       "title": "Jump-to-Page",
@@ -324,7 +334,7 @@
     },
     "FR-13": {
       "title": "Text Indexing",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/search.ts",
         "src/headless/usePdfSearch.ts"
@@ -332,7 +342,8 @@
       "automated": [
         "src/lib/search.abort.test.ts",
         "src/headless/usePdfSearch.incremental.test.tsx",
-        "src/lib/search.test.ts"
+        "src/lib/search.test.ts",
+        "src/headless/usePdfSearch.yield.test.tsx"
       ],
       "acceptance": [
         "scripts/benchmark.mjs"
@@ -342,13 +353,11 @@
         "docs/src/pages/Headless.tsx"
       ],
       "regressionGuard": [
-        "src/headless/usePdfSearch.incremental.test.tsx"
+        "src/headless/usePdfSearch.incremental.test.tsx",
+        "src/headless/usePdfSearch.yield.test.tsx"
       ],
-      "gaps": [
-        "the bounded-interval yield exists only in extractAllText, which no code in src/ calls; the path the shell actually indexes through has no timed yield and relies on each await being a worker round trip",
-        "no test observes the yield at all"
-      ],
-      "note": "Progress reporting and the per-document index are met and tested. The clause about never blocking interaction is satisfied by the engine's round trips, not by the design the requirement describes."
+      "gaps": [],
+      "note": "The yield is on the indexing path the shell uses, not only on the utility nothing calls, and it is observed: a rAF ticker counts a fresh frame on every YIELD_PAGES-th page of a supplied-index walk, and a page that never yields stops the counter. Where the read is a worker round trip the round trip is the yield, and the test says which of the two it is watching."
     },
     "FR-14": {
       "title": "Match Highlighting",
@@ -443,20 +452,32 @@
     },
     "FR-18": {
       "title": "Annotations: View",
-      "state": "absent",
-      "implementation": [],
+      "state": "met",
+      "implementation": [
+        "src/components/PdfPage.tsx",
+        "src/components/Toolbar.tsx",
+        "src/components/ViewerController.tsx",
+        "src/lib/features.ts",
+        "src/styles/viewer.css"
+      ],
       "automated": [
-        "src/lib/ink.test.ts"
+        "src/components/PdfPage.annotations.test.tsx",
+        "src/lib/core-ink.withdrawal.test.ts"
       ],
-      "acceptance": [],
-      "documentation": [],
-      "regressionGuard": [],
-      "gaps": [
-        "the annotation view half is built, but the withdrawal half is not: root and /headless still export InkLayer, usePdfInk, INK_COLORS, INK_WIDTHS and the stroke helpers",
-        "ViewerController instantiates usePdfInk unconditionally, so the shell renders a working pen with no feature loaded",
-        "src/lib/features.ts bakes transient core ink into the core feature contract"
+      "acceptance": [
+        "scripts/check-maturity.mjs"
       ],
-      "note": "State is absent because the requirement now names a removal, and that removal has not happened: ink.test.ts tests the surface that is meant to go away (task #200). Verified against the published artifact rather than inferred — usePdfInk, InkLayer, INK_COLORS, INK_WIDTHS, drawInkStrokes, simplifyPoints and InkStroke all appear in dist/index.d.ts of pdfjs-react-reader@0.1.2 on npm, so this is a public-API removal, not an internal one."
+      "documentation": [
+        "docs/src/pages/Api.tsx",
+        "docs/src/pages/Features.tsx",
+        "CODE_REFERENCE.md"
+      ],
+      "regressionGuard": [
+        "src/lib/core-ink.withdrawal.test.ts",
+        "src/components/PdfPage.annotations.test.tsx"
+      ],
+      "gaps": [],
+      "note": "Verified clause by clause, both halves. Display: — a page hands the engine's own `AnnotationLayer` the document's link, markup and widget annotations and lets it build the DOM, asserted against a stub that records the constructor and the render call separately, because pdf.js reads `annotationEditorUIManager` off one and `renderForms` off the other and a page that passed either to the wrong place looks identical on screen. Two perturbations were run to prove the guard bites: blanking the annotation list, and renaming the layer element; each failed exactly the assertion that clause owns. Withdrawal: fifteen published names leave `.` and `/headless`, the toolbar's `draw` control and the controller's ink state go with them, the core feature contract no longer carries transient strokes, and the core sheet loses the drawing chrome it was never entitled to. The scan reads `src/index.ts` and `src/headless.ts` rather than `dist/` because a name can be missing from an artifact for the wrong reason, and every scan names a control in the same file it is reading. Recorded, not just done: each name is in `api-maturity.json` with the tag it held, the version that drops it and the changelog section that announces it, and `check:maturity` fails if such a name is published again, if its recorded tag is outside the four states, if the version it left in is not a major, or if the section it cites does not name it. Of those four the first met a real artifact rather than a fixture: run against the stale pre-removal `dist/`, the check reported thirty problems, fifteen of them this rule and fifteen `exported and untagged`. The other three fired only in the check's own synthetic set, which grew from nine violations to thirteen to carry them. Two limits belong in the open record rather than in a footnote. One: the changelog warning is the only one there will be, because the PRD plans no published release between `0.1.2` and `1.0.0`, so no minor exists to carry it; `1.0.0` is the first artifact a consumer can install without these names, and the ledger states the tag each held rather than claiming a warning cycle the release plan cannot provide. Two: the shell passed `isPinchingDisabled` to pdf.js's `TouchManager` solely because core drawing wanted every finger, so with core ink gone the predicate was constant-false and it was deleted with its supplier {no behaviour change}. Whether the annotate feature's freehand editor wants the same exemption from a mid-stroke pinch is a question this package did not answer and no jsdom test can: it needs two fingers and a real engine, and it belongs to FR-47's device half."
     },
     "FR-19": {
       "title": "High-Fidelity Printing",
@@ -478,10 +499,9 @@
         "src/lib/print.test.ts"
       ],
       "gaps": [
-        "print feeds core transient inkStrokesForPage into the sheet, so unpersisted core drawing travels — the clause says there is no transient core drawing capability (depends on FR-18)",
         "no acceptance evidence: the print path has never been opened in a browser by the matrix"
       ],
-      "note": "Budget-driven resolution, the refusal that names the page count, form values, persisted marks and the known-broken platform report are all built and planned by the unit tests."
+      "note": "Budget-driven resolution, the refusal that names the page count, form values, persisted marks and the known-broken platform report are all built and asserted by the unit tests. The transient half of the row closed with FR-18: the print pipeline no longer composites in-session strokes it was handed — it takes the page's stored `annotationStorage` and nothing else {EM} so \"there is no transient core drawing capability\" is now a statement about the surface rather than about a caller that could have passed one. What is left is acceptance: the matrix has never rendered the print container, so \"the pages come out at the resolution the budget allowed\" is asserted offscreen and not yet observed on paper."
     },
     "FR-20": {
       "title": "Document Download",
@@ -507,53 +527,62 @@
     },
     "FR-21": {
       "title": "Opt-In Feature Registration",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/features.ts",
-        "src/components/FeatureHost.tsx"
+        "src/components/FeatureHost.tsx",
+        "src/components/ViewerController.tsx"
       ],
       "automated": [
         "src/components/FeatureHost.test.tsx",
-        "src/lib/features.test.ts"
+        "src/lib/features.test.ts",
+        "src/lib/features.registration.test.ts",
+        "src/components/FeatureHost.registration.test.tsx",
+        "src/lib/feature-boundary.test.ts",
+        "src/features/stylesheets.test.tsx"
       ],
       "acceptance": [
         "scripts/check-size.mjs"
       ],
       "documentation": [
-        "docs/src/pages/Features.tsx"
+        "docs/src/pages/Features.tsx",
+        "CODE_REFERENCE.md"
       ],
       "regressionGuard": [
-        "src/components/FeatureHost.test.tsx"
+        "src/components/FeatureHost.test.tsx",
+        "src/lib/features.registration.test.ts",
+        "src/components/FeatureHost.registration.test.tsx",
+        "src/lib/feature-boundary.test.ts"
       ],
-      "gaps": [
-        "no declared dependency list, no duplicate-id handling and no cycle detection, so the deterministic-failure clause is unbuilt (task #197)",
-        "the feature value declares no stylesheet entries"
-      ],
-      "note": "The shell imports no feature statically and runners are keyed by feature id with the index-key counterfactual tested; the §3.7 validation half is missing."
+      "gaps": [],
+      "note": "Both gaps this row carried are closed. The three refusals §3.7 names — duplicate id, missing dependency, dependency cycle — now throw `PdfError('CONFIGURATION_ERROR', …)` from `orderFeatures`, which the shell calls before it renders a child and `FeatureRunners` calls again where the runners actually mount, so `before any runner mounts` is a claim with a test behind it rather than a hope: each of the three asserts the recording Runner never ran, and the non-vacuous twin mounts the same list validly to show the recording works. Each removal was counterfactualled in `src/lib/features.ts` — delete the pass, and the guards fail (5, 3 and 6 tests respectively; deleting the ordering fails 7). Two decisions worth keeping. A refusal **throws** rather than routing to `onError`, because a malformed list is a mistake in a component tree and not something that happened to a document, and §3.6 leaves `onError` for the second kind; `useScope()` already threw `CONFIGURATION_ERROR` for a hook used outside a mounted feature, and this row now has that mechanism asserted too. And a list with no `dependsOn` is handed back as *the same array*, because the documented host pattern rebuilds `features` inline on every render and the shell's memos key on it — a fresh array would recompute every page contribution per render, which is a cost no host asked for. The stylesheet half is met as a declaration on the feature value, cross-checked against the export map: 8 built-ins name 8 sheets, `download` names none because its control is the shell's toolbar button, and both directions of drift fail."
     },
     "FR-22": {
       "title": "Per-Feature Stylesheets",
-      "state": "partial",
+      "state": "met",
       "implementation": [
-        "package.json"
+        "package.json",
+        "src/styles/viewer.css",
+        "src/lib/features.ts"
       ],
       "automated": [
-        "scripts/check-size.mjs"
+        "scripts/check-size.mjs",
+        "scripts/check-packaging.mjs",
+        "src/lib/core-ink.withdrawal.test.ts"
       ],
       "acceptance": [
         "scripts/check-size.mjs"
       ],
       "documentation": [
-        "docs/src/pages/Features.tsx"
+        "docs/src/pages/Features.tsx",
+        "docs/src/pages/Theming.tsx"
       ],
       "regressionGuard": [
-        "scripts/check-size.mjs"
+        "scripts/check-size.mjs",
+        "src/lib/core-ink.withdrawal.test.ts"
       ],
-      "gaps": [
-        "the core stylesheet carries all the ink chrome (.pjsr-ink rules) while annotate.css carries none, so the core sheet does hold rules for a capability the application did not request",
-        "no gate asserts CSS purity: check-size.mjs asserts JavaScript markers only"
-      ],
-      "note": "One stylesheet per tier is published and imported explicitly. The clause that the core sheet carries no rules for unrequested features fails today because of the core ink the register already flags."
+      "gaps": [],
+      "note": "Three clauses, each with a gate now. One: a stylesheet per tier is a published entry {nine, classified by `check:packaging`} and each feature declares the ones it ships, which FR-21's contract test walks. Two: the core sheet carries no rule for a feature the application did not request. The rule is computed rather than listed {every `.pjsr-*` class a feature's own source renders and no core source renders must be absent from the built `styles.css`}, which lets a feature extend the core's vocabulary {`pjsr-button`, `pjsr-canvas-wrapper`, the annotation layer element} while refusing it a home in the core sheet. Today 29 classes are feature-only and none is styled by the core; feeding the gate a `.pjsr-annotate-swatch` rule in the core sheet failed it, and the built file was restored by hash. Three: the tree-shaking asymmetry is now asserted where it was only relied on — `sideEffects` must exempt CSS and must not exempt JavaScript, in either direction, because a JS glob in that list keeps every feature in every bundle and a missing CSS entry drops a bare `import 'pdfjs-react-reader/annotate.css'` with no error anywhere. The clause failed before this package for the concrete reason the register named: the core sheet held all the ink chrome (.pjsr-ink rules, the swatch tokens, the inert-annotation rule) while the drawing capability was a feature's job. FR-18 withdrew the surface and the rules went with it, and the withdrawal test asserts the core sheet stays free of it."
     },
     "FR-23": {
       "title": "Enforced Size Boundary",
@@ -600,7 +629,7 @@
     },
     "FR-25": {
       "title": "Embedded Files",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/attachments.ts",
         "src/headless/usePdfAttachments.ts",
@@ -608,20 +637,20 @@
       ],
       "automated": [
         "src/lib/attachments.test.ts",
-        "src/lib/link-service.test.ts"
+        "src/lib/link-service.test.ts",
+        "src/lib/attachments.fixture.test.ts"
       ],
       "acceptance": [],
+      "acceptanceWaiver": "The list and the saved bytes are proven against the real engine on playground/fixtures/attachments-ocg-sample.pdf in Node, and the save is asserted down to the anchor click and the Blob it hands the browser; the matrix mounts no attachments UI, so a browser check would re-run the engine call the fixture test already makes.",
       "documentation": [
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
-        "src/lib/attachments.test.ts"
+        "src/lib/attachments.test.ts",
+        "src/lib/attachments.fixture.test.ts"
       ],
-      "gaps": [
-        "a file carried by an annotation rather than named in the name tree is listed by accident: this repo enumerates getAttachments() and relies on pdf.js including FileAttachment annotations",
-        "playground/fixtures/attachments-ocg-sample.pdf carries exactly such a file and is wired into no test"
-      ],
-      "note": "Descriptions, per-file reads and saving annotation-held files work; the listing clause depends on the engine rather than on an assertion."
+      "gaps": [],
+      "note": "The annotation-carried file is now listed, described and saved by the product's own path, proved against the fixture that carries it, and the premise is pinned at the byte level: the name tree must not name it, or the test that says \"as well as\" would be measuring one list twice. Listing still reads zero contents, which is the prefetch clause made observable."
     },
     "FR-26": {
       "title": "Replaceable Find Strategy",
@@ -648,28 +677,30 @@
     },
     "FR-27": {
       "title": "Search Depth",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/search.ts",
-        "src/headless/usePdfSearch.ts"
+        "src/headless/usePdfSearch.ts",
+        "src/components/SearchBox.tsx"
       ],
       "automated": [
         "src/lib/search.test.ts",
-        "src/lib/search.abort.test.ts"
+        "src/lib/search.abort.test.ts",
+        "src/headless/usePdfSearch.pattern.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#search-marks-matches"
       ],
       "documentation": [
-        "docs/src/pages/Features.tsx"
+        "docs/src/pages/Headless.tsx",
+        "docs/src/pages/Shell.tsx"
       ],
       "regressionGuard": [
-        "src/lib/search.abort.test.ts"
+        "src/lib/search.test.ts",
+        "src/headless/usePdfSearch.pattern.test.tsx"
       ],
-      "gaps": [
-        "the 256 UTF-16 code-unit ceiling does not exist: planFind never checks length, so an over-long pattern is indistinguishable from a valid one (task #199)"
-      ],
-      "note": "AND-per-page, literal escaping, raw regex, a pattern error rather than zero matches, per-page counts and cancellation are all met; the ceiling is the one clause with no code."
+      "gaps": [],
+      "note": "AND-per-page over escaped literals, raw regex where the reader wrote it, per-page counts, and cancellation of a superseded or aborted walk were all met before this row was revisited; the ceiling was the one clause with no code. It is now `DEFAULT_MAX_PATTERN_UNITS`, checked before `new RegExp` and overridable per query with `maxPatternUnits`, with the two refusals distinguishable as `patternKind: too-long | invalid` beside the sentence in `patternError`. Three things the tests hold that are easy to get wrong: a pattern that is both over the limit and malformed reports `too-long`, which is the proof the length gate ran first; a refused pattern reads `status: error` with `complete: true` and an empty result set, so only the status and the kind separate it from a genuine no-match; and a long *literal* query is never bounded, because its cost is in the text scanned, not in what was typed. The bound is a trade, not a virtue — the row excludes worker isolation and a per-page deadline from the `1.0.0` contract, so nothing else stands between a reader’s `(a+)+$` and a frozen tab."
     },
     "FR-28": {
       "title": "Composed Shell, Labels, Events, Locales & Shell Affordances",
@@ -678,26 +709,34 @@
         "src/components/ViewerContext.tsx",
         "src/components/ViewerController.tsx",
         "src/components/ViewerParts.tsx",
-        "src/lib/toolbar.ts",
+        "src/components/ViewerLayout.tsx",
+        "src/components/OutlineView.tsx",
+        "src/components/ThumbnailList.tsx",
+        "src/components/Sidebar.tsx",
         "src/components/labels-context.ts",
+        "src/lib/toolbar.ts",
         "src/lib/fullscreen.ts"
       ],
       "automated": [
         "src/components/ViewerLabels.test.tsx",
         "src/components/Toolbar.test.tsx",
-        "src/components/ViewerController.gestures.test.tsx"
+        "src/components/ViewerController.gestures.test.tsx",
+        "src/components/ViewerParts.composed.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#wheel-zoom-and-scroll",
-        "scripts/browser-matrix.mjs#toolbar-fold"
+        "scripts/browser-matrix.mjs#toolbar-fold",
+        "scripts/check-examples.mjs"
       ],
       "documentation": [
         "docs/src/pages/Shell.tsx"
       ],
       "regressionGuard": [
-        "src/components/ViewerController.gestures.test.tsx"
+        "src/components/ViewerController.gestures.test.tsx",
+        "src/components/ViewerParts.composed.test.tsx"
       ],
-      "gaps": []
+      "gaps": [],
+      "note": "Met, and now met for the right reason: the row read `met` while PRD §5.3 was still marked **Target API shape**, which is the clause this row points at for its composed-parts half. W5 (task #201) closed that gap — `ViewerRoot` takes the host's `className`/`style` beside the controller's own, `ViewerSidebar` takes children and drops its tab strip when the host supplies the body, `ThumbnailList` reads doc/page count/current page/rotation from `useViewer()` with only its starting width left as a prop, and `OutlineView` reads the bookmark tree out of the outline tier's publication in the same controller's store. §5.3 therefore compiles against the packed artifact and the marker is gone. `Sidebar`'s `extraTabs` became `tabs`, because a tab that selects nothing is a control that lies; `OutlineViewProps` and `ThumbnailListProps` are gone with the props. The labels, controls, events and three individually-refusable affordances were already held and asserted."
     },
     "FR-29": {
       "title": "Annotation Authoring",
@@ -792,24 +831,30 @@
       "state": "partial",
       "implementation": [
         "src/components/PdfPage.tsx",
+        "src/components/PdfThumbnail.tsx",
         "src/headless/usePdfDownload.ts",
+        "src/features/download.tsx",
         "src/edit.tsx"
       ],
       "automated": [
         "src/headless/usePdfDownload.test.tsx",
+        "src/components/PdfPage.xfa.test.tsx",
         "src/components/PdfPage.structure.test.tsx"
       ],
       "acceptance": [],
+      "acceptanceWaiver": "The refusal is a branch and a resolved value, both asserted against a stubbed engine whose `saveDocument()` rejection was measured on all three /XFA container shapes in 0.7; a browser would observe a download dialog this harness cannot read and this repository cannot drive headlessly.",
       "documentation": [
-        "docs/src/pages/Features.tsx"
+        "docs/src/pages/Features.tsx",
+        "docs/src/pages/Recipes.tsx"
       ],
       "regressionGuard": [
+        "src/components/PdfPage.xfa.test.tsx",
         "src/headless/usePdfDownload.test.tsx"
       ],
       "gaps": [
-        "the refusal names no reason to the host: usePdfDownload silently falls back to the loaded bytes, so a reader gets a file without their edits and is told nothing"
+        "an XFA thumbnail's paint has no automated assertion: `PdfThumbnail` asks for `getXfa()` and composes the tree, which was measured in a browser in 0.8 and is still unasserted — `PdfThumbnail.test.tsx` (W8) covers the canvas, the observers, the label and the buffer release, not the XFA branch"
       ],
-      "note": "XfaLayer renders, marks wrap its text runs and thumbnails draw the tree, and a save of a pure-XFA document is refused rather than attempted — the refusal itself is the measured pdf.js behaviour, whose commit call rejects. What is missing is the reason reaching anyone: usePdfDownload falls back to the loaded bytes silently, so the reader gets a file without their edits and nothing says so. The clause is W2's (#204), where it moved from W1's row at W1's close; and whatever carries it belongs on FR-54's coded error surface rather than in a message, since the contract now exists."
+      "note": "The clause W2 named — the save refusal having to say why — is closed, and closed in the API rather than in a message: `download()` resolves `{ fileName, committed, refused }`, the hook publishes `refused`, and `onRefused` is there for a caller that does not await. A refusal is not an error, so it does not go near `onError`; the file still arrives, because a reader who cannot keep their edits should not also lose the document. The built-in control puts the reason in its own accessible name, which is the one place a reader will look at the moment the difference matters — and that string is in the catalog, so it is in German, Spanish and French too. Two other clauses gained the assertions they had never had: a viewport change updates `XfaLayer` rather than re-appending it (the page must not appear twice, and the focused field must survive), and a search mark lands on the XFA tree rather than on the text layer a pure-XFA page never builds. Both fail when the mechanism is removed — re-appending on update, and dropping the span wrap — which is the pair this row could not previously show. What is left is the thumbnail half of the second clause: `PdfThumbnail` composes an XFA tree, measured in a browser during 0.8 and still unasserted — the component has a test file since W8, and it covers the canvas, the two observers, the label and the buffer release rather than that branch."
     },
     "FR-34": {
       "title": "Network Contract",
@@ -836,9 +881,10 @@
     },
     "FR-35": {
       "title": "Bounded Retries",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/retry.ts",
+        "src/lib/abort.ts",
         "src/headless/usePdfDocument.ts"
       ],
       "automated": [
@@ -846,23 +892,21 @@
         "src/headless/usePdfDocument.retry.test.tsx"
       ],
       "acceptance": [],
+      "acceptanceWaiver": "Every clause is observable in the node harness and asserted there: the status set the classifier retries and refuses, the default intervals, the per-attempt reports including the final one, and — under fake timers — that an abort during a five-second wait clears the timer outright. The browser matrix drives a successful load and a refused one; it injects no transient failure, so a browser row here would describe a check that does not exist.",
       "documentation": [
         "docs/src/pages/Headless.tsx",
         "docs/src/pages/Shell.tsx"
       ],
       "regressionGuard": [
-        "src/lib/retry.test.ts"
+        "src/lib/retry.test.ts",
+        "src/headless/usePdfDocument.retry.test.tsx"
       ],
-      "gaps": [
-        "defaults are 250 ms initial and 5 s maximum against the locked 1 s and 30 s",
-        "the last attempt is never reported: the throw precedes the report call, and retry.test.tsx asserts one wait between two attempts and not after the last, so the clause is currently guarded in the wrong direction",
-        "the backoff is an un-cancellable setTimeout with cancellation checked after it resumes, so an abort leaves a timer running for the remainder of the delay"
-      ],
-      "note": "Attempt count, the 408/425/429 and 5xx status set, 401 and 403 never retried, and full jitter are all met and tested; the three clauses §7's rewrite turned into obligations are not (task #199)."
+      "gaps": [],
+      "note": "Three attempts, one second first, thirty-second ceiling, full jitter, 408/425/429 and 5xx plus no-response retried and 401/403/404/corrupt/encrypted never retried — all of it was already true and already tested. What was not true is recorded here because the shape of the failure is the lesson: the two delay defaults sat at 250 ms and 5 s for a whole release with the row saying 1 s and 30 s, because every existing test passed its own policy in and so could not observe the shipped numbers. The guard added with this row calls `backoffDelay` with `{ jitter: false }` and nothing else, which is the only form of the call that reads the defaults. Two decisions worth having written down: a host that passes `retry: false` gets no attempt report at all (one attempt is not a retry story, and it reaches the host as an `AUTH_ERROR`-class failure instead), and the wait wakes on the load effect’s own `AbortController`, which every stop path aborts — unmount, superseded source and host signal — rather than on the host signal alone, because an unmount has to stop the timer too."
     },
     "FR-36": {
       "title": "Cancellation Tokens",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/abort.ts",
         "src/headless/usePdfDocument.ts",
@@ -872,7 +916,8 @@
         "src/headless/usePdfPrint.ts",
         "src/headless/usePdfDownload.ts",
         "src/lib/pdf-write.ts",
-        "src/lib/pdf-merge.ts"
+        "src/lib/pdf-merge.ts",
+        "src/edit.tsx"
       ],
       "automated": [
         "src/lib/abort.test.ts",
@@ -880,21 +925,23 @@
         "src/lib/search.abort.test.ts",
         "src/lib/pdf-write.test.ts",
         "src/lib/pdf-merge.test.ts",
-        "src/headless/usePdfDownload.test.tsx"
+        "src/headless/usePdfDownload.test.tsx",
+        "src/components/PdfPage.abort.test.tsx",
+        "src/edit.abort.test.tsx"
       ],
       "acceptance": [],
+      "acceptanceWaiver": "Cancellation is a lifecycle fact, not a painted one: what the clause asks is observable as engine calls that did not happen and bytes that never arrive, both of which jsdom counts exactly and a browser cannot distinguish from a slow frame. The React 18 and 19 halves are the same suite run twice, which is what the react-18 CI job does; the browser matrix runs the viewer on three engines but has no abort to issue.",
       "documentation": [
-        "docs/src/pages/Headless.tsx"
+        "docs/src/pages/Headless.tsx",
+        "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
+        "src/components/PdfPage.abort.test.tsx",
+        "src/edit.abort.test.tsx",
         "src/lib/search.abort.test.ts"
       ],
-      "gaps": [
-        "every writer pass is not covered: src/edit.tsx calls arrangePages, flattenBytes, signFields and findSignatureFields with no WriteOptions, so the signal only reaches the writer through /merge",
-        "download checks the signal only between the byte await and the write, so an already-aborted download still does the work — its own test names this the honest boundary",
-        "the page-proxy fetch sets a cancelled flag and still issues doc.getPage(), which is cancellation by discarding rather than by doing no work"
-      ],
-      "note": "All nine operations accept a signal and the superseded-load path never reaches an error handler, which is the hard half; the two exceptions are documented rather than wished away."
+      "gaps": [],
+      "note": "Three gaps, all closed by changing the code. **The page path checked nothing before starting**: every effect in `PdfPage` began its work and asked afterwards, so a page mounted under an already-fired signal still fetched its proxy, still allocated a canvas and still built its layers before discarding them — now each of the seven opens with one check, and the guard counts the `getPage` that does not happen. **Download paid for the bytes first**: the signal was read between the `getData` await and the write, which produced no file but charged the caller for the round trip the abort was meant to avoid; the check moved to the top of the call, and the test that had recorded the old boundary as “honest” now asserts the clause. **The edit tier never passed a signal at all** — the writer primitives all check one, and the one place a write is long enough to want cancelling called them with nothing; a controller now belongs to the panel’s mount, a host can hand `createEditFeature({ signal })` one, and a cancelled pass produces no document and no error report, because §3.6 says a cancellation is not a failure. Two things deliberately unchanged: a `getData` already in flight cannot be recalled (the engine owns that fetch), and a writer loop stops before its *next* page rather than undoing the one it changed — both are the clause’s own exceptions, not gaps in it. Signals are still not merged into one composed object, for a reason about lifetimes rather than a reason about versions: each effect owns a cancellation of its own, so a merged signal would make a scale change look like an abandonment. The test that used to grep the module for `AbortSignal.any` on a platform-floor basis is gone — #203 removed it, because §5.6's baseline rule makes a guard against an API the advertised floors already admit a defect rather than a defence. No code ever called it, and none does now."
     },
     "FR-37": {
       "title": "Published State Models",
@@ -1017,14 +1064,14 @@
         "docs/src/pages/Installation.tsx"
       ],
       "regressionGuard": [
-        "scripts/check-packaging.mjs"
+        "scripts/check-packaging.mjs",
+        "scripts/tarball-check.mjs"
       ],
       "gaps": [
-        "engines.node is >=20 while the contract floor is >=22.13.0 and forbids Node 20 and 22.0–22.12",
-        "the packaging matrix tests 20.9, 20 and 22 with no 22.13 pin, so it measures runtimes the contract excludes",
-        "tarball-check treats ERR_REQUIRE_ESM as a pass on any version, so cannot-be-required fails the job only if the runner happens to be new enough"
+        "the packaging job that clause five points at has never executed on a runner, so \"fails the packaging job\" is proved against the script locally (a below-floor Node exits 1, an unresolvable published path exits 1) and never against GitHub Actions, where the matrix would have to say it",
+        "the require() half is measured on node 24.21.0 alone: 15 of 15 paths resolved through both formats from the installed tarball with identical name lists, and one declaration source compiled as both .mts and .cts, but no run has been made at 22.13.0 itself, which is the version the promise is actually about"
       ],
-      "note": "Fifteen paths × four files with matching name lists between formats, proven from the packed artifact; the Node floor that makes CJS loadable at all is stated in the PRD and contradicted by package.json (task #202)."
+      "note": "Fifteen JavaScript paths, proven from the packed artifact rather than from source: npm pack, install beside the real peers into a CommonJS host, require() and import() each path, compare the name lists, and compile one identical declaration file under NodeNext in both modes. The three gaps this row carried into W7 are gone: engines.node is >=22.13.0 instead of >=20, the CI matrices test the floor and later (22.13.0, 22, 24) rather than runtimes the contract excludes, and ERR_REQUIRE_ESM is a failure instead of a tolerance -- the difference between \"we promise require()\" and \"we hope the runner is new enough\". The floor is now one value read from PRD 8 rather than three values repeated by hand: check:packaging parses both Node rows of the table, requires them to agree, requires engines.node to equal them, requires the installed engine to declare at least that floor, and walks every node-version pin in both workflow files for anything below it. Each rule fired when fed its counterfactual (engines raised to 99.0.0, a CI pin at 20.9.0, a table edited to 22.14.0, an unresolvable subpath in the map) and the files came back by md5. What is left is evidence this machine cannot produce: a clean runner."
     },
     "FR-42": {
       "title": "Document Merge",
@@ -1154,13 +1201,14 @@
         "src/lib/ssr.test.ts"
       ],
       "gaps": [
-        "the requirement says the test covers the published tarball, and the file says plainly that dist/ is not touched: the tarball half lives in check:tarball, which is outside verify, needs the network, and has never run on a clean runner"
+        "the requirement says the test covers the published tarball, and the file says plainly that dist/ is not touched: the tarball half lives in check:tarball, which is outside verify, needs the network, and has never run on a clean runner",
+        "the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108 -- the advertised peer floor -- throws ReferenceError: DOMMatrix is not defined from its own module scope on import, and prints \"Please use the `legacy` build in Node.js environments\". 6.3.289 and 6.4.299 import cleanly (62 names each). So this row is proven for the range from 6.3.289 up, and the floor question is task #211 rather than a test to rewrite"
       ],
       "note": "Every documented entry imports under bare Node without a DOM and the entry list is read from package.json rather than typed out, so a new subpath cannot escape the check; only the artifact-under-test claim is overstated."
     },
     "FR-47": {
       "title": "Touch & Gesture Handling (v1.0)",
-      "state": "met",
+      "state": "partial",
       "implementation": [
         "src/components/ViewerController.tsx",
         "src/styles/viewer.css",
@@ -1179,7 +1227,10 @@
       "regressionGuard": [
         "src/components/ViewerController.gestures.test.tsx"
       ],
-      "gaps": []
+      "gaps": [
+        "the pan half of the arbitration does not exist on the advertised peer floor: pdfjs-dist 6.2.108's TouchManager exposes no onPanning callback at all (zero occurrences in build/pdf.mjs and in its .d.ts), so the engine claims the second finger's touchmove, preventDefaults it and hands nothing back. Measured in chromium with the engine swapped to 6.2.108: the matrix's pinch-vs-pan row fails with \"a two-finger pan moved neither the page nor the scroll position\" while the pinch half passes. 6.3.289 and 6.4.299 pass both halves, and the keyboard and control equivalents stay available on every version, so this is a promise the peer range cannot carry at its bottom end (task #211) rather than a behaviour the shell dropped"
+      ],
+      "note": "The arbitration itself is built and guarded: the pinch zooms, the host page does not scroll under it, a drawing tool keeps its one-finger drag, and the gesture code is instance-scoped so a second viewer on the same page is not starved -- all of it passes on 6.3.289 and 6.4.299, in jsdom and in three browsers. What moved this row off `met` is a peer-range fact rather than a shell one: the callback that returns the pan to us is a 6.3 addition, so the version at the bottom of our own advertised range swallows it. Until #211 settles the floor, the honest reading is that FR-47 holds on the range we can prove and on every version's keyboard and control equivalents, and does not hold at 6.2.108's touch surface."
     },
     "FR-48": {
       "title": "Browser & Engine Verification Matrices",
@@ -1201,12 +1252,13 @@
         "scripts/browser-matrix.mjs"
       ],
       "gaps": [
-        "Firefox and WebKit cannot start on the development host, so only Chromium rows carry evidence and the CI job that would cover the other two has never run",
-        "the browser job installs Playwright's current defaults rather than the pinned per-floor environments §8's execution policy requires",
-        "the engine matrix has no latest-supported-6.x row, and the React matrix has no minimum-supported-patch row per major",
-        "verify still runs Node 20 against an 22.13.0 floor, and no Edge, macOS Safari, iOS or Android job exists"
+        "the browser job has never executed on a runner. Its harness is proven locally -- 2026-10-04 solo run, six engine x profile cells, 67 ok / 5 skipped / 0 failed / 0 not runnable, and 6 of 6 engines at or above PRD 8's floors (chromium 153 vs 125, firefox 155 vs 124, webkit 26 vs 18) -- and a note on this row claiming Firefox could not be driven at all was wrong: it came from two matrix processes sharing one dev-server port, and the same command run alone passes all twelve of its desktop checks",
+        "the engine axis inside a browser fails at the advertised floor: with pdfjs-dist swapped to 6.2.108, chromium passes 22 checks and its pinch-vs-pan row reports \"a two-finger pan moved neither the page nor the scroll position\", because that release's TouchManager has no onPanning to hand the pan to. 6.3.289 and 6.4.299 pass it. This is a peer-range decision (task #211), not a matrix to delete",
+        "the floors the harness measures are Playwright's current builds, not the pinned per-floor environments PRD 8's execution policy names, so chromium 153 says nothing about 125 and webkit 26 says nothing about Safari 18; that is why those rows stay implemented rather than supported, and not because a check failed",
+        "the matrix runs one engine version per checkout (whatever node_modules holds), so the consumer job's two engine cells prove a typecheck and a Vite build rather than a painted page at 6.2.108 or 6.4.299 (task #194)",
+        "no Edge, macOS Safari, iOS or Android job exists, and the mobile profile is emulation: its skips are the wheel it does not dispatch and, on Firefox and WebKit, the Touch constructor it does not expose"
       ],
-      "note": "Thirteen checks × three engines × two profiles are written and the harness classifies a launch failure as unverified rather than passed, which is the honest part; the coverage itself is one engine and one never-run job."
+      "note": "Thirteen checks, three engines, two profiles, and a run that classifies a browser it cannot start as unverified rather than passed. W7 made the floors part of the evidence instead of prose: PRD 8's browser rows are parsed out of the document, compared against each engine's reported version, printed as their own line per cell and counted in their own tally, so drift between the table and the harness exits 2 -- proved by setting chromium's floor to 126 and reading the script name the disagreement. The pinch row is deterministic now: it waits for a settled scale rather than the first change, and an engine with no Touch to synthesise reports a skip with its reason. Both 1,000-page results that came back red in the contended run came back green solo, so the WebKit \"stall at page 733\" is recorded as a harness artifact (#210, closed) and the budget comment says which run produced which number. Still open and not closeable here: the job's first run, the engine axis inside a browser at both range ends, and any device that is not a Linux VM."
     },
     "FR-49": {
       "title": "Benchmark Fixture Suite",
@@ -1214,28 +1266,34 @@
       "implementation": [
         "scripts/benchmark.mjs",
         "scripts/make-long-pdf.mjs",
-        "scripts/make-scan-pdf.mjs"
+        "scripts/make-scan-pdf.mjs",
+        "scripts/make-vector-pdf.mjs",
+        "playground/raw.html",
+        "playground/src/raw-render.ts"
       ],
       "automated": [
         "scripts/benchmark.mjs",
-        "src/lib/scan.test.ts"
+        "src/lib/scan.test.ts",
+        "src/lib/benchmark-record.test.ts"
       ],
       "acceptance": [
         "scripts/benchmark.mjs"
       ],
       "documentation": [
-        "README.md"
+        "README.md",
+        "docs/src/pages/Compatibility.tsx"
       ],
       "regressionGuard": [
+        "src/lib/benchmark-record.test.ts",
         "scripts/benchmark.mjs"
       ],
       "gaps": [
-        "profiles C (vector-heavy) and D (low-memory harness) have no committed fixture",
-        "the measurement record omits the machine model, browser version, fixture hash and p99 that §6 requires, and .spike/ is gitignored so no record is committed at all",
-        "the in-script profile C target restates a cold-page number §6 does not give",
+        "profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also asks for a real mobile-device validation, which has no device and no schedule (tasks #141, #156)",
+        "profile C attributes work to our layer by subtracting two separate page loads — the viewer's cold page and the engine-only harness at the same box — because nothing in the render path is marked; a finer split needs a seam the product does not have",
+        "profile A's cold page is above §6's 100 ms bar on this machine — a 147 ms median in the committed record and 224 ms in an earlier run of the same build — which the run reports rather than fails, and the spread between the two runs is the reason the bar stays where the document put it",
         "the CI benchmark step has never run remotely"
       ],
-      "note": "Profiles A and B are built, generated by committed scripts, and separated into bars that fail the run and measures that never do; the record §6 demands a measurement carry does not exist yet."
+      "note": "Four profiles, four committed fixtures generated by committed scripts, and a tracked record at `benchmarks/latest.json` carrying the machine, OS, browser and engine versions, the fixture hashes and the p50/p95 of every sampled number — with p99 reported only for the two sweeps that have the sample count for it. `src/lib/benchmark-record.test.ts` fails if a field goes missing, if a hash stops matching the bytes on disk, if a five-sample measure grows a p99, or if a record with a broken bar is committed. Profile C's engine time is now separate from the viewer's because there is a page that draws the sheet with none of the viewer in it, and profile D's ceiling is now the one in force because the harness zooms through the overflow menu the way a phone reader does."
     },
     "FR-50": {
       "title": "Published API Maturity",
@@ -1260,18 +1318,20 @@
       "gaps": [
         "the check is the last step of npm run verify, which no CI job calls, so an untagged export fails locally and passes CI"
       ],
-      "note": "All 315 published names are tagged with the four §5.5 states and every rule the requirement promises is implemented and self-tested; only the enforcement location is wrong."
+      "note": "All 320 published names are tagged (263 stable, 57 experimental, and 15 withdrawn names in a `removed` ledger; the count is `npm run check:maturity`'s own line, refreshed by #203) with the four §5.5 states and every rule the requirement promises is implemented and self-tested; only the enforcement location is wrong."
     },
     "FR-51": {
       "title": "Edge-Case Suite",
-      "state": "partial",
+      "state": "met",
       "implementation": [
-        "src/lib/edge-cases.test.ts"
+        "src/lib/edge-cases.test.ts",
+        "scripts/make-oversize-pdf.mjs"
       ],
       "automated": [
         "src/lib/edge-cases.test.ts",
         "src/lib/damaged.test.ts",
-        "src/lib/encrypted.test.ts"
+        "src/lib/encrypted.test.ts",
+        "src/lib/encrypted.reprompt.test.ts"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs"
@@ -1282,39 +1342,39 @@
       "regressionGuard": [
         "src/lib/edge-cases.test.ts"
       ],
-      "gaps": [
-        "the over-large page row asserts canvas arithmetic ceilings rather than what the engine reports for a page that size, because no oversize fixture exists (task #195)"
-      ],
-      "note": "Four of six shapes run against the real engine, two are cited with a stated reason, and three guards make the table evidence rather than prose; the sixth row is computed, and says so."
+      "gaps": [],
+      "note": "All six shapes now run against the real engine, five of them in this file and the sixth — the wrong password — in its own because the engine re-asks in a loop that starves everything beside it. The over-large page was the last row proved by arithmetic, and `oversize-sample.pdf` closes it: three boxes the engine itself reports (612×792, 12 000×9 000 and 200 000×600 pt) that come out as uncapped, clamped by the area ceiling at 0.56×, and refused below the 0.25 minimum by the side ceiling — the distinction the requirement is about, read off a file rather than typed into a test. The generator refuses to emit a box whose verdict has drifted from the ceilings in `src/lib/canvas.ts`, so the fixture cannot go stale in silence, and the table's guards still fail if a row is deleted, renamed or quietly skipped."
     },
     "FR-52": {
       "title": "Public API & Export Contract",
       "state": "partial",
       "implementation": [
         "package.json",
-        "scripts/check-packaging.mjs"
+        "scripts/check-packaging.mjs",
+        "scripts/check-examples.mjs"
       ],
       "automated": [
         "scripts/check-packaging.mjs",
-        "scripts/tarball-check.mjs"
+        "scripts/tarball-check.mjs",
+        "scripts/check-examples.mjs"
       ],
       "acceptance": [
         ".github/workflows/ci.yml"
       ],
       "documentation": [
         "docs/src/pages/Api.tsx",
-        "docs/src/pages/Installation.tsx"
+        "docs/src/pages/Installation.tsx",
+        "README.md"
       ],
       "regressionGuard": [
-        "scripts/check-packaging.mjs"
+        "scripts/check-packaging.mjs",
+        "scripts/check-examples.mjs"
       ],
       "gaps": [
-        "npm run check:examples does not exist, so the compile rule the PRD's own reading guide states is unenforced (task #201)",
-        "no assertion makes internal modules unreachable or forbids a /types entry appearing",
-        "the packaging job that proves both formats from the packed artifact has never run",
+        "the packaging job that proves both formats from the packed artifact has never run, and no CI job has run `npm run check:examples` either (task #202)",
         "the /edit, /merge, /features/*, per-feature CSS and /locales/* entries this row classifies as public have never been published: the surface consumers have actually had is the four subpaths in pdfjs-react-reader@0.1.2 — '.', './headless', './styles.css', './package.json' — ESM only"
       ],
-      "note": "Twenty-five published subpaths with complete declarations and no wildcards, checked against the built output; the example-compile half of the contract has no mechanism. The published-baseline fact matters twice over: nothing in this row can be a breaking change, because no consumer has ever resolved those paths, and FR-50's stable/experimental split should be derived from them rather than from a local commit."
+      "note": "Twenty-five keys, each classified into the eight groups §4.10 lists, with a wildcard key, a `./types` entry, an unclassifiable key and any target outside `dist/` all failing `npm run check:packaging` — each of the four was verified by introducing it and restoring the manifest byte-for-byte. `npm run check:examples` is §5.6's mechanism and now exists: it packs, extracts the tarball into a throwaway project's `node_modules`, and type-checks every fenced block in PRD.md and README.md plus the docs site's live examples with no `paths` mapping, so resolution goes through the export map or nowhere — 16 blocks compile, and the one skip is printed with the React major that is not installed here. Two findings came out of the first run: a README example imported `PdfPage` from `/headless`, which exports no components (a documented surface that did not exist), and six blocks were fragments with no imports at all, so they are now modules rather than exemptions — §5.6 allows exactly one kind of exemption and this check prints it. The behavioural half of internal-unreachable is the compile, not a reading of the map: an unpublished subpath fails, which was verified by perturbing an example. The two remaining gaps are runs and a publish, not code: no CI job has executed these checks, and no consumer has ever resolved the tier subpaths because nothing since 0.1.2 has been published."
     },
     "FR-53": {
       "title": "Dependency & Engine Contract",
@@ -1339,9 +1399,9 @@
       "gaps": [
         "nothing forbids the root or /headless entry from importing the writer in future — it holds today by arrangement, not by assertion",
         "no check enforces the no-undeclared-runtime-dependency rule",
-        "engines.node is >=20 while the contract floor is 22.13.0 (task #202)"
+        "the peer ranges themselves are asserted only as far as an install resolves them: nothing fails if a future import reaches a package that is in neither `dependencies` nor `peerDependencies` — the rule holds today because the imports are counted by hand in CODE_REFERENCE §3"
       ],
-      "note": "Peer ranges, the optional writer peer and a consumer that installs the packed artifact all exist and are tested; the two promises that prevent future drift are not yet asserted."
+      "note": "Peer ranges, the optional writer peer and a consumer that installs the packed artifact all exist and are tested, and the Node floor is now one of them: `npm run check:packaging` reads it out of PRD.md §8, requires `engines.node` to equal it, requires the installed engine to declare at least it, and fails on any CI node pin below it, which closes the gap this row carried since 0.12 opened (3 gaps left). The two promises that prevent future drift — the writer never entering the core, and no undeclared runtime dependency — are still arrangement rather than assertion."
     },
     "FR-54": {
       "title": "Stable Error & Cancellation Contract",
@@ -1391,7 +1451,7 @@
     },
     "FR-55": {
       "title": "Worker & Source Security Contract",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/worker.ts",
         "src/lib/source.ts",
@@ -1401,7 +1461,10 @@
         "src/lib/source.test.ts",
         "src/lib/source.classify.test.ts",
         "src/lib/worker.test.ts",
-        "src/lib/errors.test.ts"
+        "src/lib/worker.conflict.test.ts",
+        "src/lib/worker.default.test.tsx",
+        "src/lib/errors.test.ts",
+        "src/headless/usePdfDocument.worker-conflict.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#nothing-came-from-a-cdn"
@@ -1411,65 +1474,79 @@
         "docs/src/pages/Compatibility.tsx"
       ],
       "regressionGuard": [
-        "src/lib/source.test.ts"
+        "src/lib/source.test.ts",
+        "src/lib/worker.conflict.test.ts"
       ],
-      "gaps": [
-        "conflicting worker configurations across simultaneous viewers are not detected, so one worker per realm is a convention rather than an enforced contract"
-      ],
-      "note": "allowedSources, scripting disabled at the layer, the Trusted Types policy and honest redirect scoping are built. The credential clauses §3.6 adds are now both held and asserted: a refusal names only the origin through `describeOrigin`, and the test that refuses a pre-signed source asserts the token *and* the path are absent from the message. Detecting two viewers with different worker URLs is the remaining half (task #198)."
+      "gaps": [],
+      "note": "One worker configuration per realm is now enforced rather than conventional: the claim is taken at load start, released in that load's teardown, and a conflicting second load surfaces the PdfError with both origins in its details. allowedSources, scripting disabled at the layer, the Trusted Types policy, honest redirect scoping and the credential clauses §3.6 adds are each asserted — a refusal names only the origin, and the test that refuses a pre-signed source asserts the token and the path are absent from the message."
     },
     "FR-56": {
       "title": "Feature Lifecycle Contract",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/features.ts",
-        "src/components/FeatureHost.tsx"
+        "src/components/FeatureHost.tsx",
+        "src/components/ViewerController.tsx"
       ],
       "automated": [
         "src/lib/features.test.ts",
-        "src/components/FeatureHost.test.tsx"
+        "src/lib/features.registration.test.ts",
+        "src/components/FeatureHost.test.tsx",
+        "src/components/FeatureHost.registration.test.tsx",
+        "src/lib/feature-boundary.test.ts",
+        "src/features/stylesheets.test.tsx"
       ],
       "acceptance": [
         "scripts/check-size.mjs"
       ],
       "documentation": [
-        "docs/src/pages/Features.tsx"
+        "docs/src/pages/Features.tsx",
+        "CODE_REFERENCE.md"
       ],
       "regressionGuard": [
-        "src/components/FeatureHost.test.tsx"
+        "src/lib/features.registration.test.ts",
+        "src/components/FeatureHost.registration.test.tsx",
+        "src/lib/feature-boundary.test.ts"
       ],
-      "gaps": [
-        "six of §3.7's eight obligations are absent: dependency declaration, cleanup contract, stylesheet declaration, duplicate-id validation, missing-dependency and cycle validation, dependency-before-dependent ordering",
-        "none of the three registration failures has a test, which §3.7 states explicitly"
-      ],
-      "note": "Stable ids, identity-keyed runners and merged page props are real; the lifecycle half of the contract is the target §3.7 was written to make checkable (task #197)."
+      "gaps": [],
+      "note": "All eight §3.7 obligations now have code and an assertion: stable id, declared dependencies, registration lifecycle (`Runner` mounts, the store retires, `cleanup` releases), the capabilities a feature is handed (`PdfViewerShell`), declared stylesheet entries, duplicate-registration behaviour, missing/cyclic-dependency behaviour, and ordering rules where ordering is observable. Three things are recorded here because they are the parts that could have been faked. **No built-in declares `dependsOn` or `cleanup`, and none should.** The nine tiers are genuinely independent — `download` asks `forms` and `annotate` whether the document has edits and works when neither answers, which is a peer read through `usePdfFeaturePeer`, not a dependency; declaring one there would refuse a composition that is correct today. The dependency machinery is therefore proven with written features, and the two observable consequences of it are pinned where they can be seen: initialisation order, and which feature wins a page contribution (the dependent) versus which claims a chord (the dependency) — both asserted against what the *written* order would have answered, so the sort is doing the work rather than the fixture. **`cleanup` runs before the Runner's own effect teardown**, because React destroys a deleted subtree's passive effects parent-first; that was measured rather than assumed, it is asserted so the documentation cannot rot quietly, and it is why the field is for resources the component never held. **The import boundary is asserted in source, not only in the bundle.** `scripts/check-size.mjs` already refuses a feature marker in the core bundle under two bundlers; `src/lib/feature-boundary.test.ts` names the offending import, and it scans the AST rather than the text because this project's own doc comments quote specifiers. Its positive control proves the scanner is not blind: the allowed edges (`src/edit.tsx` → `./features/ids`, `annotate` → the contract) are found, the type-only cross-tier import is classified as erased, and adding a real violation to any tier fails it — verified with two counterfactual imports, both restored."
     },
     "FR-57": {
       "title": "Runtime Resource Budget Contract",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/canvas.ts",
-        "src/lib/print.ts"
+        "src/lib/print.ts",
+        "src/components/useCanvasCeiling.ts",
+        "src/components/ViewerController.tsx",
+        "src/components/PdfPage.tsx"
       ],
       "automated": [
         "src/lib/canvas.test.ts",
-        "src/lib/print.test.ts"
+        "src/lib/canvas.budget.test.ts",
+        "src/lib/canvas.probe.test.ts",
+        "src/lib/print.test.ts",
+        "src/components/PdfPage.refusal.test.tsx",
+        "src/components/ViewerController.budget.test.tsx"
       ],
       "acceptance": [
+        "scripts/canvas-probe.mjs",
         "scripts/benchmark.mjs"
       ],
       "documentation": [
-        "README.md"
+        "README.md",
+        "docs/src/pages/Headless.tsx",
+        "docs/src/pages/Shell.tsx",
+        "CODE_REFERENCE.md"
       ],
       "regressionGuard": [
-        "src/lib/canvas.test.ts"
+        "src/lib/canvas.budget.test.ts",
+        "src/lib/canvas.probe.test.ts",
+        "src/components/ViewerController.budget.test.tsx",
+        "src/components/PdfPage.refusal.test.tsx"
       ],
-      "gaps": [
-        "there is no platform probe: canvas safety is chosen from user-agent and platform labels, and the module header documents rejecting a boot-time probe as a design decision §6.1 now reverses",
-        "a host-supplied budget replaces the computed ceiling rather than constraining it",
-        "no minimum-render-scale floor exists and nothing refuses a page with RESOURCE_LIMIT"
-      ],
-      "note": "The four canonical values are single-sourced, tested, read by the benchmark rather than copied, and the viewport-derived term is implemented — but the §6.1 combination rule and its detection clause are unwritten (task #198)."
+      "gaps": [],
+      "note": "The four §6.1 ceilings now combine as a minimum and the platform-safe one is probed rather than labelled. Measured by `npm run probe:canvas` on Chromium (pdfjs-dist 6.3.289, 2026-10-03): a 1280x800 @1x page answers 3,072,000 px, which is its viewport working set and below the desktop default, so the probe confirmed the ceiling in force instead of raising it; an iPad user agent on a 390x844 @3x screen lowers the start to 5,242,880 and the answer follows it; a search forced to 1,048,576 never answers above it. The shell's own search costs ~80 ms spread over six frames with one surface per frame and its first surface ~3 ms after the page's first paint, which is what `canvas.probe.test.ts` and the harness both hold. A host budget constrains and `renderBudget.applied` names which ceiling won; a page that cannot be represented at MIN_RENDER_SCALE 0.25 is refused with RESOURCE_LIMIT rather than left blank."
     },
     "FR-58": {
       "title": "Release Evidence & Consumer Verification",
@@ -1483,9 +1560,9 @@
         "no release candidate has ever been built and tested on a clean runner from a packed artifact — the packaging, consumer and browser jobs exist but have never executed",
         "the real-device pass and the three screen-reader pairings have no environment, no schedule and no artifact",
         "the 0.1.2 to 1.0.0 upgrade path is not exercised by anything",
-        "benchmark and accessibility evidence is printed to a console and a gitignored directory rather than produced as a committed, reproducible record"
+        "the accessibility evidence is still printed to a console rather than produced as a committed, re-readable record; the benchmark half changed in W8 — `benchmarks/latest.json` is tracked and carries §6's environment, fixture hashes and distributions, with a test that fails if it goes stale"
       ],
-      "note": "This is the gate §9 stands on and the one requirement whose evidence cannot be manufactured locally: the scripts to run it exist, the environments to certify it do not (tasks #202, #194)."
+      "note": "This is the gate §9 stands on and the one requirement whose evidence cannot be manufactured locally: the scripts to run it exist, the environments to certify it do not (tasks #202, #194). What has been manufactured locally is now recorded rather than displayed — `npm run bench` writes a tracked record and `src/lib/benchmark-record.test.ts` keeps it honest — which leaves the runner, the device and the screen-reader pairings as the parts only someone else's hardware can supply."
     }
   }
 }

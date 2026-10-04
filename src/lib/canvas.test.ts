@@ -30,6 +30,8 @@ describe('resolveRenderScale', () => {
     expect(resolveRenderScale({ width: 612, height: 792, devicePixelRatio: 2 })).toEqual({
       scale: 2,
       capped: false,
+      refused: false,
+      limitedBy: undefined,
     });
   });
 
@@ -64,16 +66,16 @@ describe('resolveRenderScale', () => {
 
   it('renders at CSS resolution when the area ceiling is switched off', () => {
     expect(resolveRenderScale({ width: 612, height: 792, devicePixelRatio: 3, maxPixels: 0 }))
-      .toEqual({ scale: 1, capped: true });
+      .toEqual({ scale: 1, capped: true, refused: false, limitedBy: undefined });
     expect(resolveRenderScale({ width: 612, height: 792, devicePixelRatio: 1, maxPixels: 0 }))
-      .toEqual({ scale: 1, capped: false });
+      .toEqual({ scale: 1, capped: false, refused: false, limitedBy: undefined });
   });
 
   it('never upscales', () => {
     // A 1x display on a tiny page: the ceilings are satisfied, and the answer is
     // still 1 rather than a sharper fiction.
     expect(resolveRenderScale({ width: 100, height: 100, devicePixelRatio: 1 }))
-      .toEqual({ scale: 1, capped: false });
+      .toEqual({ scale: 1, capped: false, refused: false, limitedBy: undefined });
   });
 
   it('survives degenerate geometry and ratios', () => {

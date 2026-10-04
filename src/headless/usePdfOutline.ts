@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { resolveDestinationPageIndex, type OutlineEntry } from '../lib/outline';
+import { resolveDestination, type OutlineEntry } from '../lib/outline';
 
 export interface UsePdfOutlineOptions {
   doc: PDFDocumentProxy | null;
@@ -31,13 +31,15 @@ async function buildTree(doc: PDFDocumentProxy, items: RawOutlineItem[]): Promis
         dest = null;
       }
     }
-    const pageIndex = await resolveDestinationPageIndex(doc, dest);
+    const found = await resolveDestination(doc, dest);
     const children = Array.isArray(item.items)
       ? await buildTree(doc, item.items as RawOutlineItem[])
       : [];
     out.push({
       title: typeof item.title === 'string' ? item.title : '',
-      pageIndex,
+      pageIndex: found ? found.pageIndex : null,
+      // No page, no place: a position without a destination to hang it on is nothing to scroll to.
+      position: found ? found.position : null,
       children,
       collapsed: typeof item.count === 'number' && item.count < 0,
     });

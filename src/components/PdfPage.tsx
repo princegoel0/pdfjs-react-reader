@@ -14,9 +14,8 @@ import {
 } from 'pdfjs-dist';
 import type { CSSProperties } from 'react';
 import { formatLabel } from '../lib/labels';
-import { resolveRenderScale } from '../lib/canvas';
+import { MIN_RENDER_SCALE, resolveRenderScale } from '../lib/canvas';
 import { useLabels } from './labels-context';
-import { InkLayer } from './InkLayer';
 import { useDevicePixelRatio } from './useDevicePixelRatio';
 import { applyHighlights, unwrapMarks } from '../lib/highlight';
 import { attachmentMimeType } from '../lib/attachments';
@@ -24,13 +23,11 @@ import { downloadBytes } from '../lib/download';
 import type { AnnotationValueStore } from '../lib/form';
 import type { OptionalContentConfigHandle } from '../lib/optional-content';
 import type { PdfStructTreeLayer, PdfStructTreeLayerBuilder } from '../lib/features';
-import type { InkSettings, InkStroke, PdfPoint } from '../lib/ink';
 import type { PageDims } from '../lib/layout';
 import type { PdfLinkService } from '../lib/link-service';
 import type { PageMatch } from '../lib/search';
 import type { PdfPageStatus } from '../lib/status';
-import type { PdfError } from '../lib/errors';
-import { toPdfError } from '../lib/errors';
+import { PdfError, toPdfError } from '../lib/errors';
 
 /** `RenderParameters` is not exported, and the OC promise's type is only named there. */
 type RenderParams = Parameters<PDFPageProxy['render']>[0];
@@ -128,12 +125,6 @@ export interface PdfPageProps {
   structTreeLayerBuilder?: PdfStructTreeLayerBuilder | null;
   /** Notified after the user edits a form field. */
   onFormChange?: () => void;
-  /** Freehand strokes for this page. */
-  inkStrokes?: InkStroke[];
-  /** True while the freehand tool is armed for this page. */
-  inkDrawing?: boolean;
-  inkSettings?: InkSettings;
-  onInkCommit?: (points: PdfPoint[]) => void;
   /** Called once the page's intrinsic (scale-1) dimensions are known. */
   onBaseDimensions?: (index: number, dims: PageDims) => void;
   /**
@@ -244,7 +235,7 @@ function usePageProgress(
 }
 
 /**
- * One page: canvas, text layer, annotation layer, ink overlay.
+ * One page: canvas, text layer, annotation layer.
  *
  * Memoised, because a page is the most expensive subtree in the library and the
  * shell re-renders for reasons that cannot reach it — opening the search bar
@@ -299,10 +290,6 @@ export const PdfPage = memo(function PdfPage({
   structureLayer = false,
   structTreeLayerBuilder = null,
   onFormChange,
-  inkStrokes,
-  inkDrawing = false,
-  inkSettings,
-  onInkCommit,
   onBaseDimensions,
   onError,
   onStatusChange,
@@ -325,6 +312,15 @@ export const PdfPage = memo(function PdfPage({
   // on this component is safe to rely on.
   const signalRef = useRef(signal);
   signalRef.current = signal;
+  /**
+   * FR-36: an already-aborted signal performs no work, so every effect below opens with this.
+   *
+   * "Started it and threw the answer away" is not the same statement. A `getPage` is a round trip to the
+   * worker, a `render` is a canvas the browser has to allocate, and a text layer is the parse of a content
+   * stream — all costs a page pays for a reader who has already gone, and the ones below discard their
+   * results rather than never producing them if this check is missing.
+   */
+  const aborted = useCallback(() => signalRef.current?.aborted === true, []);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
@@ -404,6 +400,7 @@ export const PdfPage = memo(function PdfPage({
   const editingOnThisPage = annotationEditorEditing && hasEditable;
 
   useEffect(() => {
+    if (aborted()) return;
     let cancelled = false;
     const offAbort = onAbort(signalRef.current, () => {
       cancelled = true;
@@ -431,18 +428,46 @@ export const PdfPage = memo(function PdfPage({
   }, [doc, pageNumber, report, reportError, retryToken]);
 
   useEffect(() => {
+    if (aborted()) return;
     const canvas = canvasRef.current;
     if (!page || !canvas || !viewport) return;
 
     // An over-large canvas does not throw: the browser allocates nothing and
     // pdf.js paints into a blank surface, so the ceiling has to be applied here.
-    const { scale: dpr } = resolveRenderScale({
+    const { scale: dpr, refused } = resolveRenderScale({
       width: viewport.width,
       height: viewport.height,
       devicePixelRatio: pixelRatio,
       maxPixels: maxRenderPixels,
       maxSide: maxRenderSide,
     });
+    if (refused) {
+      /*
+       * FR-57 / §6.1: the renderer lowers the scale *toward* the minimum and then stops. Painting
+       * at the floor is not a soft page — the canvas comes back blank while the text layer is
+       * positioned over it as though it had content, and a reader who selects a word finds it
+       * somewhere else on the sheet. So this page reports what happened instead of painting, and
+       * the numbers a host needs in order to fix it are in `details` rather than in the sentence,
+       * because wording is not a contract.
+       */
+      reportError(
+        new PdfError(
+          'RESOURCE_LIMIT',
+          `page ${pageNumber} cannot be painted within this viewer's canvas budget`,
+          {
+            details: {
+              page: pageNumber,
+              width: Math.round(viewport.width),
+              height: Math.round(viewport.height),
+              maxPixels: maxRenderPixels,
+              maxSide: maxRenderSide,
+              minScale: MIN_RENDER_SCALE,
+            },
+          },
+        ),
+      );
+      return;
+    }
 
     canvas.width = Math.max(1, Math.floor(viewport.width * dpr));
     canvas.height = Math.max(1, Math.floor(viewport.height * dpr));
@@ -548,6 +573,7 @@ export const PdfPage = memo(function PdfPage({
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
   useEffect(() => {
+    if (aborted()) return;
     const container = textLayerRef.current;
     const at = viewportRef.current;
     if (!page || !container || !at || page.isPureXfa === true) return;
@@ -622,6 +648,7 @@ export const PdfPage = memo(function PdfPage({
    * semantics, and a second copy of them would be a second thing for a screen reader to read.
    */
   useEffect(() => {
+    if (aborted()) return;
     const host = canvasWrapperRef.current;
     const at = viewportRef.current;
     if (!structTreeLayerBuilder || !page || !textLayer || !host || !at) return;
@@ -674,6 +701,7 @@ export const PdfPage = memo(function PdfPage({
   // only repositions the layer, so programmatic form writes force a re-render
   // through `formVersion` instead.
   useEffect(() => {
+    if (aborted()) return;
     const container = annotationRef.current;
     if (!page || !container || !viewport || !linkService) return;
 
@@ -790,6 +818,7 @@ export const PdfPage = memo(function PdfPage({
   // `class` attribute — which is also why the layer is a child of ours rather than
   // our div itself.
   useEffect(() => {
+    if (aborted()) return;
     const host = xfaRef.current;
     if (!page || !host) return;
     if (page.isPureXfa !== true) {
@@ -859,6 +888,7 @@ export const PdfPage = memo(function PdfPage({
   // for this page index — which is what lets an edit survive the page being
   // scrolled out of the viewport and back.
   useEffect(() => {
+    if (aborted()) return;
     const container = editorRef.current;
     const textContainer = textLayerRef.current;
     if (!annotationEditorUIManager || !container || !textContainer || !page || !viewport) return;
@@ -973,27 +1003,13 @@ export const PdfPage = memo(function PdfPage({
        * become a highlight. Our own sheet styles `.pjsr-text-layer`.
        */}
       <div ref={textLayerRef} className="pjsr-text-layer textLayer" style={layerStyle} />
-      <div
-        ref={annotationRef}
-        className={`pjsr-annotation-layer${inkDrawing ? ' pjsr-annotation-layer--inert' : ''}`}
-        style={layerStyle}
-      />
+      <div ref={annotationRef} className="pjsr-annotation-layer" style={layerStyle} />
       {annotationEditorUIManager && (
         <div ref={editorRef} className="pjsr-editor-layer" style={layerStyle} />
       )}
       {/* XFA composes at the editor layer's level, which is pdf.js's own ordering
           (`LAYERS_ORDER` puts `xfaLayer` and `annotationEditorLayer` together). */}
       <div ref={xfaRef} className="pjsr-xfa-layer" />
-      {viewport && inkSettings && (
-        <InkLayer
-          strokes={inkStrokes ?? []}
-          viewport={viewport}
-          scale={scale}
-          drawing={inkDrawing}
-          settings={inkSettings}
-          onCommit={(points) => onInkCommit?.(points)}
-        />
-      )}
     </>
   );
 });

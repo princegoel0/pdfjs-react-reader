@@ -6,10 +6,8 @@ import {
   type PDFPageProxy,
   type RenderTask,
 } from 'pdfjs-dist';
-import type { InkStroke } from '../lib/ink';
 import { onAbort } from '../lib/abort';
 import { PdfError, toPdfError } from '../lib/errors';
-import { drawInkStrokes } from '../lib/ink';
 import {
   PRINT_MEMORY_BUDGET,
   PRINT_SCALES,
@@ -26,12 +24,6 @@ export interface UsePdfPrintOptions {
   doc: PDFDocumentProxy | null;
   /** User rotation in degrees, so the sheets match what is on screen. */
   rotation?: number;
-  /**
-   * Returns the freehand strokes drawn on a page (0-based index). Ink is React
-   * state rather than PDF content, so the only way it reaches paper is if the
-   * caller hands it over here.
-   */
-  getInkStrokes?: (pageIndex: number) => InkStroke[];
   /** A job that failed, coded (§3.6). A cancelled job reports nothing here — `cancel` is not a failure. */
   onError?: (error: PdfError) => void;
   /**
@@ -98,7 +90,6 @@ function afterPrintOnce(): Promise<void> {
 export function usePdfPrint({
   doc,
   rotation = 0,
-  getInkStrokes,
   onError,
   signal,
 }: UsePdfPrintOptions): UsePdfPrintResult {
@@ -113,8 +104,6 @@ export function usePdfPrint({
   rotationRef.current = rotation;
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
-  const getInkStrokesRef = useRef(getInkStrokes);
-  getInkStrokesRef.current = getInkStrokes;
   const taskRef = useRef<RenderTask | null>(null);
   const busyRef = useRef(false);
   const cancelledRef = useRef(false);
@@ -227,13 +216,12 @@ export function usePdfPrint({
             printAnnotationStorage,
           });
           taskRef.current = task;
+          // What the reader has authored reaches the sheet through the engine: `ENABLE_STORAGE` plus the
+          // print storage built above carries every persisted annotation, which is FR-19's rule. There is
+          // no second, transient mark layer to composite — the core pen that needed this went away with
+          // `FR-18`, and the one that remains is a real `/Ink` annotation that saves.
           try {
             await task.promise;
-            const strokes = getInkStrokesRef.current?.(pages[i]! - 1);
-            if (strokes?.length) {
-              const ctx = canvas.getContext('2d');
-              if (ctx) drawInkStrokes(ctx, strokes, viewport, scale);
-            }
           } catch (err) {
             if (cancelledRef.current || err instanceof RenderingCancelledException) return;
             throw err;

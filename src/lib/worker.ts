@@ -1,5 +1,87 @@
 import { GlobalWorkerOptions, PDFWorker } from 'pdfjs-dist';
-import { PdfError } from './errors';
+import { PdfError, describeOrigin } from './errors';
+
+/**
+ * FR-02: the worker URL is a per-realm singleton, so a second viewer that asks for a
+ * different one is not adding a configuration — it is changing the first's.
+ *
+ * pdf.js reads `GlobalWorkerOptions.workerSrc` when it builds a worker, which means a load
+ * that starts later re-points every page fetched after it. The failure therefore surfaces in
+ * the wrong place and at the wrong time to attribute: viewer A scrolls a page in after viewer
+ * B mounted, and A's page is parsed by B's worker. So the claim is taken at the one moment
+ * where the conflict is still about the viewer that caused it, and the load that cannot have
+ * the realm's worker URL is the one that says so.
+ *
+ * An empty `workerSrc` is not a claim: that is pdf.js's own fallback (the Node default, or a
+ * host that put the handler on `globalThis`), and two viewers with no URL agree.
+ */
+const activeWorkerSrcs = new Map<string, number>();
+
+export type WorkerSrcClaim = { ok: true; release: () => void } | { ok: false; error: PdfError };
+
+/**
+ * A worker URL as pdf.js will actually fetch it.
+ *
+ * Measured on `pdfjs-dist@6.3`: the value pdf.js ships itself is `''` in a browser and
+ * `'./pdf.worker.mjs'` in Node, so what is in force can be *relative*, and pdf.js resolves a relative
+ * value against the page when it builds the worker. Two viewers agreeing on `./pdf.worker.mjs` and
+ * `https://app.example/pdf.worker.mjs` are therefore describing the same worker, and a conflict test on
+ * the raw strings would refuse a page that has no conflict at all.
+ */
+function resolvedWorkerSrc(src: string): string {
+  const base = (globalThis as typeof globalThis & { document?: { baseURI?: string } }).document
+    ?.baseURI;
+  if (!base) return src;
+  try {
+    return new URL(src, base).href;
+  } catch {
+    return src;
+  }
+}
+
+/**
+ * Takes the realm's worker URL for the lifetime of one load.
+ *
+ * On failure nothing is held — the load that was refused has not changed the count, and its
+ * caller reports {@link WorkerSrcClaim.error} instead of starting.
+ */
+export function claimWorkerSrc(workerSrc: string): WorkerSrcClaim {
+  const src = resolvedWorkerSrc(workerSrc);
+  const held = activeWorkerSrcs.keys().next().value as string | undefined;
+  if (held !== undefined && held !== src) {
+    return { ok: false, error: conflictError(src, held) };
+  }
+  activeWorkerSrcs.set(src, (activeWorkerSrcs.get(src) ?? 0) + 1);
+  let released = false;
+  return {
+    ok: true,
+    release: () => {
+      if (released) return;
+      released = true;
+      const count = (activeWorkerSrcs.get(src) ?? 1) - 1;
+      if (count > 0) activeWorkerSrcs.set(src, count);
+      else activeWorkerSrcs.delete(src);
+    },
+  };
+}
+
+/** Origins only, in both the message and the details: a signed worker URL carries its credential in its query. */
+function conflictError(workerSrc: string, conflicting: string): PdfError {
+  const requestedOrigin = describeOrigin(workerSrc);
+  const activeOrigin = describeOrigin(conflicting);
+  return new PdfError(
+    'CONFIGURATION_ERROR',
+    `this viewer would use a pdf.js worker from ${requestedOrigin}, but another viewer in the same realm is already using ${activeOrigin} — pdf.js holds one worker URL per realm, so the second configuration cannot be honoured`,
+    {
+      details: { problem: 'worker-conflict', requestedOrigin, activeOrigin },
+    },
+  );
+}
+
+/** The URL pdf.js would use for a load started now. Internal: a host learns it from the error, not here. */
+export function configuredWorkerSrc(): string {
+  return GlobalWorkerOptions.workerSrc ?? '';
+}
 
 /**
  * Two forms, tried in this order, because they fail differently:
@@ -31,6 +113,17 @@ function candidates(): string[] {
 let userConfigured = false;
 let autoFailed = false;
 let autoPromise: Promise<void> | null = null;
+
+/**
+ * What pdf.js ships as the default, captured before anything can overwrite it.
+ *
+ * Measured on 6.3 in both places it matters: `''` in a browser, where pdf.js assigns it from
+ * `!isNodeJS`, and `'./pdf.worker.mjs'` in Node, where the same field carries the engine's own relative
+ * default. So this line is not documenting one value — it is remembering that the value differs by
+ * environment, and that `ensureWorker` treats a truthy one as "already configured", which is why a Node
+ * load never probes and a browser load always does.
+ */
+const ENGINE_DEFAULT_WORKER_SRC = GlobalWorkerOptions.workerSrc;
 
 /**
  * Pins the worker explicitly. A local asset import or a CDN URL both win over
@@ -198,5 +291,10 @@ export function __resetWorkerForTests(): void {
   autoFailed = false;
   autoPromise = null;
   policy = null;
-  GlobalWorkerOptions.workerSrc = '';
+  activeWorkerSrcs.clear();
+  // Back to whatever this realm's pdf.js actually shipped, which is `''` in a browser and
+  // `'./pdf.worker.mjs'` in Node. Hard-coding either one would make the auto-detection tests pass on a
+  // premise the other environment does not have, and which of them a given file sees depends on how
+  // `pdfjs-dist` was resolved rather than on what the file says.
+  GlobalWorkerOptions.workerSrc = ENGINE_DEFAULT_WORKER_SRC;
 }
