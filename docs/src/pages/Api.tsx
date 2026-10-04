@@ -490,7 +490,8 @@ export function Api() {
         The rule that keeps all of this current is mechanical:{' '}
         <code>npm run check:maturity</code> reads the published surface out of <code>dist/</code> and fails
         the build if a name has no state, if a state has no name, if a non-stable name has no reason, or if
-        the file invents a fifth state. It is the last step of <code>npm run verify</code>, and it runs
+        the file invents a fifth state. It is the last step of <code>npm run verify</code> and a named step in
+        the CI <code>verify</code> job, and it runs
         itself against nine synthetic violations first — a check that has never seen a bad input is not yet
         a check.
       </p>

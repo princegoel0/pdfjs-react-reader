@@ -278,6 +278,25 @@ checkout has. The register stands at **43 met, 14 partial, 1 absent** of 58, on 
 
 ### Changed
 
+- **`check:maturity` and `check:fr-evidence` are CI steps now, placed before the step that reddens the job.**
+  Both ran only inside `npm run verify`, and no job in `.github/workflows/ci.yml` calls `verify` — so FR-50's
+  promise that "a name that is exported and untagged fails the build" meant *this machine's* build, and the
+  register that is the status of record had never been checked by a runner either. They sit after `Build` and
+  **before** `Bundle size budget`, deliberately: the size gate is an open owner decision (#208) that stops the
+  job at step five, and every step behind it — including the examples check, which is still unreached — is
+  invisible while it stays undecided. A gate stacked behind an unresolved one is not a gate. Both new steps
+  were fed their defect to prove they bite: dropping one name from `api-maturity.json` gives `FAIL
+  AnnotateFeatureState is exported and untagged` and exit 1, and flipping one state word in the generated
+  `ROADMAP.md` block gives `status block is stale` and exit 1; each file came back by checksum. (FR-50, FR-52,
+  FR-58)
+- **Three documents said CI had never run, and by 2026-10-04 that was no longer true.** `README.md`'s
+  requirements table ("no `0.x` commit has been pushed, so no job has ever run"), its React row ("it has not
+  run yet"), its browser-floor paragraph ("exists and has never executed") and the docs site's matching
+  callout are now what actually happened: the `react` matrix is green in all four cells, the `browser` job is
+  green with the same 67 ok / 5 skipped the local run reports, and the `consumer` job builds against both
+  engine ends. What the runs still do **not** show kept its limits stated in the same sentences — one engine
+  version inside a browser, Playwright's current builds rather than §8's pinned floors, no Edge, no hardware.
+  (FR-48)
 - **`check:fr-evidence` no longer depends on which machine ran it** (#215). The gate compared `ROADMAP.md`'s
   generated status block byte-for-byte against text joined with `\n`, while `--emit` wrote that LF block into a
   file whose prose was CRLF under `core.autocrlf=true`. So it was green on the machine that had just emitted

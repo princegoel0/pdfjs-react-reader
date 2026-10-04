@@ -326,7 +326,8 @@ export function Compatibility() {
         <code>:has()</code> and <code>dvh</code> without a fallback — a leftover from the 90/14 target rather
         than something the 125/18 floors ask for, since both features are older than Safari 18, and no test
         would notice if either were used, and the{' '}
-        <code>npm run test:browsers</code> job — locally and, once it runs, on CI&apos;s Linux runner — drives
+        <code>npm run test:browsers</code> job — locally, and on CI&apos;s Linux runner since 2026-10-04,
+        where it is green — drives
         all three engines and classifies a browser that cannot start as <code>unverified</code> rather than
         passed. What remains outside it is what a Linux runner cannot produce: a pinned old-version floor,
         macOS Safari, Edge, and iOS or Android hardware.

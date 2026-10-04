@@ -149,8 +149,8 @@ plan lives: rows move by button or by drag, each carries its own controls, the b
 
 | Package | Required | Tested with |
 | --- | --- | --- |
-| `pdfjs-dist` | `^6.2.108` | 6.3.289, the version installed here; CI would install it too, but no `0.x` commit has been pushed, so no job has ever run |
-| `react` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, both verified locally. The 18 pass was re-run on 2026-09-29 with `@types/react@18`: `npm run verify` end to end — typecheck, all 449 tests then in the suite, both bundles, the size gate. A `react` matrix job in `ci.yml` installs both majors on every push and is what keeps this true after the next change; it has not run yet |
+| `pdfjs-dist` | `^6.2.108` | 6.3.289, the version installed here and the one CI's `browser` and `verify` jobs run. CI also builds a throwaway consumer against `6.2.108` and `6.4.299` — both green on the 2026-10-04 runs — but those two cells are a typecheck and a Vite build, not a painted page: the engine axis *inside* a browser is still open |
+| `react` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, both verified locally. The 18 pass was re-run on 2026-09-29 with `@types/react@18`: `npm run verify` end to end — typecheck, all 449 tests then in the suite, both bundles, the size gate. The `react` matrix job has since run on CI: all four cells (18 and 19, minimum and latest patch) passed typecheck, the suite and the build on 2026-10-04 |
 | `react-dom` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, swapped in alongside `react` for the same run |
 | `@cantoo/pdf-lib` | `^2.11.1`, **optional** — only `editFeature` asks for it | 2.11.1 |
 
@@ -214,7 +214,8 @@ which is what stops a temporary label from becoming permanent.
 
 The set is not maintained by hand. `npm run check:maturity` reads the published names out of the build and
 fails if one has no state, if a state has no name, if a non-stable name has no reason, or if the file invents
-a fifth state; it is the last step of `npm run verify`, and it runs itself against nine synthetic violations
+a fifth state; it is the last step of `npm run verify` and a named step in the `verify` CI job, and it runs
+itself against nine synthetic violations
 before it grades the real ones. The docs site's [API page](https://princegoel0.github.io/pdfjs-react-reader/)
 lists every non-stable name with its reason, generated from the same file.
 
@@ -715,7 +716,9 @@ viewer, which dispatches no wheel events on the small profile and, on Firefox an
 constructor to synthesise a pinch from. What that is *not* is floor evidence. §8 claims Chrome 125, Firefox
 124 and Safari 18, and its own execution policy says a current browser passing the suite does not certify an
 older floor; no Edge check has ever run anywhere, and no real device has been touched. The CI `browser` job
-that would run this script on a pinned Linux runner exists and has never executed. The CSS ships `@media`
+has now run — green on 2026-10-04 with the same 67 ok / 5 skipped over six cells — but it installs
+Playwright's current builds, so it is the same evidence as a local run and not the pinned-floor job §8's
+execution policy names. The CSS ships `@media`
 fallbacks beside every `@container` rule and avoids `:has()`. Both of those are written against a target that
 no longer exists: `@container` and `:has()` are older than the §8 floor of Safari 18, so the fallbacks are
 margin rather than requirement, nothing exercises them, and no test would fail if someone deleted them. If

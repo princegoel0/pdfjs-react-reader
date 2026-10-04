@@ -58,6 +58,17 @@ jobs:
       - name: Build
         run: npm run build
 
+      # FR-50: "a name that is exported and untagged fails the build" — a build, not a developer's terminal.
+      # Until this step existed the check ran only inside `npm run verify`, which no job here calls, so an
+      # untagged export could merge green.
+      - name: Published API maturity tags
+        run: npm run check:maturity
+
+      # FR-52/FR-58: the requirement register is the status of record, and its own gate is only worth
+      # anything if a runner executes it. Reads PRD.md, the register and ROADMAP.md; needs no build.
+      - name: Requirement evidence register
+        run: npm run check:fr-evidence
+
       - name: Bundle size budget
         run: npm run size
 

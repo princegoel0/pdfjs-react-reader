@@ -986,7 +986,9 @@ that was wrong.
 | `npm run test` / `typecheck` / `size` / `size:update` | vitest / `tsc --noEmit` / the gate / re-accept the gate |
 | `npm run check:packaging` | FR-41 against `dist/`: both formats and both declaration files per path, then `require()` and `import()` of every entry must expose the same names. Also FR-52's map shape: every key classified, no wildcard, no `./types`, no target outside `dist/` |
 | `npm run check:examples` | FR-52 / §5.6: packs, extracts the tarball into a throwaway project and type-checks every fenced example in `PRD.md` and `README.md` plus the docs site's live examples against **the artifact**, with no `paths` mapping — the only check here that resolves the package the way a host does. Prints each skip with the requirement it waits on; runs in `verify` and in CI |
-| `npm run check:maturity` | FR-50 against `dist/`: reads the published names through `scripts/api-names.mjs` and fails if one has no maturity state in `api-maturity.json`, if a state has no name behind it, if a non-stable name has no reason, or if the file invents a fifth state. Runs itself against nine synthetic violations first. Last step of `npm run verify` |
+| `npm run check:maturity` | FR-50 against `dist/`: reads the published names through `scripts/api-names.mjs` and fails if one has no maturity state in `api-maturity.json`, if a state has no name behind it, if a non-stable name has no reason, or if the file invents a fifth state. Runs itself against nine synthetic violations first. Last step of `npm run verify`, and since 2026-10-04 a named step in the CI `verify` job |
+| `npm run check:fr-evidence` | FR-52/FR-58: the register gate. Reads the requirement ids and titles out of `PRD.md`, so a row cannot invent or drop a requirement; fails a citation that points at a file that does not exist and a `#anchor` the browser harness does not define; demands that a `met` row show implementation, tests, a guard naming its own `FR-` id, docs, and acceptance or a waiver of at least 40 characters; refuses a `partial` with no gap; and compares `ROADMAP.md`'s generated status block against the register, ignoring line endings (#215) so the check does not depend on whose checkout it is. `--emit` rewrites that block; `--selftest` grades itself against 22 cases first — 19 injected violations and
+three that must stay quiet |
 | `npm run check:tarball` | FR-41 against the **artifact**: `npm pack`, install the tarball beside its real peers into a CommonJS project, resolve every path both ways, and typecheck one identical source file as `.mts` and as `.cts` under `NodeNext`. Needs the network, so it is not in `verify` |
 | `npm run test:browsers` | FR-48: §8's browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; exits non-zero if a check fails **or** if an engine never started, because a row with no job behind it is not a tested row |
 | `npm run bench` | FR-49: §6's profiles against their fixtures. Prints **bars** (structural — bounded canvas count, canvases actually released, the caps binding where they should) and **measures** (timings with the machine named, never failed on). C and D report that they have no fixture |
@@ -996,7 +998,8 @@ that was wrong.
 
 **CI** (`.github/workflows/ci.yml`, read-only token, `concurrency` cancelling superseded runs), six jobs:
 `verify` on Node **22.13.0, 22 and 24** (the contract floor, the LTS, the next major) running typecheck,
-tests, the axe audit, build, size, `npm pack --dry-run` and `check:examples` · `docs` (skipped on `main`,
+tests, the axe audit, build, **the maturity gate and the register gate**, size, `npm pack --dry-run` and
+`check:examples` · `docs` (skipped on `main`,
 where `docs.yml` publishes instead) · `react`, which swaps in majors **18 and 19** at both their
 **minimum-advertised and latest patches** — four runs, with the two `react`/`react-dom` majors asserted to
 match — and runs typecheck/test/build · `consumer`, which packs the tarball, installs it into a throwaway
@@ -1006,17 +1009,24 @@ range is proved at both ends), type-checks the shipped `.d.ts`, builds, and asse
 and `check:tarball` · and `browser`, the only job that starts one: `playwright install --with-deps chromium
 firefox webkit`, then `npm run test:browsers` and `npm run bench`.
 
-**What has actually run.** Three of those six jobs have, and not on their current content: GitHub Actions
-reports 22 runs, the last green on both `main` and `dev` at `5059bc7` on 2026-09-24, covering `verify` (Node
-20 **and** 22, a matrix this file no longer describes), `docs` and `consumer`. Twenty-four commits are
-unpushed and every line above differs from what ran. Two limits on that evidence, and they are the ones that
-matter. First, **no CI run has ever started a browser**: the `browser` job is written to and has never
-executed, so every rendering, touch and forced-colours number in this repository is still local-machine
-evidence. Second, `react` was added locally on 2026-09-29 and `packaging` with it, and **neither has run** —
-so the React-18 evidence is local: re-run on 2026-09-29 with `react`, `react-dom` and both `@types/*` at
-18.3.1, then `npm run verify` end to end — typecheck, the 449 tests in 38 files that made up the suite on
-that date, both bundles, the size gate — and 19.3.0 was put back afterwards, with `--no-save` both ways, which
-is why `package.json` and `package-lock.json` show no diff.
+**What has actually run.** As of 2026-10-04, everything except the two gates added an hour ago. The workflow
+had been dormant since `5059bc7` on 2026-09-24 — a run of a `verify` matrix that no longer exists, on YAML
+twenty-four commits behind — and the pushes since then have produced three runs of the current file:
+`37190478169` at `713f4b4`, `37193161535` at `15d0888` and `37197025936` at `dfe8358`. The first is the one
+that found the source-layout defect #214 closed: every `typecheck` cell red and all six browser cells
+`not runnable`, because a clean checkout has no `dist/` for the package's own self-reference to resolve
+against. The two after it are green on `packaging` (Node 22.13.0, 22 and 24, `check:packaging` **and**
+`check:tarball` in each), `consumer` (both engine ends), `react` (all four cells), `docs` and `browser` — the
+last starting real engines on a runner for the first time and returning **67 ok / 5 skipped / 0 failed / 0 not
+runnable**, the same tally the local run reports. `verify` is red in all three, at one step: `Bundle size
+budget`, which is the owner's open decision #208. What that still does not buy is stated where it matters:
+**no CI run has ever executed `check:maturity` or `check:fr-evidence`** — they were added to the job after the
+third run, and they sit deliberately *before* the size gate so the next run reaches them whatever #208 decides
+— and the browser matrix ran on the one engine version `node_modules` holds, not at §8's pinned floors, with
+no Edge and no hardware anywhere in the picture. The React evidence is now both: local (re-run on 2026-09-29
+with `react`, `react-dom` and both `@types/*` at 18.3.1 through `npm run verify` end to end, then 19.3.0 put
+back with `--no-save` both ways, which is why `package.json` and `package-lock.json` show no diff) and a
+runner's, four cells wide.
 
 Note what the consumer job exists for: every other job resolves the package from `src` through tsconfig
 paths, so a packaging defect can only surface against the installed tarball. That is how `0.1.0` shipped
