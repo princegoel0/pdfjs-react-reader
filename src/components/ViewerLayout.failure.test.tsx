@@ -93,6 +93,19 @@ describe('a document that will not load', () => {
   it('announces it, so the message is not left for the reader to find', () => {
     render(<Failing />);
     expect(screen.getByRole('alert').getAttribute('role')).toBe('alert');
-    expect(screen.queryByRole('status')).toBeNull();
+    /*
+     * This asserted `queryByRole('status')` was null, which was a proxy for the thing actually required:
+     * that nothing polite is carrying the failure. The proxy stopped working the day the shell grew a
+     * permanent polite region — the page-change announcement (FR-45), which is mounted whether or not a
+     * document ever arrived, because a live region that appears already holding its words is a live region
+     * that says nothing. So the assertion is about content now, and it is stronger: a polite region exists,
+     * and not one of them has a sentence in it.
+     */
+    const polite = screen.queryAllByRole('status');
+    expect(polite.length, 'the page-change region disappeared with the document').toBeGreaterThan(0);
+    for (const region of polite) {
+      expect((region.textContent ?? '').trim(), 'a polite region is carrying the failure').toBe('');
+    }
+    expect(screen.getByRole('alert').textContent).toContain('Invalid PDF structure.');
   });
 });

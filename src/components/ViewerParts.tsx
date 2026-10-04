@@ -1,5 +1,12 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatLabel } from '../lib/labels';
+import {
+  ANNOUNCE_QUIET_MS,
+  announcementText,
+  observePosition,
+  type PagePosition,
+} from '../lib/page-announcement';
 import { FeaturePart, FeatureRunners } from './FeatureHost';
 import { LabelsContext } from './labels-context';
 import { PasswordPrompt } from './PasswordPrompt';
@@ -189,6 +196,51 @@ export function ViewerSidebar({ children }: { children?: ReactNode } = {}) {
   );
 }
 
+/*
+ * FR-45: "page-change announcements", as one polite region per viewer instance.
+ *
+ * The pages are images as far as an assistive technology is concerned, so where the reader has gone is not
+ * something it can look up; the number in the page box is not focused when it changes, and a changed value
+ * in an unfocused control is not news. This is the sentence that carries it. It is deliberately *not* the
+ * visible counter re-used with `aria-live` on it: the counter is a fragment — "of 12", with the number in a
+ * field beside it — and announcing a fragment leaves the reader to assemble the position from two controls
+ * that no longer hold still.
+ *
+ * The instance is the boundary. Each viewer owns a controller, reads its own `currentPage`, and writes its
+ * own region, so a page turned in one is not spoken by another — the same property the keyboard handling is
+ * scoped by, and the reason this component takes no props.
+ */
+function PageAnnouncement() {
+  const { doc, status, numPages, currentPage, pageLabels, labels } = useViewer();
+  const [sentence, setSentence] = useState('');
+  /** The position the reader was last told about, or `null` until this viewer has a document at all. */
+  const told = useRef<PagePosition | null>(null);
+
+  useEffect(() => {
+    if (status !== 'ready' || !doc) return;
+    const here: PagePosition = { doc, page: currentPage };
+    const step = observePosition(told.current, here);
+    if (step === 'base') {
+      told.current = here;
+      return;
+    }
+    if (step === 'silent') return;
+    // Restarted by every move and cleared by this cleanup, which is the whole anti-spam mechanism: a scroll
+    // that runs 1→2→3→4 in a second produces the sentence for 4, once.
+    const timer = setTimeout(() => {
+      told.current = here;
+      setSentence(announcementText({ labels, page: here.page, numPages, pageLabels }));
+    }, ANNOUNCE_QUIET_MS);
+    return () => clearTimeout(timer);
+  }, [status, doc, currentPage, numPages, pageLabels, labels]);
+
+  return (
+    <span className="pjsr-live-region" role="status" aria-live="polite" aria-atomic="true">
+      {sentence}
+    </span>
+  );
+}
+
 /** The scrollable page region: its status states, and the virtualized rows. */
 export function ViewerPages() {
   const {
@@ -319,6 +371,7 @@ export function ViewerPages() {
           )}
         </div>
       )}
+      <PageAnnouncement />
     </div>
   );
 }

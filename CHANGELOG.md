@@ -19,7 +19,7 @@ the two gates added beside it (#215's follow-on) run green ahead of that step, a
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
-absent** of 58, on a suite of **1,030 tests in 109 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,050 tests in 111 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One of the eighteen, `FR-06`, has since been
 closed in the code rather than in the register (#219), and it went back to `met` on a guard that counts layer
@@ -27,6 +27,41 @@ constructions and holds the reader's focus across the step.
 
 ### Added
 
+- **The shell now says what page the reader is on (#220, FR-45's "page-change announcements").** The clause was
+  not deferred or waived, it was simply absent — and `FR-45`'s row did not say so, which is the same failure
+  #217 is about: the live region that existed was the search counter's, and a change to a control nobody is
+  focused in says nothing about a document whose pages are images as far as an assistive technology is
+  concerned. `src/lib/page-announcement.ts` holds the policy and `src/components/ViewerParts.tsx` the one
+  polite region per viewer instance: `observePosition` answers `base` for the page a viewer opened on, which is
+  not a change anybody made and would otherwise be spoken by every viewer on a page at once; `silent` when the
+  position matches the one already told; `settle` otherwise, with a replaced document counting as news even on
+  the page number already announced, because "Page 1 of 12" is a sentence about the file. The speaking waits
+  out `ANNOUNCE_QUIET_MS` = 400 ms of stillness and every move restarts that timer, so a scroll through 2, 3
+  and 4 produces one announcement — of 4, the only position still true when it is read — and out-and-back
+  produces none, because what was told is advanced when the sentence is spoken, not when the page moves. The
+  sentence is `labels.pageOf`, the entry the visible counter is already built from, so it is the host's
+  language, a host's override reaches it, and the announcement cannot drift into wording the page area does not
+  show; the page is named by its **label** when the document has one (FR-12), because a reader told
+  "Page iii of xii" by the box and "Page 3 of 12" by the region has been told two things about one place. The
+  region is mounted permanently and left empty — `display: none` and `visibility: hidden` both take an element
+  out of what a screen reader is told, and the docs already say a region that mounts holding its words
+  announces nothing — hidden by `clip-path: inset(50%)` at one pixel in `viewer.css`, a core stylesheet because
+  the shell renders it, so FR-22's feature-class guard stays green on it.
+  20 tests, and **five counterfactuals, each restoring the source by checksum**: announcing on mount produces
+  `a viewer announced a page nobody turned: expected 'Page 1 of 12' to be ''`, in three rows at once; removing
+  the quiet period speaks 2 while the reader is still moving and later speaks the position they left;
+  hard-coding English produces `expected 'Page 5 of 12' to be 'Seite 5 von 12'`; advancing the told-position
+  on the move rather than on the sentence reddens the out-and-back case; and a failure echoed into a polite
+  region — the alert still there, so only the content check can see the demotion — fails
+  `a polite region is carrying the failure`.
+  One existing assertion had to change meaning, and it is the only collision the change caused:
+  `ViewerLayout.failure.test.tsx` proved "the load failure is urgent, not polite" by asserting that **no**
+  `role="status"` element existed, and a shell with a permanent announcement region always has one. It now
+  asserts what that was a proxy for — a polite region exists, not one of them contains a character, and the
+  alert carries the whole message — which is the stronger check and the one that survives a shell with more
+  than one live region. Cost, measured against the build before it: +0.25 kB gz on `core` (30.72 → 30.97),
+  +0.47 kB on the shell (64.87 → 65.34), `headless` +0.04 kB, every catalog unchanged. The size gate is already
+  red on owner decision **#208** and no baseline was moved.
 - **The export map now has to be reachable from the source layout, not just from a build.** CI's first real
   run failed all seven `typecheck` cells (three `verify`, four `react`) and all six browser cells at once, on
   one cause: `tsconfig.json#paths` mapped the root, `/headless`, `/features/*` and the stylesheets but not

@@ -1014,6 +1014,26 @@
 
 /* ---------- status ---------- */
 
+/*
+ * FR-45: the page-change announcement's home.
+ *
+ * Hidden the only way a live region may be hidden. `display: none` and `visibility: hidden` both take the
+ * element out of what an assistive technology is told, which would leave the sentence written and never
+ * spoken; this keeps it in the accessibility tree and out of the layout — one pixel, clipped in half, and
+ * `nowrap` so a screen reader that measures the box cannot wrap it into a visible sliver.
+ */
+.pjsr-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .pjsr-status {
   display: flex;
   flex-direction: column;

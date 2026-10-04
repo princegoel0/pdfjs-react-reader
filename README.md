@@ -566,6 +566,10 @@ under `(pointer: coarse)`, 32 px with a mouse.
 
 - The page region is focusable (`role="region"`), so keyboard shortcuts are reachable and the region
   is announced.
+- Where the reader is in the document is announced as they move: one polite region per viewer, saying
+  the same sentence the page counter shows, after the movement stops rather than on every page passed.
+  It names a page by its label when the document has one, it is built from the label table so a host's
+  language and its own wording carry, and a viewer appearing on page 1 says nothing at all.
 - Shortcuts are scoped to the viewer instance: a viewer never hijacks the host page's `Ctrl+F`.
   `Ctrl/Cmd + P` belongs to `printFeature`, so a viewer that did not mount it leaves the key to the
   browser.
