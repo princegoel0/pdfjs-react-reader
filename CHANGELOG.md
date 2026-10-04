@@ -10,11 +10,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 `0.12` Prove (FR-41, FR-48–FR-51) is in progress. All five are built and three are still open on evidence
 rather than on code: FR-48's harness has run through all three engines here, FR-49 now has all four of its
 profiles and a committed record, and the proof that only a clean runner can give — the `packaging`, `browser`,
-`react` and `examples` jobs — has still not been produced. The register stands at **42 met, 15 partial,
-1 absent** of 58, on a suite of 1,019 tests in 107 files (the 58th row of this pass deletes a guard, so the count went down by one and that is the honest direction for a test whose reason stopped being true).
+`react` and `examples` jobs — has now been *run* (CI run 37190478169, `dev` at `713f4b4`, 2026-10-04) and has
+not yet been passed: `packaging` green at Node 22.13.0, 22 and 24; `consumer` green at both engine ends;
+`verify` and all four `react` cells red at `typecheck`, and all six browser cells `not runnable`, on one
+source-layout defect that #214 closes and that the local gate had been hiding behind a `dist/` no clean
+checkout has. The register stands at **43 met, 14 partial, 1 absent** of 58, on a suite of **1,024 tests in
+108 files**.
 
 ### Added
 
+- **The export map now has to be reachable from the source layout, not just from a build.** CI's first real
+  run failed all seven `typecheck` cells (three `verify`, four `react`) and all six browser cells at once, on
+  one cause: `tsconfig.json#paths` mapped the root, `/headless`, `/features/*` and the stylesheets but not
+  `/edit`, `/merge` or `/locales/*`, and `playground/vite.config.ts` aliased every entry except `/merge`.
+  Locally those specifiers resolved anyway — TypeScript and Vite both honour a package's self-reference
+  through its own `name` and `exports`, and a `dist/` from an earlier build was sitting there to be found — so
+  the local gate had been measuring the artifact while the runner measured the source. `src/lib/entry-parity.test.ts`
+  is the rule now: every key of `package.json#exports` must match a `paths` entry whose target file exists, and
+  each of the two apps must alias every documented entry its own sources import, with the playground's aliases
+  followed through to a real file. Four counterfactuals, each restoring its file by checksum: a deleted `paths`
+  entry (and the same tree then failing `tsc` with the CI error, `dist/` removed), a deleted playground alias,
+  an alias pointed at a renamed file, and the docs site losing `/edit`. (FR-52; #214)
 - **The Node floor stopped being a sentence and became a checked value.** `engines.node` is `>=22.13.0`, which
   is what `PRD.md` §8's two Node rows have said since the lock: the peer's own `engines` begins at `22.13.0`
   (`6.2.108`, `6.3.289` and `6.4.299` all declare `>=22.13.0 || >=24` — read from the registry, not recalled),

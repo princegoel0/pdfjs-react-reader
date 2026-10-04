@@ -19,7 +19,10 @@
     "paths": {
       "pdfjs-react-reader": ["./src/index.ts"],
       "pdfjs-react-reader/headless": ["./src/headless.ts"],
+      "pdfjs-react-reader/edit": ["./src/edit.tsx"],
+      "pdfjs-react-reader/merge": ["./src/merge.ts"],
       "pdfjs-react-reader/features/*": ["./src/features/*.tsx"],
+      "pdfjs-react-reader/locales/*": ["./src/locales/*.ts"],
       "pdfjs-react-reader/styles.css": ["./src/styles/viewer.css"],
       "pdfjs-react-reader/*.css": ["./src/styles/*.css"]
     }

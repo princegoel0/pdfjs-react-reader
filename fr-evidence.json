@@ -1045,7 +1045,7 @@
     },
     "FR-41": {
       "title": "Dual Module Output",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "package.json",
         "tsup.config.ts",
@@ -1067,11 +1067,8 @@
         "scripts/check-packaging.mjs",
         "scripts/tarball-check.mjs"
       ],
-      "gaps": [
-        "the packaging job that clause five points at has never executed on a runner, so \"fails the packaging job\" is proved against the script locally (a below-floor Node exits 1, an unresolvable published path exits 1) and never against GitHub Actions, where the matrix would have to say it",
-        "the require() half is measured on node 24.21.0 alone: 15 of 15 paths resolved through both formats from the installed tarball with identical name lists, and one declaration source compiled as both .mts and .cts, but no run has been made at 22.13.0 itself, which is the version the promise is actually about"
-      ],
-      "note": "Fifteen JavaScript paths, proven from the packed artifact rather than from source: npm pack, install beside the real peers into a CommonJS host, require() and import() each path, compare the name lists, and compile one identical declaration file under NodeNext in both modes. The three gaps this row carried into W7 are gone: engines.node is >=22.13.0 instead of >=20, the CI matrices test the floor and later (22.13.0, 22, 24) rather than runtimes the contract excludes, and ERR_REQUIRE_ESM is a failure instead of a tolerance -- the difference between \"we promise require()\" and \"we hope the runner is new enough\". The floor is now one value read from PRD 8 rather than three values repeated by hand: check:packaging parses both Node rows of the table, requires them to agree, requires engines.node to equal them, requires the installed engine to declare at least that floor, and walks every node-version pin in both workflow files for anything below it. Each rule fired when fed its counterfactual (engines raised to 99.0.0, a CI pin at 20.9.0, a table edited to 22.14.0, an unresolvable subpath in the map) and the files came back by md5. What is left is evidence this machine cannot produce: a clean runner."
+      "gaps": [],
+      "note": "Fifteen JavaScript paths, proven from the packed artifact rather than from source: npm pack, install beside the real peers into a CommonJS host, require() and import() each path, compare the name lists, and compile one identical declaration file under NodeNext in both modes. The three gaps this row carried into W7 are gone: engines.node is >=22.13.0 instead of >=20, the CI matrices test the floor and later (22.13.0, 22, 24) rather than runtimes the contract excludes, and ERR_REQUIRE_ESM is a failure instead of a tolerance. The floor is now one value read from PRD 8 rather than three values repeated by hand: check:packaging parses both Node rows of the table, requires them to agree, requires engines.node to equal them, requires the installed engine to declare at least that floor, and walks every node-version pin in both workflow files for anything below it. Each rule fired when fed its counterfactual (engines raised to 99.0.0, a CI pin at 20.9.0, a table edited to 22.14.0, an unresolvable subpath in the map) and the files came back by md5. The last thing this row was waiting for was a clean runner, and it has one: CI run 37190478169 on dev at 713f4b4, 2026-10-04, executed the Packaging job at Node 22.13.0, 22 and 24 and each cell passed check:packaging and check:tarball -- require() of all fifteen paths from the installed tarball at the advertised floor, which is the version the promise is about. The same run found the defect #214 closes: the source layout could not resolve /edit, /merge or /locales/*, so every typecheck cell died. Locally that had been hidden by a dist/ left over from an earlier build, because TypeScript and Vite both honour a package's self-reference through its own name and exports."
     },
     "FR-42": {
       "title": "Document Merge",
@@ -1201,10 +1198,9 @@
         "src/lib/ssr.test.ts"
       ],
       "gaps": [
-        "the requirement says the test covers the published tarball, and the file says plainly that dist/ is not touched: the tarball half lives in check:tarball, which is outside verify, needs the network, and has never run on a clean runner",
-        "the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108 -- the advertised peer floor -- throws ReferenceError: DOMMatrix is not defined from its own module scope on import, and prints \"Please use the `legacy` build in Node.js environments\". 6.3.289 and 6.4.299 import cleanly (62 names each). So this row is proven for the range from 6.3.289 up, and the floor question is task #211 rather than a test to rewrite"
+        "the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108 -- the advertised peer floor -- throws ReferenceError: DOMMatrix is not defined from its own module scope on import, and prints “Please use the `legacy` build in Node.js environments”. 6.3.289 and 6.4.299 import cleanly (62 names each). So this row is proven for the range from 6.3.289 up, and the floor question is task #211 rather than a test to rewrite"
       ],
-      "note": "Every documented entry imports under bare Node without a DOM and the entry list is read from package.json rather than typed out, so a new subpath cannot escape the check; only the artifact-under-test claim is overstated."
+      "note": "Every documented entry imports under bare Node without a DOM and the entry list is read from package.json rather than typed out, so a new subpath cannot escape the check. The tarball half of clause six, which is the part this row was overclaiming, is no longer an overclaim: CI run 37190478169 (2026-10-04) executed check:tarball in the Packaging job at Node 22.13.0, 22 and 24 and passed all three, so the published artifact rather than the repository tree has now been imported with no DOM present on a runner. What remains is the peer floor, which is a range decision (#211) and not a test."
     },
     "FR-47": {
       "title": "Touch & Gesture Handling (v1.0)",
@@ -1252,13 +1248,13 @@
         "scripts/browser-matrix.mjs"
       ],
       "gaps": [
-        "the browser job has never executed on a runner. Its harness is proven locally -- 2026-10-04 solo run, six engine x profile cells, 67 ok / 5 skipped / 0 failed / 0 not runnable, and 6 of 6 engines at or above PRD 8's floors (chromium 153 vs 125, firefox 155 vs 124, webkit 26 vs 18) -- and a note on this row claiming Firefox could not be driven at all was wrong: it came from two matrix processes sharing one dev-server port, and the same command run alone passes all twelve of its desktop checks",
+        "the browser job has executed on a runner exactly once -- CI run 37190478169, 2026-10-04 -- and returned six cells not runnable with 0 ok, because the dev server could not resolve pdfjs-react-reader/merge: the playground aliased every documented entry except that one, and a clean checkout has no dist/ for the self-reference to fall back on. That source-layout defect is closed by #214 and guarded by src/lib/entry-parity.test.ts; the same command run here with dist/ removed gives 67 ok / 5 skipped / 0 failed / 0 not runnable across the six engine x profile cells, with 6 of 6 engines at or above PRD 8's floors. So the gap is now a green run on a runner, not a harness that has never been driven. An earlier note on this row claiming Firefox could not be driven at all was wrong: it came from two matrix processes sharing one dev-server port",
         "the engine axis inside a browser fails at the advertised floor: with pdfjs-dist swapped to 6.2.108, chromium passes 22 checks and its pinch-vs-pan row reports \"a two-finger pan moved neither the page nor the scroll position\", because that release's TouchManager has no onPanning to hand the pan to. 6.3.289 and 6.4.299 pass it. This is a peer-range decision (task #211), not a matrix to delete",
         "the floors the harness measures are Playwright's current builds, not the pinned per-floor environments PRD 8's execution policy names, so chromium 153 says nothing about 125 and webkit 26 says nothing about Safari 18; that is why those rows stay implemented rather than supported, and not because a check failed",
         "the matrix runs one engine version per checkout (whatever node_modules holds), so the consumer job's two engine cells prove a typecheck and a Vite build rather than a painted page at 6.2.108 or 6.4.299 (task #194)",
         "no Edge, macOS Safari, iOS or Android job exists, and the mobile profile is emulation: its skips are the wheel it does not dispatch and, on Firefox and WebKit, the Touch constructor it does not expose"
       ],
-      "note": "Thirteen checks, three engines, two profiles, and a run that classifies a browser it cannot start as unverified rather than passed. W7 made the floors part of the evidence instead of prose: PRD 8's browser rows are parsed out of the document, compared against each engine's reported version, printed as their own line per cell and counted in their own tally, so drift between the table and the harness exits 2 -- proved by setting chromium's floor to 126 and reading the script name the disagreement. The pinch row is deterministic now: it waits for a settled scale rather than the first change, and an engine with no Touch to synthesise reports a skip with its reason. Both 1,000-page results that came back red in the contended run came back green solo, so the WebKit \"stall at page 733\" is recorded as a harness artifact (#210, closed) and the budget comment says which run produced which number. Still open and not closeable here: the job's first run, the engine axis inside a browser at both range ends, and any device that is not a Linux VM."
+      "note": "Thirteen checks, three engines, two profiles, and a run that classifies a browser it cannot start as unverified rather than passed -- a rule the first real CI run proved by obeying it: the job went red on six not-runnable cells instead of reporting a pass it had not measured. W7 made the floors part of the evidence instead of prose: PRD 8's browser rows are parsed out of the document, compared against each engine's reported version, printed as their own line per cell and counted in their own tally, so drift between the table and the harness exits 2 -- proved by setting chromium's floor to 126 and reading the script name the disagreement. The pinch row is deterministic now: it waits for a settled scale rather than the first change, and an engine with no Touch to synthesise reports a skip with its reason. Both 1,000-page results that came back red in the contended run came back green solo, so the WebKit stall at page 733 is recorded as a harness artifact (#210, closed) and the budget comment says which run produced which number. Still open and not closeable here: a green run of this job on a runner, the engine axis inside a browser at both range ends, the pinned old-version floors PRD 8's execution policy names, and any device that is not a Linux VM."
     },
     "FR-49": {
       "title": "Benchmark Fixture Suite",
@@ -1356,7 +1352,8 @@
       "automated": [
         "scripts/check-packaging.mjs",
         "scripts/tarball-check.mjs",
-        "scripts/check-examples.mjs"
+        "scripts/check-examples.mjs",
+        "src/lib/entry-parity.test.ts"
       ],
       "acceptance": [
         ".github/workflows/ci.yml"
@@ -1368,13 +1365,14 @@
       ],
       "regressionGuard": [
         "scripts/check-packaging.mjs",
-        "scripts/check-examples.mjs"
+        "scripts/check-examples.mjs",
+        "src/lib/entry-parity.test.ts"
       ],
       "gaps": [
-        "the packaging job that proves both formats from the packed artifact has never run, and no CI job has run `npm run check:examples` either (task #202)",
+        "npm run check:examples has still never executed on a runner. The Packaging job has (CI run 37190478169, 2026-10-04, Node 22.13.0 / 22 / 24, check:packaging and check:tarball green in all three cells), but the Verify job that carries the examples step died at its first step on the source-layout defect #214 closes, so the examples check has run locally only",
         "the /edit, /merge, /features/*, per-feature CSS and /locales/* entries this row classifies as public have never been published: the surface consumers have actually had is the four subpaths in pdfjs-react-reader@0.1.2 — '.', './headless', './styles.css', './package.json' — ESM only"
       ],
-      "note": "Twenty-five keys, each classified into the eight groups §4.10 lists, with a wildcard key, a `./types` entry, an unclassifiable key and any target outside `dist/` all failing `npm run check:packaging` — each of the four was verified by introducing it and restoring the manifest byte-for-byte. `npm run check:examples` is §5.6's mechanism and now exists: it packs, extracts the tarball into a throwaway project's `node_modules`, and type-checks every fenced block in PRD.md and README.md plus the docs site's live examples with no `paths` mapping, so resolution goes through the export map or nowhere — 16 blocks compile, and the one skip is printed with the React major that is not installed here. Two findings came out of the first run: a README example imported `PdfPage` from `/headless`, which exports no components (a documented surface that did not exist), and six blocks were fragments with no imports at all, so they are now modules rather than exemptions — §5.6 allows exactly one kind of exemption and this check prints it. The behavioural half of internal-unreachable is the compile, not a reading of the map: an unpublished subpath fails, which was verified by perturbing an example. The two remaining gaps are runs and a publish, not code: no CI job has executed these checks, and no consumer has ever resolved the tier subpaths because nothing since 0.1.2 has been published."
+      "note": "Twenty-five keys, each classified into the eight groups §4.10 lists, with a wildcard key, a `./types` entry, an unclassifiable key and any target outside `dist/` all failing npm run check:packaging -- each of the four was verified by introducing it and restoring the manifest byte-for-byte. npm run check:examples is §5.6's mechanism and now exists: it packs, extracts the tarball into a throwaway project's node_modules, and type-checks every fenced block in PRD.md and README.md plus the docs site's live examples with no paths mapping, so resolution goes through the export map or nowhere -- 16 blocks compile, and the one skip is printed with the React major that is not installed here. The behavioural half of internal-unreachable is the compile, not a reading of the map: an unpublished subpath fails, which was verified by perturbing an example. What the row did not have until #214 was any assertion that the map is reachable from source. Every entry resolved locally through the package's own name and exports self-reference against a dist/ from an earlier build, so tsconfig.json#paths could omit /edit, /merge and /locales/* and the playground could omit /merge and nothing said so until CI, which starts with no dist/, failed all seven typecheck cells and all six browser cells at once. src/lib/entry-parity.test.ts now requires each export key to map to a file that exists and each of the two apps to alias every entry it imports, and it was fed four counterfactuals (a deleted paths entry, a deleted alias, an alias pointing at a renamed file, and the docs site losing /edit), each of which turned exactly one rule red with the offending specifier named. The two remaining gaps are a run and a publish, not code."
     },
     "FR-53": {
       "title": "Dependency & Engine Contract",
@@ -1557,7 +1555,7 @@
       "documentation": [],
       "regressionGuard": [],
       "gaps": [
-        "no release candidate has ever been built and tested on a clean runner from a packed artifact — the packaging, consumer and browser jobs exist but have never executed",
+        "no release candidate has ever been built and tested on a clean runner from a packed artifact. The jobs now exist and have run once (CI run 37190478169, 2026-10-04: Packaging green at Node 22.13.0 / 22 / 24, Consumer build green at both engine ends, Browser matrix red on six not-runnable cells, Verify and React red at typecheck) -- but they ran against a commit, not against a tagged release candidate, and the run that found the defects is the reason #214 exists",
         "the real-device pass and the three screen-reader pairings have no environment, no schedule and no artifact",
         "the 0.1.2 to 1.0.0 upgrade path is not exercised by anything",
         "the accessibility evidence is still printed to a console rather than produced as a committed, re-readable record; the benchmark half changed in W8 — `benchmarks/latest.json` is tracked and carries §6's environment, fixture hashes and distributions, with a test that fails if it goes stale"

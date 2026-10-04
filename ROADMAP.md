@@ -88,24 +88,24 @@ certified on this machine at all.
 | `FR-38` | Source Utilities | **met** | 4/5 | 0 | — |
 | `FR-39` | Incremental, Viewport-Prioritised Indexing | **partial** | 4/5 | 2 | re-indexing after a page edit invalidates only what changed, but what it re-reads is the content… |
 | `FR-40` | Injectable External Index | **met** | 4/5 | 0 | — |
-| `FR-41` | Dual Module Output | **partial** | 5/5 | 2 | the packaging job that clause five points at has never executed on a runner, so "fails the packa… |
+| `FR-41` | Dual Module Output | **met** | 5/5 | 0 | — |
 | `FR-42` | Document Merge | **met** | 4/5 | 0 | — |
 | `FR-43` | Structure-Tree Integration | **partial** | 4/5 | 2 | the clause is what a screen reader hears, and no environment here proves it: no browser check re… |
 | `FR-44` | High Contrast & Forced Colours | **partial** | 5/5 | 1 | the browser check asserts the page-slot outline and shadow only, never the second channels or fo… |
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
-| `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 2 | the requirement says the test covers the published tarball, and the file says plainly that dist/… |
+| `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108… |
 | `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the pan half of the arbitration does not exist on the advertised peer floor: pdfjs-dist 6.2.108'… |
-| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has never executed on a runner. Its harness is proven locally -- 2026-10-04 solo… |
+| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has executed on a runner exactly once -- CI run 37190478169, 2026-10-04 -- and r… |
 | `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 4 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
 | `FR-50` | Published API Maturity | **partial** | 5/5 | 1 | the check is the last step of npm run verify, which no CI job calls, so an untagged export fails… |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
-| `FR-52` | Public API & Export Contract | **partial** | 5/5 | 2 | the packaging job that proves both formats from the packed artifact has never run, and no CI job… |
+| `FR-52` | Public API & Export Contract | **partial** | 5/5 | 2 | npm run check:examples has still never executed on a runner. The Packaging job has (CI run 37190… |
 | `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 3 | nothing forbids the root or /headless entry from importing the writer in future — it holds today… |
 | `FR-54` | Stable Error & Cancellation Contract | **met** | 4/5 | 0 | — |
 | `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |
 | `FR-57` | Runtime Resource Budget Contract | **met** | 5/5 | 0 | — |
-| `FR-58` | Release Evidence & Consumer Verification | **absent** | 0/5 | 4 | no release candidate has ever been built and tested on a clean runner from a packed artifact — t… |
+| `FR-58` | Release Evidence & Consumer Verification | **absent** | 0/5 | 4 | no release candidate has ever been built and tested on a clean runner from a packed artifact. Th… |
 
 <!-- FR-EVIDENCE:STATUS:END -->
 

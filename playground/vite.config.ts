@@ -54,6 +54,9 @@ export default defineConfig({
       // The writer tier is its own entry, not a feature: it is the one place the
       // optional peer may be imported.
       { find: /^pdfjs-react-reader\/edit$/, replacement: r('../src/edit.tsx') },
+      // Merge is a separate entry so a consumer can pull in the writer without the
+      // editing UI; the playground's merge demo is what imports it.
+      { find: /^pdfjs-react-reader\/merge$/, replacement: r('../src/merge.ts') },
       { find: /^pdfjs-react-reader\/headless$/, replacement: r('../src/headless.ts') },
       { find: /^pdfjs-react-reader$/, replacement: r('../src/index.ts') },
     ],
