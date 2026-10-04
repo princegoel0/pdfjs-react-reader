@@ -7,15 +7,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-`0.12` Prove (FR-41, FR-48–FR-51) is in progress. All five are built and three are still open on evidence
-rather than on code: FR-48's harness has run through all three engines here, FR-49 now has all four of its
-profiles and a committed record, and the proof that only a clean runner can give — the `packaging`, `browser`,
-`react` and `examples` jobs — has now been *run* (CI run 37190478169, `dev` at `713f4b4`, 2026-10-04) and has
-not yet been passed: `packaging` green at Node 22.13.0, 22 and 24; `consumer` green at both engine ends;
-`verify` and all four `react` cells red at `typecheck`, and all six browser cells `not runnable`, on one
-source-layout defect that #214 closes and that the local gate had been hiding behind a `dist/` no clean
-checkout has. The register stands at **43 met, 14 partial, 1 absent** of 58, on a suite of **1,024 tests in
-108 files**.
+`0.12` Prove (FR-41, FR-48–FR-51) is in progress. All five are built, and the evidence a clean runner gives
+has now been produced by several of them. The last run of the current workflow — 37202564139, `dev` at
+`e3efb87`, 2026-10-04 — is green on `packaging` (Node 22.13.0, 22 and 24, `check:packaging` and
+`check:tarball` in each cell), `consumer` (both engine ends), `react` (18 and 19, minimum and latest patch),
+`docs`, and on `browser`, which started real engines on a runner for the first time and returned **67 ok / 5
+skipped / 0 failed / 0 not runnable** — the same tally the local run reports, from the same thirteen checks.
+`verify` is red in all three cells at exactly one step, `Bundle size budget`, which is owner decision **#208**;
+the two gates added beside it (#215's follow-on) run green ahead of that step, so a still-undecided byte
+budget no longer hides them. What is left open is not reachable from this machine: §8's pinned browser floors,
+the engine axis inside a browser at both range ends, Edge, hardware, and the assistive-technology pairings.
+The register stands at **44 met, 13 partial, 1 absent** of 58, on a suite of **1,024 tests in 108 files**.
 
 ### Added
 
@@ -287,7 +289,13 @@ checkout has. The register stands at **43 met, 14 partial, 1 absent** of 58, on 
   invisible while it stays undecided. A gate stacked behind an unresolved one is not a gate. Both new steps
   were fed their defect to prove they bite: dropping one name from `api-maturity.json` gives `FAIL
   AnnotateFeatureState is exported and untagged` and exit 1, and flipping one state word in the generated
-  `ROADMAP.md` block gives `status block is stale` and exit 1; each file came back by checksum. (FR-50, FR-52,
+  `ROADMAP.md` block gives `status block is stale` and exit 1; each file came back by checksum. Runner
+  37202564139 then executed both steps green in all three Node cells — the maturity gate grading 320
+  published names, the register gate reporting the register consistent with `PRD.md` and with the files on
+  disk — which is the evidence FR-50 was missing: its clause is that an untagged export fails the build, and a
+  build now means a runner's, so the row moves to `met`. Whether 57 experimental names is the right number to
+  carry into `1.0.0` remains owner decision **#207**, which is about the baseline and not about the
+  enforcement. (FR-50, FR-52,
   FR-58)
 - **Three documents said CI had never run, and by 2026-10-04 that was no longer true.** `README.md`'s
   requirements table ("no `0.x` commit has been pushed, so no job has ever run"), its React row ("it has not
