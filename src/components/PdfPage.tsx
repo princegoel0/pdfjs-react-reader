@@ -327,6 +327,7 @@ export const PdfPage = memo(function PdfPage({
   const annotationRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const annotationLayerRef = useRef<AnnotationLayer | null>(null);
+  const editorLayerRef = useRef<AnnotationEditorLayer | null>(null);
   /*
    * Whether this page holds an annotation an editor can take over, read off the fetch the
    * annotation layer already makes.
@@ -697,13 +698,22 @@ export const PdfPage = memo(function PdfPage({
     };
   }, [structTreeLayerBuilder, page, textLayer]);
 
-  // Annotations (links, markups, form widgets). pdf.js's `AnnotationLayer.update`
-  // only repositions the layer, so programmatic form writes force a re-render
-  // through `formVersion` instead.
+  /*
+   * Annotations (links, markups, form widgets) — built once per page, then re-positioned.
+   *
+   * `viewport` is deliberately not a dependency, for the reason the text layer above gives and one more: the
+   * engine's own `AnnotationLayerBuilder.render` (web/pdf_viewer.mjs) *updates* the layer it already has —
+   * `annotationLayer.update({ viewport, optionalContentConfig })` — and rebuilds only when there is no div yet.
+   * Rebuilding here also cost the state the layer owns: a widget holding a focus, a popup open against the
+   * pointer, the `change` and `input` listeners this component attaches to the container below. `rotation`
+   * stays a dependency because `update()` re-sizes the layer box and re-resolves optional content; it does not
+   * re-orient a percent-placed element, so a turned page needs the rebuild the text layer needs.
+   */
   useEffect(() => {
     if (aborted()) return;
     const container = annotationRef.current;
-    if (!page || !container || !viewport || !linkService) return;
+    const at = viewportRef.current;
+    if (!page || !container || !at || !linkService) return;
 
     // Built before the annotations are fetched so that the editor layer, whose
     // effect runs later in the same commit, has the instance to link to. The
@@ -715,7 +725,7 @@ export const PdfPage = memo(function PdfPage({
     // structural implementations via a single cast.
     const layer = new AnnotationLayer({
       div: container,
-      viewport,
+      viewport: at,
       page,
       linkService,
       annotationStorage,
@@ -748,7 +758,7 @@ export const PdfPage = memo(function PdfPage({
       container.replaceChildren();
       await layer.render({
         annotations,
-        viewport,
+        viewport: at,
         div: container,
         page,
         linkService,
@@ -771,6 +781,14 @@ export const PdfPage = memo(function PdfPage({
       if (annotationLayerRef.current === layer) {
         annotationLayerRef.current = null;
       }
+      /*
+       * `destroy()` is the engine's own teardown for this class — `AnnotationLayerBuilder.cancel` calls it — and
+       * it does more than emptying the div: it drops each element's own teardown, clears the table of editable
+       * annotations the editor layer was handed, and releases the accessibility registrations. Emptying the
+       * container alone left the instance alive behind a page that had already moved on, which a rebuild on
+       * rotation or a scroll-out repeats as many times as the reader does it.
+       */
+      layer.destroy();
       container.replaceChildren();
       drop('annotations');
     };
@@ -782,7 +800,7 @@ export const PdfPage = memo(function PdfPage({
     };
   }, [
     page,
-    viewport,
+    rotation,
     linkService,
     annotationStorage,
     annotationEditorUIManager,
@@ -891,7 +909,8 @@ export const PdfPage = memo(function PdfPage({
     if (aborted()) return;
     const container = editorRef.current;
     const textContainer = textLayerRef.current;
-    if (!annotationEditorUIManager || !container || !textContainer || !page || !viewport) return;
+    const at = viewportRef.current;
+    if (!annotationEditorUIManager || !container || !textContainer || !page || !at) return;
 
     // `AnnotationEditorLayer` reads `textLayer.div` while `DrawLayer` observes the
     // node, so the two collaborators take opposite things. Swapping them throws
@@ -927,21 +946,47 @@ export const PdfPage = memo(function PdfPage({
       annotationLayer: annotationLayerRef.current,
       drawLayer,
       textLayer: { div: textContainer },
-      viewport,
+      viewport: at,
       l10n: null,
     } as unknown as ConstructorParameters<typeof AnnotationEditorLayer>[0]);
 
-    layer.render({ viewport }).catch((err: unknown) => {
+    layer.render({ viewport: at }).catch((err: unknown) => {
       if (err instanceof RenderingCancelledException) return;
       reportError(err);
     });
+    editorLayerRef.current = layer;
 
     return () => {
+      if (editorLayerRef.current === layer) editorLayerRef.current = null;
       layer.destroy();
       drawLayer.destroy();
       container.replaceChildren();
     };
-  }, [annotationEditorUIManager, page, viewport, pageNumber, structLayer, reportError]);
+  }, [annotationEditorUIManager, page, rotation, formVersion, pageNumber, structLayer, reportError]);
+
+  /*
+   * The zoom step lands here, on both overlay layers, and the engine's own repositioning is the whole
+   * implementation: `AnnotationLayer.update` sets the layer box from the new viewport, walks the elements it
+   * already made and re-resolves their optional-content state — it does not rebuild them, because an element is
+   * placed in percentages of the page box (`left: 100 * (x - pageX) / pageWidth`, in `AnnotationElement`), which
+   * is exactly the arithmetic a scale change cannot invalidate. `optionalContentConfig` is deliberately not
+   * handed over: `updateOC` returns early without it, so a group the reader switched keeps the state the layer
+   * was last told about instead of silently re-showing what is hidden.
+   *
+   * Declared after both build effects on purpose: effects run in declaration order, so the instances this reads
+   * are the ones this commit made. A layer whose `render()` is still in flight takes the call and walks an empty
+   * element list, which is why the first zoom of a page that is still painting is not a change that gets lost.
+   *
+   * The cast is the engine's, not ours to avoid: its declarations type `update` with the full
+   * `AnnotationLayerParameters` — the record `render` takes — while its implementation reads `viewport` and
+   * `optionalContentConfig` off that record, and `web/pdf_viewer.mjs` calls it with exactly those two.
+   */
+  useEffect(() => {
+    if (!viewport) return;
+    const reposition = { viewport } as unknown as Parameters<AnnotationLayer['update']>[0];
+    annotationLayerRef.current?.update(reposition);
+    editorLayerRef.current?.update(reposition as unknown as Parameters<AnnotationEditorLayer['update']>[0]);
+  }, [viewport]);
 
   /*
    * The divs a search mark wraps: the text layer's when there is one, and the XFA layer's

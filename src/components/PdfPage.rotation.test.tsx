@@ -102,6 +102,7 @@ vi.mock('pdfjs-dist', async (importOriginal) => ({
     destroy(): void {
       seen.destroyed.push('editor');
     }
+    update(): void {}
   },
   XfaLayer: {
     render(params: Call) {

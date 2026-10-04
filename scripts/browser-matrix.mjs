@@ -513,6 +513,108 @@ const CHECKS = [
     },
   },
   {
+    /*
+     * FR-06: "a zoom step updates existing overlay layers in place rather than rebuilding them."
+     *
+     * `PdfPage.overlay.test.tsx` counts the calls the page makes against its own mocks, which proves the page
+     * asks; only a real engine proves that asking is enough. The observable fact in a browser is churn: a
+     * rebuilt layer takes its elements out and puts new ones back, so a `childList` removal count over the zoom
+     * sequence is the clause, read off the DOM rather than off a stub. `annotated-sample.pdf` is the fixture
+     * because its first page carries markups the annotation layer paints with no feature mounted — a page with
+     * nothing in the layer would report zero churn in both worlds and certify nothing, so the count of elements
+     * found at load is printed with the verdict.
+     */
+    name: 'zoom-updates-the-layers-in-place',
+    run: async ({ page, load, log }) => {
+      await load('annotated-sample.pdf', 2);
+      /*
+       * The annotations arrive after the canvas does — `load` waits for the document label and the painted page,
+       * not for the overlay — so arming straight away watched an empty layer on the first Firefox run and
+       * reported a skip that was really the harness reading its own timing. Wait for the layer to have
+       * something in it, and only treat a layer that stays empty as an engine finding.
+       */
+      const populated = await waitFor(
+        async () =>
+          (await page.evaluate(() => {
+            const el = document.querySelector('.pjsr-annotation-layer');
+            return el !== null && el.querySelectorAll('*').length > 0;
+          }))
+            ? true
+            : null,
+        10_000,
+      );
+      const scale = async () => Number((await log('onScaleChange')).match(/[\d.]+$/)?.[0] ?? NaN);
+      const armed = await page.evaluate(() => {
+        const layers = ['.pjsr-annotation-layer', '.pjsr-editor-layer']
+          .map((selector) => document.querySelector(selector))
+          .filter((el) => el !== null);
+        if (!layers.length) return null;
+        window.__churn = { added: 0, removed: 0, steps: 0 };
+        /*
+         * The watched nodes are kept by reference. A zoom to 300 % legitimately mounts the *next* page with its
+         * own layers, and counting every `.pjsr-annotation-layer *` in the document would then compare one
+         * page's elements against two — which reads a correct zoom as a layer that grew. The first run of this
+         * check failed that way, on the check rather than on the viewer.
+         */
+        window.__watched = layers;
+        for (const el of layers) {
+          new MutationObserver((records) => {
+            for (const r of records) {
+              if (r.type !== 'childList') continue;
+              window.__churn.added += r.addedNodes.length;
+              window.__churn.removed += r.removedNodes.length;
+            }
+          }).observe(el, { childList: true, subtree: true });
+        }
+        return layers.map((el) => el.querySelectorAll('*').length);
+      });
+      if (!armed) fail('the page mounted neither an annotation nor an editor layer to watch');
+      if (populated === null) {
+        return skip('the annotation layer never carried an element within 10 s of the page painting, so there is nothing to keep in place');
+      }
+      const marks = armed.reduce((a, b) => a + b, 0);
+      if (!marks) {
+        return skip(`the watched layers hold ${armed.join(' + ')} elements — nothing there to keep in place`);
+      }
+
+      const field = page
+        .locator('.pjsr-toolbar .pjsr-zoom-input:visible')
+        .or(page.locator('.pjsr-overflow-menu .pjsr-zoom-input:visible'))
+        .first();
+      if (!(await field.count())) return skip('no zoom control the harness could reach in this profile');
+
+      const before = await scale();
+      for (const percent of [150, 200, 250, 300]) {
+        const want = percent / 100;
+        await field.fill(String(percent));
+        await field.press('Enter');
+        // Wait for *this* step rather than for any step: once the first has landed the scale differs from
+        // `before` forever, so a check against `before` returns at once and the sequence is measured as stillness.
+        const landed = await waitFor(async () => ((await scale()) === want ? true : null), 8_000);
+        if (landed === null) fail(`the zoom field asked for ${percent} % and the scale never reached it`);
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        await page.evaluate(() => {
+          window.__churn.steps += 1;
+        });
+      }
+      const after = await scale();
+      const churn = await page.evaluate(() => ({ ...window.__churn }));
+      const kept = await page.evaluate(() =>
+        (window.__watched ?? []).map((el) => el.querySelectorAll('*').length).reduce((a, b) => a + b, 0),
+      );
+
+      if (!(after > before)) fail(`the zoom never landed (${before} → ${after}), so the churn count means nothing`);
+      if (churn.removed || churn.added) {
+        fail(
+          `${churn.steps} zoom steps replaced ${churn.removed} overlay elements and added ${churn.added}: ` +
+            'a layer that is repositioned in place keeps its own nodes',
+        );
+      }
+      if (kept !== marks) fail(`the watched layers held ${marks} elements before the zoom and ${kept} after it`);
+      return `${churn.steps} steps ${before} → ${after}, ${marks} overlay elements in place throughout, 0 added / 0 removed`;
+    },
+  },
+  {
     name: 'pinch-vs-pan (synthetic touch)',
     mobileOnly: true,
     run: async ({ page, log, viewportBox, load }) => {

@@ -36,6 +36,8 @@ vi.mock('pdfjs-dist', async (importOriginal) => ({
     render(): Promise<void> {
       return Promise.resolve();
     }
+    update(): void {}
+    destroy(): void {}
   },
   DrawLayer: class {
     setParent(): void {}
@@ -46,6 +48,7 @@ vi.mock('pdfjs-dist', async (importOriginal) => ({
       return Promise.resolve();
     }
     destroy(): void {}
+    update(): void {}
   },
   XfaLayer: {
     render: (params: unknown) => {
