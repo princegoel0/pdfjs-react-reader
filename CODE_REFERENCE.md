@@ -864,9 +864,15 @@ declarations.
 
 **Meaning never rides on colour alone.** A search match carries a `border-bottom`; the active match an
 `outline` and `aria-current="true"` (both set by the one statement in `lib/highlight.ts` that sets its
-class); an armed toolbar button switches its `transparent` border on; the selected sidebar tab thickens its
-underline from 2 px to 3. The channels are declared outside any media query, because 1.4.1 does not wait
-for a high-contrast theme — and they survive one, because a width and a shape are not colours.
+class); an annotation highlight an inset edge on both of its paths — `outline` on the
+`.highlightAnnotation` the annotation layer paints from the file, and an inset `box-shadow` on the
+`.internal` of the editor making one now, chosen so the ring can stay while focus and selection take the
+`outline` for their own meanings; an armed toolbar button switches its `transparent` border on; the selected
+sidebar tab thickens its underline from 2 px to 3. Each is drawn from `--pjsr-fg`, so a dark palette gets a
+light edge without a second rule. The channels are declared outside any media query, because 1.4.1 does not
+wait for a high-contrast theme — and they survive one, because a width and a shape are not colours; the
+browser matrix reads the highlight's computed `outline` while `forced-colors` is emulated, which is the only
+place a reader's palette can actually be tested rather than described.
 
 ---
 

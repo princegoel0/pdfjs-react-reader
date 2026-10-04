@@ -376,6 +376,37 @@ or cannot do on the engine we advertise, and one of them (`FR-47`) gained a prom
 
 ### Changed
 
+### Changed
+
+- **An annotation highlight now says *mark* without its colour (#221, FR-44's third signal).** The clause names
+  three things that must not carry meaning by hue alone and the shell had channels for two: a search match's
+  rule, the active match's ring. An annotation highlight was the third and had nothing — its entire content is
+  a tint the engine paints from the file, so under a forced palette, where the tint stops being information,
+  the mark and a warm page are the same thing. Two rules, one per path: an `outline` on the
+  `.highlightAnnotation` the annotation layer renders out of the file, which belongs in `viewer.css` because
+  the annotation layer is core and needs no tier to paint a markup annotation; and an inset `box-shadow` on
+  `.highlightEditor .internal` in `annotate.css`, for the mark the reader is making now — a channel that
+  appeared only after a reload would be a channel for archaeologists. `box-shadow` rather than a second
+  `outline` on the editor path because focus and selection already own that property there (`:focus-visible`
+  and `.selectedEditor`), and the shape signal has to survive the ring that says where the reader is rather
+  than trading places with it. Both are `color-mix(in srgb, var(--pjsr-fg) 45%, transparent)`, so a dark theme
+  gets a light edge and the sheet's existing `@media (forced-colors: active)` block, which re-points
+  `--pjsr-fg` at `CanvasText`, carries the high-contrast case without a rule of its own — the reason invariant
+  2 of the stylesheet guard (no literal inside a forced block) stays green and why an authored `rgb(0 0 0 /…)`
+  would have been the bug wearing the fix's clothes.
+  Asserted at both levels, because each catches what the other cannot: `src/styles/forced-colors.test.ts`
+  requires the declarations and their token dependence — deleting the `outline` line is a red test, and so is
+  authoring a literal colour inside a forced block — and the matrix's `forced-colors` check now loads
+  `annotated-sample.pdf` while the palette is emulated and reads the computed outline off a real painted mark:
+  `highlight edge solid 1px rgb(0, 0, 0) on 900px`. With the rule removed the same check reports
+  `a forced palette left the highlight with "none 3px" on a 900px box — the tint is overridden here, so an
+  edge is the only thing marking it`, and it is the only row in the cell that moves; both files came back by
+  checksum. The check waits for the layer to paint rather than assuming the annotation arrived, which is the
+  same race #219's new check fell into. Cost: +0.02 kB gz on the shell, `core` and every catalog unchanged.
+  Three gaps stay on the row, and they are the evidence that is missing rather than the behaviour: the search
+  mark's channel is declared and never painted under a forced palette, the editor's ring needs a check that
+  creates an annotation and the matrix has none, and focus visibility in a forced palette has no assertion in
+  any file — `focus-visible` appears in zero tests.
 - **A zoom step now repositions the annotation and editor layers instead of rebuilding them (#219, FR-06's
   second sentence).** Both build effects listed `viewport` among their dependencies, so every scale change ran
   their teardown — `container.replaceChildren()` at `src/components/PdfPage.tsx:774`, `layer.destroy();

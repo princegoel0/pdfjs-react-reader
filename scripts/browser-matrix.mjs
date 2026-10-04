@@ -766,11 +766,43 @@ const CHECKS = [
           shadow: cs ? cs.boxShadow : '',
         };
       });
+      /*
+       * FR-44's other half, read where the mark is actually painted. The clause names three signals that must
+       * not rely on hue alone and the search marks were the ones already asserted; an annotation highlight is
+       * the one whose *only* content is the tint, and a forced palette is exactly where the tint stops being
+       * information. Read while the emulation is still on, and from the document that carries the markup —
+       * `annotated-sample.pdf`, because asserting against a page with no annotations would pass by absence.
+       */
+      await load('annotated-sample.pdf', 2);
+      const painted = await waitFor(
+        () =>
+          page.evaluate(() => {
+            const el = document.querySelector('.pjsr-annotation-layer section.highlightAnnotation');
+            if (!el) return null;
+            const cs = getComputedStyle(el);
+            const box = el.getBoundingClientRect();
+            return {
+              outline: `${cs.outlineStyle} ${cs.outlineWidth}`,
+              colour: cs.outlineColor,
+              width: Math.round(box.width),
+            };
+          }),
+        8_000,
+      );
       await page.emulateMedia({ forcedColors: 'none' });
       if (!state.matches) return skip('the engine still reports forced-colors as inactive under emulation');
       if (!state.outline.startsWith('solid')) fail(`page slot outline is "${state.outline}", not a solid line"`);
       if (state.shadow !== 'none') fail(`the page kept its drop shadow: ${state.shadow}`);
-      return `matchMedia active, slot ${state.outline}, shadow removed`;
+      if (!painted) {
+        fail('the annotation layer never painted a highlight from annotated-sample.pdf, so its edge could not be read');
+      }
+      if (!painted.outline.startsWith('solid') || painted.width <= 0) {
+        fail(
+          `a forced palette left the highlight with "${painted.outline}" on a ${painted.width}px box — ` +
+            'the tint is overridden here, so an edge is the only thing marking it',
+        );
+      }
+      return `matchMedia active, slot ${state.outline}, shadow removed; highlight edge ${painted.outline} ${painted.colour} on ${painted.width}px`;
     },
   },
   {

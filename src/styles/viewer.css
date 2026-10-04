@@ -692,6 +692,20 @@
   mix-blend-mode: multiply;
 }
 
+/*
+ * FR-44: a highlight has to say *mark* as well as *yellow*.
+ *
+ * The tint is the whole of what a display-path markup annotation carries — the engine paints the quad with
+ * the colour saved in the file, and nothing else distinguishes it from a page that happens to be warm — so a
+ * reader who cannot take the meaning from a hue gets nothing. The edge is drawn from the theme's own
+ * foreground, which is why it survives a dark palette and a host re-skin alike, and `inset` so it eats
+ * neither a pixel of the words under it nor the box the engine positioned.
+ */
+.pjsr-annotation-layer section.highlightAnnotation {
+  outline: 1px solid color-mix(in srgb, var(--pjsr-fg) 45%, transparent);
+  outline-offset: -1px;
+}
+
 .pjsr-annotation-layer :is(.linkAnnotation, .buttonWidgetAnnotation.pushButton) > a {
   position: absolute;
   top: 0;

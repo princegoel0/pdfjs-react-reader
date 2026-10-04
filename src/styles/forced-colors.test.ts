@@ -101,5 +101,22 @@ describe('the stylesheets under forced colours', () => {
     // The selected tab thickens the underline it already has, instead of only recolouring it.
     const tab = viewer.match(/\.pjsr-sidebar-tab--active\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(tab).toMatch(/border-bottom-width:/);
+
+    /*
+     * FR-44's third signal, and the one the clause names last: annotation highlights. A mark that arrived in
+     * the file and a mark the reader is making now are two different layers with two different owners, so the
+     * channel has to be on both — an edge that appears only after a reload is a channel for archaeologists.
+     * Each is drawn from the theme's own foreground, which is what makes the forced-colours case need no rule
+     * of its own: the sheet's `@media (forced-colors: active)` block re-points `--pjsr-fg` at `CanvasText`,
+     * so the edge follows the palette instead of becoming a black ring on a black theme.
+     */
+    const display = viewer.match(/\.pjsr-annotation-layer section\.highlightAnnotation\s*\{([^}]*)\}/)?.[1] ?? '';
+    const annotate = code(sheets.find((s) => s.name === 'annotate.css')!.css);
+    const authored =
+      annotate.match(/\.pjsr-editor-layer \.highlightEditor \.internal\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(display).toMatch(/outline: 1px solid/);
+    expect(authored).toMatch(/box-shadow: inset 0 0 0 1px/);
+    expect(display).toContain('var(--pjsr-fg)');
+    expect(authored).toContain('var(--pjsr-fg)');
   });
 });
