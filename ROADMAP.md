@@ -51,7 +51,7 @@ certified on this machine at all.
 | `FR-01` | Input Flexibility | **met** | 5/5 | 0 | — |
 | `FR-02` | Worker Configuration | **met** | 5/5 | 0 | — |
 | `FR-03` | Password Protection | **met** | 4/5 | 0 | — |
-| `FR-04` | Cancellation Safety | **partial** | 5/5 | 1 | the AbortSignal reason is not preserved: abortError() fabricates a fresh Error with name AbortEr… |
+| `FR-04` | Cancellation Safety | **met** | 5/5 | 0 | — |
 | `FR-05` | Viewport Virtualization | **partial** | 5/5 | 1 | placeholder heights coming from real page dimensions are asserted nowhere: `reportPageDims` (src… |
 | `FR-06` | Responsive Zoom Modes | **met** | 5/5 | 0 | — |
 | `FR-07` | High-DPI Adaptation | **met** | 5/5 | 0 | — |
@@ -84,7 +84,7 @@ certified on this machine at all.
 | `FR-34` | Network Contract | **met** | 4/5 | 0 | — |
 | `FR-35` | Bounded Retries | **met** | 4/5 | 0 | — |
 | `FR-36` | Cancellation Tokens | **partial** | 4/5 | 2 | two of the operations the clause lists have no cancellation assertion: src/components/PdfThumbna… |
-| `FR-37` | Published State Models | **partial** | 4/5 | 1 | “both unions are produced, not merely declared” is not true of `destroyed`: it is produced at sr… |
+| `FR-37` | Published State Models | **partial** | 4/5 | 1 | the union’s `destroyed` member has no observable path. It is written by two: an unmount, whose s… |
 | `FR-38` | Source Utilities | **met** | 4/5 | 0 | — |
 | `FR-39` | Incremental, Viewport-Prioritised Indexing | **met** | 4/5 | 0 | — |
 | `FR-40` | Injectable External Index | **met** | 4/5 | 0 | — |
@@ -102,7 +102,7 @@ certified on this machine at all.
 | `FR-52` | Public API & Export Contract | **partial** | 5/5 | 1 | the /edit, /merge, /features/*, per-feature CSS and /locales/* entries this row classifies as pu… |
 | `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 3 | nothing forbids the root or /headless entry from importing the writer in future — it holds today… |
 | `FR-54` | Stable Error & Cancellation Contract | **partial** | 4/5 | 3 | five of the eighteen published codes are not proven on a path a consumer can reach: `PASSWORD_RE… |
-| `FR-55` | Worker & Source Security Contract | **partial** | 5/5 | 2 | “embedded JavaScript execution remains disabled” is asserted nowhere: `enableScripting: false` i… |
+| `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |
 | `FR-57` | Runtime Resource Budget Contract | **met** | 5/5 | 0 | — |
 | `FR-58` | Release Evidence & Consumer Verification | **absent** | 0/5 | 4 | no release candidate has ever been built and tested on a clean runner from a packed artifact. Th… |

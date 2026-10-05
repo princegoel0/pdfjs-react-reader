@@ -154,3 +154,37 @@ describe('FR-34 network contract', () => {
     });
   });
 });
+
+/*
+ * FR-55's other half, at the one boundary a host can be burned at: an app that renders sources it did not
+ * author passes `allowedSources`, and the refusal has to happen on the way to the engine — before a fetch
+ * reaches an origin the host excluded — rather than in a helper that the hook then ignores. The library
+ * boundary was always tested (`source.test.ts`); this is the prop-to-policy wire, which is where an option
+ * gets dropped.
+ */
+describe('the host’s source allowlist reaches the engine (FR-55)', () => {
+  const SRC = 'https://files.example.com/contract.pdf';
+
+  it('lets an allowed origin through to getDocument with its href intact', async () => {
+    taskReturning(fakeDoc());
+    renderHook(() => usePdfDocument({ src: SRC, allowedSources: ['https://files.example.com'] }));
+
+    await waitFor(() => expect(calls).toHaveBeenCalled());
+    expect(last().url).toBe(SRC);
+  });
+
+  it('refuses an origin the host did not list, and never asks the engine for it', async () => {
+    taskReturning(fakeDoc());
+    const { result } = renderHook(() =>
+      usePdfDocument({ src: SRC, allowedSources: ['https://trusted.exampleonly.com'] }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error?.code).toBe('SOURCE_NOT_ALLOWED');
+    expect(
+      result.current.error?.message,
+      'a message a reader may be shown, so it names the origin and never the query string, which is where a signed URL keeps its credential',
+    ).toContain('https://files.example.com');
+    expect(calls, 'the refused URL never reached the engine at all').not.toHaveBeenCalled();
+  });
+});

@@ -24,18 +24,60 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **33 met, 24 partial, 1
-absent** of 58, on a suite of **1,147 tests in 123 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **35 met, 22 partial, 1
+absent** of 58, on a suite of **1,154 tests in 123 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. Seven of those eighteen are already back out:
+below and is the honest number rather than the comfortable one. Nine of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
-where writing the assertion for the third found the behaviour missing and moved the code as well; and
-`FR-17` through **#232**, which moved a second behaviour. That is the direction the count takes from here:
-down where a guard turns out to be decoration, up where a test is shown to bite — and never up on a claim
-nobody can make fail.
+where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
+through **#232**, which moved a second behaviour; and `FR-04` and `FR-55` through **#233**, where a third
+turned out not to be a missing test at all. That is the direction the count takes from here: down where a
+guard turns out to be decoration, up where a test is shown to bite — and never up on a claim nobody can
+make fail.
 
 ### Added
+
+- **Capabilities and state: three clauses closed, and one that turned out to need a ruling (`#233`,
+  2026-10-05).** `FR-04` and `FR-55` read `met`; `FR-37` keeps its gap with a sharper text. 35 met,
+  22 partial, 1 absent.
+
+  **`FR-04` — “preserve the `AbortSignal` reason where the platform provides one”.** A host that aborts a
+  text index with a reason — `controller.abort(new Error('reader navigated away'))` — got the platform’s own
+  generic sentence back and lost the cause, because `extractAllText` threw its own `AbortError` rather than
+  the helper every other cancellation in the package already uses. It now keeps `name = AbortError` (the name
+  every cancellation filter here and in hosts reads), `code = SEARCH_CANCELLED`, the message and the `cause`.
+  Three tests hold the three shapes a reason arrives in: an `Error`, a bare string, and none at all — the
+  last of which must keep the operation’s own sentence, not the platform’s.
+  **One site was looked at and deliberately left alone:** the walk inside `usePdfSearch` throws the same
+  cancellation straight into its own catch and answers the host with `idle` and no error, which is this
+  clause’s *other* sentence and already tested. Routing a reason through a throw nobody can observe would
+  have made two call sites look symmetrical and proved nothing, so it is not in the diff.
+
+  **`FR-55` — “embedded JavaScript execution remains disabled”, and the allowlist’s journey.** The literal
+  `enableScripting: false` was in the annotation layer’s render params and in no test file, so deleting it
+  was a green build that let a document’s OpenAction JavaScript run. The new test checks *every* render call
+  the page makes, because a second path that forgets the flag is the same hole. The other half was a
+  prop-to-policy wire: `source.test.ts` proved the policy, nothing proved the hook’s `allowedSources` reached
+  it. It does — an allowed origin arrives at `getDocument` with its href, and a refused one is stopped before
+  the engine is asked at all, with `SOURCE_NOT_ALLOWED` naming the origin and never the query string. A stale
+  detail in the gap text died on the way: it claimed the flag lived at two sites, and it lives at one.
+
+  **`FR-37` — the state no host can see, measured rather than asserted.** The gap said `destroyed` was
+  “produced at :489 and appears in tests only inside negative assertions”, and the obvious fix was to assert
+  it positively. That assertion failed, and the failure is the finding: `destroyed` is written by exactly two
+  paths, an unmount — whose state update React drops because the component is gone — and a supersede, whose
+  `destroyed` and `loading` land in one commit, so a host reading `status` never renders the first. The
+  counterfactual confirms it from the other side: making every teardown claim `cancelled` fails **no test in
+  the repository**, while making every teardown claim `destroyed` fails the host-cancel case. So “state
+  transitions are reportable” and “both unions are produced, not merely declared” are not answerable with a
+  test here, and the row says so.
+
+  **Also in this pass:** five counterfactuals (`.spike/counterfactual-t1d.mjs`), and a tooling lesson
+  recorded where it can be seen — three of the register’s prose fields came out with holes in them because
+  the shell that wrote them treated every backticked identifier as a command substitution. The rewrite is a
+  script in `.spike/`, and the rule it teaches is that prose full of code spans belongs to the edit tools and
+  not to a `bash -e`.
 
 - **The form hook is finally mounted, and it moved a behaviour on the way (`#232`, 2026-10-05).** `FR-17`
   reads `met` on it: 33 met, 24 partial, 1 absent, on **1,147 tests in 123 files**.

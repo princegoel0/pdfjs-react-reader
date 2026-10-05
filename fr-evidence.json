@@ -95,7 +95,7 @@
     },
     "FR-04": {
       "title": "Cancellation Safety",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/abort.ts",
         "src/components/PdfPage.tsx",
@@ -117,10 +117,8 @@
       "regressionGuard": [
         "src/components/PdfPage.status.test.tsx"
       ],
-      "gaps": [
-        "the AbortSignal reason is not preserved: abortError() fabricates a fresh Error with name AbortError and no call site reads signal.reason"
-      ],
-      "note": "Cancellation is identified by name, distinguished from failure and never reaches onError; only the preserve-the-reason clause is unmet."
+      "gaps": [],
+      "note": "The immediate cancel on unmount and scroll-out, the cancellation identified by type that never reaches an ordinary error handler, and the published code set were already asserted. The clause’s last line was not: `extractAllText` threw its own generic `AbortError` for a signal that had already fired, so a host that aborted with “reader navigated away” was handed the platform’s sentence instead of its own and lost the cause. It now goes through the helper the rest of the package uses, keeping `name = AbortError` — every cancellation filter here and in hosts reads that name — and `code = SEARCH_CANCELLED`, and three tests hold the three shapes apart: an `Error` reason, a bare string reason, and no reason at all, which keeps the operation’s own sentence. One site was looked at and deliberately left alone: the walk inside `usePdfSearch` throws the same cancellation into its own catch and answers the host with `idle` and no error, which is this clause’s other sentence and already tested. A reason no consumer can observe is not a promise, so nothing was changed there to make two call sites look symmetrical."
     },
     "FR-05": {
       "title": "Viewport Virtualization",
@@ -1020,9 +1018,9 @@
         "src/components/ViewerController.retry.test.tsx"
       ],
       "gaps": [
-        "“both unions are produced, not merely declared” is not true of `destroyed`: it is produced at src/headless/usePdfDocument.ts:489 and appears in tests only inside negative assertions (usePdfDocument.status.test.tsx:166,245 `not.toContain`), and the supersede test that should be its positive case asserts only that `idle` does not reappear (:267-271). Deleting the branch would leave the suite green"
+        "the union’s `destroyed` member has no observable path. It is written by two: an unmount, whose state update React drops because the component is gone, and a supersede, whose `destroyed` and `loading` land in one commit so no host ever renders the first. Measured 2026-10-05 in src/headless/usePdfDocument.status.test.tsx, which now records the sequence and asserts what it cannot contain, and confirmed by counterfactual: making every teardown claim `cancelled` fails no test at all, while making every teardown claim `destroyed` fails the host-cancel case. “State transitions are reportable” and “both unions are produced, not merely declared” therefore need a ruling rather than a test — an `onStatusChange`-style reporter that sees transitions a render never shows, an extra commit on the supersede path, or the clause amended to say that `destroyed` is by construction the state of a load nobody is watching."
       ],
-      "note": "Every other member of both unions has a positive assertion — `cancelled` is observed by a host that aborts (the correction this row made), the page path publishes `retryPage`/`retryToken` rather than keeping re-queueing internal, and the fields are read off the state so a status cannot disagree with a null handle. One member of one union is the exception, and the clause names that as a defect in the model rather than an unused branch.",
+      "note": "The document and page unions are published types; the invariant that a status is never `ready` with a null handle is built into `PdfDocumentLoad` rather than policed; `cancelled` is what a host that aborts a load observes and it never passes through `error`; the password path parks with its reason; and the page retry §3.5 promises is published and reaches the model. One member is still unreachable — `destroyed` — and the gap now carries the measurement and the counterfactual that show it is a question about the surface, not a missing assertion.",
       "acceptanceWaiver": "Both unions are produced by components under test rather than declared and unreachable: the document path is driven through a host `AbortSignal` and a password prompt in jsdom, and the page path through fake render tasks whose settle and failure the test controls. What a browser would add — real scroll-out timing — is covered as behaviour by FR-04’s checks, not as a state the model can only show on a device."
     },
     "FR-38": {
@@ -1530,7 +1528,7 @@
     },
     "FR-55": {
       "title": "Worker & Source Security Contract",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/worker.ts",
         "src/lib/source.ts",
@@ -1543,7 +1541,9 @@
         "src/lib/worker.conflict.test.ts",
         "src/lib/worker.default.test.tsx",
         "src/lib/errors.test.ts",
-        "src/headless/usePdfDocument.worker-conflict.test.tsx"
+        "src/headless/usePdfDocument.worker-conflict.test.tsx",
+        "src/components/PdfPage.annotations.test.tsx",
+        "src/headless/usePdfDocument.network.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#nothing-came-from-a-cdn"
@@ -1554,13 +1554,11 @@
       ],
       "regressionGuard": [
         "src/lib/source.test.ts",
-        "src/lib/worker.conflict.test.ts"
+        "src/lib/worker.conflict.test.ts",
+        "src/components/PdfPage.annotations.test.tsx"
       ],
-      "gaps": [
-        "“embedded JavaScript execution remains disabled” is asserted nowhere: `enableScripting: false` is a literal in the annotation layer’s render params (src/components/PdfPage.tsx:760) and in the render call (:506 region), and while PdfPage.annotations.test.tsx records the params it is handed, no test reads `enableScripting` from them — the string appears in no test file, so removing it would pass",
-        "`allowedSources` is proven at the library boundary only: source.test.ts’s refusals never go through `usePdfDocument`’s option (src/headless/usePdfDocument.ts:310), so nothing asserts that a host’s allowlist reaches the engine call rather than being dropped between the prop and the policy"
-      ],
-      "note": "One worker configuration per realm is enforced and asserted (worker.conflict.test.ts:47, usePdfDocument.worker-conflict.test.tsx:61, released in the load’s teardown), the Trusted Types policy is guarded, and a refusal names only the origin — the test that refuses a pre-signed source asserts the token and the path are absent from the message. The two clauses that reopen this row are the one the row’s waiver claims as covered (“each asserted”) and the one that only holds if the option is wired, which is the kind of clause a deleted literal silently unwrites."
+      "gaps": [],
+      "note": "Worker configuration, the one-per-realm rule and the source policy were already asserted at the library boundary and in a browser (nothing reached a CDN). Both halves that were missing are now pinned. `enableScripting: false` is read off the annotation layer’s *render* params, not its constructor, and deleting it left the suite green until today; the test checks every render call the page makes, because a second path that forgets the flag is the same hole as the first having it removed. And a host’s `allowedSources` is followed from the prop to the engine decision — which is where an option gets dropped: an allowed origin reaches `getDocument` with its href intact, a refused one surfaces `SOURCE_NOT_ALLOWED` naming the origin (never the query string, where a signed URL keeps its credential) with `getDocument` never called. One stale detail in the gap text was corrected on the way: the literal exists at exactly one site, not two. Two counterfactuals, each failing the test that names it."
     },
     "FR-56": {
       "title": "Feature Lifecycle Contract",

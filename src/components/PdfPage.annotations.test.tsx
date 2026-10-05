@@ -185,6 +185,22 @@ describe('the page renders what the document already carries (FR-18)', () => {
     expect(only(captured.render, 'the layer render').renderForms).toBe(true);
   });
 
+  /*
+   * FR-55: "embedded JavaScript execution remains disabled". The flag is read by pdf.js off the *render*
+   * params, not the constructor, and until now the string appeared in no test file — so deleting it from
+   * the call would have left the suite green while a document carrying OpenAction JavaScript ran it in the
+   * page. Asserted on every call this page makes, because a second render path that forgot the flag is the
+   * same hole as the first one having it removed.
+   */
+  it('disables embedded JavaScript on every annotation-layer render it asks for', async () => {
+    mount();
+    await waitFor(() => expect(captured.render).toHaveLength(1));
+    expect(captured.render.length, 'the page asked for a layer').toBeGreaterThan(0);
+    for (const params of captured.render) {
+      expect(params.enableScripting, 'a viewer that runs a document’s scripts has made the reader’s file executable').toBe(false);
+    }
+  });
+
   it('leaves the annotation layer as the only mark surface on the page', async () => {
     // FR-18's two halves meet here: with the core pen withdrawn, a page must not mount a second overlay for
     // marks of its own. An SVG anywhere in the page box would be that overlay — the engine's own editors

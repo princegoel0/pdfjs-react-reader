@@ -290,6 +290,51 @@ describe('the document state model', () => {
     expect(viewer.latest().capabilities).toBeNull();
     expect(viewer.latest().numPages).toBe(0);
     expect(viewer.latest().isReady).toBe(false);
+    /*
+     *  is a member of the published union, and until this line nothing proved a component can reach
+     * it: the state appeared in the suite only inside  assertions, so deleting the branch that
+     * writes it left every test green — the shape FR-37 calls "a defect in the model rather than an unused
+     * branch". A supersede is its reachable path. An unmount runs the same teardown, and a state written to a
+     * component that is going away has no reader, which is the difference the next test holds.
+     */
+    /*
+     * Measured here rather than asserted: the supersede writes  and  in one commit, so the
+     * sequence a host can read never holds the word. That is the deliberate design the test above names (a
+     * reload leaves the host watching the new load, not a flash of an emptied viewer) — and it is why FR-37
+     * keeps its gap: the member is written by two paths, an unmount that has no reader left and a
+     * supersede that is coalesced away, so nothing a host can observe is ever . See the register
+     * row and ; the assertion that would pin it down needs a decision about the surface, not a test.
+     */
+    expect(
+      viewer.statuses(),
+      'destroyed is written and never rendered — if that ever changes, this line is the one to look at',
+    ).not.toContain('destroyed');
+    expect(viewer.statuses(), 'and it came down, it did not fail').not.toContain('error');
+    expect(viewer.statuses(), 'and nobody cancelled it').not.toContain('cancelled');
+  });
+
+  it('releases the engine task on unmount without telling anyone, which is why the state above needed the supersede', async () => {
+    const destroy = vi.fn(() => Promise.resolve());
+    const task: FakeTask = { promise: new Promise(() => undefined), destroy };
+    calls.mockImplementation(() => task);
+    const seen: string[] = [];
+    const view = render(
+      <Probe
+        options={{ src: URL_SRC }}
+        onValue={(value) => {
+          if (seen.at(-1) !== value.status) seen.push(value.status);
+        }}
+      />,
+    );
+    await waitFor(() => expect(calls).toHaveBeenCalled());
+
+    act(() => view.unmount());
+    await waitFor(() => expect(destroy).toHaveBeenCalled());
+    // The teardown ran, which is the observable half of an unmount. What it wrote —  — never
+    // reaches a host, and must not arrive as : that word is reserved for a reader who is still
+    // looking at a viewer and stopped something.
+    expect(seen, 'no error surfaced on the way out').not.toContain('error');
+    expect(seen, 'an unmount is not a cancellation the host asked for').not.toContain('cancelled');
   });
 });
 

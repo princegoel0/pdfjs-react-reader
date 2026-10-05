@@ -1,5 +1,5 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { abortError } from './abort';
+import { cancellationFrom } from './abort';
 
 export interface SearchOptions {
   caseSensitive?: boolean;
@@ -459,7 +459,7 @@ export async function extractAllText(
     // thread, and a host that cancels a thousand-page index should wait at most one page, not the file.
     // FR-54's cancellation codes name the operation that stopped, so a host that aborts the index and the
     // load at the same moment can tell the two rejections apart without a flag of its own.
-    if (signal?.aborted) throw abortError('Text indexing was aborted.', 'SEARCH_CANCELLED');
+    if (signal?.aborted) throw cancellationFrom(signal, 'SEARCH_CANCELLED', 'Text indexing was aborted.');
     out[i] = await extractPageText(doc, i);
     onProgress?.((i + 1) / numPages);
     if ((i + 1) % YIELD_PAGES === 0) await yieldToEventLoop();

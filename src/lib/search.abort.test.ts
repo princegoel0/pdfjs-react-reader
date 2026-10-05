@@ -77,3 +77,67 @@ describe('extractAllText with a signal', () => {
     expect(fractions.at(-1)).toBe(1);
   });
 });
+
+/*
+ * FR-04's last clause, at the one call site that had it backwards: "preserve the `AbortSignal` reason where
+ * the platform provides one". A host that aborts with a reason has said something — why it stopped — and a
+ * cancellation that arrives as our generic sentence has thrown that away on the way past the boundary. The
+ * name still has to be `AbortError`, because that is what every cancellation filter in the package and in
+ * hosts reads, and the code still has to say which operation stopped.
+ */
+describe('the reason a host aborted with survives (FR-04)', () => {
+  const refused = () => {
+    const controller = new AbortController();
+    controller.abort(new Error('reader navigated away'));
+    return controller.signal;
+  };
+
+  it('carries the host’s own message, its cause, and the code of the operation that stopped', async () => {
+    const getPage = vi.fn();
+    const doc = { numPages: 10, getPage } as unknown as PDFDocumentProxy;
+    const thrown = await extractAllText(doc, undefined, refused()).catch((error: unknown) => error);
+
+    expect(isPdfError(thrown)).toBe(true);
+    const error = thrown as { message: string; code: string; cause: unknown; name: string };
+    expect(error.message).toBe('reader navigated away');
+    expect(error.code).toBe('SEARCH_CANCELLED');
+    expect(error.cause).toBeInstanceOf(Error);
+    expect((error.cause as Error).message).toBe('reader navigated away');
+    expect(
+      error.name,
+      'a reason that survives must not arrive wearing a name no filter looks for',
+    ).toBe('AbortError');
+    expect(isAbortError(error)).toBe(true);
+    expect(getPage).not.toHaveBeenCalled();
+  });
+
+  it('takes a bare string reason too, and keeps the generic sentence for no reason at all', async () => {
+    const stringed = new AbortController();
+    stringed.abort('indexing is not needed any more');
+    const silent = new AbortController();
+    silent.abort();
+    const doc = { numPages: 2, getPage: vi.fn() } as unknown as PDFDocumentProxy;
+
+    const withReason = await extractAllText(doc, undefined, stringed.signal).catch((e: unknown) => e);
+    expect((withReason as Error).message).toBe('indexing is not needed any more');
+
+    const without = await extractAllText(doc, undefined, silent.signal).catch((e: unknown) => e);
+    expect(
+      (without as Error).message,
+      'a platform reason with nothing in it is not a message worth forwarding',
+    ).toBe('Text indexing was aborted.');
+    expect((without as { code: string }).code).toBe('SEARCH_CANCELLED');
+  });
+
+  it('does not mistake the platform’s own AbortError for a host’s reason', async () => {
+    // `abort()` with no argument yields a DOMException named AbortError; re-wrapping its message would
+    // put the platform's sentence where the operation's own sentence belongs.
+    const doc = { numPages: 2, getPage: vi.fn() } as unknown as PDFDocumentProxy;
+    const controller = new AbortController();
+    controller.abort(new DOMException('The operation was aborted.', 'AbortError'));
+
+    const thrown = await extractAllText(doc, undefined, controller.signal).catch((e: unknown) => e);
+    expect((thrown as Error).message).toBe('Text indexing was aborted.');
+    expect((thrown as { code: string }).code).toBe('SEARCH_CANCELLED');
+  });
+});
