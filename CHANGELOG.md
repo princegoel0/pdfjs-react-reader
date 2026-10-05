@@ -81,8 +81,10 @@ the sentence that moved it.
   `scrollTop` for reasons that were not the gesture, so the clause is read off the cancellation signal the
   browser emits, and a device would show both halves — #141/#156); no engine but Chromium; and no tool but the
   pen, because FR-47 names one exception and measuring the highlighter would have been a claim about a case
-  the clause does not make. The row's count also moved — fourteen automated browser checks now, which §8's
-  Chromium evidence cell and this file's `0.12` header now say. Corrected alongside: the `0.10` entry below
+  the clause does not make. The row's count also moved — and the gate added by #213 found that §8's Chromium
+  evidence cell had been one behind through both of the last two rows, reading "thirteen" with fourteen running
+  and "fourteen" with fifteen, so it now says fifteen and cannot silently drift again. Corrected alongside: the
+  `0.10` entry below
   states that `isPinchingDisabled` was passed while freehand was armed, and that option appears nowhere in
   `src/`; and `core-ink.withdrawal.test.ts` now says which relocation its `touch-action` string actually
   checks instead of borrowing this row's verdict for it.
@@ -595,6 +597,38 @@ call only the owner can make.
   assertions that catch those still fail at any size. The id and the section number are unchanged.
 
 ### Changed
+
+- **The counts `CODE_REFERENCE.md` states are now derived by a gate, not copied by hand (#213).** §2's table
+  carries the numbers a reader trusts about the shape of this package — how many entry points exist, how many
+  source files and lines, how many fixtures, how many CI jobs, how many names carry each maturity tag, how many
+  checks the browser matrix runs. Every one of them has been wrong at least once, and #203 established that the
+  cause is the method rather than the editor: re-running the commands behind §2 then found *all* of its
+  hand-copied figures behind the artifacts (234/187/32/9 against the inventory's 239/197/36/13, "144 strings"
+  against the 136 the catalog test asserts, §5's "all 35 props" against an interface of 44). A courtesy line
+  saying "run it yourself" cannot fix that, because nobody runs it on anyone's behalf. `npm run check:docs`
+  derives each figure from the checkout — `package.json` exports, `api-maturity.json`, `src/**` with test files
+  excluded (`wc -l` semantics), `src/styles/*.css`, `playground/fixtures` against `git ls-files`, the job keys
+  in `ci.yml`, and the length of the array `browser-matrix.mjs` iterates — and compares it against the sentence
+  that states it. Two failure modes matter and both are implemented: a number that disagrees, and **a pattern
+  that stops matching**, because a sentence reworded out of the gate's reach is the same class of failure as a
+  guard that asserts less than its clause. The fixture rule additionally refuses when on-disk and tracked
+  counts differ, which is the trap that has fired four times. Wired into `verify` between `check:maturity` and
+  `check:fr-evidence`, and into CI's Verify job as its own step, so it runs where a build has already happened
+  and needs no build itself.
+
+  What it refuses to check, deliberately: the test *total* (`npm run test` prints it, and re-running 1,101 tests
+  inside a documentation gate would double `verify` to confirm a number the suite already states), every size
+  figure (`check-size` owns those), the PRD's code blocks (`check:examples` compiles them), and any dated
+  measurement — a CI tally or a benchmark median records one run, not a property of the tree.
+
+  Measured with `node scripts/check-docs.mjs --selftest`, which derives its cases from the live document and
+  alters one captured figure at a time at its own byte offset: **21 of 21 perturbations caught**, including the
+  word-number in §8 and the reworded-row case. The first version pinned its needles to literals, and three of
+  them went stale the same day the documents were corrected — a stale needle reads like a test that ran, so the
+  cases are now generated from the text the gate is checking. It found four real drifts on its first run:
+  source files 80 → **83** and 17,169 → **17,707** lines (the touch-fallback module and its engine stand-ins),
+  the largest stylesheet 1,372 → **1,308** lines, and §8's browser-check count, which had been one behind
+  through the last two corrections and now reads **fifteen**.
 
 - **The size gate reports growth and blocks at 200 %, not at 2 % + slack (#208).** `scripts/check-size.mjs`
   gained a third state: `ok`, `GREW`, `FAIL`. `GREW` is the old failure — past `accepted × 1.02 + 256 B` for a

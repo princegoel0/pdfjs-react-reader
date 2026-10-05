@@ -64,6 +64,12 @@ jobs:
       - name: Published API maturity tags
         run: npm run check:maturity
 
+      # §22 of CODE_REFERENCE: the counts that document states about this tree — entry points, source files,
+      # fixtures, CI jobs, browser checks — are derived here rather than copied by hand, because every one of
+      # them has been wrong at least once and a stale figure reads exactly like a live one. Needs no build.
+      - name: Documented counts
+        run: npm run check:docs
+
       # FR-52/FR-58: the requirement register is the status of record, and its own gate is only worth
       # anything if a runner executes it. Reads PRD.md, the register and ROADMAP.md; needs no build.
       - name: Requirement evidence register

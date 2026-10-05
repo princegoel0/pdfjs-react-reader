@@ -229,9 +229,10 @@
     "check:packaging": "node scripts/check-packaging.mjs",
     "check:examples": "node scripts/check-examples.mjs",
     "check:maturity": "node scripts/check-maturity.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
     "check:fr-evidence": "node scripts/check-fr-evidence.mjs",
     "check:tarball": "node scripts/tarball-check.mjs",
-    "verify": "npm run typecheck && npm run test && npm run build && npm run size && npm run check:packaging && npm run check:examples && npm run check:maturity && npm run check:fr-evidence",
+    "verify": "npm run typecheck && npm run test && npm run build && npm run size && npm run check:packaging && npm run check:examples && npm run check:maturity && npm run check:docs && npm run check:fr-evidence",
     "prepublishOnly": "npm run verify"
   },
   "engines": {
