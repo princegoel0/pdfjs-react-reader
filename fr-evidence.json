@@ -954,7 +954,7 @@
     },
     "FR-36": {
       "title": "Cancellation Tokens",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/abort.ts",
         "src/headless/usePdfDocument.ts",
@@ -963,6 +963,8 @@
         "src/headless/usePdfSearch.ts",
         "src/headless/usePdfPrint.ts",
         "src/headless/usePdfDownload.ts",
+        "src/headless/usePdfAttachments.ts",
+        "src/lib/attachments.ts",
         "src/lib/pdf-write.ts",
         "src/lib/pdf-merge.ts",
         "src/edit.tsx"
@@ -975,24 +977,25 @@
         "src/lib/pdf-merge.test.ts",
         "src/headless/usePdfDownload.test.tsx",
         "src/components/PdfPage.abort.test.tsx",
+        "src/components/PdfThumbnail.abort.test.tsx",
+        "src/headless/abort.host-signal.test.tsx",
         "src/edit.abort.test.tsx"
       ],
       "acceptance": [],
-      "acceptanceWaiver": "Cancellation is a lifecycle fact, not a painted one: what the clause asks is observable as engine calls that did not happen and bytes that never arrive, both of which jsdom counts exactly and a browser cannot distinguish from a slow frame. The React 18 and 19 halves are the same suite run twice, which is what the react-18 CI job does; the browser matrix runs the viewer on three engines but has no abort to issue.",
+      "acceptanceWaiver": "Cancellation is a lifecycle fact, not a painted one: what the clause asks is observable as engine calls that did not happen, buffers that were released and bytes that never arrive — all of which jsdom counts exactly, and a browser cannot distinguish from a slow frame. The React 18 and 19 halves are the same suite run twice, which is what the react-18 CI job does; the browser matrix runs the viewer on three engines but has no abort to issue.",
       "documentation": [
         "docs/src/pages/Headless.tsx",
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
         "src/components/PdfPage.abort.test.tsx",
+        "src/components/PdfThumbnail.abort.test.tsx",
+        "src/headless/abort.host-signal.test.tsx",
         "src/edit.abort.test.tsx",
         "src/lib/search.abort.test.ts"
       ],
-      "gaps": [
-        "two of the operations the clause lists have no cancellation assertion: src/components/PdfThumbnail.tsx:126,181 wire two aborts and PdfThumbnail.test.tsx never mentions a `signal`, and `usePdfPrint`’s host signal (src/headless/usePdfPrint.ts:122-128) is exercised only by the ceilings test, which cancels nothing",
-        "the attachments path takes a signal (usePdfAttachments.ts:21,62; src/lib/attachments.ts:82) that no test aborts"
-      ],
-      "note": "The page, load, search, download, page-label, merge and edit paths are each asserted by a test that aborts and counts what did not happen — the three closures this row gained (the page path checking before starting, download checking before paying for the bytes, the edit tier passing a signal at all) are guarded and stay guarded. What reopens the row is that “every asynchronous operation” is a list, and the thumbnail is the one a reader watches disappear on scroll-out. A writer loop that stops before its next page and a thumbnail that never starts are different promises; only the first is tested."
+      "gaps": [],
+      "note": "The clause is a list of operations — load, page proxy, render, extraction, indexing, thumbnail, print render, download, every writer pass — and it reads as one promise, which is how a single sentence can hold nine operations and still leave three of them unasserted. Each entry now has a test that aborts it and counts what did not happen. Writing the assertions for the last three found three half-gaps in the code, and the code moved rather than the sentence: `usePdfPrint` never checked a token that had already fired before the job began, and read `signal` from the render that built the callback rather than the one the host holds when it calls; the attachment walk published whatever it had reached *as a complete list* when an abort landed mid-walk, and read the catalog at all for a token born aborted; and a card mounted into an already-cancelled sidebar fetched its page anyway. All three were fixed before their cases were kept, and seven mutations — each one line of that guard — now fail exactly the case that names them. The clause's own comparison is asserted too: an aborted card ends in the same state as a scrolled-out one, says nothing through `onError`, and cancels the running render rather than releasing only the buffer. Two things stay honestly narrower than the sentence sounds: a writer loop stops *before its next page* and cannot un-make a page already rearranged inside the peer (asserted as such, with the output always suppressed), and an in-flight `getPage` is not interruptible, so the walk stops at the next check it owns."
     },
     "FR-37": {
       "title": "Published State Models",
@@ -1459,10 +1462,12 @@
       "state": "partial",
       "implementation": [
         "package.json",
-        "scripts/tarball-check.mjs"
+        "scripts/tarball-check.mjs",
+        "scripts/check-packaging.mjs"
       ],
       "automated": [
-        "scripts/tarball-check.mjs"
+        "scripts/tarball-check.mjs",
+        "src/lib/dependency-boundary.test.ts"
       ],
       "acceptance": [
         ".github/workflows/ci.yml"
@@ -1472,14 +1477,13 @@
         "docs/src/pages/Compatibility.tsx"
       ],
       "regressionGuard": [
-        "scripts/tarball-check.mjs"
+        "scripts/tarball-check.mjs",
+        "src/lib/dependency-boundary.test.ts"
       ],
       "gaps": [
-        "nothing forbids the root or /headless entry from importing the writer in future — it holds today by arrangement, not by assertion",
-        "no check enforces the no-undeclared-runtime-dependency rule",
-        "the peer ranges themselves are asserted only as far as an install resolves them: nothing fails if a future import reaches a package that is in neither `dependencies` nor `peerDependencies` — the rule holds today because the imports are counted by hand in CODE_REFERENCE §3"
+        "one range is still a promise rather than a measurement: the consumer job runs the packed tarball against both ends of the `pdfjs-dist` contract (the `6.2.108` floor and a pinned current 6.x) and the React job both majors at their minimum patch, but `@cantoo/pdf-lib` is installed exactly once, from the lockfile, so the writer peer's `^2.11.1` is asserted as far as semver resolves it and no further"
       ],
-      "note": "Peer ranges, the optional writer peer and a consumer that installs the packed artifact all exist and are tested, and the Node floor is now one of them: `npm run check:packaging` reads it out of PRD.md §8, requires `engines.node` to equal it, requires the installed engine to declare at least it, and fails on any CI node pin below it, which closes the gap this row carried since 0.12 opened (3 gaps left). The two promises that prevent future drift — the writer never entering the core, and no undeclared runtime dependency — are still arrangement rather than assertion."
+      "note": "Two of the three gaps this row carried are closed by one file. `src/lib/dependency-boundary.test.ts` walks the module graph the way a bundler does — value imports, re-exports and dynamic imports are edges, `import type` is not, comments are stripped first — and asserts the boundary in four directions: the sources that hold `@cantoo/pdf-lib` are found by scanning `src/` rather than listed, so the ban cannot be satisfied by moving the import into a new file; the root and `/headless` entries reach none of them; `/edit` and `/merge` reach at least one, which is what stops the previous pair passing on a walk that resolved nothing; and of the thirteen advertised JS entries, exactly those two compile the peer in. The last case covers the row's remaining sentence — every bare specifier a shipped module imports is declared in the manifest, with *shipped* derived as \"reachable from an advertised door\", which is what keeps the dev-only axe harness out of the set without an allow-list. Three counterfactuals are red: the barrel re-exporting the writer, the peer promoted into `dependencies`, and the walk losing its separator normalisation. The last is how the first version of this guard passed vacuously on Windows — `relative()` answers with backslashes, so every resolved edge was a different string than the ones the ban was written against, and only the case asserting the *opposite* noticed. What stays open is the range itself: an install that resolves is not a version that works, and only the floor is pinned in a gate."
     },
     "FR-54": {
       "title": "Stable Error & Cancellation Contract",
@@ -1504,11 +1508,15 @@
       ],
       "automated": [
         "src/lib/errors.test.ts",
+        "src/lib/errors.engine-classes.test.ts",
+        "src/lib/error-codes.coverage.test.ts",
         "src/lib/source.test.ts",
         "src/lib/pdf-write.test.ts",
+        "src/lib/pdf-write.codes.test.ts",
         "src/lib/pdf-merge.test.ts",
         "src/lib/search.abort.test.ts",
         "src/headless/usePdfDocument.status.test.tsx",
+        "src/headless/usePdfDocument.codes.test.tsx",
         "src/headless/usePdfPrint.ceilings.test.tsx",
         "src/components/PdfPage.retry.test.tsx",
         "src/components/ViewerController.retry.test.tsx"
@@ -1521,15 +1529,17 @@
       ],
       "regressionGuard": [
         "src/lib/errors.test.ts",
+        "src/lib/errors.engine-classes.test.ts",
+        "src/lib/error-codes.coverage.test.ts",
+        "src/lib/pdf-write.codes.test.ts",
+        "src/headless/usePdfDocument.codes.test.tsx",
         "src/headless/usePdfDocument.status.test.tsx",
         "src/components/PdfPage.retry.test.tsx"
       ],
       "gaps": [
-        "five of the eighteen published codes are not proven on a path a consumer can reach: `PASSWORD_REQUIRED` (produced at usePdfDocument.ts:473) and `WORKER_ERROR` (:466) are asserted only as `toPdfError` mappings, `WRITER_ERROR` has three production sites (pdf-write.ts:359,367,375) and no assertion at any of them",
-        "`RENDER_CANCELLED` and `UNSUPPORTED_FEATURE` exist only in the name table (errors.ts:132,135): every site that catches a `RenderingCancelledException` returns before reaching `toPdfError` (PdfPage.tsx:937, usePdfPrint.ts), so a published code no consumer can observe is a vocabulary promise with no speaker",
-        "the mappings themselves are asserted against a stand-in: errors.test.ts:41’s `engineError()` is a plain `Error` with `name` assigned, which is the right key for the map but is not the engine’s class, so no test proves a real engine throw routes through it"
+        "two published codes have no producer anywhere in the package: `RENDER_CANCELLED` is the name `toPdfError` gives a real `RenderingCancelledException`, and every call site that catches one returns before reaching the wrapper (FR-36 says a cancellation is not an ordinary failure), while `UNSUPPORTED_FEATURE` has no throw site at all — the engine's `NotImplementedException` is not exported by the build this package imports, and no path of ours can raise it. §3.6 advertises both as codes a host can branch on, and the mapping for each is now proven against the engine's own class, so what is missing is a speaker rather than a test"
       ],
-      "note": "The four codes the clause names explicitly are all asserted on real paths — `SOURCE_NOT_ALLOWED` (source.test.ts:175), `ALREADY_SIGNED` (pdf-write.test.ts:329), `RESOURCE_LIMIT` (PdfPage.refusal.test.tsx:101, usePdfPrint.ceilings.test.tsx:54) and cancellation (`LOAD_CANCELLED`/`SEARCH_CANCELLED` on abort tests) — and “abort is not an ordinary failure” plus the retry/requeue transitions are guarded. The row is about the universal: `all consumer-visible failures`, which for a code list means every code someone can receive. Five of eighteen are unproven and two are unreachable, and a stable code nobody can produce is a code waiting to be redefined."
+      "note": "The clause is about the whole vocabulary, so the read was run over the whole list: eighteen codes, and for each one the file that produces it and the tests that name it. The list splits three ways — twelve codes are thrown by a named site in the package, four more (`AUTH_ERROR`, `HTTP_ERROR`, `NETWORK_ERROR`, `PASSWORD_INVALID`) are the classifier's answer to a field on the engine's own object, and two have no producer at all, which is the single gap left here and says exactly which two and why. What this pass closed: `PASSWORD_REQUIRED` and `WORKER_ERROR` are now asserted at the load path that diagnoses them (`usePdfDocument.codes.test.tsx`, four cases — the third of them exists because a counterfactual found the worker diagnosis's *message* half unasserted, so every failed load on an undetected worker would have told the host to pin a worker it had already pinned); `WRITER_ERROR` at the one producer a caller can reach, with its three internal sites shown to be unreachable-by-construction by pinning the caller-facing edge instead — every arrangement a host can send is a `CONFIGURATION_ERROR` carrying the numbers a host would need; and the whole name table re-asserted against the engine's *real* exception classes rather than a plain `Error` with `name` assigned, which is where `PasswordException#code`, `ResponseException#status` and `#missing` either are or are not what the map reads. Ten mutations, all red. Two of them bought a case rather than passing: dropping the writer wrapper's own idempotence guard changed nothing until an `UNKNOWN_ERROR` arrived — the one code the outer `toPdfError` would let fall through to the writer's own — and dropping the worker message test changed nothing at all, so both are asserted now. `src/lib/error-codes.coverage.test.ts` then makes the list itself a gate: a nineteenth code with no test naming it fails the suite, so the row cannot go stale by growing. The two codes with no speaker are a §3.6 question rather than a test question — either each gets a producer or the published list drops it — and an amendment has been put to the owner instead of a fiction coded in the meantime."
     },
     "FR-55": {
       "title": "Worker & Source Security Contract",

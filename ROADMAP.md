@@ -83,7 +83,7 @@ certified on this machine at all.
 | `FR-33` | XFA Display, Save Refused | **met** | 5/5 | 0 | — |
 | `FR-34` | Network Contract | **met** | 4/5 | 0 | — |
 | `FR-35` | Bounded Retries | **met** | 4/5 | 0 | — |
-| `FR-36` | Cancellation Tokens | **partial** | 4/5 | 2 | two of the operations the clause lists have no cancellation assertion: src/components/PdfThumbna… |
+| `FR-36` | Cancellation Tokens | **met** | 4/5 | 0 | — |
 | `FR-37` | Published State Models | **partial** | 4/5 | 1 | the union’s `destroyed` member has no observable path. It is written by two: an unmount, whose s… |
 | `FR-38` | Source Utilities | **met** | 4/5 | 0 | — |
 | `FR-39` | Incremental, Viewport-Prioritised Indexing | **met** | 4/5 | 0 | — |
@@ -100,8 +100,8 @@ certified on this machine at all.
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
 | `FR-52` | Public API & Export Contract | **partial** | 5/5 | 1 | the /edit, /merge, /features/*, per-feature CSS and /locales/* entries this row classifies as pu… |
-| `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 3 | nothing forbids the root or /headless entry from importing the writer in future — it holds today… |
-| `FR-54` | Stable Error & Cancellation Contract | **partial** | 4/5 | 3 | five of the eighteen published codes are not proven on a path a consumer can reach: `PASSWORD_RE… |
+| `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 1 | one range is still a promise rather than a measurement: the consumer job runs the packed tarball… |
+| `FR-54` | Stable Error & Cancellation Contract | **partial** | 4/5 | 1 | two published codes have no producer anywhere in the package: `RENDER_CANCELLED` is the name `to… |
 | `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |
 | `FR-57` | Runtime Resource Budget Contract | **met** | 5/5 | 0 | — |

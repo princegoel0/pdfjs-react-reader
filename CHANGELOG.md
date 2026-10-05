@@ -24,10 +24,10 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **42 met, 15 partial, 1
-absent** of 58, on a suite of **1,211 tests in 131 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **43 met, 14 partial, 1
+absent** of 58, on a suite of **1,244 tests in 138 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. Fifteen of those eighteen are back out:
+below and is the honest number rather than the comfortable one. Sixteen of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
@@ -35,16 +35,72 @@ through **#232**, which moved a second behaviour; and `FR-04` and `FR-55` throug
 turned out not to be a missing test at all; `FR-29` through **#234**, whose two remaining clauses could only
 be measured in a browser; `FR-43`/`FR-44`'s painted halves through **#235**, which found that one of the
 channels it was sent to measure did not exist; `FR-33` through **#236**, whose last gap was a branch with
-a fix, a comment and no assertion; and `FR-05`, `FR-08`, `FR-10`, `FR-26` and `FR-28` through **#237**, where
-one of the five refused to be a missing test either. `FR-24` came back to one gap from two, and stayed short:
-what it cannot yet show is a pixel. §8's Chromium row still counts eighteen checks: neither #236 nor #237
-added a row. That is the
+a fix, a comment and no assertion; `FR-05`, `FR-08`, `FR-10`, `FR-26` and `FR-28` through **#237**, where
+one of the five refused to be a missing test either; and `FR-36` through **#238**, whose two gaps were three
+operations with no abort assertion and turned out to be three half-gaps in the code as well. `FR-24` came back
+to one gap from two, and stayed short: what it cannot yet show is a pixel. `FR-53` and `FR-54` each went from
+three gaps to one, and the sentence each now lacks is a different kind of thing — a measurement nobody has run
+(the writer peer at both ends of its range) and a speaker nobody has (two codes no consumer can receive). §8's
+Chromium row still counts eighteen checks: neither #236, #237 nor #238 added a row. That is the
 direction the count takes from here: down where a guard turns out to be decoration, up where a test is shown
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
-### Added
+- **The three contract rows, asserted rather than arranged — and the vacuous pass that found (#238,
+  2026-10-06).** `FR-36` moves from partial to met; `FR-53` and `FR-54` each lose two of their three gaps.
+  43 met, 14 partial, 1 absent, on 1,244 tests in 138 files, 33 of them new.
+
+  **`FR-53` — the optional peer's door is now a test, not an understanding.**
+  `src/lib/dependency-boundary.test.ts` (5 cases) walks the module graph the way a bundler does: value imports,
+  re-exports and dynamic `import()` are edges, `import type` is not, comments are stripped before anything is
+  scanned. The sources that hold `@cantoo/pdf-lib` are *found* by scanning `src/` rather than listed, so the ban
+  survives someone moving the import into a new file; `/edit` and `/merge` must each reach one, which is what
+  stops the ban passing on a walk that resolved nothing; of the thirteen advertised JS entries exactly those two
+  compile the peer in; and every bare specifier a shipped module imports is declared in the manifest, with
+  *shipped* derived as "reachable from an advertised door" — which is how the dev-only axe harness leaves the set
+  without a name on an allow-list, and how this pass learned that `axe-core` is the one import nothing may turn
+  into a runtime requirement. Three counterfactuals: the barrel re-exporting `arrangePages`/`flattenBytes`/
+  `signFields`, the peer promoted into `dependencies`, and the resolver losing its separator normalisation. The
+  last is the finding. The first version of the walk returned `path.relative()`'s own separators, so on Windows
+  every edge came back as `src\lib\pdf-write.ts`, matched nothing, and **the ban passed vacuously** — green on
+  the exact thing it existed to forbid. Only the case asserting the *opposite* noticed, which is the argument for
+  writing both halves.
+
+  **`FR-54` — the code set read as a list rather than as a sentence.** The clause is "all consumer-visible
+  failures", so the read went over all eighteen codes: which file produces each, which tests name it. Twelve are
+  thrown at a named site, four are the classifier's answer to a field on the engine's own object, and two have no
+  producer at all. What moved: `src/headless/usePdfDocument.codes.test.tsx` (4) asserts `WORKER_ERROR` and
+  `PASSWORD_REQUIRED` at the load path that diagnoses them — including a case a counterfactual asked for, because
+  the *message* half of the worker condition was unasserted and dropping it left every failed load on an
+  undetected worker telling the host to pin a worker it had already pinned; `src/lib/pdf-write.codes.test.ts` (6)
+  puts `WRITER_ERROR` on the one producer a caller can reach and pins the caller-facing edge instead of the three
+  internal sites, which are unreachable by construction — every arrangement a host can send is a
+  `CONFIGURATION_ERROR` carrying the numbers; `src/lib/errors.engine-classes.test.ts` (5) builds the engine's
+  *real* exception classes from the legacy build rather than a plain `Error` with `name` assigned, which is where
+  `PasswordException#code`, `ResponseException#status` and `#missing` either are or are not what the map reads;
+  and `src/lib/error-codes.coverage.test.ts` (2) makes §3.6's list itself a gate — a nineteenth code with no test
+  naming it fails the suite, and a counterfactual that adds exactly one proves it. Ten mutations, all red, after
+  two of them first came back green and bought a case: the writer wrapper's own idempotence guard is invisible on
+  every input except an `UNKNOWN_ERROR`, which is the one the outer `toPdfError` would let fall through.
+
+  **`FR-36` — "every asynchronous operation" is a list, and three of its members had no abort test.**
+  `src/headless/abort.host-signal.test.tsx` (7) and `src/components/PdfThumbnail.abort.test.tsx` (4) close the
+  print, attachment and thumbnail paths, and writing them found the behaviour short in three places, so the code
+  moved before the register did: `usePdfPrint` never checked a token that had already fired and read `signal`
+  from the render that built the callback rather than the one the host holds when it calls; the attachment walk
+  published whatever it had reached *as a complete list* when an abort landed mid-walk and read the catalog at all
+  for a token born aborted; and a card mounted into an already-cancelled sidebar fetched its page anyway. Seven
+  mutations, all red. Two things the guard says narrowly on purpose: a writer loop stops before *its next page*
+  and cannot un-make a page already rearranged inside the peer, and an in-flight `getPage` is not interruptible,
+  so the walk stops at the next check it owns.
+
+  **A gap text this pass falsified.** `FR-54`'s register row claimed `SEARCH_CANCELLED` and `INVALID_SOURCE` were
+  asserted only through a stand-in. They are not: `search.abort.test.ts` aborts a real index walk and
+  `source.test.ts` drives `normalizeSource` to its refusal. That gap is gone rather than reworded, which leaves
+  one — the two codes with no speaker — and it is a §3.6 question, not a test question: either each gets a
+  producer or the published list drops it. An amendment proposal is with the owner (#242), and nothing codes the
+  fiction in the meantime.
 
 - **The shell's six unasserted clauses, and one of them turned out to be a half-implemented prop (#237,
   2026-10-06).** `FR-05`, `FR-08`, `FR-10`, `FR-26` and `FR-28` move from partial to met; `FR-24` comes back to

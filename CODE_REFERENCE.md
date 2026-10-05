@@ -60,8 +60,8 @@ React DOM, `pdfjs-dist`, and one optional writer.
 | Names on `/headless` | **197** | the same, over `dist/headless.d.ts` |
 | Names on `/edit` | **36**, on `/merge` **13** | `dist/edit.d.ts`, `dist/merge.d.ts` |
 | Distinct public names, by maturity | **320** — 263 stable, 57 experimental, 0 deprecated, plus **15** in the `removed` ledger (FR-18). The split is measured, not asserted: `npm run check:maturity` prints it, and whether 57 experimental names is the right number to carry into `1.0.0` is the owner's open decision **#207** | `api-maturity.json`, audited by `npm run check:maturity` |
-| Source files (non-test) | **83**, 17,761 lines | `src/**`, counted by `node scripts/check-docs.mjs` (`wc -l` semantics, test files excluded). 80 / 17,169 was the figure when §2 was last re-run by hand; the touch-fallback module, its engine stand-ins, this script, the handle member and walk guard of #231 and the form hook’s refusal to claim a change it did not make have moved it since |
-| Test files / tests | **131 files / 1,211 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
+| Source files (non-test) | **83**, 17,789 lines | `src/**`, counted by `node scripts/check-docs.mjs` (`wc -l` semantics, test files excluded). 80 / 17,169 was the figure when §2 was last re-run by hand; the touch-fallback module, its engine stand-ins, this script, the handle member and walk guard of #231, the form hook’s refusal to claim a change it did not make and #238’s three cancellation guards (an already-aborted token performs no work on the print, attachment and thumbnail paths) have moved it since |
+| Test files / tests | **138 files / 1,244 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
 | Stylesheets | 9, from 24 to 1,308 lines | `src/styles/`, same command (`structure.css` is the small one, `viewer.css` the large) |
 | Fixtures | 22 PDFs, produced by 18 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded; `vector-sample.pdf` is the only one whose cost is operators — four A1 sheets, 336 clipped cells each, 12,922 engine-reported operators a page and 0.51 MB on disk; `oversize-sample.pdf` is the only one with a page no renderer may paint — 612×792, 12,000×9,000 and 200,000×600 pt, which is the edge-case suite's sixth shape and the 0.25-minimum refusal in 1,023 bytes | `playground/fixtures/`, `scripts/make-*.mjs` |
 | Benchmark | `npm run bench` measures §6's four profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). All four have committed fixtures: C is `vector-sample.pdf` with the engine's own time taken separately through `playground/raw.html`, and D is `scan-sample.pdf` on the committed low-memory harness — 412×915 at dpr 3 with an Android user agent and 6× CDP CPU throttling, zoomed through the toolbar's overflow menu. The report is **`benchmarks/latest.json`, tracked**: §6's environment fields, each fixture's sha256, and p50/p95/max per sampled number with p99 only where there are 100+ samples. `src/lib/benchmark-record.test.ts` is what keeps that file an evidence rather than an artifact of the last run | `scripts/benchmark.mjs`, `benchmarks/latest.json`, `ROADMAP.md` §1 `FR-49` |
@@ -905,7 +905,7 @@ focus **twice** — palette on, then off — so the ring seen is the sheet's re-
 
 ---
 
-## 17. Tests: 131 files, 1,211 tests, three projects
+## 17. Tests: 138 files, 1,244 tests, three projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
 from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library) except the audits, which are
@@ -1025,6 +1025,25 @@ cannot appear here.
   `enableKeyboardNavigation`, `enableFullscreen` and `enableDrop` refused against the composed shell, and the
   refusal read off the chrome rather than only off the behaviour: an unclaimed `defaultPrevented`, an absent
   fullscreen control (counted on `.pjsr-toolbar` and not on `.pjsr-toolbar-sizer`), no `pjsr-viewer--dragover`
+* The three contract rows (#238), seven files: **`lib/dependency-boundary` (5)** — FR-53's optional peer as a walk
+  over the module graph: the holders of `@cantoo/pdf-lib` discovered by scanning `src/` rather than listed, the
+  root and `/headless` reaching none, `/edit` and `/merge` each reaching one (the case that makes the ban's own
+  pass meaningful, and the one that caught a Windows path-separator bug making it vacuous), the advertised entries
+  that compile the peer in being exactly those two of thirteen, and every bare specifier a *shipped* module —
+  derived as reachable from an advertised door — importing from the manifest; **`lib/error-codes.coverage` (2)** —
+  §3.6's published list as a gate, so a code added without a test naming it fails, and the naming spread over
+  more than one suite; **`lib/errors.engine-classes` (5)** — the mapping table applied to the engine's *real*
+  classes from `pdfjs-dist/legacy/build/pdf.mjs`, where `PasswordException#code`, `ResponseException#status` and
+  `#missing` either are or are not what the map reads; **`lib/pdf-write.codes` (6)** — `WRITER_ERROR` at the one
+  producer a caller reaches, the classifier's own verdict surviving the wrapper, an already-coded `PdfError`
+  passing through (including the `UNKNOWN_ERROR` that is the only input distinguishing the two idempotence
+  guards), and every caller-side arrangement refused as a `CONFIGURATION_ERROR` carrying its numbers;
+  **`headless/usePdfDocument.codes` (4)** — `WORKER_ERROR` at the site that diagnoses it, the pinned-worker
+  control, the not-about-a-worker control a counterfactual asked for, and `PASSWORD_REQUIRED` on a dismissed
+  prompt; **`headless/abort.host-signal` (7)** — the print render stopped mid-paint, an already-aborted token
+  performing no work, the host signal and `cancel()` reaching the same engine call, and the attachment walk
+  publishing a partial list as nothing; **`components/PdfThumbnail.abort` (4)** — the card cancelling its running
+  render, releasing the buffer, doing nothing for a token born aborted, and ending where a scroll-out ends
 * Search's three new files, and the merge tier: **`usePdfSearch.incremental` (7)** — the outward order, the
   first page publishing before the batching window, the active match surviving a publish *by identity*, a
   stopped caller landing on `idle` with no error, and `invalidatePages` re-scanning one page and no other;

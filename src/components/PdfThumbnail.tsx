@@ -83,6 +83,10 @@ export function PdfThumbnail({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!visible || !canvas) return;
+    // FR-36: a token that is already aborted performs no work. The subscription below is what turns an abort
+    // into this effect's own teardown, but it is registered after the fetch starts, so on a card built into a
+    // sidebar the host already cancelled the first page fetch would still have been asked for.
+    if (signalRef.current?.aborted) return;
     let cancelled = false;
     let task: RenderTask | null = null;
 
@@ -138,6 +142,9 @@ export function PdfThumbnail({
   useEffect(() => {
     const host = xfaRef.current;
     if (!host || !xfa) return;
+    // The same rule as the canvas effect: the second half of this component's abort is not started either when
+    // the host has already stopped caring. The tree it would compose is DOM the card no longer shows.
+    if (signalRef.current?.aborted) return;
     let cancelled = false;
 
     (async () => {

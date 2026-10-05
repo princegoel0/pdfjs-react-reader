@@ -61,11 +61,24 @@ export function usePdfAttachments(options: UsePdfAttachmentsOptions): UsePdfAtta
     const stop = () => controller.abort();
     if (options.signal?.aborted === true) stop();
     else options.signal?.addEventListener('abort', stop, { once: true });
+    if (controller.signal.aborted) {
+      // FR-36: *an already-aborted signal performs no work.* Listing starts with one round trip to the
+      // catalog, so the check has to come before the read rather than inside the per-page loop.
+      setLoading(false);
+      return;
+    }
 
     (async () => {
       const named = normalizeAttachments(await doc.getAttachments());
       const carried = await collectAnnotationAttachments(doc, controller.signal);
       if (cancelled) return;
+      if (controller.signal.aborted) {
+        // The host stopped caring mid-walk. That is the same event as an unmount, and it has to end the same
+        // way: the partial list is not published as though it were the document's, nothing is reported as an
+        // error, and the panel stops spinning rather than waiting for a walk that will not finish.
+        setLoading(false);
+        return;
+      }
       setFiles(mergeAttachments(named, carried));
       setLoading(false);
     })()

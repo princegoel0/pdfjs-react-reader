@@ -107,6 +107,10 @@ export function usePdfPrint({
   const taskRef = useRef<RenderTask | null>(null);
   const busyRef = useRef(false);
   const cancelledRef = useRef(false);
+  // Read through a ref because `print` is deliberately stable: the token is whatever the host holds at the
+  // moment the call is made, not the one that happened to exist on the render that created the callback.
+  const signalRef = useRef(signal);
+  signalRef.current = signal;
 
   const supported = useMemo(isPrintSupported, []);
 
@@ -131,6 +135,10 @@ export function usePdfPrint({
     async (options: PrintOptions = {}) => {
       const current = docRef.current;
       if (!current || busyRef.current || !isPrintSupported()) return;
+      // FR-36's rule for every operation the package starts: a token that is already aborted performs no
+      // work. Without this the wiring below — which cancels a print that is running — reads as the whole
+      // contract, and a host that stopped caring before asking gets a full render loop anyway.
+      if (signalRef.current?.aborted) return;
 
       busyRef.current = true;
       cancelledRef.current = false;
