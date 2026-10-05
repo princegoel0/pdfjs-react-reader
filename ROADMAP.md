@@ -2489,6 +2489,24 @@ built**: its whole theme is CI jobs, and nothing is pushed until `1.0.0`, so the
 browser and engine matrices is the release push itself. That is a known hole in the plan and it is recorded
 here rather than discovered later.
 
+**One breaking change is already decided, and deliberately not taken yet (#227, owner's call 2026-10-05).**
+`DEFAULT_LABELS` — `src/lib/labels.ts:211`, re-exported from the root entry at `src/index.ts:206` — stops being
+published from `pdfjs-react-reader` and moves to its own subpath, `pdfjs-react-reader/labels`. **Why:** #223
+measured the cost of the current shape at **844–869 B gz** of tier-owned English default strings carried by a
+consumer who imports nothing but `PdfViewer`, and proved that the only way to release them is for the root barrel
+to stop re-exporting the const — esbuild keeps a spread-assembled exported const, Rollup drops it, and
+`npm run size` takes the larger, so the bytes stay while the root entry names it. **Why a subpath rather than
+"no assembled catalog published at all":** the byte release is identical, and a host that overrides a handful of
+strings still has a documented object to spread from instead of hand-writing the shape it already had. **Why not
+now:** it is the withdrawal of a `stable` published name, so §5.5 puts it in a major, and `1.0.0` is the only
+publication this plan has — landing it mid-milestone would break `check:packaging`'s published-name contract for
+a version nobody installs. **What it will need when it lands:** the branch is `spike/labels-tier-owns-words` at
+`5bafbe8`, based on `39e3765` and therefore **six commits behind `dev` as of 2026-10-05** (25 files, +452/−169),
+so it is rebased and **re-measured before it is taken — the byte figure is the spike's, not a promise about
+today's tree**; `DEFAULT_LABELS` moves into `api-maturity.json`'s `removed` ledger with `removedIn: 1.0.0` and
+its superseding note; and the new entry point moves `check:docs`'s subpath count and `check:packaging`'s entry
+list with it, which is the whole argument for having made those derived.
+
 Five things joined that list from the review of the documents against the code and from the signing work
 it led to. Three are still open — `#124`, `#141` and `#143`, each one a decision or a device rather than
 a piece of code. The other two, `#144` and the `#145`/`#146` pair, were **closed by measuring rather than

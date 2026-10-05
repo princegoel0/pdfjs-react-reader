@@ -633,6 +633,19 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **The label-bytes lever is decided and parked for `1.0.0` (#227).** `DEFAULT_LABELS` will stop being published
+  from the root entry and move to `pdfjs-react-reader/labels`. #223 measured what the current shape costs —
+  **844–869 B gz** of tier-owned English defaults on a `PdfViewer`-only consumer — and proved the release is only
+  possible if the root barrel stops re-exporting the const, because esbuild keeps a spread-assembled exported
+  const, Rollup drops it, and `npm run size` takes the worse of the two. The subpath was chosen over "publish no
+  assembled catalog" because it releases the same bytes while leaving a host that overrides six strings an object
+  to spread from rather than a shape to retype. It is **not** taken now because it withdraws a `stable` published
+  name, and §5.5 puts that in a major; `1.0.0` is the only publication this plan has. Recorded in the roadmap's
+  `1.0.0` block with the conditions on it: `spike/labels-tier-owns-words` (`5bafbe8`) is based on `39e3765` and is
+  six commits behind `dev`, so it is rebased *and re-measured* before landing — the byte figure is the spike's,
+  not a promise about today's tree — and the move takes `api-maturity.json`'s `removed` ledger,
+  `check:packaging`'s entry list and `check:docs`'s subpath count with it.
+
 - **The counts `CODE_REFERENCE.md` states are now derived by a gate, not copied by hand (#213).** §2's table
   carries the numbers a reader trusts about the shape of this package — how many entry points exist, how many
   source files and lines, how many fixtures, how many CI jobs, how many names carry each maturity tag, how many
