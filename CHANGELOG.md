@@ -19,14 +19,42 @@ the two gates added beside it (#215's follow-on) run green ahead of that step, a
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
-absent** of 58, on a suite of **1,050 tests in 111 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,060 tests in 111 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. One of the eighteen, `FR-06`, has since been
-closed in the code rather than in the register (#219), and it went back to `met` on a guard that counts layer
-constructions and holds the reader's focus across the step.
+below and is the honest number rather than the comfortable one. One of those eighteen is already back out:
+`FR-06` was closed in the code by #219 and re-synced in the register the same pass, so the 27 above counts it
+`met` again — on a guard that counts layer constructions and holds the reader's focus across the step, not on
+the sentence that moved it.
 
 ### Added
 
+- **§6.1's working-set factor now has the host path the row has always advertised (#222, FR-57).**
+  `PRD.md:871` reads "Viewport working-set factor | 200 %, host-configurable" and has done since the spec was
+  written, while nothing in `src/` let a host set it: the factor was a constant, and the only host input to
+  §6.1's four ceilings was `maxRenderPixels`. That is the gap the row closes, and FR-57's own sentence decides
+  which way it opens — "a host value *constrains* the renderer and does not override it" — so `capAreaFactor`
+  is accepted **below** the package's 200 and clamped **at** it above. Raising it is not tuning: on a
+  1920 × 1080 @1× display the working set is 6.2 Mpx at 200 % and the desktop class default is 33.5 Mpx, so a
+  host asking for 10 000 % does not buy a sharper page, it deletes the only term that knows what is on screen
+  and takes the 0.3-era cap back off. Whether that ceiling should move is a decision about §6.1's numbers, not
+  a decision a host makes about someone else's display. A non-number, a negative or a `NaN` takes the default
+  rather than the arithmetic, because `Math.min` with a `NaN` candidate answers `NaN` — a ceiling that
+  silently stops being one. The clamp reaches both consumers of the factor: `resolveCanvasBudget`, which is
+  what the pages paint under, and `maxRenderPixelsFor`, which is the limit handed to `ensureCanvasCeiling`, so
+  the platform search cannot allocate past a ceiling a host has just tightened. `CanvasBudget.capAreaFactor`
+  reports the number actually used, the way `applied` reports which ceiling won, so asking for 400 reads back
+  as 200 instead of being quietly dropped. `renderBudget` is already on the published controller surface and
+  `PdfViewer` passes its props through whole, so the new prop needed no wiring beyond the two arguments.
+  10 tests (7 in `canvas.budget.test.ts`, 3 in `ViewerController.budget.test.tsx`), and three deliberate
+  breaks, each reverted by checksum: removing the clamp from `resolveCanvasBudget` fails 3 with
+  `expected 'default' to be 'viewport'` twice — the ceiling lifted to the class default, which is what the
+  pages would have painted under — and `expected NaN to be 200` once; removing it from `maxRenderPixelsFor`
+  fails the 2 probe-limit tests, the shell one answering `expected [ 2764800 ] to deeply equal [ 1382400 ]`
+  from a log of every limit the search was given; and dropping the two arguments at the controller fails the 2
+  wiring tests with `expected 200 to be 50`. Cost, against a build of the same tree with these four files at
+  their previous contents: +0.04 kB gz on `core` (30.97 → 31.01), +0.10 kB on the shell (65.36 → 65.46),
+  +0.07 kB on `headless` (36.79 → 36.86). The size gate was already red on owner decision **#208** and no
+  baseline was moved.
 - **The shell now says what page the reader is on (#220, FR-45's "page-change announcements").** The clause was
   not deferred or waived, it was simply absent — and `FR-45`'s row did not say so, which is the same failure
   #217 is about: the live region that existed was the search counter's, and a change to a control nobody is

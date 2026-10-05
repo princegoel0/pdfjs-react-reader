@@ -30,6 +30,31 @@ export const MAX_RENDER_SIDE = 32_767;
 export const CAP_AREA_FACTOR = 200;
 
 /**
+ * The working-set factor a host is allowed to have asked for.
+ *
+ * §6.1 advertises this one as "200 %, host-configurable", and FR-57 decides what configurable means here:
+ * "a host value *constrains* the renderer and does not override it". The factor exists because the
+ * viewport-derived ceiling is the only one of §6.1's four that knows what is on screen rather than what the
+ * device could allocate, so a host may tighten it — a kiosk painting into a 400×400 corner wants less than
+ * 200 % of that, not more.
+ *
+ * Raising it is the direction the clamp is really for. On a 1920 × 1080 display at 1× the working set is
+ * 6.2 Mpx and the desktop class default is 33.5 Mpx, so a host asking for 10 000 % does not lift anything
+ * above the class default — it deletes the only term that was holding the renderer *below* it, and takes the
+ * 0.3 cap back off. Whether that ceiling should move is a decision about the package's numbers, recorded in
+ * §6.1 and tested against them; it is not a decision a host application gets to make about someone else's
+ * display. So the value is clamped to the package's own factor rather than passed through.
+ *
+ * A non-number or a negative one is not a request about budgets at all — it is a bug in a caller, and it takes
+ * the default instead of poisoning the arithmetic with `NaN`, which would silently delete the ceiling
+ * (`Math.min` with a `NaN` candidate answers `NaN`).
+ */
+export function resolveCapAreaFactor(host: number | undefined): number {
+  if (typeof host !== 'number' || !Number.isFinite(host) || host < 0) return CAP_AREA_FACTOR;
+  return Math.min(host, CAP_AREA_FACTOR);
+}
+
+/**
  * §6.1's minimum render scale: the renderer lowers toward this and stops.
  *
  * Below it a page is not a soft page, it is an unreadable one — the text layer is
@@ -130,10 +155,10 @@ export function resolveRenderScale({
  */
 export function maxRenderPixelsFor(
   env: CanvasEnvironment,
-  capAreaFactor = CAP_AREA_FACTOR,
+  capAreaFactor?: number,
 ): number {
   const base = defaultRenderPixelsFor(env);
-  const viewport = viewportWorkingSet(env, capAreaFactor);
+  const viewport = viewportWorkingSet(env, resolveCapAreaFactor(capAreaFactor));
   return viewport === undefined ? base : Math.min(base, viewport);
 }
 
@@ -142,7 +167,12 @@ export function defaultRenderPixelsFor(env: CanvasEnvironment): number {
   return isMobileCanvasEnvironment(env) ? MAX_RENDER_PIXELS_MOBILE : MAX_RENDER_PIXELS;
 }
 
-/** The viewport-derived working set, or `undefined` when the screen is unknown (a server, or a locked tab). */
+/**
+ * The viewport-derived working set, or `undefined` when the screen is unknown (a server, or a locked tab).
+ *
+ * The arithmetic only — a host's request has to pass through {@link resolveCapAreaFactor} first, which is
+ * what the two functions that take a host value do.
+ */
 export function viewportWorkingSet(
   env: CanvasEnvironment,
   capAreaFactor = CAP_AREA_FACTOR,
@@ -164,6 +194,12 @@ export interface CanvasBudget {
   applied: CanvasCeilingSource;
   /** Every candidate that was in play, including the ones the winner beat. */
   candidates: Partial<Record<CanvasCeilingSource, number>>;
+  /**
+   * The working-set factor that was used, after the clamp — so a host that asked for 400 reads 200 back and
+   * knows its request was constrained rather than ignored. Meaningless while `candidates.viewport` is
+   * `undefined` (no screen to multiply), which is the same fact `applied !== 'viewport'` reports.
+   */
+  capAreaFactor: number;
 }
 
 /**
@@ -176,6 +212,9 @@ export interface CanvasBudget {
  * that is not a minimum: it is pdf.js's documented "render at CSS resolution", and it wins
  * by being smaller than everything.
  *
+ * The host's working-set factor is constrained the same way, and may only ever be lowered; see
+ * {@link resolveCapAreaFactor}.
+ *
  * The probe contributes nothing until it has run, which is why `platformPixels` is optional:
  * the first paint is never waited for, and a page that arrives before the answer is capped by
  * the three ceilings that are already known.
@@ -184,12 +223,13 @@ export function resolveCanvasBudget({
   env,
   hostPixels,
   platformPixels,
-  capAreaFactor = CAP_AREA_FACTOR,
+  capAreaFactor,
 }: {
   env: CanvasEnvironment;
   hostPixels?: number;
   /** `null` is the shape the realm cache holds before the probe has answered, so it is accepted here. */
   platformPixels?: number | null;
+  /** The host's own working-set factor, clamped to {@link CAP_AREA_FACTOR}. */
   capAreaFactor?: number;
 }): CanvasBudget {
   const candidates: Partial<Record<CanvasCeilingSource, number>> = {};
@@ -197,7 +237,8 @@ export function resolveCanvasBudget({
     candidates.host = hostPixels;
   }
   if (typeof platformPixels === 'number' && platformPixels > 0) candidates.platform = platformPixels;
-  const viewport = viewportWorkingSet(env, capAreaFactor);
+  const factor = resolveCapAreaFactor(capAreaFactor);
+  const viewport = viewportWorkingSet(env, factor);
   if (viewport !== undefined) candidates.viewport = viewport;
   candidates.default = defaultRenderPixelsFor(env);
 
@@ -210,7 +251,7 @@ export function resolveCanvasBudget({
     .filter((value): value is number => value !== undefined);
   const maxPixels = Math.min(...values);
   const applied = order.find((source) => candidates[source] === maxPixels) ?? 'default';
-  return { maxPixels, applied, candidates };
+  return { maxPixels, applied, candidates, capAreaFactor: factor };
 }
 
 /** The pdf.js mobile compatibility tier: iOS (including iPadOS, which reports `MacIntel`) and Android. */

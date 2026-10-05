@@ -106,6 +106,15 @@ export interface PdfViewerProps {
    * on a large page on screen. `0` renders at CSS resolution.
    */
   maxRenderPixels?: number;
+  /**
+   * The viewport working-set factor, as a percentage of the display's own pixel count.
+   * Defaults to 200. This one is a *constraint* only: a lower number tightens the area
+   * ceiling for a viewer that occupies part of the screen, and a number above 200 is
+   * ignored, because lifting the working set past the package's own factor would raise
+   * the ceiling rather than bound it. Read back the number that was used from
+   * `renderBudget.capAreaFactor`.
+   */
+  capAreaFactor?: number;
   className?: string;
   style?: CSSProperties;
   /**

@@ -220,6 +220,7 @@ export function useViewerController({
   features = NO_FEATURES,
   devicePixelRatio,
   maxRenderPixels,
+  capAreaFactor,
   className,
   style,
   onPasswordRequired,
@@ -263,18 +264,21 @@ export function useViewerController({
    * value *constrains* the renderer rather than replacing it. Reading `maxRenderPixels ?? auto`
    * instead — which is what this line used to be — let `renderPixels: 200_000_000` raise the
    * ceiling on a device whose real limit is a fifth of that, which is the one thing a safety
-   * budget must never do.
+   * budget must never do. `capAreaFactor` is §6.1's other host input and is clamped the same way:
+   * it may lower the working set, and `renderBudget.capAreaFactor` reports the number that was
+   * actually used.
    */
   const canvasEnv = useMemo(() => readCanvasEnvironment(), [pixelRatio]);
-  const platformCeiling = useCanvasCeiling(canvasEnv);
+  const platformCeiling = useCanvasCeiling(canvasEnv, capAreaFactor);
   const renderBudget = useMemo(
     () =>
       resolveCanvasBudget({
         env: canvasEnv,
         hostPixels: maxRenderPixels,
         platformPixels: platformCeiling,
+        capAreaFactor,
       }),
-    [canvasEnv, maxRenderPixels, platformCeiling],
+    [canvasEnv, maxRenderPixels, platformCeiling, capAreaFactor],
   );
   const renderPixels = renderBudget.maxPixels;
   const [scaleMode, setScaleMode] = useState<ScaleMode>(defaultScale);

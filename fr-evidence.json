@@ -1584,6 +1584,7 @@
         "src/lib/canvas.ts",
         "src/lib/print.ts",
         "src/components/useCanvasCeiling.ts",
+        "src/components/PdfViewer.tsx",
         "src/components/ViewerController.tsx",
         "src/components/PdfPage.tsx"
       ],
@@ -1612,7 +1613,7 @@
         "src/components/PdfPage.refusal.test.tsx"
       ],
       "gaps": [],
-      "note": "The four §6.1 ceilings now combine as a minimum and the platform-safe one is probed rather than labelled. Measured by `npm run probe:canvas` on Chromium (pdfjs-dist 6.3.289, 2026-10-03): a 1280x800 @1x page answers 3,072,000 px, which is its viewport working set and below the desktop default, so the probe confirmed the ceiling in force instead of raising it; an iPad user agent on a 390x844 @3x screen lowers the start to 5,242,880 and the answer follows it; a search forced to 1,048,576 never answers above it. The shell's own search costs ~80 ms spread over six frames with one surface per frame and its first surface ~3 ms after the page's first paint, which is what `canvas.probe.test.ts` and the harness both hold. A host budget constrains and `renderBudget.applied` names which ceiling won; a page that cannot be represented at MIN_RENDER_SCALE 0.25 is refused with RESOURCE_LIMIT rather than left blank."
+      "note": "The four §6.1 ceilings now combine as a minimum and the platform-safe one is probed rather than labelled. Measured by `npm run probe:canvas` on Chromium (pdfjs-dist 6.3.289, 2026-10-03): a 1280x800 @1x page answers 3,072,000 px, which is its viewport working set and below the desktop default, so the probe confirmed the ceiling in force instead of raising it; an iPad user agent on a 390x844 @3x screen lowers the start to 5,242,880 and the answer follows it; a search forced to 1,048,576 never answers above it. The shell's own search costs ~80 ms spread over six frames with one surface per frame and its first surface ~3 ms after the page's first paint, which is what `canvas.probe.test.ts` and the harness both hold. A host budget constrains and `renderBudget.applied` names which ceiling won; a page that cannot be represented at MIN_RENDER_SCALE 0.25 is refused with RESOURCE_LIMIT rather than left blank. §6.1's 'Viewport working-set factor | 200 %, host-configurable' row is the second host input and had no host path until #222 gave it one, so it is constrained the same way: `capAreaFactor` is accepted below the package's 200 and clamped at it above — lifting the working set is switching the term off rather than tuning it, and a `NaN` would erase it silently because `Math.min` answers `NaN` — `CanvasBudget.capAreaFactor` reports the number actually used, and the same clamp bounds the probe's search limit, not only the budget the pages paint under."
     },
     "FR-58": {
       "title": "Release Evidence & Consumer Verification",

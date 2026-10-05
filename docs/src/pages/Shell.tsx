@@ -26,6 +26,7 @@ const PROPS: [string, string, string][] = [
   ['defaultSidebarOpen', 'boolean', 'Show the sidebar on first render, on its first tab.'],
   ['gap', 'number', 'Vertical gap between pages in CSS pixels.'],
   ['maxRenderPixels', 'number', 'Area ceiling per page canvas in device pixels. Constrains the budget rather than replacing it: the ceiling used is the minimum of this, the viewport working set, the probed platform ceiling and pdf.js’s own limit, tightened for mobile — over it a browser paints a blank page rather than failing. Unset, the limit is that minimum without this term.'],
+  ['capAreaFactor', 'number', 'The viewport working-set factor, as a percentage of the display’s own pixel count (§6.1’s “200 %, host-configurable” row). A constraint in one direction: below 200 tightens the area ceiling for a viewer that occupies part of the screen, above 200 is ignored, because lifting the working set is switching a ceiling off rather than tuning it. `renderBudget.capAreaFactor` reports the number that was used.'],
   ['devicePixelRatio', 'number', 'Device pixels per CSS pixel for page canvases. Unset, this is the live window.devicePixelRatio, re-read when the display changes; passing a number pins it and a monitor switch then repaints nothing.'],
   ['enableWheelZoom', 'boolean', 'Ctrl/Cmd + wheel, which is also how browsers report trackpad pinch. Defaults to true.'],
   ['enablePinchZoom', 'boolean', 'Two-finger pinch through the engine’s touch manager. Defaults to true.'],

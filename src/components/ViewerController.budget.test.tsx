@@ -12,6 +12,14 @@
  * `ensureCanvasCeiling`, which is the honest shape of this test: jsdom has no canvas memory to
  * measure, so the platform's real number is measured in Chromium (`.spike/canvas-probe-browser.mjs`)
  * and what is tested here is what the shell does with an answer.
+ *
+ * #222 added the second host input, §6.1's working-set factor, and the stub above is why the file grew a
+ * `limits` log: the factor has to reach two places from one prop — the budget the pages paint under, and
+ * the bound the platform search is allowed to allocate to. Only the first is visible in `renderBudget`.
+ * Removing the two arguments at the call site fails 2 tests here (`expected 200 to be 50`, and the limits
+ * log answering `[2764800]`), and removing the clamp inside `resolveCanvasBudget` fails the refusal test
+ * with `expected 'default' to be 'viewport'` — the ceiling lifted to the class default, which is the
+ * outcome this file exists to catch in the shell rather than in the arithmetic.
  */
 import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -44,13 +52,16 @@ const probeState = vi.hoisted(() => {
     gate: Promise.resolve() as Promise<void>,
     closed,
     open: () => open(),
+    /** Every `limit` the shell handed the search, so a test can read the cap rather than trust it. */
+    limits: [] as (number | null | undefined)[],
   };
 });
 
 vi.mock('../lib/canvas', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   probedCanvasCeiling: () => probeState.cached,
-  ensureCanvasCeiling: vi.fn(async () => {
+  ensureCanvasCeiling: vi.fn(async (options?: { limit?: number }) => {
+    probeState.limits.push(options?.limit);
     await probeState.gate;
     return probeState.answer;
   }),
@@ -102,17 +113,24 @@ const probe: {
   controller: ReturnType<typeof useViewerController> | null;
 } = { controller: null };
 
-function Probe({ maxRenderPixels }: { maxRenderPixels?: number }) {
+function Probe({
+  maxRenderPixels,
+  capAreaFactor,
+}: {
+  maxRenderPixels?: number;
+  capAreaFactor?: number;
+}) {
   const controller = useViewerController({
     src: '/fixtures/labelled-sample.pdf',
     defaultScale: 1,
     ...(maxRenderPixels === undefined ? null : { maxRenderPixels }),
+    ...(capAreaFactor === undefined ? null : { capAreaFactor }),
   });
   probe.controller = controller;
   return null;
 }
 
-async function mount(props: { maxRenderPixels?: number } = {}) {
+async function mount(props: { maxRenderPixels?: number; capAreaFactor?: number } = {}) {
   await act(async () => {
     render(<Probe {...props} />);
   });
@@ -127,6 +145,7 @@ afterEach(() => {
   probeState.cached = null;
   probeState.answer = null;
   probeState.gate = Promise.resolve();
+  probeState.limits = [];
 });
 
 /** The two frames the hook waits for, each scheduled on the next macrotask. */
@@ -159,6 +178,54 @@ describe('the shell applies §6.1’s minimum (FR-57)', () => {
       expect(controller.renderPixels).toBe(WORKING_SET);
     } finally {
       Reflect.set(globalThis, 'screen', original);
+    }
+  });
+
+  it('lets a host tighten the working-set factor, and reports the number it used', async () => {
+    const original = globalThis.screen;
+    Reflect.set(globalThis, 'screen', SCREEN);
+    try {
+      const controller = await mount({ capAreaFactor: 50 });
+      expect(controller.renderBudget.capAreaFactor).toBe(50);
+      expect(controller.renderPixels).toBe(1_382_400);
+      expect(controller.renderBudget.applied).toBe('viewport');
+    } finally {
+      Reflect.set(globalThis, 'screen', original);
+    }
+  });
+
+  it('refuses a host factor above the package default, and says so', async () => {
+    const original = globalThis.screen;
+    Reflect.set(globalThis, 'screen', SCREEN);
+    try {
+      const controller = await mount({ capAreaFactor: 10_000 });
+      // Unclamped, this display's working set is 93 Mpx and the minimum lands on the 33.5 Mpx class
+      // default — the host would have switched the §6.1 cap off. Clamped, the working set still binds.
+      expect(controller.renderBudget.applied).toBe('viewport');
+      expect(controller.renderPixels).toBe(WORKING_SET);
+      expect(controller.renderBudget.capAreaFactor).toBe(200);
+    } finally {
+      Reflect.set(globalThis, 'screen', original);
+    }
+  });
+
+  it('caps the probe search at the ceiling the host tightened, not at the package’s', async () => {
+    // §6.1's search is bounded by "the ceiling already in force", and the host's factor is now part of that
+    // ceiling: a search that allocated above the number the renderer was refused would be measuring a size
+    // this shell can never paint, costing main-thread time for a candidate the minimum cannot select.
+    const original = globalThis.screen;
+    Reflect.set(globalThis, 'screen', SCREEN);
+    const raf = stubFrames();
+    probeState.answer = 40_000_000;
+    try {
+      await mount({ capAreaFactor: 50 });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      expect(probeState.limits).toEqual([1_382_400]);
+    } finally {
+      Reflect.set(globalThis, 'screen', original);
+      raf.mockRestore();
     }
   });
 

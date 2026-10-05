@@ -21,8 +21,12 @@ import type { CanvasEnvironment } from '../lib/canvas';
  * The cap is also the one place a user-agent string is allowed to matter: it lowers where the
  * probe starts, because everything above the cap is irrelevant to a minimum, and it can never
  * raise the result.
+ *
+ * The host's working-set factor is passed through for the same reason it is passed to the budget: a host that
+ * tightened it is saying the working set here is smaller than the package's 200 %, and a search that allocates
+ * above the ceiling in force would be measuring a size the renderer has already been refused.
  */
-export function useCanvasCeiling(env: CanvasEnvironment): number | null {
+export function useCanvasCeiling(env: CanvasEnvironment, capAreaFactor?: number): number | null {
   const [ceiling, setCeiling] = useState<number | null>(() => probedCanvasCeiling());
 
   useEffect(() => {
@@ -38,7 +42,7 @@ export function useCanvasCeiling(env: CanvasEnvironment): number | null {
     let second = 0;
     first = raf(() => {
       second = raf(() => {
-        void ensureCanvasCeiling({ limit: maxRenderPixelsFor(env) }).then((answer) => {
+        void ensureCanvasCeiling({ limit: maxRenderPixelsFor(env, capAreaFactor) }).then((answer) => {
           if (!cancelled && answer !== null) setCeiling(answer);
         });
       });
@@ -50,7 +54,7 @@ export function useCanvasCeiling(env: CanvasEnvironment): number | null {
       cancel?.(first);
       cancel?.(second);
     };
-  }, [ceiling, env]);
+  }, [ceiling, env, capAreaFactor]);
 
   return ceiling;
 }

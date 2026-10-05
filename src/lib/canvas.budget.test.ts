@@ -9,6 +9,12 @@
  * ceiling exists to prevent, caused by the one input that was supposed to be safe. Every
  * assertion here is paired with a number that *should* lose, because a minimum is only
  * testable by what it refuses.
+ *
+ * The second clause the same requirement decides is §6.1's "Viewport working-set factor | 200 %,
+ * host-configurable" — a row that advertised a host path which did not exist until #222 built one. What
+ * *configurable* means is inherited from the sentence above: the host may lower the working set, and the
+ * number reported back is the one that was used, so a request for 400 answers 200 rather than being
+ * silently dropped.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -17,7 +23,9 @@ import {
   MAX_RENDER_PIXELS_MOBILE,
   MAX_RENDER_SIDE,
   MIN_RENDER_SCALE,
+  maxRenderPixelsFor,
   resolveCanvasBudget,
+  resolveCapAreaFactor,
   resolveRenderScale,
   viewportWorkingSet,
   type CanvasEnvironment,
@@ -137,6 +145,91 @@ describe('the four ceilings combine as a minimum (FR-57)', () => {
     expect(MAX_RENDER_SIDE).toBe(32_767);
     expect(CAP_AREA_FACTOR).toBe(200);
     expect(MIN_RENDER_SCALE).toBe(0.25);
+  });
+});
+
+/*
+ * §6.1's row reads "Viewport working-set factor | 200 %, host-configurable", and FR-57's sentence decides
+ * which direction configurable runs in. Both halves are asserted below, because a clamp that is only tested
+ * from one side is a range nobody has measured: the host's number has to reach the arithmetic when it is
+ * smaller, and has to fail to reach it when it is bigger.
+ *
+ * Three deliberate breaks, each reverted by checksum afterwards. Removing the clamp from
+ * `resolveCanvasBudget` fails 3 tests (2 here, 1 in `ViewerController.budget.test.tsx`), and the failures
+ * read `expected 'default' to be 'viewport'` and `expected NaN to be 200` — the ceiling lifted to the class
+ * default, and a NaN candidate eating the minimum. Removing it from `maxRenderPixelsFor` fails the 2
+ * probe-limit tests. Not passing the prop at the controller fails the 2 wiring tests in the shell file. A
+ * green run here therefore has a measured reason to be green, not only an assertion that has never seen the
+ * guard moved.
+ */
+describe('the host working-set factor (FR-57 / §6.1)', () => {
+  /** 1920 × 1080 at 1×: 6.2 Mpx of working set at the package's 200 %, far under the 33.5 Mpx class default. */
+  it('honours a factor below the package default', () => {
+    const budget = resolveCanvasBudget({ env: desktop, capAreaFactor: 50 });
+    expect(budget.capAreaFactor).toBe(50);
+    expect(budget.candidates.viewport).toBe(Math.ceil(1920 * 1080 * 1.5));
+    expect(budget.applied).toBe('viewport');
+    expect(budget.maxPixels).toBe(3_110_400);
+  });
+
+  it('takes 0 literally, which is "the screen and nothing more"', () => {
+    // 0 is a real request — it is the same shape as `maxPixels: 0` being pdf.js's "CSS pixels only" rather
+    // than a synonym for unset. Treating it as falsy would silently widen a kiosk's ceiling to 200 %.
+    const budget = resolveCanvasBudget({ env: desktop, capAreaFactor: 0 });
+    expect(budget.capAreaFactor).toBe(0);
+    expect(budget.maxPixels).toBe(1920 * 1080);
+  });
+
+  it('refuses a factor above the package default, and reports the number that was used', () => {
+    const raised = resolveCanvasBudget({ env: desktop, capAreaFactor: 10_000 });
+    // The counterfactual in one line: 10 000 % of this display is 209 Mpx, so passing the factor through
+    // would delete the working-set term and leave 33.5 Mpx — the ceiling the 200 % exists to hold down.
+    // What the pages paint at is asserted first: a broken clamp should fail as a too-big canvas, not as a
+    // bookkeeping mismatch on the reported factor.
+    expect(raised.applied).toBe('viewport');
+    expect(raised.maxPixels).toBe(6_220_800);
+    expect(raised.maxPixels).toBeLessThan(MAX_RENDER_PIXELS);
+    expect(raised.capAreaFactor).toBe(CAP_AREA_FACTOR);
+    expect(raised.maxPixels).toBe(resolveCanvasBudget({ env: desktop }).maxPixels);
+  });
+
+  it('lets a phone host tighten below its class ceiling', () => {
+    // 390 × 844 at 3× gives 8.9 Mpx of working set at 200 %, which the 5.24 Mpx class default beats anyway;
+    // at 50 % the screen's own 4.4 Mpx is the binding number. This is the legitimate use of the knob, and
+    // it is the half that has to work for the row to say "configurable" rather than "ignored".
+    const budget = resolveCanvasBudget({ env: phone, capAreaFactor: 50 });
+    expect(budget.applied).toBe('viewport');
+    expect(budget.maxPixels).toBe(Math.ceil(390 * 844 * 9 * 1.5));
+    expect(budget.maxPixels).toBeLessThan(MAX_RENDER_PIXELS_MOBILE);
+  });
+
+  it('keeps a nonsense factor on the default instead of letting NaN delete the ceiling', () => {
+    // `Math.min` with a NaN candidate answers NaN, and a NaN viewport candidate would make the whole
+    // minimum NaN — every page then capped at NaN device pixels, which is no cap at all.
+    for (const junk of [Number.NaN, Number.POSITIVE_INFINITY, -1, '50' as unknown as number, null as unknown as number]) {
+      expect(resolveCapAreaFactor(junk)).toBe(CAP_AREA_FACTOR);
+      const budget = resolveCanvasBudget({ env: desktop, capAreaFactor: junk });
+      expect(budget.capAreaFactor).toBe(CAP_AREA_FACTOR);
+      expect(budget.maxPixels).toBe(6_220_800);
+    }
+    expect(resolveCapAreaFactor(undefined)).toBe(CAP_AREA_FACTOR);
+  });
+
+  it('caps the probe search under the same clamp it caps the budget', () => {
+    // `useCanvasCeiling` feeds `maxRenderPixelsFor` to the probe as its limit, so an unclamped factor would
+    // make the measurement allocate above the ceiling the renderer was just given — which is the failure
+    // the limit exists to prevent, arriving through the second host input instead of the first.
+    expect(maxRenderPixelsFor(desktop, 10_000)).toBe(maxRenderPixelsFor(desktop));
+    expect(maxRenderPixelsFor(desktop, 50)).toBe(3_110_400);
+    expect(maxRenderPixelsFor(desktop, Number.NaN)).toBe(maxRenderPixelsFor(desktop));
+    expect(maxRenderPixelsFor(desktop, 50)).toBeLessThan(maxRenderPixelsFor(desktop));
+  });
+
+  it('leaves the raw arithmetic alone when asked for the working set directly', () => {
+    // `viewportWorkingSet` is the multiplication, not the policy; the two functions that take a host value
+    // clamp before reaching it. Pinned so a later "simplification" that moves the clamp into here is a
+    // change someone notices rather than a double clamp nobody can see.
+    expect(viewportWorkingSet(desktop, 10_000)).toBe(1920 * 1080 * 101);
   });
 });
 

@@ -319,8 +319,13 @@ if (capabilities?.form === 'xfa' && !capabilities.renderedFromXfa) {
         class, the viewport working set, the platform ceiling the runtime can really allocate, and the
         number you passed. Yours is a constraint, not an override — passing{' '}
         <code>maxRenderPixels={'{'}200_000_000{'}'}</code> on a phone buys the phone’s ceiling, because
-        the budget exists to bound what the renderer allocates. An uncapped page at deep zoom asks for
-        more pixels than a browser will give it, and the failure is a blank rectangle, not an exception.
+        the budget exists to bound what the renderer allocates. The viewport working set is settable the
+        same way, and in one direction only: <code>capAreaFactor</code> is a percentage of the
+        display’s own pixel count, and a number above the package’s 200 is ignored, since lifting that
+        term is how a host switches a ceiling off rather than tuning it.{' '}
+        <code>renderBudget.capAreaFactor</code> reports the number that was used. An uncapped page at deep
+        zoom asks for more pixels than a browser will give it, and the failure is a blank rectangle, not an
+        exception.
       </p>
       <p>
         The platform term is <em>measured</em>, not read off the user-agent string:{' '}
@@ -333,7 +338,9 @@ if (capabilities?.form === 'xfa' && !capabilities.renderedFromXfa) {
         ceiling already in force, because a bigger answer could not change a minimum. When the answer is
         lower than what pages were painted under, the shell redraws them.
         <code>readCanvasEnvironment()</code> and <code>maxRenderPixelsFor()</code> give you the two terms
-        that need no measurement; <code>resolveCanvasBudget()</code> is the whole rule, and it reports
+        that need no measurement — the second takes the same working-set factor, and clamps it before it
+        multiplies, so the search cannot be pointed above a ceiling a host has just tightened.{' '}
+        <code>resolveCanvasBudget()</code> is the whole rule, and it reports
         which candidate won — because &ldquo;this page is soft&rdquo; is only fixable if you can tell a
         cap from a bug.
       </p>
