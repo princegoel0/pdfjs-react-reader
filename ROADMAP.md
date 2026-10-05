@@ -77,9 +77,9 @@ certified on this machine at all.
 | `FR-27` | Search Depth | **met** | 5/5 | 0 | — |
 | `FR-28` | Composed Shell, Labels, Events, Locales & Shell Affordances | **partial** | 5/5 | 2 | the three affordances the clause names as individually switchable and observable are never switc… |
 | `FR-29` | Annotation Authoring | **partial** | 4/5 | 3 | `annotateFeature` is never mounted by a test. It is imported twice — src/features/stylesheets.te… |
-| `FR-30` | Page Authoring | **partial** | 4/5 | 2 | “undo of the last apply, which restores the snapshot that write started from” is asserted nowher… |
+| `FR-30` | Page Authoring | **met** | 4/5 | 0 | — |
 | `FR-31` | True Flattening | **met** | 4/5 | 0 | — |
-| `FR-32` | Visual Signing | **partial** | 4/5 | 2 | “scaled into each widget box that field declares” is proven over two single-box fields, not over… |
+| `FR-32` | Visual Signing | **met** | 4/5 | 0 | — |
 | `FR-33` | XFA Display, Save Refused | **partial** | 4/5 | 1 | an XFA thumbnail's paint has no automated assertion: `PdfThumbnail` asks for `getXfa()` and comp… |
 | `FR-34` | Network Contract | **met** | 4/5 | 0 | — |
 | `FR-35` | Bounded Retries | **met** | 4/5 | 0 | — |
@@ -188,7 +188,7 @@ now reads as history: the state of record is the generated block above.
 | `FR-13` | In-memory indexing | `0.1` | done in substance — `page.getTextContent()` parses in the pdf.js worker; the index is assembled on the main thread, yielding every five pages (`extractAllText`'s `i % 5 === 4` yield) |
 | `FR-14` | Match highlighting | `0.1`, counts `0.5` | done |
 | `FR-15` | Search controls | `0.1`, `0.5` | done — case, whole-word, next/previous, `Indexing {percent}%` |
-| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6`; `/Sig` fixtures and signing, post-`0.8` and unreleased | **partial** — `signature-sample.pdf` and `signature-signed-sample.pdf` now carry four `/FT /Sig` fields in three shapes, so the type `describeWidget`'s `Sig` arm classifies is finally in a file, and a drawn mark can be written into the field's appearance (see *Spike D*). Its display in a real viewer is measured and proven both ways (see *Signing shipped*): a file that already carries the marks paints all three boxes including the noRotate one, and a mark placed through the panel took the page's box from 0 to 856 ink pixels and stayed painted across a zoom step. XFA now renders through `XfaLayer` (`xfa-sample.pdf`, see *0.6.0 — Mark*), and a document whose template pdf.js cannot lay out **fails to load** rather than showing a blank page, so `enableXfa` on by default carries that risk |
+| `FR-16` | AcroForm support | `0.1`; XFA renders `0.6`; `/Sig` fixtures and signing, post-`0.8` and unreleased | **partial** — `signature-sample.pdf` and `signature-signed-sample.pdf` now carry five `/FT /Sig` fields in four shapes and six widget boxes (the two-box field arrived 2026-10-05 for FR-32's plural), so the type `describeWidget`'s `Sig` arm classifies is finally in a file, and a drawn mark can be written into the field's appearance (see *Spike D*). Its display in a real viewer was measured and proven both ways on the four-box document (see *Signing shipped*): a file that already carries the marks paints every one of its boxes including the noRotate one — the same measurement read **0** boxes painted for the unsigned file in `scripts/browser-matrix.mjs#form-widgets-are-html-controls`, which is the half that is still #229 — and a mark placed through the panel took the page's box from 0 to 856 ink pixels and stayed painted across a zoom step. XFA now renders through `XfaLayer` (`xfa-sample.pdf`, see *0.6.0 — Mark*), and a document whose template pdf.js cannot lay out **fails to load** rather than showing a blank page, so `enableXfa` on by default carries that risk |
 | `FR-17` | Form data sync | `0.1` | done |
 | `FR-18` | Annotations view, and the withdrawal of the core pen | `0.1` view, ink `0.5`; authoring `0.6`; core ink withdrawn `0.12`/W6 | **met, and the second half of the row is a deletion.** Links and markup rendered, and until this package the core also drew: freehand ink shipped at `0.1.2` printed with the page and never reached a download, while `annotateFeature`'s ink is a real `/Ink` annotation that does — two pens, one of which loses the reader's work silently. So `usePdfInk`, `InkLayer`, the stroke helpers and the pen option lists leave `.` and `/headless` (fifteen published names, recorded name-by-name in `api-maturity.json` under `removed` and listed in the changelog), the toolbar's `draw` control goes with them, the shell's `isPinchingDisabled` predicate goes because core drawing was its only supplier, and the print path stops compositing strokes nobody persisted. Authoring itself stayed where the `0.6` measurement put it — highlight, free text and ink, with the engine unable to create or edit underline/strikeout/squiggly and stamp and signature breaking the save (see *0.6.0 — Mark*) — and it is now the package's only pen. A signature drawn through the **engine's** editor is still out; a mark written through the **writer** is in the `edit` tier (see *Spike D*) |
 | `FR-19` | High-fidelity printing | `0.1`, ranges `0.5` | done — iOS Safari is excluded by design, and `PRD` FR-19 now says so, alongside the scale ladder and the 256 MiB budget it never used to state |
@@ -1937,9 +1937,11 @@ written for the purpose, the writer already in the tree does it.
   than from scanning objects, and `field.acroField.dict` is public — which is where `/AP` goes. The
   class is absent from the fork's barrel grep but present at runtime, so the check for it was made
   against `import('@cantoo/pdf-lib')` rather than against `types/`.
-* Three shapes, all handled: the widget **is** the field (`sigPlain`); the field is a parent whose
-  `/Kids` name the widgets and the `/AP` belongs on the kid (`sigKid`, what Acrobat writes for a
-  form signed in more than one place); and a widget carrying `/F 20` (`sigNoRotate`). Reaching a
+* Shapes, all handled: the widget **is** the field (`sigPlain`); the field is a parent whose
+  `/Kids` name the widgets and the `/AP` belongs on the kid (`sigKid`, and `sigTwoBoxes`, which
+  names *two* kids on two pages at two sizes — the shape Acrobat writes for a form signed in more
+  than one place, and the one FR-32's plural needed a file for); and a widget carrying `/F 20`
+  (`sigNoRotate`). Reaching a
   kid's field type means resolving an indirect reference through `context.lookup` — under
   `/Kids` the entries are `PDFRef`s, so `parent instanceof PDFDict` is false and the first version
   of that lookup quietly lost a field. The fixture's self-check caught it as "3 expected, 2 found".
@@ -2708,10 +2710,12 @@ a hybrid that also carries `/Fields`. What none of them produce is a field that 
 the input a `fieldid` and no `dataId`, so `XfaLayer.setupStorage` never attaches and `#127`'s edit half is
 still open.
 
-Built since, for the signing work: `signature-sample.pdf` (`scripts/make-signature-pdf.mjs`) — four
-`/FT /Sig` fields in the three shapes files arrive in, one of them carrying a `/V` so the refusal case
-has a fixture, and one with no appearance at all so "a mark appeared" can only mean "we wrote it";
-and `signature-signed-sample.pdf`, the same document with marks in the three unsigned boxes — both
+Built since, for the signing work: `signature-sample.pdf` (`scripts/make-signature-pdf.mjs`) — five
+`/FT /Sig` fields in four shapes and six widget boxes, one field carrying a `/V` so the refusal case
+has a fixture, and three boxes with no appearance at all so "a mark appeared" can only mean "we wrote
+it" — including the one field whose `/Kids` name two boxes on two pages, which is what makes FR-32's
+"scaled into each widget box that field declares" measurable rather than assumed;
+and `signature-signed-sample.pdf`, the same document with marks in the five unsigned boxes — both
 written by that one script, the second from the same widget-resolution and `/BBox` rules `signFields`
 follows, which is what the display question has to be measured against.
 

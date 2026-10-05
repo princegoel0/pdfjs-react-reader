@@ -11,9 +11,15 @@
 //                          flag, which routes the appearance into a separate canvas
 //                          rather than into the page — so this row measures the other
 //                          rendering path rather than repeating the first
-// The three /Sig fields deliberately carry no /V: a value there would tell every
-// reader in the world that the document holds a cryptographic signature, and this
-// fixture proves only that a drawn mark can be written.
+//   both:   sigTwoBoxes  — a parent field whose /Kids name TWO widgets, on two pages, at two
+//                          different sizes. FR-32 says the mark is scaled into *each widget box
+//                          that field declares*, and until this field existed no file in the repo
+//                          had a field with more than one box, so a writer that stopped after the
+//                          first one passed every test. This is the shape Acrobat writes for a form
+//                          signed on the cover page and again in the signature block.
+// The four /Sig fields above carry no /V: a value there would tell every reader in the world
+// that the document holds a cryptographic signature, and this fixture proves only that a drawn
+// mark can be written.
 //
 // Two files come out of this: `signature-sample.pdf`, the empty form the tests and the panel read,
 // and `signature-signed-sample.pdf`, the same file with a mark already in each unsigned box, which
@@ -38,6 +44,12 @@ const AP_NOROTATE = 51;
 // leaves the file still making that claim while no longer keeping it.
 const SIG_SIGNED = 15;
 const AP_SIGNED = 52;
+// One field, two widget boxes, on two different pages. Neither starts with an `/AP`, so a mark
+// found in either afterwards can only have been written by `signFields` — and found in *both* is
+// the plural FR-32 claims.
+const TWO_PARENT = 16;
+const TWO_KID_A = 17;
+const TWO_KID_B = 18;
 
 // Rects are page coordinates, and the appearance /BBox values below match them
 // exactly. Declaring the appearances in page space rather than in a 0-anchored
@@ -49,6 +61,14 @@ const RECT_PLAIN = [72, 660, 272, 720];
 const RECT_KID = [72, 570, 222, 610];
 const RECT_NOROTATE = [72, 660, 272, 720];
 const RECT_SIGNED = [72, 560, 272, 620];
+/*
+ * The two boxes of the one field: 200x60 on page 1 and 100x30 on page 2. Different sizes on
+ * purpose — a mark written at the same page coordinates in both would be a copy, not a scale,
+ * and the only way to tell those apart in the bytes is to read two different number pairs out
+ * of two different appearances.
+ */
+const RECT_TWO_A = [300, 560, 500, 620];
+const RECT_TWO_B = [72, 460, 172, 490];
 
 const rect = (r) => `[${r.join(' ')}]`;
 const objects = new Map();
@@ -60,13 +80,13 @@ objects.set(
   PAGE1,
   '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
     `/Resources << /Font << /F1 3 0 R >> >> /Contents 60 0 R ` +
-    `/Annots [${TEXT_FIELD} 0 R ${SIG_PLAIN} 0 R ${SIG_PARENT} 0 R ${SIG_KID} 0 R] >>`,
+    `/Annots [${TEXT_FIELD} 0 R ${SIG_PLAIN} 0 R ${SIG_PARENT} 0 R ${SIG_KID} 0 R ${TWO_KID_A} 0 R] >>`,
 );
 objects.set(
   PAGE2,
   '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
     `/Resources << /Font << /F1 3 0 R >> >> /Contents 61 0 R ` +
-    `/Annots [${SIG_NOROTATE} 0 R ${SIG_SIGNED} 0 R] >>`,
+    `/Annots [${SIG_NOROTATE} 0 R ${SIG_SIGNED} 0 R ${TWO_KID_B} 0 R] >>`,
 );
 
 /*
@@ -105,6 +125,25 @@ objects.set(
     `/FT /Sig /T (sigAlreadySigned) /V << /Type /Sig /Name (Test Signer) /M (D:20260927120000Z) >> ` +
     `/AP << /N ${AP_SIGNED} 0 R >> >>`,
 );
+/*
+ * The two-box field: `/FT /Sig` and `/T` on the parent, `/Rect` and `/Parent` on each widget, and
+ * no `/AP` on either. This is the shape that makes FR-32's plural testable — one mark, two boxes,
+ * each getting the mark scaled to fit it rather than the same rectangle pasted twice.
+ */
+objects.set(
+  TWO_PARENT,
+  `<< /FT /Sig /T (sigTwoBoxes) /Kids [${TWO_KID_A} 0 R ${TWO_KID_B} 0 R] >>`,
+);
+objects.set(
+  TWO_KID_A,
+  `<< /Type /Annot /Subtype /Widget /F 4 /Rect ${rect(RECT_TWO_A)} /P ${PAGE1} 0 R ` +
+    `/Parent ${TWO_PARENT} 0 R >>`,
+);
+objects.set(
+  TWO_KID_B,
+  `<< /Type /Annot /Subtype /Widget /F 4 /Rect ${rect(RECT_TWO_B)} /P ${PAGE2} 0 R ` +
+    `/Parent ${TWO_PARENT} 0 R >>`,
+);
 objects.set(
   TEXT_FIELD,
   `<< /Type /Annot /Subtype /Widget /F 4 /Rect [72 730 272 746] /P ${PAGE1} 0 R ` +
@@ -113,7 +152,7 @@ objects.set(
 
 objects.set(
   30,
-  `<< /Fields [${TEXT_FIELD} 0 R ${SIG_PLAIN} 0 R ${SIG_PARENT} 0 R ${SIG_NOROTATE} 0 R ${SIG_SIGNED} 0 R] ` +
+  `<< /Fields [${TEXT_FIELD} 0 R ${SIG_PLAIN} 0 R ${SIG_PARENT} 0 R ${SIG_NOROTATE} 0 R ${SIG_SIGNED} 0 R ${TWO_PARENT} 0 R] ` +
     '/DR << /Font << /F1 3 0 R >> >> /DA (/F1 0 Tf 0 g) >>',
 );
 
@@ -142,6 +181,7 @@ objects.set(
     text('title (a text field, to prove the others survive a write):', 72, 750, 9),
     text('sigPlain - a /Sig widget with no /AP:', 72, 726, 9),
     text('sigKid - a parent field, the /AP on its widget kid:', 72, 630, 9),
+    text('sigTwoBoxes - box 1 of 2, on this page:', 300, 640, 9),
   ]),
 );
 objects.set(
@@ -149,6 +189,7 @@ objects.set(
   stream([
     text('Page two', 72, 762, 16),
     text('sigNoRotate - /F 20, so pdf.js gives it its own canvas:', 72, 726, 9),
+    text('sigTwoBoxes - box 2 of the same field, a different size:', 72, 505, 9),
   ]),
 );
 
@@ -170,16 +211,40 @@ for (const num of new Set(refsIn(bodies))) {
   if (!objects.has(num)) throw new Error(`a dictionary names ${num} 0 R, which this file does not hold`);
 }
 
-// Three signature fields, and exactly one of them reached through /Kids.
-const sigs = [SIG_PLAIN, SIG_NOROTATE, SIG_PARENT].filter((n) => dict(n).includes('/FT /Sig'));
-if (sigs.length !== 3) throw new Error(`expected 3 /FT /Sig fields, found ${sigs.length}`);
+// Four signature fields, and two of them reached through /Kids.
+const sigs = [SIG_PLAIN, SIG_NOROTATE, SIG_PARENT, TWO_PARENT].filter((n) =>
+  dict(n).includes('/FT /Sig'),
+);
+if (sigs.length !== 4) throw new Error(`expected 4 /FT /Sig fields, found ${sigs.length}`);
 if (!dict(SIG_PARENT).includes('/Kids')) throw new Error('sigKid must reach its widget through /Kids');
 if (!dict(SIG_KID).includes(`/Parent ${SIG_PARENT}`)) throw new Error('the widget kid must name its parent');
 if (dict(SIG_KID).includes('/FT')) throw new Error('/FT belongs on the parent, not on the kid');
 
-// Three of the four are unsigned: no `/V` anywhere a reader could mistake for a value. The
-// fourth is the refusal case, and it is the only object in the file with one.
-for (const num of [SIG_PLAIN, SIG_NOROTATE, SIG_PARENT, SIG_KID]) {
+/*
+ * The two-box field, checked as a shape rather than as a nice-to-have: the parent names both kids,
+ * each kid names the parent, each carries its own `/Rect`, and the two rects are different sizes.
+ * A fixture that quietly degraded into two identical boxes would make the scaling claim
+ * unmeasurable, and this is the only place that would notice.
+ */
+if (!dict(TWO_PARENT).includes(`/Kids [${TWO_KID_A} 0 R ${TWO_KID_B} 0 R]`)) {
+  throw new Error('sigTwoBoxes must reach both of its widgets through /Kids');
+}
+for (const [num, r, page] of [
+  [TWO_KID_A, RECT_TWO_A, PAGE1],
+  [TWO_KID_B, RECT_TWO_B, PAGE2],
+]) {
+  const kid = dict(num);
+  if (!kid.includes(`/Parent ${TWO_PARENT}`)) throw new Error(`widget ${num} does not name its parent`);
+  if (!kid.includes(rect(r))) throw new Error(`widget ${num} does not carry its own /Rect ${rect(r)}`);
+  if (!kid.includes(`/P ${page} 0 R`)) throw new Error(`widget ${num} is not on page ${page}`);
+  if (kid.includes('/FT')) throw new Error(`/FT belongs on the parent, not on widget ${num}`);
+  if (kid.includes('/AP')) throw new Error(`widget ${num} starts with an appearance, so a mark there proves nothing`);
+}
+if (RECT_TWO_A.join() === RECT_TWO_B.join()) throw new Error('both boxes of one field are the same size');
+
+// Four of the five are unsigned: no `/V` anywhere a reader could mistake for a value. The
+// fifth is the refusal case, and it is the only object in the file with one.
+for (const num of [SIG_PLAIN, SIG_NOROTATE, SIG_PARENT, SIG_KID, TWO_PARENT, TWO_KID_A, TWO_KID_B]) {
   if (dict(num).includes('/V ')) throw new Error(`object ${num} carries a /V, so it would read as signed`);
 }
 if (!dict(SIG_SIGNED).includes('/V << /Type /Sig')) throw new Error('the signed field lost its /V');
@@ -200,12 +265,14 @@ for (const [num, ap, r] of [
   if (objects.get(ap).stream !== '') throw new Error(`appearance ${ap} is not empty, so the before-state would paint`);
 }
 
-// Every widget the form lists must be reachable, and the kid must not be listed twice.
+// Every widget the form lists must be reachable, and a kid must never be listed twice.
 const fields = dict(30);
-for (const num of [TEXT_FIELD, SIG_PLAIN, SIG_PARENT, SIG_NOROTATE]) {
+for (const num of [TEXT_FIELD, SIG_PLAIN, SIG_PARENT, SIG_NOROTATE, TWO_PARENT]) {
   if (!fields.includes(`${num} 0 R`)) throw new Error(`/Fields omits ${num}, so the form would not hold it`);
 }
-if (fields.includes(`${SIG_KID} 0 R`)) throw new Error('/Fields must name the parent, never the widget kid');
+for (const num of [SIG_KID, TWO_KID_A, TWO_KID_B]) {
+  if (fields.includes(`${num} 0 R`)) throw new Error('/Fields must name the parent, never the widget kid');
+}
 if (!fields.includes(`${SIG_SIGNED} 0 R`)) throw new Error('/Fields must list the signed field, or nothing would refuse it');
 
 // ---- assembly ----
@@ -248,12 +315,14 @@ console.log(`wrote ${out} (${pdf.length} bytes)`);
 // shipped writer lives in TypeScript and a fixture generator has to run with `node scripts/…`
 // alone. The bytes it produces are checked against the same rules below, and `pdf-write.test.ts`
 // holds the equivalent assertions for the product path.
-const SHAPES = { sigPlain: 'wave', sigKid: 'loop', sigNoRotate: 'zig' };
+const SHAPES = { sigPlain: 'wave', sigKid: 'loop', sigNoRotate: 'zig', sigTwoBoxes: 'wave' };
 
 /**
  * Three different silhouettes, deliberately. If every box got the same mark, an appearance that
  * landed in the wrong rectangle would still be a non-zero pixel count and the browser check would
- * report a pass for the file being wrong.
+ * report a pass for the file being wrong. `sigTwoBoxes` shares `sigPlain`'s on purpose: the two
+ * boxes of one field take the same mark at two scales, which is the claim, and the rectangles they
+ * land in are what differs.
  */
 function mark([x0, y0, x1, y1], shape) {
   const pad = 8;
@@ -324,7 +393,10 @@ writeFileSync(signedOut, Buffer.from(signedBytes));
 // Re-read what was written, because "the script ran" is not "the file is what the browser needs".
 const check = await PDFDocument.load(signedBytes, { ignoreEncryption: true });
 const byName = new Map(check.getForm().getFields().map((f) => [f.getName(), f]));
-if (written.length !== 3) throw new Error(`three boxes should have taken a mark, got ${written.length}`);
+if (written.length !== 5) throw new Error(`five boxes should have taken a mark, got ${written.length}`);
+if (written.filter((w) => w.name === 'sigTwoBoxes').length !== 2) {
+  throw new Error('one field must take the mark in both of its boxes, and this one did not');
+}
 if (skipped.join() !== 'sigAlreadySigned') throw new Error('the signed field must be the one skipped');
 for (const { name, rect } of written) {
   const field = byName.get(name);

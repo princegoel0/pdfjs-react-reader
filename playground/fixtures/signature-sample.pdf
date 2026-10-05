@@ -9,10 +9,10 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 4 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 60 0 R /Annots [14 0 R 10 0 R 12 0 R 13 0 R] >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 60 0 R /Annots [14 0 R 10 0 R 12 0 R 13 0 R 17 0 R] >>
 endobj
 5 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 61 0 R /Annots [11 0 R 15 0 R] >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 61 0 R /Annots [11 0 R 15 0 R 18 0 R] >>
 endobj
 10 0 obj
 << /Type /Annot /Subtype /Widget /F 4 /Rect [72 660 272 720] /P 4 0 R /FT /Sig /T (sigPlain) >>
@@ -32,8 +32,17 @@ endobj
 15 0 obj
 << /Type /Annot /Subtype /Widget /F 4 /Rect [72 560 272 620] /P 5 0 R /FT /Sig /T (sigAlreadySigned) /V << /Type /Sig /Name (Test Signer) /M (D:20260927120000Z) >> /AP << /N 52 0 R >> >>
 endobj
+16 0 obj
+<< /FT /Sig /T (sigTwoBoxes) /Kids [17 0 R 18 0 R] >>
+endobj
+17 0 obj
+<< /Type /Annot /Subtype /Widget /F 4 /Rect [300 560 500 620] /P 4 0 R /Parent 16 0 R >>
+endobj
+18 0 obj
+<< /Type /Annot /Subtype /Widget /F 4 /Rect [72 460 172 490] /P 5 0 R /Parent 16 0 R >>
+endobj
 30 0 obj
-<< /Fields [14 0 R 10 0 R 12 0 R 11 0 R 15 0 R] /DR << /Font << /F1 3 0 R >> >> /DA (/F1 0 Tf 0 g) >>
+<< /Fields [14 0 R 10 0 R 12 0 R 11 0 R 15 0 R 16 0 R] /DR << /Font << /F1 3 0 R >> >> /DA (/F1 0 Tf 0 g) >>
 endobj
 50 0 obj
 << /Type /XObject /Subtype /Form /BBox [72 570 222 610] /Resources << >> /Length 0 >>
@@ -54,19 +63,21 @@ stream
 endstream
 endobj
 60 0 obj
-<<  /Length 287 >>
+<<  /Length 358 >>
 stream
 BT /F1 16 Tf 72 762 Td (Signature fixture) Tj ET
 BT /F1 9 Tf 72 750 Td (title (a text field, to prove the others survive a write):) Tj ET
 BT /F1 9 Tf 72 726 Td (sigPlain - a /Sig widget with no /AP:) Tj ET
 BT /F1 9 Tf 72 630 Td (sigKid - a parent field, the /AP on its widget kid:) Tj ET
+BT /F1 9 Tf 300 640 Td (sigTwoBoxes - box 1 of 2, on this page:) Tj ET
 endstream
 endobj
 61 0 obj
-<<  /Length 125 >>
+<<  /Length 212 >>
 stream
 BT /F1 16 Tf 72 762 Td (Page two) Tj ET
 BT /F1 9 Tf 72 726 Td (sigNoRotate - /F 20, so pdf.js gives it its own canvas:) Tj ET
+BT /F1 9 Tf 72 505 Td (sigTwoBoxes - box 2 of the same field, a different size:) Tj ET
 endstream
 endobj
 xref
@@ -76,37 +87,32 @@ xref
 0000000075 00000 n 
 0000000138 00000 n 
 0000000208 00000 n 
-0000000373 00000 n 
+0000000380 00000 n 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
-0000000524 00000 n 
-0000000636 00000 n 
-0000000772 00000 n 
-0000000830 00000 n 
-0000000954 00000 n 
-0000001097 00000 n 
-0000000000 65535 f 
-0000000000 65535 f 
-0000000000 65535 f 
-0000000000 65535 f 
-0000000000 65535 f 
-0000000000 65535 f 
-0000000000 65535 f 
-0000000000 65535 f 
+0000000538 00000 n 
+0000000650 00000 n 
+0000000786 00000 n 
+0000000844 00000 n 
+0000000968 00000 n 
+0000001111 00000 n 
+0000001314 00000 n 
+0000001384 00000 n 
+0000001489 00000 n 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
-0000001300 00000 n 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
+0000001593 00000 n 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
@@ -121,9 +127,14 @@ xref
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
-0000001418 00000 n 
-0000001538 00000 n 
-0000001658 00000 n 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000000 65535 f 
+0000001718 00000 n 
+0000001838 00000 n 
+0000001958 00000 n 
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
@@ -131,10 +142,10 @@ xref
 0000000000 65535 f 
 0000000000 65535 f 
 0000000000 65535 f 
-0000001814 00000 n 
-0000002154 00000 n 
+0000002114 00000 n 
+0000002525 00000 n 
 trailer
 << /Size 62 /Root 1 0 R >>
 startxref
-2332
+2790
 %%EOF

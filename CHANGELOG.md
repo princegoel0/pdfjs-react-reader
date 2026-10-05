@@ -24,20 +24,66 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
-absent** of 58, on a suite of **1,101 tests in 118 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **29 met, 28 partial, 1
+absent** of 58, on a suite of **1,110 tests in 119 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. One of those eighteen is already back out:
-`FR-06` was closed in the code by #219 and re-synced in the register the same pass, so the 27 above counts it
-`met` again — on a guard that counts layer constructions and holds the reader's focus across the step, not on
-the sentence that moved it.
+below and is the honest number rather than the comfortable one. Three of those eighteen are already back out:
+`FR-06` was closed in the code by #219 and re-synced in the register the same pass, and `FR-30` and `FR-32`
+came back through **#230**, the first Tier-1 work order, where the assertion had to be written before the row
+could be re-earned — on guards that count layer constructions, hold the reader's focus across a zoom step,
+read page trees out of written bytes, and refuse to believe a fixture that cannot hold two signature boxes.
+That is the direction the count takes from here: down where a guard turns out to be decoration, up where a
+test is shown to bite.
 
 ### Added
 
-### Added
+- **Tier 1 opens: the edit tier's two unasserted claims are asserted, and a fixture had to grow for one
+  of them (`#230`, 2026-10-05).** The clause-by-clause audit found rows whose cited guard asserted less
+  than the PRD sentence; this closes the first two, and both are now `met` again — `FR-30` and `FR-32`,
+  each on a guard that fails when the behaviour is removed, which is the only definition of the word this
+  register accepts.
 
-### Added
+  **`FR-30` — "undo at two levels".** `undoApply` and its label appeared in no test file: the batch level
+  was guarded and the level that touches bytes was not. `src/edit.undo.test.tsx` mounts the panel over the
+  real writer and reads page trees out of the bytes handed to the shell, and the shell's document is
+  modelled as a *file that changes* — `getData()` returns whatever `replaceDocument` was last given —
+  because with a static fixture every snapshot in the suite is the same bytes and the test cannot tell
+  "before this apply" from "before any apply", which is exactly the distinction the clause turns on. Four
+  assertions: the restored bytes are the snapshot byte for byte (`Buffer.compare` against the file, not a
+  page-tree match); the level spends itself, so the control is disabled after one press; a second apply
+  holds *its own* snapshot and not the first one's; and the view rotations that the apply had written into
+  the file come back as view state, `rotatePage(4, 90)`. The batching half is a tally: three edits cost
+  zero reads and zero parses, the apply that follows costs one of each, counted on `PDFDocument.load` —
+  the peer's own door, because the parse is what "not once per keystroke" is about.
 
+  **`FR-32` — "scaled into each widget box that field declares".** The plural had no file to be tested
+  against: `signature-sample.pdf` had four fields and four boxes, so a writer that stopped after the first
+  widget of a field passed every test in the repository. `scripts/make-signature-pdf.mjs` now writes a
+  fifth field, `sigTwoBoxes`, whose `/Kids` name two widgets on two pages at two sizes (200×60 and
+  100×30), with the generator refusing to emit the file unless both kids name the parent, each carries its
+  own `/Rect`, neither carries `/FT` or `/AP`, and the two rectangles differ. One mark then has to arrive as
+  four different page numbers — `310 581 … 490 599` and `77 470.5 … 167 479.5` in the writer, `320 590 …
+  480 590` and `82 475 … 162 475` from the pad — and the panel says `· 2` out loud, because a reader who
+  signed the first box would otherwise check the second and conclude it failed. The clause's last three
+  words, "and reported while it runs", are now asserted by holding the scan's bytes behind a deferred and
+  reading the status line while it is still unpaid: `Finding signature fields…` during the parse, the rows
+  when it lands, and the paragraph gone when it does.
+
+  **Ripples, all of them the fixture telling the truth about itself.** Six consumers re-counted: three
+  `pdf-write.test.ts` expectations (a flatten now removes 6 fields, not 5; five appearance streams, not
+  three; the page-move test carries the two boxes to opposite pages), two `edit.signatures.test.tsx`
+  lists (five fields, six rows), the generator's own self-checks, and the browser matrix's `/Sig` name
+  list. `scripts/check-fr-evidence.mjs`'s `met` rules are what kept the prose honest: `FR-32` could not
+  move to `met` without its cited guard naming the requirement, and `FR-16`'s gap — which cited that
+  fixture's four shapes — had to be re-measured rather than edited, so the chromium cell ran again on the
+  new file and still reads **0 sig boxes, 0 sig controls** across both mounted layers. #229 stays open on
+  that number.
+
+  **Nine counterfactuals, each failing the test that names it** (`.spike/counterfactual-t1a.mjs`, sources
+  restored byte-for-byte): the wrong snapshot kept, the level never spent, the rotations not given back,
+  a second apply keeping the first snapshot, a read per keystroke, a parse per pending edit, the writer
+  stopping after the first box, the announcement hard-coded to one, and the scan silent while it runs. No
+  case passed, which is the only result worth having.
 - **A runner has now seen the whole `verify` chain, and two register gaps closed on its output (`#214`→`#218`→
   `#208` paying off; observed 2026-10-05).** CI run **37296313715**, dev at `25d7c07`, is green across all
   fourteen jobs, and the thing that makes it news is a step list rather than a conclusion: `Verify (Node 22.13.0)`

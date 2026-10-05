@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { PdfError } from './errors';
 import { isPdfError, isCancellationCode } from './errors';
+import type { PdfSignatureField } from './pdf-write';
 import { arrangePages, findSignatureFields, flattenBytes, signFields } from './pdf-write';
 
 const fixture = (name: string): Uint8Array =>
@@ -220,8 +221,8 @@ describe('arrangePages', () => {
 
 /*
  * The signature half of the writer, measured against `signature-sample.pdf` — a form whose
- * three `/Sig` fields are the three shapes a reader's file arrives in, and which starts with
- * one of them carrying no appearance at all. That last detail is what makes the second test
+ * four `/Sig` fields are the four shapes a reader's file arrives in, and which starts with
+ * three boxes carrying no appearance at all. That last detail is what makes the second test
  * below mean something: with no `/AP` in the source file, a mark found afterwards can only
  * have come from `signFields`.
  */
@@ -245,35 +246,79 @@ describe('signatures', () => {
       'sigKid',
       'sigNoRotate',
       'sigAlreadySigned',
+      // One field, two boxes: the list is per widget, because those are two rectangles a
+      // reader has to see and choose between.
+      'sigTwoBoxes',
+      'sigTwoBoxes',
     ]);
-    expect(fields.map((f) => f.page)).toEqual([0, 0, 1, 1]);
+    expect(fields.map((f) => f.page)).toEqual([0, 0, 1, 1, 0, 1]);
     expect(fields.map((f) => f.rect)).toEqual([
       [72, 660, 272, 720],
       [72, 570, 222, 610],
       [72, 660, 272, 720],
       [72, 560, 272, 620],
+      [300, 560, 500, 620],
+      [72, 460, 172, 490],
     ]);
-    // The fixture gives only sigPlain an empty start: the other three already carry a /AP.
-    expect(fields.map((f) => f.hasAppearance)).toEqual([false, true, true, true]);
-    expect(fields.map((f) => f.noRotate)).toEqual([false, false, true, false]);
+    // The fixture gives only the boxes that start empty an absent appearance: sigPlain and
+    // the two widgets of sigTwoBoxes.
+    expect(fields.map((f) => f.hasAppearance)).toEqual([false, true, true, true, false, false]);
+    expect(fields.map((f) => f.noRotate)).toEqual([false, false, true, false, false, false]);
     // One field arrives with a signature value, and it is the only one that does.
-    expect(fields.map((f) => f.alreadySigned)).toEqual([false, false, false, true]);
+    expect(fields.map((f) => f.alreadySigned)).toEqual([false, false, false, true, false, false]);
+  });
+
+  /*
+   * FR-32's plural: "scaled into each widget box that field declares". `signature-sample.pdf`
+   * grew a fifth field for this — a parent whose `/Kids` name two widgets, on two pages, at two
+   * sizes — because every earlier fixture had one box per field, and a writer that stopped after
+   * the first box passed all of it. The two marks have to land as four different page numbers:
+   * the same relative pair resolved into a 200x60 rectangle and a 100x30 one.
+   */
+  it('writes one mark into both boxes of a field that declares two, scaled to each', async () => {
+    const source = fixture('signature-sample.pdf');
+    const boxes = (await findSignatureFields(source)).filter((f) => f.name === 'sigTwoBoxes');
+    expect(boxes.map((b) => b.rect)).toEqual([
+      [300, 560, 500, 620],
+      [72, 460, 172, 490],
+    ]);
+    expect(new Set(boxes.map((b) => b.page)).size, 'one box on each page').toBe(2);
+
+    const result = await signFields(source, [{ field: 'sigTwoBoxes', points: MARK }]);
+    // Two entries for one call: `signed` counts widgets, which is what the panel says out loud.
+    expect(result.signed).toEqual(['sigTwoBoxes', 'sigTwoBoxes']);
+    const out = text(result.bytes);
+    expect(out).toContain('310 581 m 490 599 l');
+    expect(out).toContain('77 470.5 m 167 479.5 l');
+    expect(count(out, 'S Q'), 'one appearance stream per box').toBe(2);
+    // The parent that reaches both boxes holds no appearance of its own.
+    expect(objectOf(out, 'sigTwoBoxes')).toContain('/Kids');
+    expect(objectOf(out, 'sigTwoBoxes')).not.toContain('/AP');
+
+    const after = await findSignatureFields(result.bytes);
+    expect(after.filter((f) => f.name === 'sigTwoBoxes').map((f) => f.hasAppearance)).toEqual([
+      true,
+      true,
+    ]);
+    expect(
+      after.filter((f) => f.name !== 'sigTwoBoxes').map((f) => f.hasAppearance),
+      'signing one field leaves every other box as it was',
+    ).toEqual([false, true, true, true]);
   });
 
   it('writes the marks into the fields that are unsigned, and refuses a list that includes a signed one', async () => {
     const source = fixture('signature-sample.pdf');
     const fields = await findSignatureFields(source);
-    const result = await signFields(
-      source,
-      fields.filter((field) => !field.alreadySigned).map((field) => ({ field: field.name, points: MARK })),
-    );
+    const names = unsignedFields(fields);
+    const result = await signFields(source, names.map((field) => ({ field, points: MARK })));
     const out = text(result.bytes);
 
-    expect(result.signed).toEqual(['sigPlain', 'sigKid', 'sigNoRotate']);
+    // One of the five is a field with two boxes, so six widgets carry a mark from four calls.
+    expect(result.signed).toEqual(['sigPlain', 'sigKid', 'sigNoRotate', 'sigTwoBoxes', 'sigTwoBoxes']);
     expect(result.refused).toEqual([]);
     expect(out.startsWith('%PDF-')).toBe(true);
-    expect(count(out, 'S Q')).toBe(3);
-    expect(count(out, '/FT /Sig')).toBe(4);
+    expect(count(out, 'S Q')).toBe(5);
+    expect(count(out, '/FT /Sig')).toBe(5);
     // One mark, two boxes, two different sets of page coordinates — the difference between
     // storing a mark relative to its box and storing it in one rectangle's space.
     expect(out).toContain('82 681 m 262 699 l');
@@ -377,24 +422,34 @@ describe('signatures', () => {
     expect(count(out, '/Subtype /Widget')).toBe(count(text(source), '/Subtype /Widget'));
   });
 
+  /*
+   * `findSignatureFields` answers one entry per *widget* and a mark addresses one *field*, so a
+   * file with a two-box field needs this to be said: handing the list straight to `signFields`
+   * would ask for the same field twice and write its boxes twice over.
+   */
+  const unsignedFields = (fields: PdfSignatureField[]): string[] => [
+    ...new Set(fields.filter((field) => !field.alreadySigned).map((field) => field.name)),
+  ];
+
   it('flattens a signed field into the page without losing the mark', async () => {
     const source = fixture('signature-sample.pdf');
     const fields = await findSignatureFields(source);
     const { bytes } = await signFields(
       source,
-      fields.filter((field) => !field.alreadySigned).map((field) => ({ field: field.name, points: MARK })),
+      unsignedFields(fields).map((field) => ({ field, points: MARK })),
     );
     const flat = await flattenBytes(bytes);
     const out = text(flat.bytes);
 
     // The form is gone — that is what a flatten is — and with it every /Sig field.
     // Four signature fields and the text field: everything the form held.
-    expect(flat.fieldsRemoved).toBe(5);
+    expect(flat.fieldsRemoved).toBe(6);
     expect(count(out, '/FT /Sig')).toBe(0);
     expect(count(out, '/Subtype /Widget')).toBe(0);
     // And the marks are page content now, which is the answer to "will it still read as
-    // signed in a viewer with no form layer at all".
-    expect(count(out, 'S Q')).toBe(3);
+    // signed in a viewer with no form layer at all". Five because the field with two boxes
+    // contributed two page-marked rectangles.
+    expect(count(out, 'S Q')).toBe(5);
     // The text field's value is baked into the page as well, but it cannot be read off these
     // bytes as a string: the writer compresses the content streams it composes, which is why
     // the mark — written uncompressed, by us — is countable and the value is not. What can
@@ -415,7 +470,7 @@ describe('signatures', () => {
     const unsigned = await flattenBytes(fixture('signature-sample.pdf'));
     const out = text(unsigned.bytes);
 
-    expect(unsigned.fieldsRemoved).toBe(5);
+    expect(unsigned.fieldsRemoved).toBe(6);
     expect(unsigned.hadNoForm).toBe(false);
     expect(count(out, '/FT /Sig')).toBe(0);
     expect(count(out, '/Subtype /Widget')).toBe(0);
@@ -431,7 +486,7 @@ describe('signatures', () => {
     const fields = await findSignatureFields(source);
     const { bytes } = await signFields(
       source,
-      fields.filter((field) => !field.alreadySigned).map((field) => ({ field: field.name, points: MARK })),
+      unsignedFields(fields).map((field) => ({ field, points: MARK })),
     );
     const moved = await arrangePages(bytes, { order: [1, 0] });
     const after = await findSignatureFields(moved.bytes);
@@ -442,21 +497,18 @@ describe('signatures', () => {
       'sigKid',
       'sigNoRotate',
       'sigAlreadySigned',
+      'sigTwoBoxes',
+      'sigTwoBoxes',
     ]);
-    // Both pages' work moved with them: page 1's boxes are page 2's now, and the field
-    // that carries a signature value still carries it.
-    expect(after.map((f) => f.page)).toEqual([1, 1, 0, 0]);
+    /*
+     * Both pages' work moved with them: page 1's boxes are page 2's now, and the field
+     * that carries a signature value still carries it. The last two are the one field's two
+     * boxes, which land on opposite pages and must both survive the swap.
+     */
+    expect(after.map((f) => f.page)).toEqual([1, 1, 0, 0, 1, 0]);
     expect(after.filter((f) => f.alreadySigned).map((f) => f.name)).toEqual(['sigAlreadySigned']);
   });
 });
-
-/*
- * The signature half of the writer, measured against `signature-sample.pdf` — a form whose
- * three `/Sig` fields are the three shapes a reader's file arrives in, and which starts with
- * one of them carrying no appearance at all. That last detail is what makes the first test
- * below mean something: with no `/AP` in the source file, a mark found afterwards can only
- * have come from `signFields`.
- */
 
 /*
  * FR-36 on the writer. These loops are synchronous inside `@cantoo/pdf-lib`, so the honest contract is

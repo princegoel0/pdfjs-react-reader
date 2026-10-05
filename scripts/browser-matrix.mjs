@@ -734,7 +734,7 @@ const CHECKS = [
       }
       const sig = await page.evaluate(() => {
         const controls = [...document.querySelectorAll('.pjsr-annotation-layer input, .pjsr-annotation-layer select, .pjsr-annotation-layer textarea')];
-        const names = ['sigPlain', 'sigNoRotate', 'sigKid', 'sigAlreadySigned'];
+        const names = ['sigPlain', 'sigNoRotate', 'sigKid', 'sigAlreadySigned', 'sigTwoBoxes'];
         return {
           layers: document.querySelectorAll('.pjsr-annotation-layer').length,
           sigControls: controls.filter((el) => names.includes(el.name ?? '')).length,

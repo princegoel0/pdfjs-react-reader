@@ -98,6 +98,8 @@ const click = (element: Element | null | undefined) => {
  *
  * A tenth and nine-tenths of the way across at half the height is 0.1 and 0.9, and 0.5 down — in
  * sigPlain's box [72 660 272 720] that is `92 690` and `252 690`, page points and right way up.
+ * Half the height is the middle of every box this file signs, so an assertion never has to settle
+ * which way the y axis went to know where the mark landed.
  */
 function strokeThePad(): HTMLCanvasElement | null {
   const pad = document.querySelector<HTMLCanvasElement>('.pjsr-sign-pad');
@@ -120,8 +122,8 @@ function strokeThePad(): HTMLCanvasElement | null {
   return pad;
 }
 
-/** A stroke, and the rows the scan it triggers is expected to produce. */
-async function drawUntilBoxesAppear(rows = 4) {
+/** A stroke, and the rows the scan it triggers is expected to produce: one per widget box. */
+async function drawUntilBoxesAppear(rows = 6) {
   strokeThePad();
   await waitFor(() => expect(document.querySelectorAll('.pjsr-sign-row')).toHaveLength(rows), {
     timeout: 4000,
@@ -147,7 +149,10 @@ afterEach(async () => {
   cleanup();
   replaced.mockClear();
   reportError.mockClear();
-  loaded.mockClear();
+  // `mockReset`, not `mockClear`: the scan test hands `getData` a deferred, and an unconsumed
+  // `mockImplementationOnce` would ride into whichever test runs after it.
+  loaded.mockReset();
+  loaded.mockImplementation(async () => sample());
   declaresForm.value = true;
 });
 
@@ -170,6 +175,46 @@ describe('signature panel', () => {
     expect(loaded, 'a second stroke must not parse the same document again').toHaveBeenCalledTimes(1);
   });
 
+  /*
+   * FR-32: "reported while it runs". The scan that lists the boxes is a parse of the whole file —
+   * measured at 150–200 ms of main thread on a thousand-page document — and it starts the moment
+   * the reader lifts the pen. A panel that says nothing for a fifth of a second and then changes
+   * underneath a reader is what that clause exists to forbid, so the sentence has to be on screen
+   * *during* the parse. The bytes are held behind a deferred so this test can look while it runs.
+   */
+  it('says the boxes are being looked for while the parse is running', async () => {
+    let release: (bytes: Uint8Array) => void = () => {};
+    loaded.mockImplementationOnce(
+      () =>
+        new Promise<Uint8Array>((resolve) => {
+          release = resolve;
+        }),
+    );
+    render(<Harness shell={sigShell()} />);
+    await settle();
+    // Nothing is claimed to be running before there is a mark to place.
+    expect(sectionText()).toBe('');
+
+    strokeThePad();
+    await settle();
+    expect(sectionText(), 'the reader is told the list is coming').toBe(
+      DEFAULT_LABELS.signatureScanning,
+    );
+    expect(document.querySelector('.pjsr-sign-row'), 'and the answer has not arrived yet').toBeNull();
+
+    await act(async () => {
+      release(sample());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    await waitFor(() => expect(document.querySelectorAll('.pjsr-sign-row')).toHaveLength(6), {
+      timeout: 4000,
+      interval: 25,
+    });
+    // The sentence does not linger: with the rows on screen the status paragraph is gone rather
+    // than emptied, which is the same shape as the "no boxes" answer below it.
+    expect(document.querySelector('.pjsr-sign-status'), 'the sentence goes when the rows arrive').toBeNull();
+  });
+
   it('shows no section at all to a document that declares no form', async () => {
     declaresForm.value = false;
     render(<Harness shell={sigShell()} />);
@@ -190,6 +235,10 @@ describe('signature panel', () => {
       'sigKid',
       'sigNoRotate',
       'sigAlreadySigned',
+      // Five fields, six rows: a field displayed twice is offered twice, because the reader
+      // has to see both rectangles to know what signing one does.
+      'sigTwoBoxes',
+      'sigTwoBoxes',
     ]);
     /*
      * Only the box holding a `/V` is called signed. Two of the others have an appearance
@@ -201,6 +250,8 @@ describe('signature panel', () => {
       'Page 1',
       'Page 2',
       'Page 2 · Already signed',
+      'Page 1',
+      'Page 2',
     ]);
   });
 
@@ -249,6 +300,32 @@ describe('signature panel', () => {
     // still holds no appearance of its own.
     expect(objectOf(out, 'sigPlain')).toContain('/AP');
     expect(objectOf(out, 'sigKid')).not.toContain('/AP');
+  });
+
+  /*
+   * FR-32's plural from the pad's side: one field displayed in two places takes the mark twice, and
+   * the panel has to say so. A reader who signs the first box and is told only that it was placed
+   * will look at the second and conclude it failed — so the count is in the announcement, and both
+   * rectangles are in the bytes.
+   */
+  it('counts the boxes when one field has two, and writes the mark into both', async () => {
+    render(<Harness shell={sigShell()} />);
+    await settle();
+    await drawUntilBoxesAppear();
+    click(rowButton('sigTwoBoxes'));
+    await waitFor(() => expect(noticeText()).toBe('Signature placed on sigTwoBoxes · 2'), {
+      timeout: 4000,
+      interval: 25,
+    });
+
+    const out = latin(replaced.mock.calls.at(-1)?.[0] as Uint8Array);
+    // The same stroke, resolved into two different boxes: 0.1 and 0.9 across a 200-wide rectangle
+    // on page 1, across a 100-wide one on page 2. One writer pass, four numbers that differ.
+    expect(out).toContain('320 590 m');
+    expect(out).toContain('480 590 l');
+    expect(out).toContain('82 475 m');
+    expect(out).toContain('162 475 l');
+    expect(reportError).not.toHaveBeenCalled();
   });
 
   it('says which field the signature went into', async () => {

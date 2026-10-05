@@ -447,7 +447,7 @@
         "src/lib/form.test.ts"
       ],
       "gaps": [
-        "the signature widget is still asserted nowhere, and now for a harder reason than absence of a test: measured 2026-10-05 in the browser, **none** of the fixture's four /Sig shapes renders anything at all (0 sig boxes, 0 sig controls across both mounted page layers). The engine's SignatureWidgetAnnotationElement (node_modules/pdfjs-dist/build/pdf.mjs:19170-19173) marks a signature renderable only when data.hasOwnCanvas, so \"a signature widget renders as its box\" cannot be satisfied by passing the engine more flags -- it needs a box drawn by this package from the annotation's own rect, which is #229. No test in the repo asserts the box either way, and none should until it exists"
+        "the signature widget is still asserted nowhere, and now for a harder reason than absence of a test: measured 2026-10-05 in the browser, **none** of the fixture's /Sig widgets renders anything at all -- 0 sig boxes, 0 sig controls across both mounted page layers, now over five `/Sig` fields and six widget boxes rather than four fields and four (the fixture grew the two-box field FR-32's plural needed, and the count was re-read on it the same day). The engine's SignatureWidgetAnnotationElement (node_modules/pdfjs-dist/build/pdf.mjs:19170-19173) marks a signature renderable only when data.hasOwnCanvas, so \"a signature widget renders as its box\" cannot be satisfied by passing the engine more flags -- it needs a box drawn by this package from the annotation's own rect, which is #229. No test in the repo asserts the box either way, and none should until it exists"
       ],
       "note": "Collecting widgets and reading their types off a real AcroForm fixture is guarded (form.test.ts:46-115), which is the data half. The rendered half is now measured rather than read: scripts/browser-matrix.mjs#form-widgets-are-html-controls (added 2026-10-05, #206) loads form-sample.pdf and asserts, per field name, the element the widget became -- input[text] fullName, textarea notes, input[checkbox] subscribe, three input[radio] priority, select[select-one] country, select[select-multiple] skills -- plus that every one of them is focusable (9 controls, 10 boxes, 0 untabbable on this run). **An acceptance waiver this row carried was wrong and is gone:** it said the control set should be proven in jsdom and that no browser check adds evidence. jsdom does not run pdf.js's AnnotationLayer at all, so a jsdom assertion would have tested a stub; the browser check is the only instrument that can see the elements the clause names. The same row measured the clause's sixth type into a real gap rather than a missing test -- see the gap -- so FR-16 stays partial on the signature box (#229), not on the five kinds that now have evidence."
     },
@@ -805,7 +805,7 @@
     },
     "FR-30": {
       "title": "Page Authoring",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/page-plan.ts",
         "src/edit.tsx"
@@ -813,21 +813,21 @@
       "automated": [
         "src/lib/page-plan.test.ts",
         "src/lib/pdf-write.test.ts",
-        "src/edit.extract.test.tsx"
+        "src/edit.extract.test.tsx",
+        "src/edit.test.tsx",
+        "src/edit.undo.test.tsx"
       ],
       "acceptance": [],
-      "acceptanceWaiver": "Reorder, delete, rotate, extract and split are asserted by writing real files and re-opening them in jsdom, which is the same byte-level evidence a browser pass would produce at higher cost.",
+      "acceptanceWaiver": "Reorder, delete, rotate, extract and split are asserted by writing real files and re-opening them in jsdom, and so is both-level undo: the assertion reads the page tree out of the bytes handed to the shell. A browser pass would produce the same evidence about the same bytes at higher cost, and would add nothing the tier’s clause claims.",
       "documentation": [
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
+        "src/edit.undo.test.tsx",
         "src/edit.extract.test.tsx"
       ],
-      "gaps": [
-        "“undo of the last apply, which restores the snapshot that write started from” is asserted nowhere: `undoApply` (src/edit.tsx:439) and its label (:136,:759) appear in no test file, and no `byLabel(/^Undo$/)` query ever reaches the apply-undo control. The batch level is guarded — “steps back through the batch without writing anything” (edit.test.tsx:201, asserting `replaced` was never called at :209) — and the level that touches bytes is not",
-        "“parsed once per apply and not once per keystroke” is only ever observed at one operation per apply (edit.test.tsx:311 counts a single load for a single move). No test performs N operations, applies once, and asserts the document was read once"
-      ],
-      "note": "Reorder, delete, rotate, extract and split are guarded against written bytes and re-opened in jsdom (page-plan.test.ts, pdf-write.test.ts:118-162, edit.extract.test.tsx:156, which asserts two files with the right page kids). The two-level undo is the clause the row claims, and only one of its two levels has ever been executed by a test."
+      "gaps": [],
+      "note": "Reorder, delete, rotate, extract and split are guarded against written bytes and re-opened in jsdom (page-plan.test.ts, pdf-write.test.ts:118-162, edit.extract.test.tsx:156, which asserts two files with the right page kids). Both undo levels are now executed by a test (src/edit.undo.test.tsx): the snapshot an apply started from comes back byte for byte, the level spends itself, what an apply holds is the last apply’s snapshot and not the first, and the view rotations return as view state. The batching is tallied on the writer’s own entry point — three edits cost no read and no parse, the apply that follows costs one of each. Nine counterfactuals were run against these guards on 2026-10-05 and each failed the test that names it."
     },
     "FR-31": {
       "title": "True Flattening",
@@ -848,11 +848,11 @@
         "src/lib/pdf-write.test.ts"
       ],
       "gaps": [],
-      "note": "undefined Amended 2026-10-04: the clause now names what the writer does — supported widgets and supported signature appearances, markup annotations carried through untouched — because `PDFForm.flatten()` walks `getFields()` and their widgets and never sees a non-widget annotation (@cantoo/pdf-lib/cjs/api/form/PDFForm.js:635-657). No clause of the restated requirement changed its evidence."
+      "note": "Amended 2026-10-04: the clause now names what the writer does — supported widgets and supported signature appearances, markup annotations carried through untouched — because `PDFForm.flatten()` walks `getFields()` and their widgets and never sees a non-widget annotation (@cantoo/pdf-lib/cjs/api/form/PDFForm.js:635-657). No clause of the restated requirement changed its evidence."
     },
     "FR-32": {
       "title": "Visual Signing",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/pdf-write.ts",
         "src/lib/signature.ts",
@@ -864,18 +864,15 @@
         "src/edit.signatures.test.tsx"
       ],
       "acceptance": [],
-      "acceptanceWaiver": "A written mark painting in both file-borne and in-session documents was browser-verified during the signing spike and recorded in the changelog; the matrix carries no signing check yet, which is tracked rather than claimed here.",
+      "acceptanceWaiver": "A written mark painting in both file-borne and in-session documents was browser-verified during the signing spike and recorded in the changelog; the matrix carries no signing check yet, which is tracked rather than claimed here. What the clause states is about bytes and about a sentence on screen while a parse runs, and both are asserted against real files in jsdom.",
       "documentation": [
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
         "src/edit.signatures.test.tsx"
       ],
-      "gaps": [
-        "“scaled into each widget box that field declares” is proven over two single-box fields, not over one field with two boxes: the two paths asserted at pdf-write.test.ts:263 belong to `sigPlain` and `sigKid`, and no fixture gives one field two `/Annots` entries, so a writer that stopped after the first box would pass",
-        "“reported while it runs” is asserted nowhere: the scanning state that carries the progress (src/edit.tsx:811,980, `signatureScanning`) appears in no test file. The single-parse half is guarded (edit.signatures.test.tsx:155,162,166,170) — one stroke parses once, a second stroke does not parse again"
-      ],
-      "note": "The mark reaching an appearance stream, the `/V` count proving no signature value is written, the `ALREADY_SIGNED` refusal on both the writer and the built-in pad, and the deferred one-parse scan are each asserted. The row’s remaining gap is the plural in the clause — `each widget box` — and the reporting the clause asks for while the scan runs."
+      "gaps": [],
+      "note": "The mark reaching an appearance stream, the `/V` count proving no signature value is written, the `ALREADY_SIGNED` refusal on both the writer and the built-in pad, and the deferred one-parse scan are each asserted. The plural is now asserted too: `signature-sample.pdf` grew a fifth field whose `/Kids` name two widgets on two pages at two sizes (2026-10-05), so one mark resolved into four different page numbers is what `pdf-write.test.ts` reads back, and the panel says `· 2` out loud because a reader who signed the first box would otherwise check the second and conclude it failed. `reported while it runs` is asserted by holding the scan’s bytes behind a deferred and reading the status line while it is still unpaid."
     },
     "FR-33": {
       "title": "XFA Display, Save Refused",
