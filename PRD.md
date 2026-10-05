@@ -813,7 +813,18 @@ versions, so their APIs are development surfaces until the `1.0.0` export map is
 | **Internal** | Not reachable from a published entry point. | May change at any time, no note. |
 | **Deprecated** | Superseded, still working. | Removed only in a major version, after one minor of warning in the changelog. |
 
-Tags are published per name and enforced by a build check (FR-50). Two boundaries this policy protects: the
+Tags are published per name and enforced by a build check (FR-50). The **baseline that decides a name's tag is a
+commit, not a preference**: a name is Stable if it was reachable from a published entry point at `aed9fd6` (the
+`0.9` close) and Experimental if it arrived after it, with any hand-moved name carrying its reason in the
+manifest's `notes`. That rule is a decision, taken on 2026-10-05, and its reason is an asymmetry: only `0.1.0`,
+`0.1.1` and `0.1.2` are published, and `0.1.2` exposes four subpaths — `.`, `./headless`, `./styles.css`,
+`./package.json` — so re-deriving stability from the *published* surface would relabel most of the feature,
+edit, merge, composition and locale names Experimental without telling a consumer anything they could not
+already see. Those names have shipped in every internal build since, and the shell itself relies on them, which
+is the table's own test for Stable. The split is printed by `npm run check:maturity` and stated in
+`CODE_REFERENCE.md` §2 as a derived figure, so it cannot go stale silently.
+
+Two boundaries this policy protects: the
 find-controller interface is stable *as a shape*, which is what makes an alternative search strategy
 possible without a fork; and where a public prop is typed with an engine class, an upstream change to that
 class is a breaking change to our surface — which is why §6's engine policy pins a major and requires a
@@ -1171,6 +1182,16 @@ The first complete public release occurs only when the following are all true:
   `1.0.0` does not ship;
 * the release candidate is built and tested on a clean runner from the packed npm artifact;
 * the documented upgrade path from `0.1.2` to `1.0.0` is exercised, including lockfile/dependency migration and public API checks;
+* the published pre-1.0 line is deprecated wherever it permits a pairing this contract forbids: `0.1.0` and
+  `0.1.1` are deprecated on npm, because each declares `pdfjs-dist: ^5.0.0` as its *only* engine peer and every
+  one of the three declares `engines.node >=20`, while §6 rejects 5.x (CVE-2026-16633 has no 5.x fix) and §8
+  rejects Node below 22.13.0 — so `npm i pdfjs-react-reader@0.1.0` installs, silently, exactly the combination
+  the security decision rules out. `0.1.2` stays installable: deprecating it would leave no published package at
+  all, and its `^5.0.0 || ^6.2.108` range is a limit of the published surface, corrected at `1.0.0`, where the
+  range is `^6.2.108` only. The deprecation message is the pointer a consumer needs, not an alarm: it names
+  `0.1.2` and the engine floor. Deprecating is a registry write and `1.0.0`'s publication is another; neither is
+  a build step, so neither belongs to a job — they belong to this gate, with the commands recorded in the
+  roadmap's certification row;
 * the required real-device mobile pass is complete; and
 * `0.2.0` through `0.12.0` remain internal milestone labels only. No intermediate npm publication is implied
   by their completion.

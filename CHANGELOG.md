@@ -528,12 +528,47 @@ the sentence that moved it.
 
 ### Amended
 
-Six statements moved across two rulings (2026-10-04 and 2026-10-05), and each moved as the lock requires: the
+Eight statements moved across three rulings (2026-10-04, 2026-10-05, and 2026-10-05 again on #207), and each
+moved as the lock requires: the
 id or section is unchanged, the whole requirement is restated, and the reason is written here to stay. Nothing
 in this list is a requirement weakened to match the code — in every case the sentence was saying something the
 package does not do, or cannot do on the engine we advertise, one of them (`FR-47`) gained a promise instead of
 losing one, and the last (§6's bundle budgets) changed what a budget is *allowed to do*, which is the kind of
-call only the owner can make.
+call only the owner can make. The two added under #207 are a different kind of amendment from the other six:
+neither is about what the package does, but about what a *promise* is founded on — when a name counts as
+stable, and what the published pre-1.0 line is allowed to permit. They are recorded here rather than in prose
+because §5.5 and §9 are the contract a consumer reads, and an unstated baseline is a baseline that will be
+re-derived by whoever asks next.
+
+- **§5.5 API maturity** now states that the tag baseline is a commit and names it — a name is Stable if it was
+  reachable from a published entry point at `aed9fd6`, the `0.9` close, and Experimental if it arrived after —
+  with the reason written down instead of left as an implementation habit. **Reason:** the registry answers were
+  read again on 2026-10-05 before deciding (`npm view pdfjs-react-reader versions` → `0.1.0`, `0.1.1`, `0.1.2`,
+  nothing deprecated), and `0.1.2` exposes four subpaths: `.`, `./headless`, `./styles.css`, `./package.json`.
+  Re-deriving "relied on" from that published surface would relabel most of the feature, `edit`, `merge`,
+  composition and locale names Experimental — measured rather than imagined: read through the same extractor
+  `check:maturity` uses, `0.1.2`'s two JS entries carry **127** distinct names, and of today's **263** stable
+  names only **110** are among them, so the split would become **110 stable / 210 experimental** with **153**
+  names moved down — while telling a consumer nothing they could not already see, because those names have
+  shipped in every internal build since and the shell itself uses them, which is §5.5's own test for Stable.
+  (`.spike/baseline-counterfactual.mjs` produced that arithmetic on 2026-10-05; the first draft of this sentence
+  guessed "nearer 90 / 230" and was wrong by forty names, which is why the number was measured before it was
+  kept.) The alternative was
+  a one-time reclassification with a changelog line; the owner chose to keep the commit baseline and remove the
+  ambiguity instead, so the question cannot be re-litigated by a future reader who finds the asymmetry without
+  finding this paragraph. The split itself is no longer prose anyone must trust: `npm run check:maturity` prints
+  it and `CODE_REFERENCE.md` §2 states it as a derived figure under the new `npm run check:docs`.
+- **§9's publication gate** gained a bullet on the pre-1.0 npm line. **Reason:** read from the registry,
+  `0.1.0` and `0.1.1` each declare `peerDependencies.pdfjs-dist` as `^5.0.0` **only**, and all three declare
+  `engines.node >=20`, while §6 rejects 5.x (CVE-2026-16633 has no 5.x fix) and §8 rejects Node below 22.13.0.
+  So `npm i pdfjs-react-reader@0.1.0` installs, with no warning, exactly the pairing the security decision rules
+  out — and npm will not let a peer range say "5.x is forbidden *or* 6.x is required" in a way that blocks the
+  5.x branch, because an `||` range permits both sides. `0.1.2` stays installable by deliberate choice:
+  deprecating it would leave no published package at all, and its `^5.0.0 || ^6.2.108` range is a limit of a
+  surface published before the 6.x decision, corrected at `1.0.0` where the range is `^6.2.108` alone. The
+  bullet is written as a gate item with its commands in the roadmap's W9 row because a deprecation is a registry
+  write — it is the owner's action, not a job's, and recording it as "done" until the answer comes back from
+  `npm view … deprecated` would be the kind of claim this register exists to refuse.
 
 - **`FR-31` True Flattening** now flattens *supported widgets and supported signature appearances*, says plainly
   that markup annotations — highlight, text markup, ink, free-text — are carried through as annotations rather
