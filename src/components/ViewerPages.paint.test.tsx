@@ -17,10 +17,11 @@
  */
 import { act, cleanup, render } from '@testing-library/react';
 import { useState } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type PDFDocumentProxy, type PDFPageProxy } from 'pdfjs-dist';
 import { usePdfVirtualizer, type VirtualSlot } from '../headless/usePdfVirtualizer';
 import { computeSlots, type PageLayout, type ScaleMode } from '../lib/layout';
+import type { OptionalContentConfigHandle } from '../lib/optional-content';
 import { DEFAULT_LABELS } from '../lib/labels';
 import { ViewerProvider } from './ViewerContext';
 import type { ViewerController } from './ViewerController';
@@ -28,6 +29,8 @@ import { ViewerPages } from './ViewerParts';
 
 /** Page number → how many times the engine was asked to paint it. */
 const paints = vi.hoisted(() => new Map<number, number>());
+/** Page number → the options of its most recent `render()`, which is where FR-24's shared instance travels. */
+const renders = vi.hoisted(() => new Map<number, unknown>());
 
 vi.mock('pdfjs-dist', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -62,11 +65,44 @@ vi.mock('pdfjs-dist', async (importOriginal) => ({
 }));
 
 class ObserverStub {
+  static instances: ObserverStub[] = [];
+  constructor(readonly callback: () => void) {
+    ObserverStub.instances.push(this);
+  }
+
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}
 }
 globalThis.ResizeObserver = ObserverStub as unknown as typeof ResizeObserver;
+
+/**
+ * A viewport with a size in it.
+ *
+ * jsdom answers 0 for every `clientWidth`, which is why this file used to be able to test only half of FR-08:
+ * a fit scale resolved against nothing never moves, so "repaints only when the fit target itself moves" had
+ * one leg. Faking the two measurements at the prototype level — and deleting the shadow afterwards, which
+ * puts jsdom's own answer back — gives the fit modes a target to move against.
+ */
+const metrics = { width: 1000, height: 800 };
+
+function giveViewportASize(): void {
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => metrics.width });
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+    configurable: true,
+    get: () => metrics.height,
+  });
+}
+
+/** Every element's resize watcher, fired the way an engine fires one when its box changes. */
+function resize(): void {
+  act(() => {
+    ObserverStub.instances.forEach((observer) => observer.callback());
+  });
+}
+
+/** The padding a wide viewport gets, read from the virtualizer rather than copied into this file. */
+const WIDE_PADDING = 32;
 
 const NUM_PAGES = 12;
 const PAGE_W = 612;
@@ -89,8 +125,9 @@ function pageProxy(number: number): PDFPageProxy {
     getAnnotations: async () => [],
     getTextContent: async () => ({ items: [], styles: {} }),
     getXfa: async () => null,
-    render: () => {
+    render: (options: { viewport: { width: number; height: number }; optionalContentConfigPromise?: Promise<unknown> }) => {
       paints.set(number, (paints.get(number) ?? 0) + 1);
+      renders.set(number, options);
       return { promise: Promise.resolve(), cancel: () => {} };
     },
     cleanup: () => {},
@@ -129,7 +166,14 @@ const harness: { setLayout: ((next: PageLayout) => void) | null; slots: VirtualS
   scale: 0,
 };
 
-function Harness({ scale }: { scale: ScaleMode }) {
+function Harness({
+  scale,
+  optionalContentConfig = null,
+}: {
+  scale: ScaleMode;
+  /** The one config the shell resolved for this document, exactly as `ViewerParts` hands it down. */
+  optionalContentConfig?: OptionalContentConfigHandle | null;
+}) {
   const [layout, setLayout] = useState<PageLayout>('continuous');
   const virtualizer = usePdfVirtualizer({ doc, numPages: NUM_PAGES, scale, layout });
   // The shell is given the whole document's rows rather than the hook's two-row window, because jsdom's
@@ -151,7 +195,7 @@ function Harness({ scale }: { scale: ScaleMode }) {
     rotation: 0,
     pageRotations: {},
     contentVersion: 0,
-    optionalContentConfig: null,
+    optionalContentConfig,
     maxRowWidth: 0,
     linkService: {},
     matchesByPage: new Map(),
@@ -183,9 +227,12 @@ function canvases(): Map<number, string> {
   return out;
 }
 
-async function mount(scale: ScaleMode) {
+async function mount(
+  scale: ScaleMode,
+  options: { optionalContentConfig?: OptionalContentConfigHandle | null } = {},
+) {
   await act(async () => {
-    render(<Harness scale={scale} />);
+    render(<Harness scale={scale} optionalContentConfig={options.optionalContentConfig ?? null} />);
   });
   await act(async () => undefined);
 }
@@ -204,6 +251,7 @@ afterEach(() => {
   harness.setLayout = null;
   harness.slots = [];
   paints.clear();
+  renders.clear();
 });
 
 describe('FR-08: a layout switch at a fixed zoom paints nothing again', () => {
@@ -248,5 +296,128 @@ describe('FR-08: a layout switch at a fixed zoom paints nothing again', () => {
     // repaint that follows it is correct rather than wasteful.
     expect(scaleBefore).toBe(1);
     expect(harness.scale).toBe(scaleBefore);
+  });
+});
+
+/*
+ * FR-08's other leg, which this file used to hand to a browser because jsdom had no viewport to fit against
+ * (see the header). With the measurements faked above it is testable where the arithmetic is: a fit scale
+ * resolves against the element's box, the box is known, and the two halves of "repaints *only* when the fit
+ * target itself moves" can both be asked.
+ *
+ * The two-page case is the interesting one because the fit target really does move: two pages across one
+ * viewport width is a different fit than one, which is why the row is allowed to reach the canvas. The
+ * single-page case is the guard against an implementation that repaints on *any* layout change — the fit
+ * target there is identical, so a repaint is the waste the clause forbids.
+ */
+describe('FR-08: in a fit mode the switch repaints only when the fit target moved', () => {
+  beforeEach(() => {
+    metrics.width = 1000;
+    metrics.height = 800;
+    ObserverStub.instances = [];
+    giveViewportASize();
+  });
+
+  afterEach(() => {
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth;
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
+  });
+
+  it('fits one page across a 1000 px viewport, and doubles the canvas that implies', async () => {
+    await mount('fit-width');
+    expect(harness.scale).toBeCloseTo((1000 - WIDE_PADDING) / PAGE_W, 6);
+    const before = canvases();
+    expect(before.size).toBe(NUM_PAGES);
+
+    await switchTo('spread');
+
+    // Two pages across the same width, minus the gap between them: the fit target moved, so the paint follows.
+    expect(harness.scale).toBeCloseTo((1000 - WIDE_PADDING - DEFAULT_GAP) / (2 * PAGE_W), 6);
+    const repainted = [...paints.entries()].filter(([, count]) => count > 1).map(([page]) => page);
+    expect(repainted.sort((a, b) => a - b), 'every page was asked to paint again').toEqual(
+      Array.from({ length: NUM_PAGES }, (_, i) => i + 1),
+    );
+    const after = canvases();
+    const resized = [...before.keys()].filter((page) => before.get(page) !== after.get(page));
+    expect(resized.length, 'and every canvas changed size, which is what a repaint is').toBe(NUM_PAGES);
+  });
+
+  it('leaves every canvas alone when the fit target did not move — continuous to single is the same fit', async () => {
+    await mount('fit-width');
+    const scale = harness.scale;
+    const before = canvases();
+
+    await switchTo('single');
+
+    expect(harness.scale, 'a row of one page fits one page wide, whichever layout asked for it').toBe(scale);
+    const repainted = [...paints.entries()].filter(([, count]) => count > 1).map(([page]) => page);
+    expect(repainted, `pages the switch repainted for no reason: ${repainted.join(', ')}`).toEqual([]);
+    const after = canvases();
+    const resized = [...before.entries()].filter(([page, box]) => after.get(page) !== box);
+    expect(resized).toEqual([]);
+  });
+
+  it('follows the viewport, because a window dragged narrower is a fit target that moved', async () => {
+    await mount('fit-width');
+    const before = harness.scale;
+    metrics.width = 500;
+    resize();
+    await act(async () => undefined);
+
+    expect(harness.scale, 'the narrow padding applies below 640 px, so the scale is not simply halved').toBeCloseTo(
+      (500 - 8) / PAGE_W,
+      6,
+    );
+    expect(harness.scale).not.toBe(before);
+    const repainted = [...paints.entries()].filter(([, count]) => count > 1).map(([page]) => page);
+    expect(repainted.sort((a, b) => a - b), 'and the pages caught up with the new fit').toEqual(
+      Array.from({ length: NUM_PAGES }, (_, i) => i + 1),
+    );
+  });
+});
+
+/*
+ * FR-24's shared-instance clause, at the one place it can be seen: the options a page hands to
+ * `page.render()`. `getOptionalContentConfig()` builds a new object per call, so a render that fetched its
+ * own would paint layers that no panel switch can move — which is exactly the bug the shell's comment says it
+ * is avoiding, and until now the only evidence was the reading of `PdfPage.tsx:495`.
+ */
+describe('FR-24: every page renders with the one configuration instance', () => {
+  it('passes the shell’s own object to each page’s render, and does not fetch a fresh one', async () => {
+    const calls: Array<{ id: string; visible: boolean }> = [];
+    const handle = {
+      getOrder: () => ['1', '2'],
+      getGroup: (id: string) => ({ id, name: `Layer ${id}`, visible: id === '1' }),
+      setVisibility: (id: string, visible: boolean) => calls.push({ id, visible }),
+      setOCGState: () => undefined,
+    } as unknown as OptionalContentConfigHandle;
+    const fetched = vi.spyOn(doc, 'getOptionalContentConfig');
+
+    await mount(1, { optionalContentConfig: handle });
+
+    const pages = [...renders.keys()].sort((a, b) => a - b);
+    expect(pages, 'every page painted').toEqual(Array.from({ length: NUM_PAGES }, (_, i) => i + 1));
+    const instances = await Promise.all(
+      pages.map(async (page) => {
+        const options = renders.get(page) as { optionalContentConfigPromise?: Promise<unknown> };
+        return options.optionalContentConfigPromise ? options.optionalContentConfigPromise : null;
+      }),
+    );
+    expect(instances.every((promise) => promise !== null), 'no page rendered without a layer config').toBe(true);
+    const resolved = await Promise.all(instances.map((promise) => promise!));
+    expect(
+      resolved.filter((instance) => instance === handle).length,
+      'the instance each page renders with is the one the shell resolved, not a copy of it',
+    ).toBe(NUM_PAGES);
+    expect(fetched, 'a page that fetched its own config would be rendering something nobody can switch').not
+      .toHaveBeenCalled();
+  });
+
+  it('hands no promise at all to a document the shell found layer-less', async () => {
+    await mount(1);
+    const withConfig = [...renders.values()].filter(
+      (options) => (options as { optionalContentConfigPromise?: unknown }).optionalContentConfigPromise,
+    );
+    expect(withConfig, 'an absent config is not an empty one — pdf.js would then build its own').toEqual([]);
   });
 });

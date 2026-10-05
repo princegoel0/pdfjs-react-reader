@@ -24,23 +24,108 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **37 met, 20 partial, 1
-absent** of 58, on a suite of **1,165 tests in 125 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **42 met, 15 partial, 1
+absent** of 58, on a suite of **1,211 tests in 131 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. Ten of those eighteen are back out:
+below and is the honest number rather than the comfortable one. Fifteen of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
 through **#232**, which moved a second behaviour; and `FR-04` and `FR-55` through **#233**, where a third
 turned out not to be a missing test at all; `FR-29` through **#234**, whose two remaining clauses could only
 be measured in a browser; `FR-43`/`FR-44`'s painted halves through **#235**, which found that one of the
-channels it was sent to measure did not exist; and `FR-33` through **#236**, whose last gap was a branch with
-a fix, a comment and no assertion. §8's Chromium row still counts eighteen checks: #236 extended a row rather
-than adding one, and found a defect in the process. That is the
+channels it was sent to measure did not exist; `FR-33` through **#236**, whose last gap was a branch with
+a fix, a comment and no assertion; and `FR-05`, `FR-08`, `FR-10`, `FR-26` and `FR-28` through **#237**, where
+one of the five refused to be a missing test either. `FR-24` came back to one gap from two, and stayed short:
+what it cannot yet show is a pixel. §8's Chromium row still counts eighteen checks: neither #236 nor #237
+added a row. That is the
 direction the count takes from here: down where a guard turns out to be decoration, up where a test is shown
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+### Added
+
+- **The shell's six unasserted clauses, and one of them turned out to be a half-implemented prop (#237,
+  2026-10-06).** `FR-05`, `FR-08`, `FR-10`, `FR-26` and `FR-28` move from partial to met; `FR-24` comes back to
+  one gap from two. 42 met, 15 partial, 1 absent, on 1,211 tests in 131 files.
+
+  **`FR-10` — the recursion nobody parsed.** `buildTree` is private to `usePdfOutline` and called by nothing:
+  `outline.test.ts` walked the raw `doc.getOutline()` array through *its own* helper, and the nested trees the
+  audit asserts against are hand-built `OutlineEntry` literals. So "parse the bookmark tree recursively" was
+  proven for one fixture's top level and for shapes nobody parsed. `usePdfOutline.tree.test.tsx` (8) drives it
+  through the only door it has and asks what a shallow `.map` gets wrong: three levels come back three levels
+  deep with the leaf's page resolved; a named destination is asked of `getDestination` *before* it is read and
+  the place it answers is kept, not flattened to the top of the page; a name the document cannot resolve still
+  publishes its entry, with no page and its children intact — that `catch` is the difference between one bad
+  `/Dests` and an empty sidebar; `{num: 7}` is page 6, translated through `cachedPageNumber` when the engine
+  has one and `getPageIndex` when it has not, and stepped down from 1-based; and `/Count < 0` is read per
+  level. Six mutations, one of them red on six cases and the rest red on exactly one each.
+
+  **`FR-05` — a page measures itself, and the scrollbar keeps the reader's place.** `reportPageDims` was a
+  `vi.fn()` in every test that mounted the shell, so the clause rested on `layout.test.ts`'s arithmetic over
+  sizes handed to it. `usePdfVirtualizer.dims.test.tsx` (7) mounts the hook against a viewport with a size in
+  it: a report sizes its own row and leaves the fit basis alone; a *page-1* report moves the fit basis and the
+  scale resolved against it; the first measurement wins, so a stale repaint cannot move the layout twice; the
+  rows the sweep has not reached are sized from a sample mean, which is asserted as a distance — the laid-out
+  height before the sweep finishes is within 5 % of the height after it, and the case prints what page-1
+  sizing would have cost (the 0.8 defect: 15 % short on a fixture whose boxes cycle, 36 % long on the default
+  estimate); and a row growing above the fold moves `scrollTop` by exactly the growth so `currentPage` does
+  not change. That last is the clause in its only observable form: a scrollbar that does not jump is a scroll
+  position that moved *on purpose*. `PdfPage.status.test.tsx` gained the other end of the wire — a page reports
+  its scale-1 box, 0-based, once, and it is mounted at 2× to prove the number is not the one it painted. Two
+  counterfactuals had to be rewritten before they bit: the fit-basis mutation was a no-op while the only page-1
+  report came from the sweep (which also sets the estimate, so both spellings agreed), and the page mutation
+  could not show a scaled box on a component mounted at scale 1.
+
+  **`FR-08` — the half jsdom was told it could not do.** The paint file's own header handed the fit-mode leg
+  to a browser measurement from 2026-09-29 because "jsdom's viewport is zero by zero, so `resolvedScale` never
+  moves no matter what the layout does". Faking `clientWidth`/`clientHeight` at the prototype level turned out
+  to be enough, and three cases joined it: continuous→spread at `fit-width` moves the fit target and every page
+  repaints with every canvas resized; continuous→single does *not* move it and nothing repaints, which is the
+  half of "only when the fit target itself moves" that an implementation repainting on any layout change would
+  fail; and a narrower viewport moves it, including the 640 px padding step. Two mutations on the one line that
+  computes `pagesAcross` go red on the two legs respectively.
+
+  **`FR-26` — the seam nobody crossed.** `find ?? builtInSearch` had never been exercised from the shell: the
+  only `PdfFindController` in the suite was either a test's own mock return value or a stub handed straight to
+  `SearchBox`. `ViewerController.find.test.tsx` (5) supplies one and asserts the bar publishes it *by
+  identity*, that the per-page marks and the active local index are grouped from the host's results, that
+  asking the shell to search calls the host and reads **no page's text** — the difference between the host's
+  strategy running and both running with the built-in's answer on screen — and, as the pair that makes that
+  mean it, that without a host controller the same question does open the pages. A mutation that merges the
+  host into a shell-built wrapper is red only on the identity case, which is why that case exists.
+
+  **`FR-24` — the shared instance, at both ends, and one gap left.** `setVisibility` and
+  `usePdfOptionalContent` appeared in no test and both page tests passed `optionalContentConfig: null`.
+  `usePdfOptionalContent.shared.test.tsx` (6) pins the panel's half — an injected config means the document is
+  never asked for one, the instance comes back by identity because that is what a caller hands to `render`,
+  rows are re-read only on a revision bump because a mutable object changes no prop, an action's array is
+  copied, `preserveRB` defaults to the engine's meaning, and a throwing config reports through `onError`
+  *without* asking for a repaint. `ViewerPages.paint.test.tsx` adds the page half: all twelve pages' render
+  options carry a promise resolving to the shell's one instance, and the document is never asked for another.
+  `ViewerController.layers.test.tsx` (3) drives the `SetOCGState` relay the way pdf.js does — through the
+  options handed to `createPdfLinkService` — and reads back that the published instance moved, the panel's
+  shown state moved with it, `contentVersion` grew, no second config was fetched, the array was copied,
+  `preserveRB` travelled untouched, and a layer-less document drops the action in silence — no repaint *and*
+  no error, which is what makes the guard in front of the relay load-bearing. Eight mutations, each red on
+  exactly the case that names it. What remains is the thing jsdom cannot say: that the pixels change. That
+  needs a fixture with two layers whose painted content differs, and a browser row, and the row says so.
+
+  **`FR-28` — five props that had never been set to `false`.** A case-insensitive sweep of the test tree found
+  no `enableWheelZoom`, `enableFullscreen`, `enableDrop`, `enablePinchZoom` or `enableKeyboardNavigation`
+  passed as false anywhere. `ViewerController.affordances.test.tsx` (9) refuses them one at a time against the
+  composed shell — the real `Toolbar` inside `ViewerLayout`, because a bar the test never rendered cannot show
+  whether a control is missing from it — and reads the refusal off the chrome: refused gestures leave the scale
+  alone and leave `defaultPrevented` false so the host keeps the scroll and the keys; refused fullscreen hides
+  the control and never reaches the element; refused drop leaves the page's own `dragover` alone and never
+  paints the drop highlight, while the enabled pair claims the event, shows `pjsr-viewer--dragover` and hands
+  the file over. Asserting the control count needed the bar and *not* the `.pjsr-toolbar-sizer` copy, which is
+  why a loose label query resolves twice here as it does in the browser matrix. One case went red on the first
+  honest attempt and was not a test bug: `toggleFullscreen` is published on `PdfViewerHandle` and ignored the
+  prop, so the refusal only hid the button. That is the *Changed* entry above; the guard now covers all three
+  doors. Six mutations — each of the five guards removed, plus the bar showing the control anyway — and none
+  of them red anywhere in the gesture file, because the enabled half was never the untested part.
 
 - **The XFA card's own branch, guarded twice, and the row that could not be extended (`#236`, 2026-10-06).**
   `FR-33` moves from partial to met: 37 met, 20 partial, 1 absent.
@@ -1004,6 +1089,16 @@ re-derived by whoever asks next.
   assertions that catch those still fail at any size. The id and the section number are unchanged.
 
 ### Changed
+
+- **`enableFullscreen: false` now refuses fullscreen, not just the button (#237).**
+  `useViewerController`'s `toggleFullscreen` — published on `PdfViewerHandle` — went straight to
+  `element.requestFullscreen()` whatever the prop said, so a host that turned the affordance off could still be
+  fullscreened by its own code, and by any component that reached the handle. The method now returns when the
+  prop refuses it, which is what the word in FR-28 is: *"each is individually switchable and observable"*. The
+  keyboard chord and the bar's control were already gated on `fsAvailable`; this closes the third door. No
+  signature changed and nothing new is published, so it is a fix rather than a breaking change — a host that
+  wanted the old behaviour had to be passing `enableFullscreen={false}` and calling the handle anyway, and what
+  it was getting was a prop that did not do what it said.
 
 - **The label-bytes lever is decided and parked for `1.0.0` (#227).** `DEFAULT_LABELS` will stop being published
   from the root entry and move to `pdfjs-react-reader/labels`. #223 measured what the current shape costs —

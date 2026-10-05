@@ -687,6 +687,10 @@ export function useViewerController({
   useChangeSignal(isFullscreen, (active) => onFullscreenChange?.(active));
 
   const toggleFullscreen = useCallback(() => {
+    // FR-28 says the affordance is switchable, and the imperative handle publishes this method. A host that
+    // set `enableFullscreen={false}` and then reaches the same door through the handle would get fullscreen
+    // anyway, which is a prop that hides a button rather than one that refuses an affordance.
+    if (!enableFullscreen) return;
     const el = rootRef.current;
     if (!el) return;
     if (fullscreenElement() === el) {
@@ -694,7 +698,7 @@ export function useViewerController({
     } else {
       void enterFullscreen(el).catch(() => {});
     }
-  }, []);
+  }, [enableFullscreen]);
 
   // ---- keyboard ------------------------------------------------------------
   // Ctrl/Cmd+F opens the search bar, Ctrl/Cmd+P the print pipeline, plain F

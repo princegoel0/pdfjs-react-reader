@@ -137,6 +137,10 @@ function mountPage(
     withLinkService?: boolean;
     /** Set when the test is playing the part of a host that owns the density. */
     devicePixelRatio?: number;
+    /** FR-05's door: what the page reports as its own intrinsic box, and how often. */
+    onBaseDimensions?: (index: number, dims: { width: number; height: number }) => void;
+    /** The zoom the page is mounted at. The tests that report dimensions need a page painted away from 1. */
+    initialScale?: number;
   } = {},
 ) {
   const reported: PdfPageStatus[] = [];
@@ -157,9 +161,10 @@ function mountPage(
       {...(options.signal ? { signal: options.signal } : null)}
       {...(options.onError ? { onError: options.onError } : null)}
       {...(options.devicePixelRatio ? { devicePixelRatio: options.devicePixelRatio } : null)}
+      {...(options.onBaseDimensions ? { onBaseDimensions: options.onBaseDimensions } : null)}
     />
   );
-  const view: RenderResult = render(element(1, record));
+  const view: RenderResult = render(element(options.initialScale ?? 1, record));
   return {
     reported,
     pages,
@@ -435,5 +440,54 @@ describe('the density a page paints at', () => {
     await act(async () => undefined);
     expect(reported.filter((status) => status === 'rendering')).toHaveLength(1);
     expect(canvas?.width).toBe(200);
+  });
+});
+
+/*
+ * FR-05's other half of the same door. `usePdfVirtualizer.dims.test.tsx` proves what the virtualizer *does*
+ * with a reported box; this proves the page is the thing that says it, that what it says is the box at
+ * scale 1 rather than the one it painted (a layout that grows every time the reader zooms is worse than one
+ * that guesses), and that it says it once rather than on every repaint.
+ */
+describe('FR-05: the page reports its own intrinsic box', () => {
+  it('reports the scale-1 box, keyed by 0-based index, even when it is painted at 2×', async () => {
+    const task = fakeRenderTask();
+    const reports: Array<[number, { width: number; height: number }]> = [];
+    const { view } = mountPage(fakePage([task]), {
+      initialScale: 2,
+      onBaseDimensions: (index, dims) => reports.push([index, dims]),
+    });
+
+    await waitFor(() => expect(reports).toEqual([[2, { width: 200, height: 260 }]]));
+    expect(task.cancel, 'the report does not wait for the paint to finish').not.toHaveBeenCalled();
+    // The page really is being painted at the other scale, so the box above is not the box it happens to
+    // match: without this the assertion would pass on a page mounted at 1× and prove nothing about the zoom.
+    const canvas = view.container.querySelector('canvas');
+    expect([canvas?.width, canvas?.height], 'what the canvas was sized to at scale 2').toEqual([400, 520]);
+  });
+
+  it('says it once across a zoom, because the box did not change — only the scale applied to it did', async () => {
+    const first = fakeRenderTask();
+    const second = fakeRenderTask();
+    const reports: Array<[number, { width: number; height: number }]> = [];
+    const { rerender } = mountPage(fakePage([first, second]), {
+      onBaseDimensions: (index, dims) => reports.push([index, dims]),
+    });
+    await paint(first);
+    expect(reports).toEqual([[2, { width: 200, height: 260 }]]);
+
+    rerender(2);
+    await paint(second);
+    expect(reports, 'a page painted at scale 2 is still a 200×260 page').toEqual([
+      [2, { width: 200, height: 260 }],
+    ]);
+  });
+
+  it('reports nothing for a page whose proxy never arrives', async () => {
+    const reports: unknown[] = [];
+    mountPage(null, { onBaseDimensions: (index, dims) => reports.push([index, dims]) });
+    await act(async () => undefined);
+    await act(async () => undefined);
+    expect(reports, 'a page that could not be measured cannot size a row').toEqual([]);
   });
 });

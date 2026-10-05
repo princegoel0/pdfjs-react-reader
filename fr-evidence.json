@@ -122,13 +122,15 @@
     },
     "FR-05": {
       "title": "Viewport Virtualization",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/headless/usePdfVirtualizer.ts",
         "src/lib/layout.ts"
       ],
       "automated": [
-        "src/lib/layout.test.ts"
+        "src/lib/layout.test.ts",
+        "src/headless/usePdfVirtualizer.dims.test.tsx",
+        "src/components/PdfPage.status.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#virtualizes-1000-pages",
@@ -139,12 +141,11 @@
         "README.md"
       ],
       "regressionGuard": [
-        "src/lib/layout.test.ts"
+        "src/headless/usePdfVirtualizer.dims.test.tsx",
+        "src/components/PdfPage.status.test.tsx"
       ],
-      "gaps": [
-        "placeholder heights coming from real page dimensions are asserted nowhere: `reportPageDims` (src/headless/usePdfVirtualizer.ts:147) is a `vi.fn()` in every test that mounts the shell (ViewerController.search.test.tsx:51) and no test reports a measured page and asserts the slot it lands in, so “the scrollbar does not jump as pages measure themselves” rests on layout.test.ts’s arithmetic over sizes handed to it"
-      ],
-      "note": "Render-what-intersects-plus-overscan is guarded as arithmetic (layout.test.ts:101) and measured in the browser harness, which fails a cell that mounts more than forty pages of a thousand; the measurement path that turns a real page into a slot height has no failing test behind it. The estimate-sampling walk (usePdfVirtualizer.ts:186-200) is the code a regression would live in, and it is the code nothing calls from a test."
+      "gaps": [],
+      "note": "Both clauses have assertions now. Only the visible pages plus an overscan buffer has held since the virtualizer was written — the arithmetic in layout.test.ts, the window in the hook, and the 1,000-page browser row that counts the mounted slots. The placeholder clause is what had no assertion at all: reportPageDims was a vi.fn() in every test that mounted the shell, and the pages that reached the DOM in the suite were hand-built slot lists, so the sentence rested on arithmetic over sizes handed to it. usePdfVirtualizer.dims.test.tsx (7) drives the hook against a viewport with a size in it and asks what a reader would notice: a report sizes its own row and leaves the fit basis alone; a page-1 report moves the fit basis and the scale resolved against it; the first measurement of a page wins, so a stale or repeated report cannot move the layout twice; the rows the sweep has not reached are sized from a sample mean, so the laid-out height at that moment is within 5 % of the one it ends at — and the assertion says what page-1-only sizing would have cost, because that was the 0.8 defect (15 % short on a fixture whose boxes cycle through three shapes, 36 % long before the estimate was a default); and a row growing above the fold moves the scroll position by exactly the growth, so the page at the top of the viewport is still the page that was there. PdfPage.status.test.tsx adds the other end of the same wire: a page reports its scale-1 box, keyed 0-based, once — mounted at 2× and asserted not to report 400×520 — and reports nothing for a proxy that never arrives. Six mutations, each restored byte-for-byte: page-1 sizing for the mean, no scroll compensation, a report that overwrites the last, a fit basis that ignores page 1, a page reporting the box it painted, and a 1-based index. The first four each failed one case in this file; the last two each failed the page cases. Two of them needed a second attempt: the fit-basis mutation was a no-op until the case that reports page 1 existed, and the page mutation did not bite while the component was mounted at scale 1, because at that scale the painted box and the intrinsic box are the same number."
     },
     "FR-06": {
       "title": "Responsive Zoom Modes",
@@ -202,7 +203,7 @@
     },
     "FR-08": {
       "title": "Page Layouts",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/layout.ts",
         "src/headless/usePdfVirtualizer.ts",
@@ -225,10 +226,8 @@
         "src/components/ViewerPages.regroup.test.tsx",
         "src/components/ViewerPages.paint.test.tsx"
       ],
-      "gaps": [
-        "the fit-mode half of “repaints only when the fit target itself moves” is asserted nowhere. A fit scale resolves against a viewport that jsdom sizes 0×0, so the only evidence is a manual Chromium measurement from 2026-09-29 (scale 1.04 → 0.50, every canvas 792×1025 → 386×499) that no check repeats and no artifact carries"
-      ],
-      "note": "The identity clause — switching regroups the rows without remounting a page — is guarded over a whole document of rows (ViewerPages.regroup.test.tsx:206,220,239,282), and the fixed-zoom half of the repaint clause is guarded by counting `page.render()` calls and backing stores (ViewerPages.paint.test.tsx:207,226,239). The row read `met` while its own note said the fit-mode half could not be asserted here; that is a gap, not a waiver, because a clause whose only evidence is one person’s browser session regresses silently. Closing it means either a harness that gives jsdom a real viewport or a committed browser check."
+      "gaps": [],
+      "note": "The layout mode is a property of the virtualizer and not of the page: switching regroups the rows without remounting a page (ViewerPages.regroup), paints nothing again at a fixed zoom (ViewerPages.paint, whose assertions are render calls and canvas backing stores rather than React renders), and — the half that had no assertion, because jsdom sized the viewport at zero and a fit scale resolved against nothing never moves — repaints when the fit target itself moves. That premise is now false: faking the two measurements at the prototype level gives the fit modes a target, and three cases joined the paint file. Continuous to spread at fit-width moves the scale from (viewport - padding) / width to (viewport - padding - gap) / (2 * width) and every page is asked to paint again, every canvas resized. Continuous to single does not move it — the fit target is the same one page across — and no page repaints and no canvas changes size, which is the half of \"only when\" that an implementation repainting on any layout change would fail. A narrower viewport does move it, including the 640 px padding step, and the pages catch up. The 2026-09-29 Chromium measurement (scale 1.04 to 0.50, every canvas 792×1025 to 386×499) that this row had to cite stands, now with a check that repeats it in jsdom. Four mutations, each restored byte-for-byte: the fit target ignoring the spread (the repaint case red), the fit target assuming two pages always (the no-repaint case red, and the fixed-zoom cases too), and FR-24’s two page wiring mutations, which this file also guards."
     },
     "FR-09": {
       "title": "Rotation",
@@ -261,7 +260,7 @@
     },
     "FR-10": {
       "title": "Outline",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/outline.ts",
         "src/headless/usePdfOutline.ts",
@@ -271,6 +270,7 @@
       ],
       "automated": [
         "src/lib/outline.test.ts",
+        "src/headless/usePdfOutline.tree.test.tsx",
         "src/components/ViewerController.destination.test.tsx",
         "src/components/a11y.audit.test.tsx"
       ],
@@ -282,14 +282,12 @@
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
+        "src/headless/usePdfOutline.tree.test.tsx",
         "src/lib/outline.test.ts",
-        "src/components/ViewerController.destination.test.tsx",
-        "src/components/a11y.audit.test.tsx"
+        "src/components/ViewerController.destination.test.tsx"
       ],
-      "gaps": [
-        "the recursion is never exercised: `buildTree` (src/headless/usePdfOutline.ts:22) is called by no test. outline.test.ts resolves destinations through its own `resolveItem` helper over the raw `doc.getOutline()` array (:158-166), and the nested trees that reach the DOM are hand-built arrays (a11y.audit.test.tsx:193), so “parse the bookmark tree recursively” is proven for the fixture’s top level and for literals nobody parsed"
-      ],
-      "note": "Named-destination translation, object-reference page numbers and the viewport position a click must land on are all asserted against real bytes (outline.test.ts:168-200, ViewerController.destination.test.tsx:169,197,230), and the ARIA tree is axe-audited with nested entries (a11y.audit.test.tsx:183). What is not asserted is the walk that turns the engine’s flat `items` arrays into that tree — the recursion the clause names. `buildTree` is module-private, which is why no test has ever reached it."
+      "gaps": [],
+      "note": "Three clauses, each with an assertion of its own. A click resolves to a page and a position, and the magnification a destination names is taken before the place is measured (outline.test.ts over the real fixture bytes, ViewerController.destination over the wiring that asks the question with the page’s own rotation). The ARIA tree is audited (a11y.audit), which is the clause that was once a styling choice and is now a rule. What had no assertion was the recursion: buildTree is private to usePdfOutline and was called by nothing, while outline.test.ts walked the raw getOutline() array through its own resolveItem helper and the nested trees that reach the DOM in the audit are hand-built OutlineEntry literals. So the shape a reader sees was asserted from a shape nothing parsed. usePdfOutline.tree.test.tsx (8) drives the walk through its only public door and asks the four questions a shallow map gets wrong: three levels come back three levels deep with the leaf’s page resolved; a named destination is asked of getDestination before it is read, and the place it answers is kept rather than dropped; a name the document cannot resolve publishes its entry with no page and its children intact, because the catch is what stops one bad /Dests entry from emptying the sidebar; an object reference is translated at depth, through cachedPageNumber when the engine has one and getPageIndex when it has not, and the 1-based answer is stepped down. Plus /Count read per level, a non-string title that becomes the empty string rather than \"undefined\", and a document with no outline or a broken one publishing an empty tree instead of an error. Six mutations, each restored byte-for-byte: no recursion (6 cases red), no name resolution, no catch, no /Count, a stringified title, and the cached page number used without the step — each of the last four red on exactly one case."
     },
     "FR-11": {
       "title": "Thumbnails",
@@ -640,7 +638,10 @@
         "src/lib/link-service.ts"
       ],
       "automated": [
-        "src/lib/optional-content.test.ts"
+        "src/lib/optional-content.test.ts",
+        "src/headless/usePdfOptionalContent.shared.test.tsx",
+        "src/components/ViewerController.layers.test.tsx",
+        "src/components/ViewerPages.paint.test.tsx"
       ],
       "acceptance": [],
       "acceptanceWaiver": "The shared-instance clause is impossible to satisfy as literally written — pdf.js builds a new config per call — so the code passes one owned instance to both the panel and every render, and the impossibility is measured and documented in the module rather than re-proved in a browser.",
@@ -648,13 +649,14 @@
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
-        "src/lib/optional-content.test.ts"
+        "src/headless/usePdfOptionalContent.shared.test.tsx",
+        "src/components/ViewerController.layers.test.tsx",
+        "src/components/ViewerPages.paint.test.tsx"
       ],
       "gaps": [
-        "the shared-instance clause is asserted nowhere: `setVisibility` and `usePdfOptionalContent` appear in no test file, and both page tests pass `optionalContentConfig: null` (ViewerPages.paint.test.tsx:151, ViewerPages.regroup.test.tsx:142), so “every page redrawing from the same configuration instance the render uses” is a reading of PdfPage.tsx:495 rather than a checked property",
-        "the `SetOCGState` half stops at the relay: link-service.test.ts:39 asserts the callback is invoked with the state and `preserveRB`, and nothing asserts what ViewerController.tsx:996-1004 does with it — that the panel’s shown state moved, not a copy of it"
+        "what no jsdom can show: that switching a layer changes the pixels. The instance property is now asserted at both ends — every page’s render options carry the object the shell resolved, by identity, and no page fetches its own — and the SetOCGState relay is asserted against the same instance. The remaining evidence is a browser row on a fixture with two layers whose painted content differs, which the matrix does not have yet."
       ],
-      "note": "Group flattening and the panel’s tree shape are guarded (optional-content.test.ts:19), the relay is guarded, and the engine’s own limitation — it builds a new config per call, so “the same instance” is impossible as literally written — is measured and documented in the module. What is left is that the two behaviours the clause is about are unasserted: a switch that reaches every page, and a document action that lands on the panel’s state."
+      "note": "Both gaps this row carried are closed and a third is named in their place. The shared-instance clause was a reading of PdfPage.tsx rather than a checked property: setVisibility and usePdfOptionalContent appeared in no test, and both page tests passed optionalContentConfig: null. usePdfOptionalContent.shared.test.tsx (6) pins what the panel does — an injected config means the document is never asked for one (the fetch is the bug the injection exists to avoid), the instance is handed back by identity because that is what a caller passes to render, rows are re-read from the mutable object only when the revision moves because a mutation changes no prop, a SetOCGState action is copied on the way in so a caller reusing its array cannot rewrite what was applied, preserveRB defaults to the engine’s meaning, and a config that throws is reported through onError without asking every page to repaint for a switch that failed. ViewerPages.paint.test.tsx adds the page end: the options each page hands to render carry a promise resolving to the shell’s one instance for all twelve pages, the document is never asked for another, and a layer-less document gets no promise at all rather than an empty one. ViewerController.layers.test.tsx drives the relay the way pdf.js does — through the options the shell hands createPdfLinkService — and reads the consequences back: the instance the controller publishes is the one that moved, the state a panel would now show moved with it, contentVersion grew by one, no second config was fetched, the engine’s array was copied rather than passed through, preserveRB travelled untouched, and a document with no layers drops the action in silence — no repaint and no error, which is what makes the guard in front of the relay load-bearing rather than defensive. Eight mutations, each restored byte-for-byte: no repaint after the action, the action’s array passed through, preserveRB decided for the document, the relay run with no config, a panel that fetches its own config, a panel that hands back a copy, a panel that passes the array through, and a failed switch that still repaints. Every one of them red, one case each. What is left is the painted consequence, which is a browser’s to report and has no row yet."
     },
     "FR-25": {
       "title": "Embedded Files",
@@ -683,7 +685,7 @@
     },
     "FR-26": {
       "title": "Replaceable Find Strategy",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/headless/usePdfSearch.ts",
         "src/components/PdfViewer.tsx",
@@ -691,7 +693,8 @@
       ],
       "automated": [
         "src/components/ViewerController.search.test.tsx",
-        "src/components/SearchBox.counter.test.tsx"
+        "src/components/SearchBox.counter.test.tsx",
+        "src/components/ViewerController.find.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#search-marks-matches"
@@ -700,13 +703,11 @@
         "docs/src/pages/Api.tsx"
       ],
       "regressionGuard": [
+        "src/components/ViewerController.find.test.tsx",
         "src/components/SearchBox.counter.test.tsx"
       ],
-      "gaps": [
-        "no test hands the shell a host-supplied controller. The seam is real (`find?: PdfFindController` at PdfViewer.tsx:188, consumed at ViewerController.tsx:445 as `find ?? builtInSearch`) and is never exercised: the `PdfFindController` in ViewerController.search.test.tsx:59 is that test’s own mock return value, not an injected alternative",
-        "SearchBox.counter.test.tsx:86 does pass a host-shaped stub, but straight into `SearchBox`, which proves the counter follows injected state. Nothing proves the in-page marks and the bar’s enablement follow a host controller rather than the built-in search"
-      ],
-      "note": "The interface is published and the shell reads it, so the substitution is possible; what the clause promises is that it works, and that is asserted for one of the three parts the sentence names. A test that injects a controller with one match on page 9 and asserts the marks and the counter come from it, not from the indexed document, is the whole gap."
+      "gaps": [],
+      "note": "The seam was real and unexercised: find ?? builtInSearch at ViewerController.tsx:450, typed as PdfFindController on PdfViewer’s props, with the only PdfFindController in the suite being ViewerController.search.test.tsx’s own mock return value for usePdfSearch and the host-shaped stub in SearchBox.counter.test.tsx going straight into SearchBox. So nothing proved the clause — that an alternative strategy is passed in rather than built around, and that a host keeping the built-in bar, marks and counts does not have to fork the shell. ViewerController.find.test.tsx (5) supplies a host controller to the shell and asserts the five things that makes true: the object the shell publishes is the host’s, by identity (a merged wrapper would be a second opinion on every field, and the bar reads what the shell publishes); the matches are grouped per page from the host’s results and the active local index comes from the host’s activeIndex; a query asked of the shell reaches the host’s search and no page’s text is read, which is the difference between the host’s strategy running and both running with the built-in’s answer on screen; without a host controller the same question does open the pages, so the previous claim is not a search that silently did nothing; and a host publishing new results re-marks the pages on the next render without the shell being asked again. Three mutations, each restored byte-for-byte: the seam ignored (all five cases red), the host merged into a shell-built wrapper (the identity case red), and the marks grouped from the built-in’s results even while a host drove the find (two cases red)."
     },
     "FR-27": {
       "title": "Search Depth",
@@ -737,7 +738,7 @@
     },
     "FR-28": {
       "title": "Composed Shell, Labels, Events, Locales & Shell Affordances",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/components/ViewerContext.tsx",
         "src/components/ViewerController.tsx",
@@ -754,7 +755,8 @@
         "src/components/ViewerLabels.test.tsx",
         "src/components/Toolbar.test.tsx",
         "src/components/ViewerController.gestures.test.tsx",
-        "src/components/ViewerParts.composed.test.tsx"
+        "src/components/ViewerParts.composed.test.tsx",
+        "src/components/ViewerController.affordances.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#wheel-zoom-and-scroll",
@@ -765,14 +767,12 @@
         "docs/src/pages/Shell.tsx"
       ],
       "regressionGuard": [
+        "src/components/ViewerController.affordances.test.tsx",
         "src/components/ViewerController.gestures.test.tsx",
         "src/components/ViewerParts.composed.test.tsx"
       ],
-      "gaps": [
-        "the three affordances the clause names as individually switchable and observable are never switched off in any test: a case-insensitive sweep of the test tree finds no `enableWheelZoom`, `enableFullscreen`, `enableDrop`, `enablePinchZoom` or `enableKeyboardNavigation` passed as `false`. The gesture tests assert the behaviour when enabled (ViewerController.gestures.test.tsx:121,177,236), and “leaves a plain wheel alone” (:194) is about a wheel that is not a pinch, not about a refusal",
-        "“observable” is the missing half of the same clause: nothing asserts that a refused affordance leaves the chrome consistent — a hidden fullscreen control after a refused fullscreen, a wheel that does nothing rather than scrolling the host"
-      ],
-      "note": "The composed-parts half of this row is now genuinely guarded: ViewerParts.composed.test.tsx mounts the parts against a controller and the documented example compiles against the packed artifact. The labels, the controls configuration, the event surface and the three libraries behind the affordances each have their own assertions. What the row read as met was the affordance clause, and a prop that nothing refuses is exactly the host’s problem the sentence forbids."
+      "gaps": [],
+      "note": "The composed-shell, labels, events and locales clauses have held since 0.5 and 0.2; what pulled this row back was the sentence about the shell’s own affordances, which named five props that no test ever passed as false. ViewerController.affordances.test.tsx (9) refuses them one at a time against the composed shell — the real Toolbar inside ViewerLayout, because a bar the test never rendered cannot show whether a control is missing from it — and reads the refusal back off the chrome: a refused wheel leaves the scale alone and is not preventDefaulted, so the host page keeps the scroll, while the same gesture taken unconditionally zooms and reports defaultPrevented true; a refused pinch changes nothing and does not claim the touchmove; a refused keyboard leaves PageDown and ArrowDown unclaimed, which is the claim the clause makes about who owns the key (with no document mounted the page cannot move, so the enabled leg is asserted as the prevented counterpart rather than as a page change); a refused fullscreen hides the control — counted on the bar and not on the measuring copy in .pjsr-toolbar-sizer, which is why a query that names a control without naming its bar resolves twice — reports fsAvailable false, and never reaches the element’s requestFullscreen; and a refused drop leaves the page’s own dragover alone and never shows the drop highlight, while an enabled one claims the event, puts pjsr-viewer--dragover on the root and hands the file to onDropFile. That last pair is where the read found a defect rather than a missing test: enableFullscreen only ever hid the button, while the published imperative handle’s toggleFullscreen went straight to the element, so a host that refused the affordance could still be fullscreened by its own code. toggleFullscreen now returns when the prop says the affordance is off, which is the change the row’s word for this is “refused”. Six mutations, each restored byte-for-byte: every one of the five guards removed, plus the bar showing the control anyway — each red on the case that names it, and none of them red anywhere in the gesture file, because the enabled half was never the untested part."
     },
     "FR-29": {
       "title": "Annotation Authoring",

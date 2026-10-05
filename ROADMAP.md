@@ -52,12 +52,12 @@ certified on this machine at all.
 | `FR-02` | Worker Configuration | **met** | 5/5 | 0 | — |
 | `FR-03` | Password Protection | **met** | 4/5 | 0 | — |
 | `FR-04` | Cancellation Safety | **met** | 5/5 | 0 | — |
-| `FR-05` | Viewport Virtualization | **partial** | 5/5 | 1 | placeholder heights coming from real page dimensions are asserted nowhere: `reportPageDims` (src… |
+| `FR-05` | Viewport Virtualization | **met** | 5/5 | 0 | — |
 | `FR-06` | Responsive Zoom Modes | **met** | 5/5 | 0 | — |
 | `FR-07` | High-DPI Adaptation | **met** | 5/5 | 0 | — |
-| `FR-08` | Page Layouts | **partial** | 5/5 | 1 | the fit-mode half of “repaints only when the fit target itself moves” is asserted nowhere. A fit… |
+| `FR-08` | Page Layouts | **met** | 5/5 | 0 | — |
 | `FR-09` | Rotation | **met** | 5/5 | 0 | — |
-| `FR-10` | Outline | **partial** | 5/5 | 1 | the recursion is never exercised: `buildTree` (src/headless/usePdfOutline.ts:22) is called by no… |
+| `FR-10` | Outline | **met** | 5/5 | 0 | — |
 | `FR-11` | Thumbnails | **met** | 5/5 | 0 | — |
 | `FR-12` | Jump-to-Page | **met** | 5/5 | 0 | — |
 | `FR-13` | Text Indexing | **met** | 5/5 | 0 | — |
@@ -71,11 +71,11 @@ certified on this machine at all.
 | `FR-21` | Opt-In Feature Registration | **met** | 5/5 | 0 | — |
 | `FR-22` | Per-Feature Stylesheets | **met** | 5/5 | 0 | — |
 | `FR-23` | Enforced Size Boundary | **met** | 5/5 | 0 | — |
-| `FR-24` | Optional-Content Layers | **partial** | 4/5 | 2 | the shared-instance clause is asserted nowhere: `setVisibility` and `usePdfOptionalContent` appe… |
+| `FR-24` | Optional-Content Layers | **partial** | 4/5 | 1 | what no jsdom can show: that switching a layer changes the pixels. The instance property is now … |
 | `FR-25` | Embedded Files | **met** | 4/5 | 0 | — |
-| `FR-26` | Replaceable Find Strategy | **partial** | 5/5 | 2 | no test hands the shell a host-supplied controller. The seam is real (`find?: PdfFindController`… |
+| `FR-26` | Replaceable Find Strategy | **met** | 5/5 | 0 | — |
 | `FR-27` | Search Depth | **met** | 5/5 | 0 | — |
-| `FR-28` | Composed Shell, Labels, Events, Locales & Shell Affordances | **partial** | 5/5 | 2 | the three affordances the clause names as individually switchable and observable are never switc… |
+| `FR-28` | Composed Shell, Labels, Events, Locales & Shell Affordances | **met** | 5/5 | 0 | — |
 | `FR-29` | Annotation Authoring | **met** | 5/5 | 0 | — |
 | `FR-30` | Page Authoring | **met** | 4/5 | 0 | — |
 | `FR-31` | True Flattening | **met** | 4/5 | 0 | — |
