@@ -72,8 +72,8 @@ Core, in every import of the shell:
   reopen — and those fixtures bind their fields without a `dataId`, so a keystroke never reaches
   `annotationStorage` to begin with. Whether a real LiveCycle form's edits survive is unmeasured, and
   [the page that documents the limit](https://princegoel0.github.io/pdfjs-react-reader/#/compatibility)
-  says which half is which. Its thumbnails are blank too, for the reason you would guess: a pure-XFA
-  page paints no operators.
+  says which half is which. Its thumbnails compose the same template rather than a blank card, because a
+  pure-XFA page paints no operators and a miniature of canvas alone would show nothing.
 - **Document structure that acts** — a link that switches a layer does switch it, and the layers panel
   agrees with it; a paperclip annotation saves the file it carries on double-click or `Ctrl/Cmd + Enter`.
 - **Encrypted documents** with a built-in password prompt you can replace.

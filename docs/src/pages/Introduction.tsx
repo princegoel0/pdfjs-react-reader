@@ -50,8 +50,9 @@ export function Introduction() {
           of showing a blank page, and search marks its text as it marks a text layer. Saving one back is
           not offered, and the reason is measured rather than assumed —{' '}
           <a href="#/compatibility">the limits page</a> says which half of that was tested and which
-          could not be. Its sidebar thumbnail stays blank, for the same underlying reason: a pure-XFA page
-          paints no operators.
+          could not be. Its sidebar thumbnail composes that template rather than showing a blank card, for
+          the same underlying reason: a pure-XFA page paints no operators, so a miniature made of canvas
+          alone has nothing in it.
         </li>
         <li>
           <strong>Encrypted documents.</strong> A built-in password prompt, or take over the UI

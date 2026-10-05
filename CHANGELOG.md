@@ -24,21 +24,89 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **36 met, 21 partial, 1
-absent** of 58, on a suite of **1,159 tests in 124 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **37 met, 20 partial, 1
+absent** of 58, on a suite of **1,165 tests in 125 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. Nine of those eighteen are back out:
+below and is the honest number rather than the comfortable one. Ten of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
 through **#232**, which moved a second behaviour; and `FR-04` and `FR-55` through **#233**, where a third
 turned out not to be a missing test at all; `FR-29` through **#234**, whose two remaining clauses could only
-be measured in a browser; and `FR-43`/`FR-44`'s painted halves through **#235**, which found that one of the
-channels it was sent to measure did not exist. §8's Chromium row now counts eighteen checks. That is the
+be measured in a browser; `FR-43`/`FR-44`'s painted halves through **#235**, which found that one of the
+channels it was sent to measure did not exist; and `FR-33` through **#236**, whose last gap was a branch with
+a fix, a comment and no assertion. §8's Chromium row still counts eighteen checks: #236 extended a row rather
+than adding one, and found a defect in the process. That is the
 direction the count takes from here: down where a guard turns out to be decoration, up where a test is shown
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **The XFA card's own branch, guarded twice, and the row that could not be extended (`#236`, 2026-10-06).**
+  `FR-33` moves from partial to met: 37 met, 20 partial, 1 absent.
+
+  Its last gap was the shape this repository keeps finding. `0.8` had fixed a real defect — a pure-XFA page
+  paints zero operators, and a thumbnail *is* a painted canvas, so every card of an XFA form was an empty
+  buffer — by composing the page's own `XfaLayer` tree over the card. The component says why in a comment,
+  `PdfThumbnail.test.tsx` (W8) covers the canvas, both observers, the label and the buffer release, and the
+  branch itself was asserted nowhere. `src/components/PdfThumbnail.xfa.test.tsx` (6) now asks the four
+  questions the card has to answer: the tree is fetched **only** of a page that declares itself composed from
+  one (`getXfa()` on a plain page is a wasted round trip on the hot path of a forty-card sidebar); it is laid
+  out at the **card's CSS scale** while the buffer is sized at `scale × devicePixelRatio`, because the two
+  differ by the density and a form sized for the bitmap puts its widgets outside the card; the composition is
+  handed the **document's own `annotationStorage`** at `display` intent; and the result is **`inert`**, because
+  it is live DOM inside a `<button>` and nine pages of miniature would otherwise offer a keyboard reader nine
+  copies of fields they cannot see. Plus the end states: one tree per card, none after an abort.
+
+  The browser half is `scripts/browser-matrix.mjs`'s `sidebar-thumbs-outline`, which was sent to count painted
+  cards and now also loads `xfa-sample.pdf` and reads what jsdom cannot: the tree the engine laid out, at
+  **106×148 over 49 form characters** in Chromium and 116×162 in Firefox's wider card, `inert`,
+  `aria-hidden="true"`, and **0 tabbable of the 2 fields it holds**. §8's count does not move: this row was
+  extended, not added.
+
+  Five mutations, driven through jsdom and, for the four the component can reach, through a real browser
+  (`.spike/counterfactual-t1f.mjs`, restored byte-for-byte; pristine 18 passed over the three XFA files):
+  dropping the `isPureXfa` gate, swapping the layer scale for the buffer scale, handing `null` for the storage
+  and deleting the inertness each fail **one** case in jsdom, and dropping the composition, the `inert` flag
+  or the `aria-hidden` turns the browser row red — `inert=false … tabbable=2`, `aria-hidden=null`, no host at
+  all. The fifth mutation stayed green in **both** harnesses: `host.replaceChildren(div)` written as
+  `appendChild` cannot be observed, because `XfaLayer.render` appends into a container the component only ever
+  hands it fresh — every input that re-runs the composition also re-runs the fetch, whose teardown drops the
+  tree and unmounts the host. A driven browser, through two rotations, still reported one tree. The line stays
+  in the product as defence for a call site that does not exist yet, and the row says that rather than
+  counting it as a tested branch.
+
+  **What the browser will not do is rotate that card, and it is the library's fault, not the harness's.** The
+  arm was written with a viewport change in it — the clause's third sentence, measured where the mechanism is
+  real — and Chromium at 375×812 could not click the rotate control at all. Measured: `.pjsr-viewer` spans
+  y=447 to y=688 (343×241) with `overflow: clip`, while the folded bar's menu runs 222×637 from y=504 and
+  reaches its last row at y=1061. The rotate row is 44 px tall starting at y=669, so its centre lands at
+  y=691 — past the clip edge — `elementFromPoint` there answers the page behind it, and Playwright's click
+  reports `intercepts pointer events` until it times out. `scrollHeight` equals `clientHeight` and
+  `overflow-y` is `visible`, so nothing scrolls it into view either. **The keyboard path was checked rather
+  than assumed, and it works:** 49 Tab presses from the body put `activeElement` on that same row, the ring
+  computed to the sheet's own `rgb(79, 70, 229) solid 2px`, and Enter turned the canvas from 670×867 to
+  871×673. So the defect is a pointer one — a 44 px touch target with 19 px of it painted, and rows below the
+  edge not painted at all — in a bar that folds on every phone. That is **task #241**, and it is not
+  mobile-only: any host whose viewer is shorter than the menu loses its lower rows to the same rule. The arm
+  therefore asserts the composition, the count and the reachability, and the comment in
+  `sidebar-thumbs-outline` states why the viewport half of the clause is guarded through the component's own
+  inputs instead.
+
+  Three documents claimed the card was blank while the code had been composing it since `0.8` —
+  `docs/src/pages/Compatibility.tsx` ("Measured, and unfixable here: the thumbnail is blank"), `Introduction.tsx`
+  ("Its sidebar thumbnail stays blank") and `README.md` ("Its thumbnails are blank too") — which also
+  contradicted this file's own 0.7 → 0.8 row. All three now say what is measured, and the Compatibility page
+  keeps the question it cannot answer (whether a typed value reaches the card, given a `dataId`-less fixture)
+  pointed at the bullet above it.
+
+  **Two gap texts died in the same run.** `FR-44`'s and `FR-43`'s rows each said this host cannot start
+  Firefox and that one engine has seen their browser rows; the cells that measured #236 started it and brought
+  both back green — six painted members of the forced-colours clause in Firefox, its own `rgb(51, 153, 255)`
+  focus ring against the sheet's `rgb(79, 70, 229)`, and the structure row's nine roles, its nested link and
+  its resolving `aria-owns` in a tree that numbers its elements differently from Chromium's. Both gaps now
+  name two engines and keep the one that did not start: WebKit reported `n/a` at engine launch twice on this
+  day, which is a host fact rather than a result, and Safari's answer is still owed.
 
 - **A second channel that the palette took away, and the structure tree read as the tree it hands a screen
   reader (`#235`, 2026-10-06).** `FR-43` and `FR-44` keep their gaps and narrow them; 36 met, 21 partial,

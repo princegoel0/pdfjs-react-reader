@@ -398,11 +398,73 @@ const CHECKS = [
       await page.waitForSelector('.pjsr-outline-item', { timeout: 15_000 });
       const items = await page.locator('.pjsr-outline-item').count();
       if (items === 0) fail('the outline tab is empty on a document that has an outline');
+      /*
+       * FR-33's thumbnail half, which needs a document of its own: a pure-XFA page's canvas holds no
+       * operators at all, so the card's bitmap is white paper and the composed DOM form *is* the miniature.
+       * That is what made every card of an XFA form blank in 0.8, and neither the outline fixture nor the
+       * ink reading above could have caught it — the ink line passes on a document with one painted card,
+       * and this document has zero.
+       */
+      await page.click('.pjsr-sidebar [role="tab"]:has-text("Thumbnails")');
+      await load('xfa-sample.pdf', 1);
+      const readCard = () =>
+        page.evaluate(() => {
+          const host = document.querySelector('.pjsr-thumbnail-xfa');
+          if (!host) return null;
+          const box = host.getBoundingClientRect();
+          const fields = [...host.querySelectorAll('input, select, textarea, button, a[href]')];
+          return {
+            layers: host.querySelectorAll('.xfaLayer').length,
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+            inert: host.inert === true,
+            hidden: host.getAttribute('aria-hidden'),
+            tabbable: fields.filter((el) => el.tabIndex >= 0).length,
+            chars: (host.textContent ?? '').replace(/\s+/g, '').length,
+          };
+        });
+      const card = await waitFor(async () => {
+        const reading = await readCard();
+        return reading && reading.layers > 0 && reading.width > 0 && reading.chars > 0 ? reading : null;
+      }, 25_000);
+      if (card === null) {
+        const where = await page.evaluate(() => ({
+          cards: document.querySelectorAll('.pjsr-thumbnail').length,
+          hosts: document.querySelectorAll('.pjsr-thumbnail-xfa').length,
+          canvas: document.querySelector('.pjsr-thumbnail-canvas')?.width ?? 0,
+        }));
+        fail(`a pure-XFA document left the card holding no composed form: ${JSON.stringify(where)}`);
+      }
+      if (card.layers !== 1) fail(`the card's form tree repeated ${card.layers} times, expected 1`);
+      // The card sits inside a button, so a live form in it is a set of fields a keyboard reader reaches
+      // nine times over on a nine-page document, none of it visible. `inert` plus `aria-hidden` plus the
+      // walked `tabIndex = -1` is the whole of that defence, and only a real engine applies the cascade.
+      if (!card.inert || card.hidden !== 'true' || card.tabbable > 0) {
+        fail(
+          `the form inside the card is reachable by a reader: inert=${card.inert} ` +
+            `aria-hidden=${card.hidden} ${card.tabbable} tabbable field(s)`,
+        );
+      }
+      /*
+       * The card is not turned here, and the reason is a defect rather than a harness shortcut. The viewport
+       * change this path needs is a toolbar control, and at 375×812 the bar folds every one of them into the
+       * overflow menu — measured with `.pjsr-viewer` spanning y=447 to y=688 (343×241) under `overflow: clip`:
+       * the rotate row is 44 px tall from y=669, so its own centre at y=691 is past the clip edge,
+       * `elementFromPoint` there answers the page behind it, and a pointer click cannot land on it at all. The
+       * keyboard still reaches it — 49 Tab presses from the body, `activeElement` on the button, the sheet's
+       * own `rgb(79, 70, 229) solid 2px` ring, and Enter turned the canvas from 670×867 to 871×673 — so what a
+       * pointer user loses is the row, which is task #241. Until that is fixed, the rotation half of the
+       * clause is guarded where the mechanism is observable: `PdfPage.xfa.test.tsx` and
+       * `PdfThumbnail.xfa.test.tsx` drive the viewport change through the component's own inputs.
+       */
       // Closed with the panel's own control rather than the toolbar's: an open sidebar narrows the bar the
       // fold check measures next, and by this width the toggle may itself be folded away.
       await page.click('.pjsr-sidebar .pjsr-sidebar-close');
       await page.waitForSelector('.pjsr-sidebar', { state: 'detached' });
-      return `${thumbs} thumbnails at ${(ink.ratio * 100).toFixed(2)} % ink, outline ${items} items`;
+      return (
+        `${thumbs} thumbnails at ${(ink.ratio * 100).toFixed(2)} % ink, outline ${items} items, ` +
+        `pure-XFA card ${card.width}×${card.height}px over ${card.chars} form characters, 1 tree, inert`
+      );
     },
   },
   {

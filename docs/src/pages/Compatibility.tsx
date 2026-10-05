@@ -164,10 +164,17 @@ export function Compatibility() {
           print a confident limit it did not observe.
         </li>
         <li>
-          <strong>Measured, and unfixable here: the thumbnail is blank.</strong> A pure-XFA page paints
-          zero operators, and a thumbnail is a painted canvas, so the sidebar shows an empty 132×185
-          buffer where the page should be. Composing the layer at print intent into that buffer is open
-          work.
+          <strong>Measured: the thumbnail composes the form.</strong> A pure-XFA page paints zero operators,
+          and a thumbnail is a painted canvas, so the sidebar showed an empty 132×185 buffer where the page
+          should be — the same absence the page itself had before <code>0.8</code>. The card now lays the
+          same <code>XfaLayer</code> tree over its canvas, at the card&apos;s own CSS scale rather than the
+          density that sizes the bitmap, with the document&apos;s own <code>annotationStorage</code> at
+          display intent, and it is marked <code>inert</code>: that tree is live DOM inside a{' '}
+          <code>&lt;button&gt;</code>, so without it a nine-page form offers a keyboard reader nine copies
+          of fields they cannot see. Both halves are asserted — <code>PdfThumbnail.xfa.test.tsx</code> for
+          what the card asks the engine for, and the matrix&apos;s <code>sidebar-thumbs-outline</code> row
+          for the tree a real engine laid out, its measured box and its tab order. Whether a value the
+          reader typed reaches the card is the question the bullet above says this project cannot answer.
         </li>
       </ul>
       <p>
