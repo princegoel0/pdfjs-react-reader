@@ -625,13 +625,15 @@ moves it: a new tsup entry reshuffles the shared chunks every path is built from
 core* column, not the base row, is the number that describes what a feature costs you.
 
 CI runs `npm run size`, which compares each path against the numbers committed in
-`size-baseline.json` and fails when one grows more than 2 % above them (plus 256 bytes of slack, so
-minifier jitter is not a failure), and separately fails if any single feature exceeds **6 kB** over
-core. It is a ratchet rather than a ceiling: a library that grows with features cannot honestly promise
-a fixed size, and `pdfjs-dist` decides a bundle's weight long before this layer does. What the gate
-guarantees is that bytes never arrive quietly — accepting growth means running `npm run size:update`,
-so the increase lands in the same diff as the code that caused it. Shrinking is always allowed and
-reported.
+`size-baseline.json` and **reports** growth beyond minifier noise (2 % plus 256 bytes) as `GREW` on the
+build output. It fails a number only when a path reaches **200 % of its accepted size**, or a single
+feature reaches twice its **6 kB** expected cost over core. That line is deliberate: a budget that blocks
+feature work is a ceiling wearing a different name, while a doubling is never a feature — it is a
+dependency arriving, a tier being imported statically, or the same code shipped twice. It is a ratchet
+rather than a promise: a library that grows with features cannot honestly promise a fixed size, and
+`pdfjs-dist` decides a bundle's weight long before this layer does. What the gate guarantees is that bytes
+never arrive quietly — accepting growth means running `npm run size:update`, so the increase lands in the
+same diff as the code that caused it. Shrinking is always allowed and reported.
 
 The 6 kB figure is not the ceiling this project started with: it was 4 kB until the signing work, which
 measured 4.73 kB for the writer pass and the geometry it needs *before* any interface was counted. The

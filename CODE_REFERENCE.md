@@ -128,15 +128,21 @@ For scale, measured the same way (gzip level 9): `pdf.min.mjs` **131.70 kB**, `p
 API). The engine is 507 kB before this package contributes anything, which is the context for every
 number above.
 
-### The two size rules that fail a build
+### The two size rules, and what each one is allowed to do
 
-1. **The ratchet.** Any measured path growing more than **2 %** above the baseline committed in
-   `size-baseline.json` (plus **256 bytes** of slack for minifier jitter) fails. Accepting growth means
-   running `npm run size:update`, which is a reviewable line in the same diff.
-2. **The per-feature assertion.** No single feature more than **6 kB** over core. This one is a constant
-   in `scripts/check-size.mjs` — `size:update` cannot lift it; it has to be argued. It was 4 kB until the
-   signing work (2026-09-27), and the reason is in `PRD.md` §6: bytes are negotiable, behaviour under
-   load is not.
+1. **The ratchet reports; it blocks only at 200 %.** Any measured path growing more than **2 %** above the
+   baseline committed in `size-baseline.json` (plus **256 bytes** of slack for minifier jitter) is printed as
+   `GREW`, and the build carries on. It fails when a path reaches **twice** its accepted size — the owner's
+   ruling on #208, that bytes must not gate feature work, paired with the one growth that is never a feature:
+   a dependency arriving, a tier imported statically, or a second copy of something. Accepting growth means
+   running `npm run size:update`, which is a reviewable line in the same diff. Because the *failing* half got
+   smaller, the decision rule is now tested by the script itself: `pathVerdict()` / `tierVerdict()` are driven
+   with twelve synthetic sizes plus two assertions about the thresholds' shape on every run, before any
+   bundling (`--no-selftest` opts out, and nothing in `package.json` or CI does).
+2. **The per-feature target.** A tier is expected to cost no more than **6 kB** over core; past that it is
+   reported (`GREW`, with the multiple and the stop printed), and only **12 kB** fails. It was 4 kB until the
+   signing work (2026-09-27), and the reason is in `PRD.md` §6: bytes are negotiable, behaviour under load is
+   not — and neither, now, is a size number.
 
 ---
 

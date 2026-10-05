@@ -957,11 +957,17 @@ the probe set the number, not the string. The probe runs off the render path and
   A bundle or performance budget MUST NOT cause a required feature to be disabled, silently degraded or
   omitted at runtime.
 * **Bundle Budgets.** Excluding the engine, size is governed by a **ratchet**, not a functional ceiling:
-  every consumer path is measured gzipped and the build fails when one grows more than the committed
-  allowance above its baseline. Per-feature size is measured incrementally as **core + feature − core**, so
-  shared core code is not charged repeatedly to every feature. Accepting a growth is a reviewed change to
-  the budget in the same diff as the code that caused it. The feature budget is therefore a CI contract, not
-  a reason to remove functionality. For scale: the engine itself is external to these package-layer budgets.
+  every consumer path is measured gzipped against its committed baseline, and growth beyond the minifier's
+  noise is **reported** on the build output. Reporting is the obligation; blocking is reserved. The build
+  fails a size number only when a path reaches **200 % of its accepted size**, because a budget that stops
+  feature work is being used as a ceiling, which is what this section forbids — and a doubling is the one
+  growth that is not a feature: an arriving dependency, a static import of a tier, or a second copy of
+  something. Per-feature size is measured incrementally as **core + feature − core** against an expected
+  target for a tier, reported the same way and failed at twice that target. Accepting a growth is a reviewed
+  change to the baseline in the same diff as the code that caused it, so the history of what each feature
+  cost stays readable rather than becoming an obstacle. The feature budget is therefore a CI contract about
+  visibility, not a reason to remove functionality. For scale: the engine itself is external to these
+  package-layer budgets.
 * **Tree-Shakability.** Pure ES modules, one entry per tier, one stylesheet per tier, and the opt-in feature
   model of FR-21. The guarantee is that feature-specific JavaScript modules are absent from a consumer bundle
   when the feature is not imported. This is verified against more than one bundler. The PRD does not promise

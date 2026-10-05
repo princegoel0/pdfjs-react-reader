@@ -268,15 +268,18 @@ export function Introduction() {
       </p>
       <p>
         Measured on the signing build. CI runs <code>npm run size</code>, which compares every path
-        against the numbers committed in <code>size-baseline.json</code> and fails on growth beyond
-        2&nbsp;% (+256&nbsp;B of slack for minifier jitter), and fails on its own if any single feature
-        costs more than <strong>6&nbsp;kB</strong> over core. Bytes are a ratchet rather than a
-        ceiling: a library that grows with features cannot honestly promise a fixed size, so what the
-        gate protects is the process — accepting growth means running <code>npm run size:update</code>,
-        which puts the new number in the same diff as the code that caused it. That limit was
-        4&nbsp;kB until signing, which measured 4.73&nbsp;kB for the writer pass and its geometry
-        alone, before any interface: the number moved because the requirement that does not move is
-        what a feature costs a reader&rsquo;s machine, not what it weighs.
+        against the numbers committed in <code>size-baseline.json</code> and <em>reports</em> growth beyond
+        2&nbsp;% (+256&nbsp;B of slack for minifier jitter) as <code>GREW</code>; it fails a number only at
+        <strong>200&nbsp;% of the accepted size</strong>, or when a single feature costs twice the
+        <strong>6&nbsp;kB</strong> its tier is expected to fit. A budget that blocks feature work is a
+        ceiling wearing another name, and a doubling is never a feature — it is a dependency arriving or the
+        same code shipped twice. Bytes are a ratchet rather than a promise: a library that grows with
+        features cannot honestly promise a fixed size, so what the gate protects is that a number never moves
+        quietly — accepting growth means running <code>npm run size:update</code>, which puts the new number
+        in the same diff as the code that caused it. That 6&nbsp;kB was 4&nbsp;kB until signing, which
+        measured 4.73&nbsp;kB for the writer pass and its geometry alone, before any interface: the number
+        moved because the requirement that does not move is what a feature costs a reader&rsquo;s machine,
+        not what it weighs.
       </p>
 
       <h2>Behaviour under load</h2>

@@ -338,10 +338,10 @@ export function Compatibility() {
         Gzipped, excluding <code>pdfjs-dist</code>, React and the optional{' '}
         <code>@cantoo/pdf-lib</code>, measured on the <code>0.9</code> build. Each row is a real
         consumer file bundled once with esbuild and once with Rollup, and the larger number is
-        reported, so a path only counts as small if two independent tree-shakers agree. CI fails the
-        build when a path grows more than 2&nbsp;% above the numbers committed in{' '}
-        <code>size-baseline.json</code>, and fails on its own when any single feature costs more than
-        6&nbsp;kB over core, so these are enforced rather than estimated.
+        reported, so a path only counts as small if two independent tree-shakers agree. CI reports any path
+        that grew past the numbers committed in <code>size-baseline.json</code>, and stops the build at
+        <strong> twice</strong> an accepted number — or twice the 6&nbsp;kB a tier is expected to fit — so the
+        growth is measured rather than estimated, and a feature is never refused for being a feature.
       </p>
       <table className="doc-table">
         <thead>
@@ -443,8 +443,10 @@ export function Compatibility() {
         The gate is a ratchet, not a promise about how small the library stays. The budget was a fixed
         45&nbsp;kB until <code>0.3</code>&apos;s production-robustness features pushed the shell to
         45.45&nbsp;kB; raising the ceiling was the smaller fix, and a number every feature release has
-        to renegotiate is not a requirement. What replaced it is the committed baseline plus the
-        per-feature cap, which is the part that can stay fixed.
+        to renegotiate is not a requirement. What replaced it is the committed baseline plus a
+        per-feature target — and since #208 both are things the build reports rather than argues with:
+        it stops at twice the accepted number, which is the point where growth has stopped being a
+        feature.
       </p>
 
       <h2>Versions</h2>

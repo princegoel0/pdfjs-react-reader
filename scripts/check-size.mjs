@@ -2,11 +2,15 @@
  * Measures what a consumer actually downloads, per tier, and fails the build on
  * three different mistakes.
  *
- * **The ratchet.** Every number is compared against `size-baseline.json`, and
- * growth of more than 2 % (plus 256 bytes of minifier noise) fails. A library
- * that grows with features cannot honestly promise a fixed size — `pdfjs-dist`
- * alone is 131.7 kB gzipped on the main thread and 375.3 kB in its worker — so
- * what is promised instead is that bytes never
+ * **The ratchet.** Every number is compared against `size-baseline.json`. Growth
+ * past 2 % (plus 256 bytes of minifier noise) is reported as `GREW`; only
+ * **200 % of the accepted size fails** — the owner's ruling on #208, that a size
+ * gate must not block development or a feature, and that the thing worth
+ * stopping is a doubling, which is never a feature: it is a dependency arriving,
+ * a static feature import, or a second copy of something. A library that grows
+ * with features cannot honestly promise a fixed size — `pdfjs-dist` alone is
+ * 131.7 kB gzipped on the main thread and 375.3 kB in its worker — so what is
+ * promised instead is that bytes never
  * arrive quietly: accepting growth means running `npm run size:update`, which
  * changes a committed file in the same diff as the code that caused it.
  * Shrinking is always free.
@@ -33,25 +37,118 @@ import { build, transformSync } from 'esbuild';
 import { rollup } from 'rollup';
 
 const KB = 1000;
+/**
+ * The line above which growth is *reported*. Not a failure line — see `HARD_STOP` — but the reason a
+ * diff shows `GREW`: bytes must never arrive quietly, which is the only thing a ratchet can promise.
+ */
 const TOLERANCE = 0.02;
 const SLACK_BYTES = 256;
+/**
+ * The only number this gate fails on: 200 % of the accepted size for a path.
+ *
+ * Owner ruling on #208, 2026-10-05: "we can raise the size if any feature required but it should not block
+ * the development or feature or anything unless it becomes 200% in size from the current size". So the
+ * ratchet reports growth and stops gatekeeping it, and what remains forbidden is the thing a size gate was
+ * never allowed to do — pressure that removes or degrades required functionality, which §6 already rules out.
+ * A doubling is kept as a failure because it is the one signal that cannot be a feature: a path that grew
+ * past 2× its accepted size has almost certainly gained a whole dependency, a static feature import, or a
+ * second copy of something, and that is worth stopping the build for.
+ */
+const HARD_STOP = 2;
 /*
- * Each feature's cost over the core bundle.
+ * Each feature's *expected* cost over the core bundle — a target, not a ceiling, since #208.
  *
  * This was 4 kB from `0.4` until the signing work, which measured 5.53 kB for `edit` and 4.73 kB
  * for the same tier with its interface removed — so the writer and the geometry it needs cost more
- * than the ceiling, on their own and before any UI is counted. Bending a ceiling to fit a feature
- * is how a ceiling stops meaning anything, so the number moved because what the project holds fixed
- * moved: bytes are a ratchet that records decisions, and the requirement that does not bend is
- * behaviour under load (`PRD.md` §6). A tier that has to parse the file it is showing is allowed to
- * cost the kilobytes that doing so takes, provided the work is asked for rather than volunteered,
- * runs once, and says so while it runs — which is exactly the shape signing ended up in.
+ * than the number, on their own and before any UI is counted. It moved because what the project
+ * holds fixed moved: bytes are a ratchet that records decisions, and the requirement that does not
+ * bend is behaviour under load (`PRD.md` §6). A tier that has to parse the file it is showing is
+ * allowed to cost the kilobytes that doing so takes, provided the work is asked for rather than
+ * volunteered, runs once, and says so while it runs — which is exactly the shape signing ended up
+ * in, and exactly the case the owner ruled must not be blocked by this number.
  *
- * What this number is *for* has not changed: it stops one capability swallowing the viewer. At
- * 6 kB the largest tier is a quarter of the core again rather than a fifth, and the next feature
- * that reaches for the writer inherits the same room without another conversation.
+ * So the number still has a job: it is what a tier is *expected* to cost, it is what the report
+ * measures each one against, and past twice it the build stops, because a tier that doubled has
+ * picked up something other than its own feature. At 6 kB the largest expected tier is a quarter of
+ * the core again rather than a fifth, and the next feature that reaches for the writer inherits the
+ * same room without another conversation.
  */
 const FEATURE_TARGET_BYTES = 6 * KB;
+
+/* ------------------------------------------------------------------ *
+ * The two decision rules, separated from the measuring so a synthetic
+ * number can test them (FR-23, `selfTest` below).
+ * ------------------------------------------------------------------ */
+
+/**
+ * A baselined path against the size that was accepted for it: reported past the minifier's noise,
+ * stopped at 200 %. Returns the flag the report prints, never pads it.
+ */
+function pathVerdict(bytes, accepted) {
+  if (bytes > accepted * HARD_STOP) return 'FAIL';
+  // The noise line is `TOLERANCE` *plus* `SLACK_BYTES`, so a small path cannot be flagged by rounding:
+  // 2 % of a 2.3 kB catalog is 46 B, which is smaller than a changed chunk name.
+  if (bytes > accepted * (1 + TOLERANCE) + SLACK_BYTES) return 'GREW';
+  return 'ok';
+}
+
+/**
+ * A tier's cost over core against what that tier is *expected* to cost. Past the target is a report;
+ * twice the target is the same stop the ratchet uses, because a tier that doubled gained something
+ * that is not the feature.
+ */
+function tierVerdict(bytes, limit) {
+  if (bytes > limit * HARD_STOP) return 'FAIL';
+  if (bytes > limit) return 'GREW';
+  return 'ok';
+}
+
+/**
+ * Does the gate still gate? Every case below is a number a real bundle could be, and the two states the
+ * owner's #208 ruling separated are the ones being tested: growth that is reported and growth that stops
+ * the build. A guard nobody can prove still bites is a comment, so this runs on every `npm run size`
+ * before anything is bundled — cheap, and it fails before a minute of esbuild work.
+ *
+ * Measured on 2026-10-05 by breaking the rule on purpose, in copies under `.spike/` (each case ran to
+ * completion and exited 1): `HARD_STOP = 1.01` — the regression that silently turns the ratchet back into
+ * the ceiling §6 forbids — reported 7 failures, including `HARD_STOP 1.01 is at or below the reporting line
+ * 1.02, so nothing is ever reported`; `HARD_STOP = 1.5` reported 4, because three sizes that are now legal
+ * were being stopped; and returning `FAIL` where the report line belongs returned 3, naming each of them.
+ * A baseline at half of today's `core` still produces the other half of the proof end to end —
+ * `FAIL core 31.01 kB gz +15.51 kB`, exit 1 — and one at 90 % produces
+ * `GREW core 31.01 kB gz +3.10 kB`, exit 0.
+ */
+function selfTest() {
+  const cases = [
+    // A path at its accepted size, 25 B past it (inside the noise line), past the noise line, at exactly
+    // 2× (still a report), and one byte past it (the stop).
+    ['path, unchanged', pathVerdict(10_000, 10_000), 'ok'],
+    ['path, +25 B', pathVerdict(10_025, 10_000), 'ok'],
+    ['path, 1.05×', pathVerdict(10_500, 10_000), 'GREW'],
+    ['path, 1.99×', pathVerdict(19_900, 10_000), 'GREW'],
+    ['path, exactly 2×', pathVerdict(20_000, 10_000), 'GREW'],
+    ['path, 2.01×', pathVerdict(20_100, 10_000), 'FAIL'],
+    ['path, 3×', pathVerdict(30_000, 10_000), 'FAIL'],
+    // Shrinking is always free (#208: the gate reports, it does not reward).
+    ['path, half of accepted', pathVerdict(5_000, 10_000), 'ok'],
+    // A tier against its target, including today's real `edit` number and the stop it is nowhere near.
+    ['tier, at target', tierVerdict(6_000, 6_000), 'ok'],
+    ['tier, 6.46 kB of 6 kB', tierVerdict(6_460, 6_000), 'GREW'],
+    ['tier, exactly 2× target', tierVerdict(12_000, 6_000), 'GREW'],
+    ['tier, 2.01× target', tierVerdict(12_100, 6_000), 'FAIL'],
+  ];
+  const failures = cases
+    .filter(([, got, want]) => got !== want)
+    .map(([name, got, want]) => `${name} classified as ${got}, expected ${want}`);
+  // And the shape of the ruling, not just its arithmetic: if the stop ever sits at or below the noise
+  // line, `GREW` is unreachable and the gate has silently become the hard ceiling §6 forbids.
+  if (HARD_STOP <= 1 + TOLERANCE) {
+    failures.push(`HARD_STOP ${HARD_STOP} is at or below the reporting line ${1 + TOLERANCE}, so nothing is ever reported`);
+  }
+  if (HARD_STOP !== 2) failures.push(`HARD_STOP is ${HARD_STOP}, not the 200 % the #208 ruling set`);
+  const lines = cases.length + 2;
+  return { failures, lines };
+}
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
@@ -65,6 +162,18 @@ if (!existsSync(dist)) {
 if (!existsSync(baselinePath) && !update) {
   console.error(`${baselinePath} is missing — run \`npm run size:update\` to create it.`);
   process.exit(1);
+}
+
+/* Run first, because a broken decision rule makes every number below it meaningless — and it costs
+   nothing, unlike the bundling. */
+if (!process.argv.includes('--no-selftest')) {
+  const { failures, lines } = selfTest();
+  if (failures.length) {
+    for (const line of failures) console.error(`FAIL  the size gate is not a gate: ${line}`);
+    console.error('\nFR-23 is not met: the decision rule itself is broken, so the numbers below it mean nothing.');
+    process.exit(1);
+  }
+  console.log(`  ok    ${lines} synthetic size cases classified as the #208 ruling requires (FR-23)\n`);
 }
 
 /* ------------------------------------------------------------------ *
@@ -275,17 +384,21 @@ const measured = {};
 let failed = markerFailures > 0;
 
 function report(label, bytes, detail) {
-  const allowed = (baseline[label] ?? bytes) * (1 + TOLERANCE) + SLACK_BYTES;
-  const over = bytes > allowed;
+  const accepted = baseline[label] ?? bytes;
+  const verdict = pathVerdict(bytes, accepted);
+  const over = verdict === 'FAIL';
   if (over) failed = true;
-  const delta = bytes - (baseline[label] ?? bytes);
-  const flag = over ? 'FAIL' : 'ok  ';
+  const delta = bytes - accepted;
+  // Three states, because "nothing changed" and "it got bigger and somebody looked" are different facts.
+  const flag = verdict.padEnd(4);
   const change =
     baseline[label] === undefined
       ? 'new   '
       : `${delta >= 0 ? '+' : ''}${(delta / KB).toFixed(2)} kB`.padEnd(8);
   console.log(
-    `${flag}  ${label.padEnd(15)} ${(bytes / KB).toFixed(2).padStart(7)} kB gz   ${change}  ${detail}`,
+    `${flag}  ${label.padEnd(15)} ${(bytes / KB).toFixed(2).padStart(7)} kB gz   ${change}  ${detail}` +
+      // The line a doubling is judged against, so `GREW` cannot be read as "fine, keep going" forever.
+      (over ? `\n     ${(bytes / accepted).toFixed(2)}× the accepted ${(accepted / KB).toFixed(2)} kB — the 200 % stop.` : ''),
   );
   measured[label] = bytes;
 }
@@ -307,10 +420,17 @@ for (const path of consumerPaths) {
 
 console.log('\nwhat each feature costs over core');
 for (const tier of tierTargets) {
-  const over = tier.bytes > tier.limit;
+  // The same rule as the ratchet: the target is what the tier is *expected* to cost, and only twice it is a
+  // failure. A feature that needs more bytes is allowed to have them; a feature that doubled has picked up
+  // something nobody meant to ship.
+  const verdict = tierVerdict(tier.bytes, tier.limit);
+  const over = verdict === 'FAIL';
   if (over) failed = true;
   console.log(
-    `  ${(over ? 'FAIL' : 'ok  ')}  ${tier.label.padEnd(9)} ${(tier.bytes / KB).toFixed(2).padStart(6)} kB gz of ${(tier.limit / KB).toFixed(0)} kB`,
+    `  ${verdict.padEnd(4)}  ${tier.label.padEnd(9)} ${(tier.bytes / KB).toFixed(2).padStart(6)} kB gz of ${(tier.limit / KB).toFixed(0)} kB` +
+      (verdict !== 'ok'
+        ? ` — ${(tier.bytes / tier.limit).toFixed(2)}× the target, ${((tier.limit * HARD_STOP) / KB).toFixed(0)} kB is the stop`
+        : ''),
   );
 }
 
@@ -394,7 +514,7 @@ if (!leaked.length && featureOnly.length) {
 if (update) {
   const body = `${JSON.stringify(
     {
-      '//': 'Gzipped bytes per measured path, accepted by `npm run size:update`. See scripts/check-size.mjs.',
+      '//': 'Gzipped bytes per measured path, accepted by `npm run size:update`. The build stops at 200% of these; growth past 2% is reported as GREW. See scripts/check-size.mjs.',
       ...measured,
     },
     null,
@@ -407,11 +527,14 @@ if (update) {
 
 if (failed) {
   console.error(
-    `\nSomething grew past its baseline, or a feature leaked into the core bundle.\n` +
-      `A size growth: look at the diff, then accept it with \`npm run size:update\` — that\n` +
-      `edit is the record that someone decided the bytes were worth it.\n` +
-      `A marker failure: the shell imported a feature statically again, which is the one\n` +
-      `regression this gate exists to catch, and no amount of golfing fixes it.`,
+    `\nA path passed 200% of its accepted size, or a feature leaked into the core bundle.\n` +
+      `Ordinary growth is not this message — it prints GREW and the build carries on,\n` +
+      `because #208 ruled that bytes must not block a feature. Twice the accepted size is\n` +
+      `where that stops being a feature and starts being a mistake: a dependency arriving, a\n` +
+      `second copy of something, or a static import of a tier. Check which, then either undo\n` +
+      `it or move the line with \`npm run size:update\`, which is the record that somebody\n` +
+      `decided. A marker failure is the shell importing a feature statically again, which no\n` +
+      `amount of accepting fixes.`,
   );
   process.exit(1);
 }

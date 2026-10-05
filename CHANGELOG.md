@@ -13,9 +13,12 @@ has now been produced by several of them. The last run of the current workflow �
 `check:tarball` in each cell), `consumer` (both engine ends), `react` (18 and 19, minimum and latest patch),
 `docs`, and on `browser`, which started real engines on a runner for the first time and returned **67 ok / 5
 skipped / 0 failed / 0 not runnable** — the same tally the local run reports, from the same thirteen checks.
-`verify` is red in all three cells at exactly one step, `Bundle size budget`, which is owner decision **#208**;
-the two gates added beside it (#215's follow-on) run green ahead of that step, and #218 moved `Pack` and
-`check:examples` in front of it too, so a still-undecided byte budget cannot hide a contract check — that
+`verify` was red in all three cells at exactly one step, `Bundle size budget`, until the owner ruled on
+**#208** (2026-10-05): the gate now reports growth and blocks only at 200 % of an accepted number, and the
+baseline is re-accepted at today's figures — `core` 31.01 kB gz, the shell entry 65.46, `edit` 6.46 kB over
+core — so `verify` is green again with every number in the diff that moved it. The two gates added beside the
+size step (#215's follow-on) run green ahead of it, and #218 moved `Pack` and `check:examples` in front of it
+too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
@@ -54,7 +57,8 @@ the sentence that moved it.
   wiring tests with `expected 200 to be 50`. Cost, against a build of the same tree with these four files at
   their previous contents: +0.04 kB gz on `core` (30.97 → 31.01), +0.10 kB on the shell (65.36 → 65.46),
   +0.07 kB on `headless` (36.79 → 36.86). The size gate was already red on owner decision **#208** and no
-  baseline was moved.
+  baseline was moved for this row; the ruling that closed #208 re-accepted it, and these numbers are in the
+  figures it names.
 - **The shell now says what page the reader is on (#220, FR-45's "page-change announcements").** The clause was
   not deferred or waived, it was simply absent — and `FR-45`'s row did not say so, which is the same failure
   #217 is about: the live region that existed was the search counter's, and a change to a control nobody is
@@ -88,8 +92,8 @@ the sentence that moved it.
   asserts what that was a proxy for — a polite region exists, not one of them contains a character, and the
   alert carries the whole message — which is the stronger check and the one that survives a shell with more
   than one live region. Cost, measured against the build before it: +0.25 kB gz on `core` (30.72 → 30.97),
-  +0.47 kB on the shell (64.87 → 65.34), `headless` +0.04 kB, every catalog unchanged. The size gate is already
-  red on owner decision **#208** and no baseline was moved.
+  +0.47 kB on the shell (64.87 → 65.34), `headless` +0.04 kB, every catalog unchanged. The size gate was
+  already red on owner decision **#208** when this landed and no baseline was moved for it.
 - **The export map now has to be reachable from the source layout, not just from a build.** CI's first real
   run failed all seven `typecheck` cells (three `verify`, four `react`) and all six browser cells at once, on
   one cause: `tsconfig.json#paths` mapped the root, `/headless`, `/features/*` and the stylesheets but not
@@ -349,10 +353,12 @@ the sentence that moved it.
 
 ### Amended
 
-Five requirements moved, on the owner's ruling of 2026-10-04, and each moved as the lock requires: the id is
-unchanged, the whole requirement is restated, and the reason is written here to stay. Nothing in this list is a
-requirement weakened to match the code — in every case the sentence was saying something the package does not do,
-or cannot do on the engine we advertise, and one of them (`FR-47`) gained a promise instead of losing one.
+Six statements moved across two rulings (2026-10-04 and 2026-10-05), and each moved as the lock requires: the
+id or section is unchanged, the whole requirement is restated, and the reason is written here to stay. Nothing
+in this list is a requirement weakened to match the code — in every case the sentence was saying something the
+package does not do, or cannot do on the engine we advertise, one of them (`FR-47`) gained a promise instead of
+losing one, and the last (§6's bundle budgets) changed what a budget is *allowed to do*, which is the kind of
+call only the owner can make.
 
 - **`FR-31` True Flattening** now flattens *supported widgets and supported signature appearances*, says plainly
   that markup annotations — highlight, text markup, ink, free-text — are carried through as annotations rather
@@ -401,10 +407,52 @@ or cannot do on the engine we advertise, and one of them (`FR-47`) gained a prom
   that. The decidable property is therefore about load, not about invocation, which is what
   `src/lib/ssr.test.ts` holds and what a client boundary depends on. A reader of the old sentence could not
   tell a violated rule from a loosely written one.
+- **§6's `Bundle Budgets` rule** now separates *reporting* from *blocking*: every consumer path is measured
+  gzipped against its committed baseline, growth beyond the minifier's noise is **reported** on the build
+  output, and the build fails a size number only when a path reaches **200 % of its accepted size**; the
+  per-feature increment is measured as core + feature − core against an *expected target* for a tier, reported
+  the same way and failed at twice that target; accepting a growth stays a reviewed change to the baseline in
+  the same diff. **Reason:** the owner's ruling of 2026-10-05, quoted — *"we can raise the size if any feature
+  required but it should not block the development or feature or anything unless it becomes 200% in size from
+  the current size"*. The old sentence made the ratchet a hard fail at a small allowance, which is the one use
+  of a budget this section explicitly forbids: it turned #208, a decision about bytes, into a blocker on
+  feature work, and `edit` at 6.46 kB over a 6 kB target was stopping `verify` while nothing was wrong with the
+  feature. The blocking line is kept, and moved to a doubling, because that is the growth that is *not* a
+  feature — an arriving dependency, a static import of a tier, a second copy of something — and the marker
+  assertions that catch those still fail at any size. The id and the section number are unchanged.
 
 ### Changed
 
-### Changed
+- **The size gate reports growth and blocks at 200 %, not at 2 % + slack (#208).** `scripts/check-size.mjs`
+  gained a third state: `ok`, `GREW`, `FAIL`. `GREW` is the old failure — past `accepted × 1.02 + 256 B` for a
+  baselined path, past the 6 kB target for a tier increment — and now prints and exits 0; `FAIL` is
+  `HARD_STOP = 2`, applied to the same two kinds of number, so a path is blocked at twice its accepted size
+  and a tier at twice its target. Nothing else in the gate moved: the feature-marker checks, the FR-22
+  core-stylesheet check and the "worst of esbuild and Rollup" comparison are still hard failures at any size,
+  because they assert a *boundary* rather than a *quantity*, and a boundary that only fails when it is
+  expensive is not a boundary. Both live states were measured rather than reasoned about, with throwaway
+  baselines under `.spike/`: a baseline written at half today's `core` makes the gate print
+  `FAIL core 31.01 kB gz +15.51 kB` / `2.00× the accepted 15.51 kB — the 200 % stop.` and exit 1, and a
+  baseline written at 90 % of it — a real 1.11× growth — prints `GREW core 31.01 kB gz +3.10 kB` and exits 0.
+  `size-baseline.json` was then re-accepted at the numbers this
+  tree actually builds — core 31.01 kB gz, the shell entry 65.46 kB gz, `edit` 6.46 kB over core — which is
+  the reviewed-change half of the same rule, and why `npm run size` is now green without any code having
+  shrunk. `verify` was the last gate red for this reason and is green now: `npm run verify` exits 0 end to end
+  — 113 files and 1,070 tests, then `build`, `size`, `check:packaging`, `check:examples`, `check:maturity` and
+  `check:fr-evidence` — and the size numbers in the [Unreleased] state paragraph are the ones that run printed. PRD §6, README, `CODE_REFERENCE.md` and the
+  docs site's Introduction and Compatibility pages were restated to match; the requirement text moved in the
+  `Amended` entry above, on the owner's instruction, not to fit the tool.
+
+  A gate that no longer fails on growth needs a check on its own decision rule, so the two thresholds now live
+  in `pathVerdict()` and `tierVerdict()` and `selfTest()` drives them with twelve synthetic sizes and two
+  shape assertions, on every run, before anything is bundled. It was proven to bite by breaking the rule in
+  copies under `.spike/`: `HARD_STOP = 1.01` (the ratchet quietly becoming the ceiling §6 forbids) reported
+  7 failures, `HARD_STOP = 1.5` reported 4, and returning `FAIL` at the reporting line reported 3 — each with
+  exit 1, naming which size was misclassified. The self-test reads no file and needs no build, so a fresh
+  checkout runs it exactly as this machine did — the condition #215 made the register gate prove.
+  `FR-23`'s register row gained a note saying which half of the
+  gate moved; its state is unchanged, because every tier is still measured independently in CI and the core
+  artifact is still asserted free of feature code, which is what the requirement actually demands.
 
 - **An annotation highlight now says *mark* without its colour (#221, FR-44's third signal).** The clause names
   three things that must not carry meaning by hue alone and the shell had channels for two: a search match's
@@ -501,8 +549,9 @@ or cannot do on the engine we advertise, and one of them (`FR-47`) gained a prom
   `check:examples` builds the tarball itself — so the reorder costs no time. What it buys was shown by feeding
   the job its own defect: a manifest whose `files` list omits a published subpath is caught by `Pack`, and with
   the budget in front of it the run reports nothing about that omission, because the job had already stopped.
-  The size step keeps its verdict — it still reddens the job, and #208 is still owed — it simply no longer blinds
-  what follows it. (FR-52, FR-58)
+  The size step keeps its verdict — it reddens the job when a number passes its stop — and simply no longer
+  blinds what follows it. (#208, the decision this ordering was working around, was ruled on 2026-10-05 and is
+  the entry below.) (FR-52, FR-58)
 - **Eighteen requirements stopped being reported as `met`, because their guards asserted less than their clauses**
   (#217). The register read 44 met / 13 partial / 1 absent. The re-read this pass was deliberately blind to the
   register: each row was graded from `PRD.md`'s sentence against `src/` and the test tree only, asking per
@@ -551,9 +600,9 @@ or cannot do on the engine we advertise, and one of them (`FR-47`) gained a prom
   Both ran only inside `npm run verify`, and no job in `.github/workflows/ci.yml` calls `verify` — so FR-50's
   promise that "a name that is exported and untagged fails the build" meant *this machine's* build, and the
   register that is the status of record had never been checked by a runner either. They sit after `Build` and
-  **before** `Bundle size budget`, deliberately: the size gate is an open owner decision (#208) that stops the
-  job at step five, and every step behind it — including the examples check, which is still unreached — is
-  invisible while it stays undecided. A gate stacked behind an unresolved one is not a gate. Both new steps
+  **before** `Bundle size budget`, deliberately: the size gate was then an open owner decision (**#208**, closed
+  2026-10-05 by the entry above) that stopped the job at step five, and every step behind it — including the
+  examples check, which was still unreached — is invisible while it stays undecided. A gate stacked behind an unresolved one is not a gate. Both new steps
   were fed their defect to prove they bite: dropping one name from `api-maturity.json` gives `FAIL
   AnnotateFeatureState is exported and untagged` and exit 1, and flipping one state word in the generated
   `ROADMAP.md` block gives `status block is stale` and exit 1; each file came back by checksum. Runner
@@ -978,7 +1027,8 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   `check:packaging`, `check:examples`, `check:maturity` and `check:fr-evidence` all pass, and `npm run verify`
   stops at `size` for the one reason it is meant to: core at 30.68 kB against the accepted 29.09 kB baseline
   and `edit` at 6.43 kB of its 6 kB ceiling, which is decision #208 and not something a gate should be talked
-  out of.
+  out of. (The ruling that closed #208 kept the reporting and moved the stop to 200 %; both numbers above are
+  inside the re-accepted baseline it names.)
 
 ### Fixed
 
