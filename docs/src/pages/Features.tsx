@@ -122,7 +122,12 @@ export function Features() {
               palette, and a Delete enabled only while a mark is selected. The marks are PDF
               annotations, so they go back into the file on save and survive zoom, rotation and
               scrolling a page out of the way. It is the only ink the package draws (FR-18 withdrew the core freehand
-              surface), and this is the one that saves.
+              surface), and this is the one that saves. The three are the whole list, and the reason is
+              said here rather than found at save time (FR-29): stamp and the engine&apos;s signature
+              editor were measured to break <code>saveDocument()</code> rather than refuse politely —
+              <code>pdfjs-dist</code> exports no <code>SignatureManager</code> to give one, and an
+              image-less stamp throws in the worker — and underline, strikeout and squiggly are absent
+              because the engine gives its editors no subtype to build them on.
             </td>
             <td>
               <code>pdfjs-react-reader/annotate.css</code>

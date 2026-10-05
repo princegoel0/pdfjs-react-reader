@@ -24,19 +24,60 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **35 met, 22 partial, 1
-absent** of 58, on a suite of **1,154 tests in 123 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **36 met, 21 partial, 1
+absent** of 58, on a suite of **1,159 tests in 124 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. Nine of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
 through **#232**, which moved a second behaviour; and `FR-04` and `FR-55` through **#233**, where a third
-turned out not to be a missing test at all. That is the direction the count takes from here: down where a
-guard turns out to be decoration, up where a test is shown to bite — and never up on a claim nobody can
-make fail.
+turned out not to be a missing test at all; `FR-29` through **#234**, whose two remaining clauses could only
+be measured in a browser, which is why §8's Chromium row now counts seventeen checks. That is the direction the
+count takes from here: down where a guard turns out to be decoration, up where a test is shown to bite — and
+never up on a claim nobody can make fail.
 
 ### Added
+
+- **Annotation authoring's lifetime, and the two clauses only a browser can answer (`#234`,
+  2026-10-06).** `FR-29` reads `met`: 36 met, 21 partial, 1 absent.
+
+  The row's first gap — "`annotateFeature` is never mounted by a test" — had itself gone stale;
+  `annotate.armed.test.tsx` mounts the feature and guards the tool→mode arithmetic. The rest of the
+  sentence was unguarded, and `src/features/annotate.lifecycle.test.tsx` (5 tests) now holds it. The
+  manager is constructed with the document whose `annotationStorage` an incremental save commits — pdf.js
+  binds `pdfDocument.annotationStorage` at `build/pdf.mjs:2733`, so that constructor argument *is* the
+  persistence clause at the depth jsdom can reach — built once per document, disposed when the document is
+  replaced and when the viewer unmounts, with its alert region taken down beside it so a second document
+  cannot stack two live regions, and untouched while pages come and go, each returning page re-attached to
+  the *same instance*. That identity is the mechanism "an editor survives its page scrolling out and back"
+  rests on. The refusal clause is guarded by enumeration: every control the bar renders is pressed, and no
+  mode outside `NONE`/`HIGHLIGHT`/`FREETEXT`/`INK` may appear, with the ban list read off the engine's own
+  `AnnotationEditorType` values rather than typed by hand, and `signatureManager: null` asserted because
+  that argument, not a hidden button, is what makes signing unavailable rather than available and broken.
+
+  Two clauses jsdom cannot reach — *persisted by an incremental save*, and the survival itself, since
+  `pdfjs-dist` exports no editor classes from its root and a mark is a pointer moving over an editor layer
+  — became the matrix's seventeenth check, `authored-ink-survives-scroll-and-save`: a stroke drawn with the
+  pen armed, page 1 sent out of the virtualized window by jumping to page 14 (**the row fails if the editor
+  element never left the document**, because then the scroll was never asked about), the mark found again on
+  the return, then the file saved through the viewer's own Download control and re-opened by the engine in
+  Node to count `/Ink` on page 1 against a fixture that carries none. Measured: 24,378 bytes in, 26,164
+  out, one `/Ink` where the file had none.
+
+  Nine counterfactuals, every one restored byte-for-byte. In jsdom: `doc` dropped from the build effect's
+  dependency array (2 failed), `manager.destroy()` deleted from the cleanup (1), the constructor's document
+  replaced with `null` (2), and the manager disposed by the page rather than the feature (8 failed across
+  two files, the overlay guard keeping the same clause). In the browser: that same per-page disposal breaks
+  the new row and 3 cells, and a download that decides there are no edits fails it naming the saved file as
+  carrying 0 ink annotations. `docs/src/pages/Features.tsx` now records the exclusions beside the tools,
+  which is FR-29's "the reason is recorded rather than discovered by a user at save time".
+
+  One thing the row had to fail to learn, and now says in its own comment: **the engine commits an ink
+  editor when the mode changes, not when the pointer lifts.** The first reading of the check came straight
+  after `pointerup`, saw a path on the draw layer and no `.inkEditor`, and reported a viewer that draws
+  nothing; taking the tool off first, as a reader does when they are finished, gives the editor.
+  `pen-draws-not-scrolls` already knew this.
 
 - **Capabilities and state: three clauses closed, and one that turned out to need a ruling (`#233`,
   2026-10-05).** `FR-04` and `FR-55` read `met`; `FR-37` keeps its gap with a sharper text. 35 met,

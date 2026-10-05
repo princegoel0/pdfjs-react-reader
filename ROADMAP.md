@@ -76,7 +76,7 @@ certified on this machine at all.
 | `FR-26` | Replaceable Find Strategy | **partial** | 5/5 | 2 | no test hands the shell a host-supplied controller. The seam is real (`find?: PdfFindController`… |
 | `FR-27` | Search Depth | **met** | 5/5 | 0 | — |
 | `FR-28` | Composed Shell, Labels, Events, Locales & Shell Affordances | **partial** | 5/5 | 2 | the three affordances the clause names as individually switchable and observable are never switc… |
-| `FR-29` | Annotation Authoring | **partial** | 4/5 | 3 | `annotateFeature` is never mounted by a test. It is imported twice — src/features/stylesheets.te… |
+| `FR-29` | Annotation Authoring | **met** | 5/5 | 0 | — |
 | `FR-30` | Page Authoring | **met** | 4/5 | 0 | — |
 | `FR-31` | True Flattening | **met** | 4/5 | 0 | — |
 | `FR-32` | Visual Signing | **met** | 4/5 | 0 | — |

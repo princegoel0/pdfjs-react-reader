@@ -776,30 +776,30 @@
     },
     "FR-29": {
       "title": "Annotation Authoring",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/features/annotate.tsx",
         "src/components/PdfPage.tsx",
+        "src/features/download.tsx",
         "src/headless/usePdfDownload.ts"
       ],
       "automated": [
         "src/lib/features.test.ts",
-        "src/lib/editing-state.test.ts"
+        "src/lib/editing-state.test.ts",
+        "src/features/annotate.armed.test.tsx",
+        "src/features/annotate.lifecycle.test.tsx"
       ],
-      "acceptance": [],
-      "acceptanceWaiver": "Editors surviving scroll-out, rotation and zoom was browser-verified during 0.6 and the persistence half is asserted by writing and re-opening real files; the matrix has no annotate check and adding one repeats the engine-level evidence.",
+      "acceptance": [
+        "scripts/browser-matrix.mjs#authored-ink-survives-scroll-and-save"
+      ],
       "documentation": [
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
-        "src/components/PdfPage.structure.test.tsx"
+        "src/features/annotate.lifecycle.test.tsx"
       ],
-      "gaps": [
-        "`annotateFeature` is never mounted by a test. It is imported twice — src/features/stylesheets.test.tsx:23 for its `stylesheets` list, src/lib/core-ink.withdrawal.test.ts:118 for a file-ownership scan — and neither runs the feature, so nothing asserts that the feature owns and disposes the editor manager (annotate.tsx:210 `manager.destroy()`) or that arming a tool goes through the engine’s own manager",
-        "“persisted by an incremental save” has no authoring round trip: pdf-write.test.ts:77 counts `/Highlight`, `/Ink` and `/FreeText` annotations already present in a fixture surviving a flatten. No test creates an editor, writes, and re-opens the bytes",
-        "“an editor survives its page scrolling out and back” is asserted nowhere — the remount tests (ViewerPages.regroup.test.tsx:206,220) prove pages are not remounted and involve no editors"
-      ],
-      "note": "Editing state, the shell seam and the stylesheets are guarded (editing-state.test.ts, features.test.ts), and the persistence primitives are guarded at the writer. What the clause is about is the feature’s lifecycle — the manager it must own because the engine will not share it, and the mark a reader draws that has to survive both a save and a scroll. That was browser-verified once, during 0.6, and the register mistook the memory for a guard."
+      "gaps": [],
+      "note": "The row read met on a browser pass made during 0.6 and no guard, and its first gap — `annotateFeature` is never mounted by a test — had itself gone stale: annotate.armed.test.tsx mounts the feature and guards the tool-to-mode arithmetic. What was missing was the rest of the sentence. annotate.lifecycle.test.tsx now owns it in jsdom: the manager is constructed with the document whose `annotationStorage` an incremental save commits, is built once per document and rebuilt-and-disposed on a swap, survives page churn untouched while the page's own layer is rebuilt against the same instance, takes its alert region down with it, and cannot arm any engine mode outside the three tools offered. The two clauses jsdom cannot reach — a real mark reaching real bytes, and a mark surviving a real page leaving the window — are measured in Chromium by the matrix row, which draws one stroke, jumps to page 14, proves page 1's editor element left the document and came back, then saves through the viewer's own Download control and re-opens the bytes with the engine to count the `/Ink` annotation against a fixture that carries none. Measured: four jsdom counterfactuals (2, 1, 2 and 8 failures) and two browser ones — a page that disposes the document-wide manager breaks the row and 3 cells, and a download that decides there are no edits fails it naming the 24,378-byte file as carrying 0 ink annotations."
     },
     "FR-30": {
       "title": "Page Authoring",
@@ -1194,7 +1194,7 @@
       ],
       "gaps": [
         "two of the clause’s three named signals are read in a real browser and one is not: the `forced-colours` check now asserts an annotation highlight’s computed outline while the palette is forced, but the search match’s rule and the active match’s ring are asserted as declarations only, and jsdom resolves no colour at all",
-        "the editor’s half of the highlight channel — the inset `box-shadow` on `.highlightEditor .internal` — is asserted as a declaration, not painted: no browser check arms the annotate tier and reads a mark being made, because the matrix has no check that creates an annotation",
+        "the editor’s half of the highlight channel — the inset `box-shadow` on `.highlightEditor .internal` — is asserted as a declaration, not painted. The reason the matrix gave for that has just been closed and the gap has not: `authored-ink-survives-scroll-and-save` now arms the annotate tier and makes a real mark in Chromium, but it reads the mark’s *survival through a scroll and a save*, not its computed style. What is still missing is a check that creates a highlight rather than a stroke, emulates `forced-colors: active`, and reads `getComputedStyle(internal).boxShadow` — #235",
         "focus visibility under a forced palette is asserted nowhere; the sheet says the outline token survives the override, and nothing in a browser has ever looked"
       ],
       "note": "Tokens re-pointed at system colours, shadows turned into outlines and the four `forced-color-adjust: none` cases are each justified in the stylesheet. The clause’s colour-only list now has all three of its members: the search mark’s rule and the active match’s ring were already there, and #221 added the annotation highlight, on both of its paths — an outline on the `.highlightAnnotation` the annotation layer paints out of the file (`viewer.css`, which is core because the layer is core) and an inset `box-shadow` on the editor’s `.internal` (`annotate.css`), the second chosen deliberately so the focus and selection rings keep the `outline` property to themselves. Both are drawn from `color-mix(… var(--pjsr-fg) 45% …)`, so a forced palette re-points the edge with no rule of its own and a dark theme gets a light mark. `src/styles/forced-colors.test.ts` holds the declarations and the token dependence — deleting the `outline` line is a red test, as is authoring a literal inside a forced block — and the matrix’s `forced-colors` check reads the computed result on a real highlight in a forced palette: `highlight edge solid 1px rgb(0, 0, 0) on 900px`, and with the rule removed `a forced palette left the highlight with \"none 3px\" on a 900px box`, which is the case the clause exists for. Cost: +0.02 kB gz on the shell, `core` and every catalog unchanged. What is still thin is in the gaps: two of the three signals are only declared, not painted, and no check has looked at focus in a forced palette."

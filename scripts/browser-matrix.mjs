@@ -234,6 +234,49 @@ const LAST_LOG = (prefix) => {
   return lines.find((line) => line.startsWith(prefix)) ?? '';
 };
 
+/**
+ * The bytes a check asked the browser to save.
+ *
+ * `download.path()` is the file Playwright kept for it; the stream is the fallback for an engine that reports
+ * the event without a temporary file. Either way the bytes are read here, in Node, and re-opened there: the
+ * claim is about the file that left the page, not about a save the page said good things about.
+ */
+async function savedBytes(download) {
+  const path = await download.path();
+  if (path) return new Uint8Array(readFileSync(path));
+  const stream = await download.createReadStream();
+  if (!stream) {
+    fail(`the download event carried neither a file path nor a stream, so its bytes cannot be read`);
+  }
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+/**
+ * Open saved bytes with the engine and count one annotation subtype on one page.
+ *
+ * This is the *reopen* in FR-29's "a written mark survives a save and a reopen": `pdfjs-dist` parses the bytes
+ * the save produced, and `getAnnotations()` is the record a page view would be handed. The dynamic import is
+ * the `legacy` build because this half runs in Node, where the browser build says so in its own warning.
+ */
+async function countSubtype(bytes, pageNumber, subtype) {
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  // A copy, because the engine hands `data` to the worker and the caller's view is left detached: reading
+  // `bytes.length` afterwards answers 0 for a file that parsed perfectly.
+  const doc = await getDocument({ data: new Uint8Array(bytes), verbosity: 0 }).promise;
+  try {
+    const page = await doc.getPage(pageNumber);
+    const annotations = await page.getAnnotations();
+    return {
+      count: annotations.filter((annotation) => annotation.subtype === subtype).length,
+      all: annotations.map((annotation) => annotation.subtype).join(','),
+    };
+  } finally {
+    await doc.loadingTask.destroy();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Checks. Each takes the harness and returns a detail string, `skip(reason)` or throws.
 // ---------------------------------------------------------------------------
@@ -1141,6 +1184,202 @@ const CHECKS = [
         `layer "${armed.layerClass}", scroll ${armed.scrolled}→${committed.scrolled} | disarmed at ` +
         `(${off.at.x},${off.at.y}) on "${off.at.name}": cancelled after ${off.mid.moves} move(s), ` +
         `${off.after.inkEditors} editors unchanged`
+      );
+    },
+  },
+  {
+    /*
+     * FR-29's two clauses that jsdom cannot reach: "persisted by an incremental save" and "an editor survives
+     * its page scrolling out and back".
+     *
+     * `src/features/annotate.lifecycle.test.tsx` guards the lifetime the package controls — one manager per
+     * document, bound to the document an incremental save commits, disposed by the feature, and untouched by a
+     * page coming and going. It cannot *author* anything: `pdfjs-dist` exports no editor classes from its
+     * package root, and a mark is made by a pointer moving over an editor layer, which is a browser's input
+     * pipeline and not a DOM shim's. So this row draws one real stroke and then asks the two questions of it:
+     *
+     *  - does it survive its page leaving the virtualized window and coming back? The premise is proved rather
+     *    than assumed: the row **fails** if jumping to page 14 does not take page 1's editor element out of the
+     *    document, because then the scroll never happened and the "survived" it would report means nothing;
+     *  - does it reach the bytes? The file is saved through the viewer's own Download control, captured by the
+     *    browser, and re-opened here by the same engine — with the fixture read off disk as the control, so a
+     *    file that already carried an ink annotation would fail the row instead of quietly passing it.
+     *
+     * A mouse, not a finger: FR-47's touch exception is `pen-draws-not-scrolls`' job, and it needs CDP to ask.
+     * What is under test here is what happens to the mark *after* it is drawn, which is engine and storage
+     * rather than input. The save leg reports `skip` where an engine will not hand over the file, because a
+     * capability that cannot be shown is a gap in the evidence rather than a green row.
+     */
+    name: 'authored-ink-survives-scroll-and-save',
+    desktopOnly: true,
+    run: async ({ page, load, reveal, jumpTo }) => {
+      const engine = page.context().browser()?.browserType().name();
+      await page.locator('.app-features label', { hasText: 'annotate' }).locator('input').check();
+      await load('page-order-sample.pdf', 20);
+      // A box this row owns: the earlier rows leave the zoom wherever they parked it, and "out of the window"
+      // is a statement about how much of a page a window holds.
+      await page.selectOption(`${BAR} [aria-label="Zoom level"]`, 'automatic');
+
+      const read = () =>
+        page.evaluate(() => ({
+          inkEditors: document.querySelectorAll('.pjsr-editor-layer .inkEditor').length,
+          layerClass:
+            document
+              .querySelector('.pjsr-editor-layer')
+              ?.className.replace('pjsr-editor-layer', '')
+              .trim() ?? '(no editor layer)',
+          pressed:
+            document.querySelector('.pjsr-toolbar [aria-label="Ink"]')?.getAttribute('aria-pressed') ?? '?',
+          mountedPages: document.querySelectorAll('.pjsr-page').length,
+          scrolled: Math.round(document.querySelector('.pjsr-viewport')?.scrollTop ?? -1),
+        }));
+
+      /** Poll the live DOM until `predicate` accepts a reading, and hand back whichever reading it settled on. */
+      const until = async (predicate, timeout = 12_000) => {
+        let last = null;
+        const hit = await waitFor(async () => {
+          last = await read();
+          return predicate(last) ? last : null;
+        }, timeout);
+        return hit ?? last;
+      };
+
+      /*
+       * The top-left of page 1, clamped to what is actually visible, resolved after the arming (the bar grows
+       * the pen's pointer-only sentence, which pushes the page down) — the same three lessons
+       * `pen-draws-not-scrolls` records, applied to a mouse.
+       */
+      const aim = () =>
+        page.evaluate(() => {
+          const scroller = document.querySelector('.pjsr-viewport');
+          scroller.scrollTop = 0;
+          scroller.scrollLeft = 0;
+          const win = `${window.innerWidth}×${window.innerHeight}`;
+          const rect = document.querySelector('.pjsr-page-canvas')?.getBoundingClientRect();
+          if (!rect) return { error: `there is no page canvas to aim at in ${win}` };
+          const left = Math.max(rect.left, 0);
+          const top = Math.max(rect.top, 0);
+          const width = Math.min(rect.right, window.innerWidth) - left;
+          const height = Math.min(rect.bottom, window.innerHeight) - top;
+          if (width < 60 || height < 120) {
+            return { error: `page 1 holds only ${Math.round(width)}×${Math.round(height)} visible px in ${win}` };
+          }
+          const x = Math.round(left + width * 0.15);
+          const y = Math.round(top + Math.min(50, height * 0.12));
+          const hit = document.elementFromPoint(x, y);
+          const name = (node) =>
+            node ? `${node.tagName.toLowerCase()}.${node.className?.baseVal ?? node.className ?? ''}` : '(nothing)';
+          return {
+            x,
+            y,
+            name: name(hit),
+            layer: hit?.closest('.pjsr-editor-layer') instanceof Element,
+            win,
+            canvas: `${Math.round(rect.width)}×${Math.round(rect.height)}`,
+          };
+        });
+
+      const pen = await reveal('Ink');
+      await pen.click();
+      await page.keyboard.press('Escape').catch(() => undefined);
+      await page.waitForFunction(
+        () => document.querySelector('.pjsr-editor-layer')?.className.includes('inkEditing') === true,
+        undefined,
+        { timeout: 15_000 },
+      );
+
+      const at = await aim();
+      if (at.error) fail(`cannot aim a stroke at page 1: ${at.error}`);
+      if (!at.layer) {
+        fail(
+          `the armed point (${at.x},${at.y}) is over "${at.name}" rather than the editor layer (canvas ` +
+            `${at.canvas}, window ${at.win}), so the drag would not be a mark on the page`,
+        );
+      }
+      await page.mouse.move(at.x, at.y);
+      await page.mouse.down();
+      for (let step = 1; step <= 8; step += 1) {
+        await page.mouse.move(at.x + step * 7, at.y + step * 11, { steps: 2 });
+      }
+      await page.mouse.up();
+      /*
+       * Take the tool off *before* counting. The engine's ink editor holds several strokes in one drawing
+       * session, so `endDrawing` builds the editor when the mode changes rather than at every pointerup — a
+       * reading taken straight after `pointerup` sees the stroke on the draw layer and no editor element at
+       * all. This row found that out by failing: the same gesture, measured after disarming, gives one editor.
+       */
+      await pen.click();
+      const drawn = await until((state) => state.inkEditors >= 1);
+      if (drawn.inkEditors < 1) {
+        fail(
+          `a mouse drag over (${at.x},${at.y}) with the pen armed, and the tool then taken off, produced ` +
+            `${drawn.inkEditors} ink editors (layer "${drawn.layerClass}", aria-pressed ${drawn.pressed}) — ` +
+            'nothing was drawn, so the rest of this row has nothing to follow',
+        );
+      }
+
+      // The scroll-out leg, and its premise proved by the element going away.
+      await jumpTo(14);
+      const away = await until((state) => state.inkEditors === 0);
+      if (away.inkEditors !== 0) {
+        fail(
+          `page 1's ink editor was still in the document after jumping to page 14 (${away.inkEditors} editors, ` +
+            `${away.mountedPages} of 20 pages mounted, scroll ${away.scrolled}) — the page never left the ` +
+            'virtualized window, so "survives scrolling out and back" was never asked',
+        );
+      }
+      const mountedAway = away.mountedPages;
+      await jumpTo(1);
+      const back = await until((state) => state.inkEditors >= 1);
+      if (back.inkEditors < 1) {
+        fail(
+          `page 1 came back with ${back.inkEditors} ink editors (${back.mountedPages} pages mounted, scroll ` +
+            `${back.scrolled}, layer "${back.layerClass}") after holding ${drawn.inkEditors} — the mark the ` +
+            `reader drew did not survive its page leaving the window (${mountedAway} pages mounted there)`,
+        );
+      }
+
+      // The save leg, through the viewer's own control.
+      let captureError = null;
+      const pending = page
+        .waitForEvent('download', { timeout: 25_000 })
+        .catch((error) => {
+          captureError = error;
+          return null;
+        });
+      const save = await reveal('Download document');
+      await save.click();
+      const download = await pending;
+      if (!download) {
+        return skip(
+          `${engine}: the save leg could not be captured (${errText(captureError)}) — the mark was drawn at ` +
+            `(${at.x},${at.y}) and survived page 1 leaving the window and returning, but its bytes were never read`,
+        );
+      }
+      const bytes = await savedBytes(download);
+      const saved = await countSubtype(bytes, 1, 'Ink');
+      const original = new Uint8Array(
+        readFileSync(join(repo, 'playground/fixtures/page-order-sample.pdf')),
+      );
+      const control = await countSubtype(original, 1, 'Ink');
+      if (control.count !== 0) {
+        fail(
+          `the fixture already carries ${control.count} ink annotations on page 1 (it holds ${control.all}), so ` +
+            "a mark the reader made cannot be told from one the file arrived with — this row's control is broken",
+        );
+      }
+      if (saved.count < 1) {
+        fail(
+          `the saved ${bytes.length}-byte file (${download.suggestedFilename()}) carries ${saved.count} ink ` +
+            `annotations on page 1 (it holds ${saved.all || 'nothing'}) where the fixture held none — the mark ` +
+            'was drawn, seen on screen, re-mounted after a scroll, and never reached the bytes',
+        );
+      }
+      return (
+        `drew at (${at.x},${at.y}) of a ${at.canvas} page 1 in ${at.win}: ${drawn.inkEditors} editor ` +
+        `committed, ${mountedAway} pages mounted at 14 with page 1 gone, back to ${back.inkEditors} editor on ` +
+        `return, ${download.suggestedFilename()} saved as ${bytes.length} bytes and re-opened with ` +
+        `${saved.count} /Ink on page 1 against ${control.count} in the fixture`
       );
     },
   },
