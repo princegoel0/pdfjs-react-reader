@@ -33,11 +33,57 @@ came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `F
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
 through **#232**, which moved a second behaviour; and `FR-04` and `FR-55` through **#233**, where a third
 turned out not to be a missing test at all; `FR-29` through **#234**, whose two remaining clauses could only
-be measured in a browser, which is why §8's Chromium row now counts seventeen checks. That is the direction the
-count takes from here: down where a guard turns out to be decoration, up where a test is shown to bite — and
-never up on a claim nobody can make fail.
+be measured in a browser; and `FR-43`/`FR-44`'s painted halves through **#235**, which found that one of the
+channels it was sent to measure did not exist. §8's Chromium row now counts eighteen checks. That is the
+direction the count takes from here: down where a guard turns out to be decoration, up where a test is shown
+to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **A second channel that the palette took away, and the structure tree read as the tree it hands a screen
+  reader (`#235`, 2026-10-06).** `FR-43` and `FR-44` keep their gaps and narrow them; 36 met, 21 partial,
+  1 absent.
+
+  **FR-44 first, because it was not a missing test.** The clause says a mark that carries meaning by colour
+  alone must carry it by shape, outline or text under a forced palette, and #221's answer for an
+  editor-authored highlight was an inset `box-shadow` on `.highlightEditor .internal` — chosen deliberately,
+  so the focus and selection rings could keep `outline` to themselves, and commented with the claim that the
+  token would re-point it. Measured in Chromium with `forced-colors: active` on a highlight drawn through the
+  annotate tier, that element reported `box-shadow: none`, `outline: none`, `border: 0px none` and a
+  transparent background on a 98×50 box. **A forced palette does not re-point a shadow; it removes one**, so
+  the mark a reader had just made painted nothing in exactly the mode the clause exists for. `annotate.css`
+  now declares the edge as `border: 1px solid` inside its forced block — with `box-sizing: border-box`, which
+  the sheet otherwise sets per rule, and that would have grown the box two pixels — and
+  `src/styles/forced-colors.test.ts` refuses the shape in general: a colour-only signal whose resting channel
+  is a `box-shadow` owes an edge inside the forced block, read from the sheets rather than from a list this
+  file would have to remember.
+
+  **The focus arm was decoration, and a counterfactual said so.** The new reading asked whether focus stays
+  visible under the palette, found `outline` non-`none` on a tabbed button, and passed — with
+  `.pjsr-button:focus-visible` **deleted from the sheet**, because Chromium paints its own `auto 1px` ring
+  once the palette is on. It now reads the same element twice, the palette on and off, and the report names
+  both: `focus button[Whole words only] forced "solid 2px rgb(55, 0, 110)" against the sheet's own
+  "solid 2px rgb(79, 70, 229)"`. That is the token being re-pointed rather than replaced, which is the claim
+  the sheet used to make in a comment; and the deletion is now red in the sheet test and in the browser.
+
+  **FR-43's row is the eighteenth.** jsdom had the wiring — both layers handed the builder, an untagged
+  document left alone — and the consequence was asserted nowhere. `structure-tree-in-the-accessibility-tree`
+  reads Playwright's aria snapshot, built from each engine's own accessibility protocol: 2 structure trees
+  over `cell/columnheader/figure/heading/list/listitem/paragraph/row/table`, the heading called by its text,
+  the figure named from `/Alt`, and the link **announced inside its owning paragraph** with `aria-owns`
+  resolving to an element in the tree. Measured: handing the annotation layer `structTreeLayer: null` fails
+  the row and 1 case in `PdfPage.structure.test.tsx`; dropping the `MarkInfo` gate fails it and 5 cases in
+  `structure.test.tsx`. The gate's cost is now a browser fact too — the untagged document is loaded **first**,
+  because once the ~50 kB viewer chunk is in the page's module cache no later reading can show what it would
+  have cost: 0 requests for a file that declares no tree, 1 for one that does.
+
+  Five counterfactuals for this work order, each restored byte-for-byte: the editor edge (1 sheet case + the
+  row), the search mark's rule (1 + the row), the focus ring (1 + the row), and FR-43's two. `PRD.md` §8's
+  Chromium row counts the checks that exist, so its spelled word moved seventeen → eighteen. Cost, measured:
+  `annotate.css` is 4,473 B raw and 1,202 B gzipped with the new rule in it, and the gate reports the tier at
+  **2.05 kB over core** (`core+annotate` 33.80 kB gz). The docs' per-feature column still says 1.86 kB —
+  adrift since `0.12` opened, and a hand-copied figure that nothing re-runs `npm run size` against, so it is
+  re-accepted at release close rather than tuned cell by cell here.
 
 - **Annotation authoring's lifetime, and the two clauses only a browser can answer (`#234`,
   2026-10-06).** `FR-29` reads `met`: 36 met, 21 partial, 1 absent.

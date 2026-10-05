@@ -887,9 +887,21 @@ class); an annotation highlight an inset edge on both of its paths — `outline`
 `outline` for their own meanings; an armed toolbar button switches its `transparent` border on; the selected
 sidebar tab thickens its underline from 2 px to 3. Each is drawn from `--pjsr-fg`, so a dark palette gets a
 light edge without a second rule. The channels are declared outside any media query, because 1.4.1 does not
-wait for a high-contrast theme — and they survive one, because a width and a shape are not colours; the
-browser matrix reads the highlight's computed `outline` while `forced-colors` is emulated, which is the only
-place a reader's palette can actually be tested rather than described.
+wait for a high-contrast theme.
+
+**…and one of them does not survive one, which is what measuring rather than describing is for.** A width and
+a shape are not colours, so an outline or a rule comes through a forced palette re-pointed; a shadow does
+not, because the palette *removes* shadows rather than re-tinting them. Measured on a highlight drawn through
+the editor with `forced-colors: active` emulated, the element reported `box-shadow: none`, `outline: none`,
+`border: 0px none` and a transparent background — so `annotate.css` declares that path's edge twice: the
+shadow for the ordinary theme, a `border: 1px solid` inside its forced block for the reader who asked for the
+palette, with `box-sizing` spelled out because this sheet sets it per rule and the element is placed with
+`inset: 0`. `forced-colors.test.ts` now refuses the shape in general — a colour-only signal whose resting
+channel is a `box-shadow` owes an edge inside the forced block — and it also pins `.pjsr-button:focus-visible`'s
+own `outline`, because a browser paints a focus ring whether the package declares one or not. The browser
+matrix reads the computed result while the palette is forced: the page slot's outline and its shadow gone, the
+file-borne highlight's edge, the search mark's rule, the active match's ring, an editor mark's border, and
+focus **twice** — palette on, then off — so the ring seen is the sheet's re-pointed, not the UA's.
 
 ---
 

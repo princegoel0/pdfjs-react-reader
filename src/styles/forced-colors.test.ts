@@ -106,9 +106,16 @@ describe('the stylesheets under forced colours', () => {
      * FR-44's third signal, and the one the clause names last: annotation highlights. A mark that arrived in
      * the file and a mark the reader is making now are two different layers with two different owners, so the
      * channel has to be on both — an edge that appears only after a reload is a channel for archaeologists.
-     * Each is drawn from the theme's own foreground, which is what makes the forced-colours case need no rule
-     * of its own: the sheet's `@media (forced-colors: active)` block re-points `--pjsr-fg` at `CanvasText`,
-     * so the edge follows the palette instead of becoming a black ring on a black theme.
+     *
+     * …and it has to be on both *in the palette too*, which is the half this file used to get wrong. The
+     * display path's edge is an `outline`, and a forced palette keeps outlines and re-points their colour;
+     * the editor path's is a `box-shadow`, and a forced palette does not re-point a shadow — it removes one.
+     * Measured in Chromium on a highlight drawn while `forced-colors: active` was emulated, the element
+     * reported `box-shadow: none`, `outline: none`, `border: 0` and a transparent background on a 98×50 box:
+     * a mark with no channel at all, in exactly the mode the clause is about. So the authored path's resting
+     * edge is a shadow (which is what lets it survive a focus ring on the same element) and its
+     * forced-mode edge is a border, declared in the block below — and this test reads both, because the
+     * sentence "the token re-points it, so no rule is needed" is precisely the claim that had to be measured.
      */
     const display = viewer.match(/\.pjsr-annotation-layer section\.highlightAnnotation\s*\{([^}]*)\}/)?.[1] ?? '';
     const annotate = code(sheets.find((s) => s.name === 'annotate.css')!.css);
@@ -118,5 +125,32 @@ describe('the stylesheets under forced colours', () => {
     expect(authored).toMatch(/box-shadow: inset 0 0 0 1px/);
     expect(display).toContain('var(--pjsr-fg)');
     expect(authored).toContain('var(--pjsr-fg)');
+
+    /*
+     * The rule that keeps the two paths honest with each other: a signal whose resting channel is a
+     * `box-shadow` owes an edge inside the forced-colours block, because the palette is where the shadow
+     * stops existing. Read from the sheet rather than from a list — a fourth shadow-mark gets refused
+     * until it says what the palette will keep.
+     */
+    const forced = split(sheets.find((s) => s.name === 'annotate.css')!.css).inside;
+    const forcedAuthored =
+      forced.match(/\.pjsr-editor-layer \.highlightEditor \.internal\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(forcedAuthored, 'a forced palette removes the shadow, so the mark needs an edge it keeps').toMatch(
+      /border:\s*1px solid/,
+    );
+    expect(authored.match(/box-shadow:/g) ?? []).toHaveLength(1);
+    expect((display + forcedAuthored).match(/#|rgba?\(/g) ?? [], 'the forced edge may not author a hue').toEqual([]);
+
+    /*
+     * The clause's other sentence — "focus remains visible" — and the one a browser will silently fake. With
+     * `.pjsr-button:focus-visible` deleted from the sheet, the matrix's forced-colours row still reads a ring
+     * under the palette, because Chromium paints its own (`auto 1px`) and the clause looks satisfied. So the
+     * declaration is what proves the ring is this package's: a solid two-pixel outline drawn from a token,
+     * which is also what lets a palette re-point it rather than replace it.
+     */
+    const ring = viewer.match(/\.pjsr-button:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(ring, 'no focus ring of our own means the one the browser paints is the claim').toMatch(
+      /outline:\s*2px solid var\(--pjsr-/,
+    );
   });
 });

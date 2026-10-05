@@ -161,8 +161,15 @@
    * making *now* has to carry the same second signal as one that arrived in the file — otherwise the
    * channel appears only after a reload, which is a feature for archaeologists. `box-shadow` rather than
    * `outline` because both are taken by the focus and selection rings below: this has to survive being
-   * focused, not compete with the ring that says where the reader is. The colour is the theme's
-   * foreground, so it is `CanvasText` under a forced palette without a rule of its own.
+   * focused, not compete with the ring that says where the reader is.
+   *
+   * It does not survive the palette, though, and that is not a guess: a forced-colours mode does not
+   * re-point a shadow, it removes one. Measured in Chromium on a highlight drawn while
+   * `forced-colors: active` was emulated, this element reported `box-shadow: none`, `outline: none 3px`,
+   * `border: 0px none` and a transparent background on a 98×50 box — a mark the reader could not see at
+   * all, in the one mode this clause exists for. So the resting edge here stays a shadow (which is what
+   * makes it survive a focus ring on the same element) and `@media (forced-colors: active)` below adds
+   * the edge in a property the palette keeps.
    */
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pjsr-fg) 45%, transparent);
 }
@@ -367,5 +374,20 @@
      adapting the palette and destroying it. Its `var(--pjsr-border)` edge still comes from the theme. */
   .pjsr-annotate-swatch {
     forced-color-adjust: none;
+  }
+
+  /*
+   * The edge a highlight the reader just made has to be drawn with, once the palette has thrown the
+   * `box-shadow` version away above. A border is what survives: the palette takes its colour from the
+   * system (`BorderColor`), keeps the width it is given, and leaves the `outline` property to the focus
+   * and selection rings, which is the reason the resting channel was a shadow in the first place.
+   *
+   * `box-sizing` comes with it because this sheet sets it per-rule rather than globally and `.internal`
+   * is placed with `inset: 0` and `width/height: 100%` — without it the edge would grow the mark's box by
+   * two pixels, which is a layout change smuggled in as a colour one.
+   */
+  .pjsr-editor-layer .highlightEditor .internal {
+    border: 1px solid;
+    box-sizing: border-box;
   }
 }

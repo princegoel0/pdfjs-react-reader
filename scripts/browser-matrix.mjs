@@ -1384,9 +1384,188 @@ const CHECKS = [
     },
   },
   {
+    /*
+     * FR-43: the structure tree as an assistive technology is handed it, not as a DOM shape.
+     *
+     * `src/lib/tagged.test.ts` reads the tree out of the engine and `PdfPage.structure.test.tsx` proves both
+     * layers were handed the builder — which is the wiring, and nothing more. The clause is about what the
+     * reader gets: "heading, list and table hierarchy instead of an undifferentiated run of text", and "a
+     * widget is announced with its owning node rather than as an unlabelled control". Neither is a jsdom
+     * question: jsdom has no accessibility tree, and axe checks the tree it derives against rules, not the
+     * ownership the clause names.
+     *
+     * So this row asks Playwright's own aria snapshot, which every engine here serves from its inspector
+     * protocol, and reads the ownership the engine writes: `aria-owns` from the link annotation onto the
+     * structure elements its words sit in. The two halves are asserted together on purpose — a page can carry
+     * `role="heading"` elements that nothing references while the link still reads as a bare control, and a
+     * link can own its text while the hierarchy was never mounted.
+     *
+     * The second document is the clause's degrade, measured rather than assumed: the same feature left
+     * mounted, an untagged file, no structure root anywhere, the text layer still there, and no page error
+     * raised on the way. `null` from `getStructTree()` and a swallowed exception look identical in the UI.
+     *
+     * …and it comes *first*, because the tier's cost model is a request. `structure.tsx` fetches
+     * `pdfjs-dist/web/pdf_viewer.mjs` — about 50 kB gzipped, and the docs promise it is fetched only for a
+     * document that declares a structure tree. jsdom proves that by counting reads of the exported class
+     * (`structure.test.tsx`, which fails five cases if the gate is dropped); in a browser the same fact is a
+     * network request, and a request is what a consumer pays. Loading the untagged file first is what makes
+     * that measurable at all: fetch the chunk once and every later document is served from the page's own
+     * module cache, so the second reading would answer zero for reasons that have nothing to do with the gate.
+     */
+    name: 'structure-tree-in-the-accessibility-tree',
+    desktopOnly: true,
+    run: async ({ page, load, pageErrors }) => {
+      const viewerRequests = [];
+      const onRequest = (request) => {
+        if (/pdf_viewer/.test(request.url())) viewerRequests.push(request.url().split('/').pop());
+      };
+      page.on('request', onRequest);
+      await page.locator('.app-features label', { hasText: 'structure' }).locator('input').check();
+      const errorsBefore = pageErrors.length;
+
+      // The degrade, asked before it has anything to cache.
+      await load('page-order-sample.pdf', 20);
+      await page.waitForTimeout(1_500);
+      const untagged = await page.evaluate(() => ({
+        roots: document.querySelectorAll('.structTree').length,
+        spans: document.querySelectorAll('.pjsr-text-layer span').length,
+        errorState: document.querySelector('.pjsr-status')?.textContent ?? '',
+      }));
+      const untaggedFetch = viewerRequests.length;
+      if (untagged.roots !== 0) {
+        fail(`an untagged document mounted ${untagged.roots} structure tree(s) — the gate reads the document, not a hope`);
+      }
+      if (untagged.spans === 0) {
+        fail('an untagged document lost its text layer along with the structure tree, which is the degrade done wrong');
+      }
+      if (untaggedFetch !== 0) {
+        fail(
+          `an untagged document fetched ${untaggedFetch} viewer chunk(s) (${untaggedFetch ? viewerRequests[0] : '-'}) ` +
+            '— the tier costs nothing for a file that declares no structure tree, and the docs say so',
+        );
+      }
+
+      await load('tagged-sample.pdf', 2);
+      await waitFor(
+        () => page.evaluate(() => document.querySelectorAll('.structTree').length > 0),
+        15_000,
+      );
+      const taggedFetch = viewerRequests.length;
+
+      const dom = await page.evaluate(() => {
+        const roots = [...document.querySelectorAll('.structTree')];
+        const roles = new Set();
+        for (const root of roots) {
+          for (const el of root.querySelectorAll('[role]')) roles.add(el.getAttribute('role'));
+        }
+        const link = document.querySelector('.pjsr-annotation-layer a');
+        const owned = (link?.getAttribute('aria-owns') ?? '')
+          .split(' ')
+          .filter(Boolean)
+          .map((id) => {
+            const el = document.getElementById(id);
+            return el
+              ? { id, inTree: !!el.closest('.structTree'), role: el.getAttribute('role') ?? el.tagName.toLowerCase() }
+              : { id, inTree: false, role: '(no such element)' };
+          });
+        return {
+          roots: roots.length,
+          roles: [...roles].sort(),
+          link: link
+            ? {
+                owns: owned,
+                ownsCount: owned.filter((entry) => entry.inTree).length,
+                name: link.getAttribute('aria-label') ?? '',
+              }
+            : null,
+        };
+      });
+
+      if (dom.roots === 0) {
+        fail('no structure tree was mounted on a document that declares one — the feature fetched nothing or the gate refused');
+      }
+      if (taggedFetch === 0) {
+        fail('a tagged document mounted a structure tree without fetching the viewer it is built from — the tree came from somewhere the tier does not name');
+      }
+      // The hierarchy the clause names, read off the elements the builder wrote. Every role here is one the
+      // fixture declares: `tagged-sample.pdf` is authored as H1, three list items, a figure and a table.
+      const wanted = ['heading', 'list', 'listitem', 'figure', 'table', 'row', 'columnheader', 'cell'];
+      const missing = wanted.filter((role) => !dom.roles.includes(role));
+      if (missing.length) {
+        fail(`the structure tree carries no ${missing.join(', ')} — it read ${dom.roles.join(', ')}`);
+      }
+      if (!dom.link) {
+        fail('the tagged fixture carries a link annotation and the annotation layer mounted none, so the ownership half of the clause could not be asked');
+      }
+      if (dom.link.ownsCount === 0) {
+        fail(
+          `the link annotation owns nothing in the structure tree (aria-owns ${JSON.stringify(dom.link.owns)}): ` +
+            'an unlabelled control is what a reader gets when the widget and its words are not connected',
+        );
+      }
+
+      /*
+       * The a11y tree itself, in the engine's own words. This is the assertion the clause is actually about:
+       * the roles above could be present in a DOM that no assistive technology reads, and `aria-owns` could
+       * resolve to elements the engine ignores. Playwright's snapshot is built from each engine's accessibility
+       * protocol, so what appears here is what an AT is handed.
+       */
+      const snapshot = await page.locator('.pjsr-page').first().ariaSnapshot();
+      const lines = snapshot.split('\n');
+      const paragraphAt = lines.findIndex((line) => /^\s*- paragraph:$/.test(line));
+      const linkAt = lines.findIndex((line) => /- link "/.test(line));
+      const indent = (line) => (/^(\s+)/.exec(line)?.[1] ?? '').length;
+      const nestedUnderParagraph =
+        paragraphAt >= 0 && linkAt === paragraphAt + 1 && indent(lines[linkAt]) > indent(lines[paragraphAt]);
+      if (!/heading "Quarterly report"/.test(snapshot)) {
+        fail(`the accessibility tree calls no heading by its text. Snapshot began:\n${snapshot.slice(0, 400)}`);
+      }
+      if (!/listitem:/.test(snapshot)) {
+        fail('the accessibility tree has no list items, so the list is a run of text again');
+      }
+      const linkLine = linkAt >= 0 ? lines[linkAt].trim() : '(no link node in the snapshot)';
+      if (!nestedUnderParagraph) {
+        fail(
+          `the link is not announced inside its owning paragraph (paragraph at line ${paragraphAt + 1}, link ` +
+            `at line ${linkAt + 1}: "${linkLine}") — it owns ${dom.link.ownsCount} structure element(s), which ` +
+            'is the wiring, but the tree still reads it flat',
+        );
+      }
+      if (!/link "See the annual statement"/.test(snapshot)) {
+        fail(`the link is announced with no name: "${linkLine}"`);
+      }
+
+      // The figure's alternative text, which arrives from `/Alt` and nowhere else.
+      const figure = await page.evaluate(() => {
+        for (const root of document.querySelectorAll('.structTree')) {
+          const el = root.querySelector('[role="figure"][aria-label]');
+          if (el) return el.getAttribute('aria-label');
+        }
+        return null;
+      });
+      if (!figure || !/bar chart/i.test(figure)) {
+        fail(`the figure is announced as ${JSON.stringify(figure)}, not the alternative text the file carries`);
+      }
+
+      page.off('request', onRequest);
+      if (pageErrors.length > errorsBefore) {
+        fail(`the two documents raised ${pageErrors.length - errorsBefore} page error(s): ${pageErrors[errorsBefore]}`);
+      }
+
+      return (
+        `untagged first: 0 trees, ${untagged.spans} spans, ${untaggedFetch} requests for the viewer chunk; ` +
+        `then tagged: ${dom.roots} tree(s) over ${dom.roles.join('/')} after ${taggedFetch - untaggedFetch} ` +
+        `fetch of ${viewerRequests[0] ?? '?'}, the heading called by its text, link owns ` +
+        `${dom.link.ownsCount} in-tree element(s) (${dom.link.owns.map((o) => `${o.id.slice(-8)}→${o.role}`).join(', ')}) ` +
+        `and is announced as a named link inside its paragraph; figure named "${(figure ?? '').slice(0, 34)}" from /Alt`
+      );
+    },
+  },
+  {
     name: 'forced-colours',
     desktopOnly: true,
-    run: async ({ page, load }) => {
+    run: async ({ page, load, reveal }) => {
+      const engineName = () => page.context().browser()?.browserType().name();
       await load('page-order-sample.pdf', 20);
       try {
         await page.emulateMedia({ forcedColors: 'active' });
@@ -1402,6 +1581,9 @@ const CHECKS = [
           shadow: cs ? cs.boxShadow : '',
         };
       });
+      if (!state.matches) return skip('the engine still reports forced-colors as inactive under emulation');
+      if (!state.outline.startsWith('solid')) fail(`page slot outline is "${state.outline}", not a solid line"`);
+      if (state.shadow !== 'none') fail(`the page kept its drop shadow: ${state.shadow}`);
       /*
        * FR-44's other half, read where the mark is actually painted. The clause names three signals that must
        * not rely on hue alone and the search marks were the ones already asserted; an annotation highlight is
@@ -1425,10 +1607,6 @@ const CHECKS = [
           }),
         8_000,
       );
-      await page.emulateMedia({ forcedColors: 'none' });
-      if (!state.matches) return skip('the engine still reports forced-colors as inactive under emulation');
-      if (!state.outline.startsWith('solid')) fail(`page slot outline is "${state.outline}", not a solid line"`);
-      if (state.shadow !== 'none') fail(`the page kept its drop shadow: ${state.shadow}`);
       if (!painted) {
         fail('the annotation layer never painted a highlight from annotated-sample.pdf, so its edge could not be read');
       }
@@ -1438,7 +1616,173 @@ const CHECKS = [
             'the tint is overridden here, so an edge is the only thing marking it',
         );
       }
-      return `matchMedia active, slot ${state.outline}, shadow removed; highlight edge ${painted.outline} ${painted.colour} on ${painted.width}px`;
+      /*
+       * FR-44's remaining two signals, and the sentence it names outright: "focus remains visible".
+       *
+       * Both were asserted as *declarations* in `src/styles/forced-colors.test.ts` and never painted, which is
+       * the weak half of that file's own argument — a declaration is not a channel in the one rendering mode
+       * that exists to override declarations. So read them here, on a document that carries the marks: a
+       * search for `license` over `page-order-sample.pdf`, whose hits are the tinted spans.
+       */
+      await load('page-order-sample.pdf', 20);
+      const searchToggle = await reveal('Search document');
+      await searchToggle.click();
+      await page.waitForSelector('.pjsr-search-input');
+      // `MARKER` is the word this fixture was generated to be found by; a query that matches nothing
+      // would leave this row reporting the palette's flatness on an empty page.
+      await page.fill('.pjsr-search-input', 'MARKER');
+      await page.press('.pjsr-search-input', 'Enter');
+      const haveMarks = await waitFor(
+        () => page.evaluate(() => document.querySelectorAll('mark.pjsr-mark').length || null),
+        25_000,
+      );
+      if (!haveMarks) fail('the search painted no marks, so the match signals could not be read');
+      const marks = await page.evaluate(() => {
+        const pick = (el) => {
+          if (!el) return null;
+          const cs = getComputedStyle(el);
+          return {
+            rule: `${cs.borderBottomStyle} ${cs.borderBottomWidth}`,
+            ring: `${cs.outlineStyle} ${cs.outlineWidth}`,
+            box: Math.round(el.getBoundingClientRect().width),
+          };
+        };
+        return {
+          count: document.querySelectorAll('mark.pjsr-mark').length,
+          plain: pick(document.querySelector('mark.pjsr-mark:not(.pjsr-mark--active)')),
+          active: pick(document.querySelector('mark.pjsr-mark--active')),
+        };
+      });
+      if (!marks.plain) {
+        fail(
+          `the search made ${marks.count} marks and none of them was the resting kind, so the clause's ` +
+            'first colour-only signal had nothing to be read on',
+        );
+      }
+      if (!marks.plain.rule.startsWith('solid') || marks.plain.box <= 0) {
+        fail(
+          `a forced palette left the search mark with the rule "${marks.plain.rule}" on a ${marks.plain.box}px ` +
+            'box — the tint is flattened here, so the rule is the whole channel',
+        );
+      }
+      if (marks.active && !marks.active.ring.startsWith('solid')) {
+        fail(`the active match reached a forced palette with the ring "${marks.active.ring}"`);
+      }
+
+      /*
+       * Focus, reached the way a keyboard reader reaches it. This arm first used `element.focus()` and read
+       * `outline: none 3px` off a toolbar button — which is Chromium declining to call a programmatic focus
+       * `:focus-visible`, not a viewer that hides focus. Tab is the state the clause is about.
+       */
+      await page.keyboard.press('Tab');
+      let focus = null;
+      for (let step = 0; step < 24; step += 1) {
+        await page.keyboard.press('Tab');
+        focus = await page.evaluate(() => {
+          const el = document.activeElement;
+          if (!el || !el.closest('.pjsr-toolbar, .pjsr-search, .pjsr-viewport, .pjsr-sidebar')) return null;
+          const cs = getComputedStyle(el);
+          return {
+            label: `${el.tagName.toLowerCase()}[${el.getAttribute('aria-label') ?? ''}]`,
+            outline: `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}`,
+            visible: el.matches(':focus-visible'),
+          };
+        });
+        if (focus) break;
+      }
+      if (!focus) fail('Tab never reached the viewer’s own chrome, so focus could not be asked');
+      if (!focus.visible || /^(none|0px)/.test(focus.outline)) {
+        fail(`a keyboard-focused ${focus.label} reports "${focus.outline}" (:focus-visible ${focus.visible}) under a forced palette`);
+      }
+      /*
+       * And which ring that was. This arm first stopped at the line above, and a counterfactual that deleted
+       * `.pjsr-button:focus-visible` from the sheet **passed it**: under a forced palette Chromium paints its
+       * own focus ring, `auto 1px`, so "focus is visible" can be the engine's answer rather than ours. Read
+       * the same element with the palette off, where nothing overrides the author's outline, and the ring has
+       * to be the one this package declared — which is also the only way this row can tell that the token is
+       * the thing re-pointed by the palette rather than a default the browser would have supplied anyway.
+       */
+      await page.emulateMedia({ forcedColors: 'none' });
+      const resting = await page.evaluate(() => {
+        const cs = getComputedStyle(document.activeElement);
+        return `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}`;
+      });
+      await page.emulateMedia({ forcedColors: 'active' });
+      if (!/^solid 2px/.test(resting)) {
+        fail(
+          `the focused ${focus.label} shows "${resting}" with the palette off, so the ring seen under a forced ` +
+            `palette ("${focus.outline}") is the browser's, not this sheet's`,
+        );
+      }
+
+      /*
+       * The editor's half of the highlight signal — a mark the reader is making *now*, in the layer that is
+       * not the file's. Its resting channel is a `box-shadow`, and a forced palette does not re-point a
+       * shadow: it removes one. Measured before the fix, the element reported `box-shadow: none`,
+       * `outline: none`, `border: 0` and a transparent background on a 98×50 box — a mark with no channel at
+       * all, which is the failure `annotate.css` now answers with a border inside its forced block.
+       *
+       * A rectangle drag started on the text layer's own surface, because that is where pdf.js begins a
+       * highlight drawing: `#textLayerPointerDown` only starts one when the pointerdown lands on the layer
+       * div rather than on a word. Where an engine will not take the gesture, the arm says so in the report
+       * instead of passing a claim it did not measure.
+       */
+      await page.locator('.app-features label', { hasText: 'annotate' }).locator('input').check();
+      await page.locator(`${BAR} [aria-label="Highlight"]:visible`).click();
+      const stroke = await page.evaluate(() => {
+        const span = [...document.querySelectorAll('.pjsr-text-layer span')].find(
+          (node) => (node.textContent ?? '').trim().length > 3,
+        );
+        const rect = span?.getBoundingClientRect();
+        return rect && rect.width > 20
+          ? { x: Math.round(rect.left) - 6, y: Math.round(rect.top + rect.height / 2) - 7 }
+          : null;
+      });
+      let authored = null;
+      let authoredNote = 'the mark was never drawn';
+      if (stroke) {
+        await page.mouse.move(stroke.x, stroke.y);
+        await page.mouse.down();
+        await page.mouse.move(stroke.x + 90, stroke.y + 16, { steps: 8 });
+        await page.mouse.up();
+        authored = await waitFor(
+          () =>
+            page.evaluate(() => {
+              const el = document.querySelector('.highlightEditor .internal');
+              if (!el) return null;
+              const cs = getComputedStyle(el);
+              const box = el.getBoundingClientRect();
+              return {
+                edge: `${cs.borderTopStyle} ${cs.borderTopWidth} ${cs.borderTopColor}`,
+                shadow: cs.boxShadow,
+                box: `${Math.round(box.width)}×${Math.round(box.height)}`,
+              };
+            }),
+          10_000,
+        );
+      }
+      await page.emulateMedia({ forcedColors: 'none' });
+
+      if (authored) {
+        if (!/^solid 1px/.test(authored.edge)) {
+          fail(
+            `a highlight the reader drew sits under a forced palette with the border "${authored.edge}" and ` +
+              `the box-shadow "${authored.shadow}" on a ${authored.box} box — the palette removes shadows, ` +
+              'which is the entire reason the sheet carries an edge of its own there',
+          );
+        }
+        authoredNote = `editor mark edged ${authored.edge} on ${authored.box} (shadow ${authored.shadow})`;
+      } else if (stroke) {
+        authoredNote = `${engineName()}: a rectangle drag made no highlight editor, so the edge was not read there`;
+      }
+
+      return (
+        `matchMedia active, slot ${state.outline}, shadow removed; file highlight edge ${painted.outline} ` +
+        `${painted.colour} on ${painted.width}px; search mark rule ${marks.plain.rule} on ${marks.plain.box}px, ` +
+        `active ring ${marks.active ? marks.active.ring : '(none mounted)'}; focus ${focus.label} forced ` +
+        `"${focus.outline}" against the sheet's own "${resting}"; ` +
+        `${authoredNote}`
+      );
     },
   },
   {

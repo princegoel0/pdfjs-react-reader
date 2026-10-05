@@ -1155,9 +1155,12 @@
       ],
       "automated": [
         "src/lib/tagged.test.ts",
-        "src/components/PdfPage.structure.test.tsx"
+        "src/components/PdfPage.structure.test.tsx",
+        "src/features/structure.test.tsx"
       ],
-      "acceptance": [],
+      "acceptance": [
+        "scripts/browser-matrix.mjs#structure-tree-in-the-accessibility-tree"
+      ],
       "documentation": [
         "docs/src/pages/Features.tsx"
       ],
@@ -1165,10 +1168,10 @@
         "src/components/PdfPage.structure.test.tsx"
       ],
       "gaps": [
-        "the clause is what a screen reader hears, and no environment here proves it: no browser check reads the structure tree and the VoiceOver/Safari pairing has no runner",
-        "the annotation and editor layers both receive the structure instance, which is asserted, but that the widget is announced with its owning node is not"
+        "the announcement is read from the accessibility tree, not from an assistive technology: the row asks Playwright’s aria snapshot, which each engine serves from its own inspector protocol, and in Chromium it shows the heading called by its text, three list items, the link named and nested inside its paragraph, and the figure named from `/Alt`. The NVDA/JAWS/VoiceOver pairings §8 lists have no runner, no operator and no record (#141, #156 — the same evidence FR-45 owes), and one engine has seen this row: CI runs it in three",
+        "the clause’s noun is a widget and the measurement is a link. `tagged-sample.pdf` carries exactly one annotation — a Link — which is what `aria-owns` and the engine’s `enableLinkOwnership` are written for, so ownership is proven for the annotation the file has. A form *field* inside a marked-content node is still unmeasured, because no tagged fixture holds one: `form-sample.pdf` declares no structure tree and `tagged-sample.pdf` declares no fields"
       ],
-      "note": "Handing the builder to both layers and degrading an untagged document to the plain text layer are built and tested against a real tagged fixture; the announcement half of the requirement is the same unbuilt screen-reader evidence FR-45 names."
+      "note": "What was missing was not the wiring — both layers being handed the builder, and the untagged degrade, were already guarded against a real tagged fixture — but the consequence. The new row measures it in a browser: `untagged first: 0 trees, 10 spans, 0 requests for the viewer chunk; then tagged: 2 tree(s) over cell/columnheader/figure/heading/list/listitem/paragraph/row/table after 1 fetch of pdfjs-dist_web_pdf_viewer__mjs.js … link owns 1 in-tree element(s) and is announced as a named link inside its paragraph`. The untagged document is loaded first *because* the cost model is a request: once the chunk is in the page’s module cache, a second document cannot show what it would have cost, and the gate could have been dropped without the row noticing. Measured twice, and both readings bite: handing the annotation layer `structTreeLayer: null` fails this row (“the link annotation owns nothing in the structure tree”) and 1 case in `PdfPage.structure.test.tsx`; dropping the `MarkInfo` gate fails it (“an untagged document fetched 1 viewer chunk”) and 5 cases in `structure.test.tsx`."
     },
     "FR-44": {
       "title": "High Contrast & Forced Colours",
@@ -1180,7 +1183,9 @@
         "src/styles/forms.css"
       ],
       "automated": [
-        "src/styles/forced-colors.test.ts"
+        "src/styles/forced-colors.test.ts",
+        "src/lib/highlight.test.tsx",
+        "src/components/a11y.page.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#forced-colours"
@@ -1193,11 +1198,9 @@
         "src/styles/forced-colors.test.ts"
       ],
       "gaps": [
-        "two of the clause’s three named signals are read in a real browser and one is not: the `forced-colours` check now asserts an annotation highlight’s computed outline while the palette is forced, but the search match’s rule and the active match’s ring are asserted as declarations only, and jsdom resolves no colour at all",
-        "the editor’s half of the highlight channel — the inset `box-shadow` on `.highlightEditor .internal` — is asserted as a declaration, not painted. The reason the matrix gave for that has just been closed and the gap has not: `authored-ink-survives-scroll-and-save` now arms the annotate tier and makes a real mark in Chromium, but it reads the mark’s *survival through a scroll and a save*, not its computed style. What is still missing is a check that creates a highlight rather than a stroke, emulates `forced-colors: active`, and reads `getComputedStyle(internal).boxShadow` — #235",
-        "focus visibility under a forced palette is asserted nowhere; the sheet says the outline token survives the override, and nothing in a browser has ever looked"
+        "every member of the clause is now painted and read in a real browser, in one engine: the page slot’s outline with its shadow removed, the file-borne highlight’s edge, the search mark’s rule, the active match’s ring, focus read twice so the ring is known to be the sheet’s, and an editor-created mark’s edge. The row runs against all three §8 engines, but this host cannot start Firefox or WebKit and CI has not seen this version of it, so their answers are not evidence yet"
       ],
-      "note": "Tokens re-pointed at system colours, shadows turned into outlines and the four `forced-color-adjust: none` cases are each justified in the stylesheet. The clause’s colour-only list now has all three of its members: the search mark’s rule and the active match’s ring were already there, and #221 added the annotation highlight, on both of its paths — an outline on the `.highlightAnnotation` the annotation layer paints out of the file (`viewer.css`, which is core because the layer is core) and an inset `box-shadow` on the editor’s `.internal` (`annotate.css`), the second chosen deliberately so the focus and selection rings keep the `outline` property to themselves. Both are drawn from `color-mix(… var(--pjsr-fg) 45% …)`, so a forced palette re-points the edge with no rule of its own and a dark theme gets a light mark. `src/styles/forced-colors.test.ts` holds the declarations and the token dependence — deleting the `outline` line is a red test, as is authoring a literal inside a forced block — and the matrix’s `forced-colors` check reads the computed result on a real highlight in a forced palette: `highlight edge solid 1px rgb(0, 0, 0) on 900px`, and with the rule removed `a forced palette left the highlight with \"none 3px\" on a 900px box`, which is the case the clause exists for. Cost: +0.02 kB gz on the shell, `core` and every catalog unchanged. What is still thin is in the gaps: two of the three signals are only declared, not painted, and no check has looked at focus in a forced palette."
+      "note": "Tokens re-pointed at system colours, shadows turned into outlines, and the `forced-color-adjust: none` cases each justified in the sheet. What #235 changed is that the clause’s members are now *read* rather than declared — and that one of them turned out not to exist. Measured in Chromium with `forced-colors: active` on a highlight drawn by the editor, `.highlightEditor .internal` reported `box-shadow: none`, `outline: none`, `border: 0px none` and a transparent background on a 98×50 box: the resting channel #221 chose is a shadow, and a forced palette does not re-point a shadow, it removes one, so a mark the reader had just made painted nothing in exactly the mode this clause is about. `annotate.css` now carries that edge as a `border: 1px solid` inside its forced block (with `box-sizing`, because the sheet sets it per rule and the element is placed with `inset: 0`), which is what the row reads — `editor mark edged solid 1px rgb(0, 0, 0) on 98×50 (shadow none)` — and `forced-colors.test.ts` refuses the pattern in general: a colour-only signal whose resting channel is a `box-shadow` owes an edge inside the forced block, read from the sheets rather than from a remembered list. Focus needed the same treatment from the other direction: the row first read a ring off a tabbed button and **passed with `.pjsr-button:focus-visible` deleted**, because Chromium paints its own `auto 1px` under a forced palette. It now reads the same element twice — `focus button[Whole words only] forced \"solid 2px rgb(55, 0, 110)\" against the sheet’s own \"solid 2px rgb(79, 70, 229)\"` — which is the token being re-pointed rather than replaced, and that deletion is now red in the sheet test and in the browser. Five counterfactuals for this work order, each restored byte-for-byte: the editor edge (1 sheet case + the row), the search mark’s rule (1 + the row), the focus ring (1 + the row), and FR-43’s two (5 cases and 1 case, plus the row each time)."
     },
     "FR-45": {
       "title": "WCAG 2.2 AA Conformance",
