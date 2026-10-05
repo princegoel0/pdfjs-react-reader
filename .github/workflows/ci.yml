@@ -177,21 +177,63 @@ jobs:
       - name: Swap in React ${{ env.REACT_VERSION }} (${{ matrix.pin }} of ${{ matrix.react }}.x)
         run: |
           set -euo pipefail
-          npm i --no-save --no-package-lock \
-            "react@$REACT_VERSION" "react-dom@$REACT_VERSION" \
-            "@types/react@${{ matrix.react }}" "@types/react-dom@${{ matrix.react }}"
-          # §8 pairs each React major with "the matching `react-dom` major", and an npm install that quietly
-          # resolves them apart would leave this job proving two different trees at once. The versions are
-          # printed because a matrix cell that does not say what it installed cannot be read back later.
-          node -e '
-            const react = require("react/package.json").version;
-            const dom = require("react-dom/package.json").version;
-            const major = (v) => v.split(".")[0];
-            console.log("react", react, "react-dom", dom);
-            if (major(react) !== major(dom)) {
-              console.error(`the DOM major ${dom} does not match react ${react}`);
+          # `npm i` re-resolves the whole tree from `package.json`, so everything this cell must not change
+          # has to be named *in the same install* at its lockfile version. Two ways to get that wrong were
+          # measured here on 2026-10-06. Leaving the dev tree out: `axe-core` arrived as 4.14.0 over the
+          # lockfile's 4.13.0, the 4.14 rule set added `label-content-name-mismatch`, its evaluator throws
+          # under jsdom, and the accessibility audit went red in this matrix while staying green in `verify` —
+          # a peer job reporting on a different linter than the job it is supposed to be the same suite on.
+          # Putting the tree back in a *second* install: `npm i` then re-resolved `react` from `package.json`'s
+          # `^19.0.0`, which makes all four cells of the matrix React 19 and the peer range unproven, silently.
+          # So the install names both halves, and the step then reads what is actually on disk and fails if
+          # this is not the cell the matrix asked for.
+          AXIS="react@$REACT_VERSION react-dom@$REACT_VERSION @types/react@${{ matrix.react }} @types/react-dom@${{ matrix.react }}"
+          DEV_PIN=$(node -p "
+            const lock = require('./package-lock.json').packages;
+            const axis = ['react', 'react-dom', '@types/react', '@types/react-dom'];
+            Object.keys(require('./package.json').devDependencies || {})
+              .filter((name) => !axis.includes(name) && lock['node_modules/' + name])
+              .map((name) => name + '@' + lock['node_modules/' + name].version)
+              .join(' ');
+          ")
+          npm i --no-save --no-package-lock --no-audit --no-fund $AXIS $DEV_PIN > /dev/null
+          REACT_MAJOR='${{ matrix.react }}' node -e '
+            const lock = require("./package-lock.json").packages;
+            const dev = Object.keys(require("./package.json").devDependencies || {});
+            const axis = ["react", "react-dom", "@types/react", "@types/react-dom"];
+            const major = (v) => String(v).split(".")[0];
+            // Straight off the disk, not through `require`: several devDependencies (`@cantoo/pdf-lib`,
+            // `@vitejs/plugin-react`) restrict their `exports` and will not answer `require(name +
+            // "/package.json")`, and a guard that reads those as missing fails a cell that is fine. The
+            // top-level path is also exactly the key the lockfile uses, and npm hoists a direct
+            // dependency there, so the two sides of this comparison are the same file.
+            const version = (name) => {
+              try {
+                return JSON.parse(require("fs").readFileSync("node_modules/" + name + "/package.json", "utf8")).version;
+              } catch (error) {
+                return null;
+              }
+            };
+            const want = process.env.REACT_MAJOR;
+            const problems = [];
+            for (const name of axis) {
+              const have = version(name);
+              if (have === null) problems.push(name + " is not installed at all");
+              else if (major(have) !== want) problems.push(name + " is " + have + ", this cell is the " + want + ".x major");
+            }
+            for (const name of dev) {
+              if (axis.includes(name)) continue;
+              const locked = lock["node_modules/" + name] && lock["node_modules/" + name].version;
+              const have = version(name);
+              if (locked && have !== locked) problems.push(name + " is " + have + ", the lockfile says " + locked);
+            }
+            const read = dev.map((name) => name + " " + version(name)).join(", ");
+            if (problems.length) {
+              console.error(read);
+              console.error("this cell is not the cell the matrix asked for:\n  " + problems.join("\n  "));
               process.exit(1);
             }
+            console.log(read);
           '
 
       - name: Type check

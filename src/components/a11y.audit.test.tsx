@@ -257,14 +257,59 @@ describe('the primitives, audited on their own', () => {
 });
 
 /*
- * The audit's own reach, asserted. If axe ever starts resolving layout under jsdom, `color-contrast`
- * leaves this list and the test fails — which is the moment to re-read what this file claims, not to drop
- * the id from the array.
+ * The audit's own reach, asserted.
+ *
+ * The claim is not "these ids show up" — it is *why* whatever shows up shows up: jsdom has no layout, so a
+ * rule that needs one cannot decide and axe parks it in `incomplete` with its own error sentence in the reason
+ * field. Measured on 2026-10-06, every incomplete node under this tree reads exactly
+ * "Fix all of the following: Axe encountered an error; test the page for this type of problem manually". So
+ * the case fails if any node's reason is instead a *finding* — the shell having something axe could actually
+ * read — and separately fails if a rule outside the known blind spots appears. The blind spots themselves are
+ * asserted to be present too: an audit that came back with nothing incomplete would satisfy the other two
+ * readings by accident, and would mean this file's reach had quietly narrowed rather than that the shell had
+ * quietly improved.
+ *
+ * The known-id set has to be a set and not an equality because the axe versions differ between jobs — and they
+ * should not, which is the `react` matrix's defect this pass found. Measured 2026-10-06: `npm ci` installs the
+ * lockfile's `axe-core` 4.13.0 and the audit is incomplete on two rules; that matrix installed with
+ * `npm i --no-save`, npm re-resolved the tree, 4.14.0 arrived, and a third appeared —
+ * `label-content-name-mismatch`, whose evaluator also throws under jsdom, so it is the same kind of blind spot
+ * and not a new one. The job now pins every devDependency to the lockfile alongside the react swap, so both
+ * read the same rules; this case stays tolerant of the version anyway, because a test that fails when a
+ * *checker* is upgraded is usually asserting the wrong thing.
  */
 describe('what the audit cannot see', () => {
-  it('has no layout to evaluate contrast or target size against', async () => {
+  /** The blind spot this file exists to name: rules that need layout, geometry or a real hit-test. */
+  const BLIND_SPOTS = ['aria-hidden-focus', 'color-contrast'];
+  /** `BLIND_SPOTS` plus any rule that has turned out not to answer here either, on any axe version. */
+  const NEEDS_LAYOUT = new Set([...BLIND_SPOTS, 'label-content-name-mismatch']);
+  /** The sentence axe writes when its own evaluator could not run, as opposed to a result about the DOM. */
+  const CANNOT_EVALUATE = /encountered an error|cannot (?:be )?evaluat|not able to determin/i;
+
+  it('reports only rules it cannot evaluate, never a finding about the shell', async () => {
     const { container } = render(<Shell />);
-    const { incomplete } = await run(container);
-    expect(incomplete.sort()).toEqual(['aria-hidden-focus', 'color-contrast']);
+    const results = await runAudit(container);
+    const seen = results.incomplete.map(
+      (rule) =>
+        `${rule.id} ${rule.nodes
+          .map(
+            (node) =>
+              `${JSON.stringify(node.target)} “${String(node.failureSummary ?? node.html ?? '')
+                .replace(/\s+/g, ' ')
+                .slice(0, 200)}”`,
+          )
+          .join(' ; ')}`,
+    );
+    // The blind spot itself has to be reported, not merely bounded: an audit that came back with nothing
+    // incomplete would satisfy the two assertions below by accident, and would mean the reach of this file
+    // had silently narrowed rather than that the shell had silently improved.
+    const ids = results.incomplete.map((rule) => rule.id);
+    for (const blind of BLIND_SPOTS) expect(ids, seen.join('\n')).toContain(blind);
+    const unexpected = results.incomplete.filter((rule) => !NEEDS_LAYOUT.has(rule.id));
+    expect(unexpected.map((rule) => rule.id), seen.join('\n')).toEqual([]);
+    const findings = results.incomplete
+      .flatMap((rule) => rule.nodes.map((node) => `${rule.id}: ${String(node.failureSummary ?? '')}`))
+      .filter((line) => !CANNOT_EVALUATE.test(line));
+    expect(findings, seen.join('\n')).toEqual([]);
   });
 });

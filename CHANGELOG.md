@@ -8,11 +8,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 `0.12` Prove (FR-41, FR-48–FR-51) is in progress. All five are built, and the evidence a clean runner gives
-has now been produced by several of them. The last run of the current workflow — 37202564139, `dev` at
-`e3efb87`, 2026-10-04 — is green on `packaging` (Node 22.13.0, 22 and 24, `check:packaging` and
+has now been produced by several of them. The last run of the current workflow that was green end to end —
+37202564139, `dev` at `e3efb87`, 2026-10-04 — is green on `packaging` (Node 22.13.0, 22 and 24, `check:packaging` and
 `check:tarball` in each cell), `consumer` (both engine ends), `react` (18 and 19, minimum and latest patch),
 `docs`, and on `browser`, which started real engines on a runner for the first time and returned **67 ok / 5
 skipped / 0 failed / 0 not runnable** — the same tally the local run reports, from the same thirteen checks.
+The two pushes that carried #237 and #238 were not: all four `react` cells went red at the accessibility audit,
+for a reason none of those two work orders touched — the job installs with `npm i --no-save`, which re-resolves
+every devDependency it was not told to keep, so the matrix ran a linter `verify` had not run. #244 pins the tree
+in the same install and prints what each cell holds; the sentence above about the `react` job is a React verdict
+from that run, not a second reading of this suite.
 `verify` was red in all three cells at exactly one step, `Bundle size budget`, until the owner ruled on
 **#208** (2026-10-05): the gate now reports growth and blocks only at 200 % of an accepted number, and the
 baseline is re-accepted at today's figures — `core` 31.01 kB gz, the shell entry 65.46, `edit` 6.46 kB over
@@ -1856,6 +1861,43 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   inside the re-accepted baseline it names.)
 
 ### Fixed
+
+- **The React peer job was running a different suite from `verify` (#244; FR-48, FR-45).**
+  `npm i --no-save --no-package-lock react@…` does not swap one package: npm re-resolves the whole tree from
+  `package.json`, keeping nothing it was not told to keep. Measured on this host on 2026-10-06, that swap moved
+  four devDependencies while asking for one — `axe-core` 4.13.0 → 4.14.0, `jsdom` 30.1.1 → 30.1.2, `@types/node`
+  26.6.2 → 26.6.4, `pdfjs-dist` 6.3.289 → 6.4.299 — so the four `react` matrix cells were not the tree `verify`
+  had just certified. The symptom arrived through the first of those: axe 4.14 added `label-content-name-mismatch`,
+  its evaluator throws under jsdom, the rule landed in `incomplete`, and the audit's pinned
+  `toEqual(['aria-hidden-focus', 'color-contrast'])` failed — in every cell, on both of the last two pushes, each
+  of which was green in `verify` at the same commit. Two things were wrong, and only one of them was the job.
+  The job did not pin what it re-resolved. The test pinned an *id list* where it meant to claim a *reason*: what
+  the file asserts is that a DOM without layout cannot answer certain rules, so the case now reads each
+  incomplete node's `failureSummary` and fails if any of them is a finding about the shell rather than axe
+  reporting that it could not run; the known blind spots became a set a new rule may join, and — the part the
+  rewrite very nearly lost — the blind spots are asserted to be *present*, because an audit that reported nothing
+  incomplete at all satisfies both other readings by accident, and would mean this file's reach had narrowed
+  rather than the shell having improved. Measured, every incomplete node on this tree reads exactly
+  "Fix all of the following: Axe encountered an error; test the page for this type of problem manually", so the
+  reason filter matches text, not the empty string.
+  The trap is written down elsewhere in this file already — #225 measured its engine floor by "moving the
+  directory aside, not by `npm i --no-save`, which re-resolves every caret in the tree and so changes the axis
+  nobody is measuring" — and the CI job had been doing exactly that on every push for a month. The `consumer`
+  job was read for the same hole and does not have it: it installs into a throwaway app under `/tmp` with its own
+  `npm init -y` and no lockfile, where resolving fresh *is* the claim being tested.
+  The step now names the axis *and* every other devDependency, at its lockfile version, in one install, then reads
+  what is on disk and fails a cell that is not the cell the matrix asked for. The single install is not style: the
+  first draft of this fix re-pinned the tree in a **second** `npm i`, and that one re-resolved `react` from
+  `package.json`'s `^19.0.0` — silently turning all four cells into React 19 and the peer range back into a
+  promise. Both shapes were run here, and the step is red without either half: drop the dev pin and it names the
+  four re-resolved packages, drop the axis and it says `react is 19.3.0, this cell is the 18.x major`. A third
+  failure came from testing the guard rather than the fix — reading versions through
+  `require(name + '/package.json')` reports `@cantoo/pdf-lib` and `@vitejs/plugin-react` as missing, because both
+  restrict their `exports`, so the check reads `node_modules/<name>/package.json` off the disk, which is also the
+  path the lockfile names. `FR-48`'s gap text says the quiet part now: the React green it cites was a verdict
+  about the peer axis on a tree the cell chose for itself, not a second reading of this suite. Green at the
+  lockfile tree (`npm run verify`), green at a React 18 cell with the tree pinned (typecheck, and all 1,244 tests
+  in 138 files), green at the audit under axe 4.13.0 and 4.14.0 both.
 
 - **One slow axe audit no longer reddens the audits behind it (#224, closes #216; FR-45).** The symptom was a
   busy machine turning the accessibility suite into a wall of `Axe is already running`, which reads like six
