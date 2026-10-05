@@ -63,7 +63,7 @@ certified on this machine at all.
 | `FR-13` | Text Indexing | **met** | 5/5 | 0 | — |
 | `FR-14` | Match Highlighting | **partial** | 5/5 | 1 | “scroll the active match into view” is asserted nowhere: the call exists (src/components/PdfPage… |
 | `FR-15` | Search Controls | **partial** | 5/5 | 2 | next and previous are never navigated: `nextMatch` and `prevMatch` appear in the test tree only … |
-| `FR-16` | AcroForm Support | **partial** | 4/5 | 2 | “as real HTML controls” is asserted for none of the six widget types: src/lib/form.test.ts reads… |
+| `FR-16` | AcroForm Support | **partial** | 5/5 | 1 | the signature widget is still asserted nowhere, and now for a harder reason than absence of a te… |
 | `FR-17` | Form Data Sync | **partial** | 4/5 | 2 | the published hook is untested: `usePdfFormValues` (src/headless/usePdfFormValues.ts) is importe… |
 | `FR-18` | Annotations: View | **met** | 5/5 | 0 | — |
 | `FR-19` | High-Fidelity Printing | **partial** | 4/5 | 1 | no acceptance evidence: the print path has never been opened in a browser by the matrix |

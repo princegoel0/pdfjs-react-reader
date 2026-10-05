@@ -620,6 +620,138 @@ const CHECKS = [
     },
   },
   {
+    /*
+     * FR-16's first clause: five interactive form field types have to arrive as **real HTML controls**.
+     *
+     * Until now the evidence was `src/lib/form.test.ts` reading parsed field data — `combo?.type === 'select'`
+     * describes an annotation object, not something a reader can tab to — so a layer that painted nine boxes and
+     * no controls would have passed. This asks the DOM: for each field the fixture names, the element that
+     * carries it, its `type`, and whether it is focusable at all. Measured 2026-10-05 in chromium at
+     * 6.3.289, `form-sample.pdf`: eight controls on page 1 — `input[text] fullName`, `textarea notes`,
+     * `input[checkbox] subscribe`, three `input[radio] priority`, `select[select-one] country`,
+     * `select[select-multiple] skills` — all with `tabIndex >= 0`, inside nine widget boxes.
+     *
+     * The clause's sixth type is the one this row cannot assert, and it says so in its report rather than
+     * quietly narrowing: **none** of the fixture's four `/Sig` widgets produces anything. The engine's
+     * `SignatureWidgetAnnotationElement` marks a signature renderable only when `data.hasOwnCanvas`
+     * (`node_modules/pdfjs-dist/build/pdf.mjs:19170-19173`), and the shapes this fixture carries — `/F 4` with
+     * no appearance, `/F 4` with one, a `/Kids` widget, and `/F 20` (NOROTATE) — produced zero boxes on either
+     * page, including the NOROTATE one the fixture's own comment expected to pass. So "a signature widget
+     * renders as its box" is a gap for us to close in our own layer, not an assertion to write in the engine's
+     * image; #229 carries it. What IS asserted about signatures is the thing that stays true either way: a
+     * signature box is not a control, so nothing on those two pages is a focusable widget named for a `/Sig`
+     * field.
+     */
+    name: 'form-widgets-are-html-controls',
+    run: async ({ page, load }) => {
+      /*
+       * Back to the top, then wait for the layer. The rows before this one leave the document scrolled (the
+       * 1,000-page row jumps to its last sheet) and zoomed, and the virtualizer only mounts the pages that are
+       * near the viewport — so a page whose widgets are off-screen has no annotation layer to read yet. #228
+       * learned the same lesson the hard way: measure where the thing actually is, or the harness reports its
+       * own aim as a defect.
+       */
+      const settle = async (predicate, ms = 20_000) => {
+        await page.evaluate(() => {
+          const el = document.querySelector('.pjsr-viewport');
+          el.scrollTop = 0;
+          el.scrollLeft = 0;
+        });
+        // `waitFor` hands back the truthy value, not a boolean: a count of 6 is a pass, and comparing it
+        // with `true` is how the first version of this helper reported "never painted" for a layer holding six
+        // controls.
+        return Boolean(await waitFor(predicate, ms));
+      };
+      const painted = (selector) =>
+        page.evaluate((s) => document.querySelectorAll(s).length, selector);
+
+      await load('form-sample.pdf', 2);
+      // Wait only for the layer to paint *something*; the assertions below name what is missing, which is a
+      // better report than a magic count that can move with the zoom the previous row left behind. The
+      // predicate has to await the read — `painted(...) >= 1` compares a Promise to a number, which is false
+      // for any value, and the first version of this line reported "never painted" for a layer holding six
+      // controls.
+      if (
+        !(await settle(
+          async () =>
+            (await painted('.pjsr-annotation-layer input, .pjsr-annotation-layer select, .pjsr-annotation-layer textarea')) >= 1,
+        ))
+      ) {
+        fail('the form fixture never painted a single widget within 20 s — the annotation layer is not rendering at all');
+      }
+      const fields = await page.evaluate(() => {
+        const out = [];
+        for (const layer of document.querySelectorAll('.pjsr-annotation-layer')) {
+          for (const el of layer.querySelectorAll('input, select, textarea')) {
+            out.push({
+              name: el.name ?? '',
+              tag: el.tagName.toLowerCase(),
+              type: el.type ?? '',
+              focusable: el.tabIndex >= 0,
+            });
+          }
+        }
+        return { controls: out, boxes: document.querySelectorAll('.pjsr-annotation-layer [class*="Widget"]').length };
+      });
+      const wanted = [
+        ['fullName', 'input', 'text'],
+        ['notes', 'textarea', 'textarea'],
+        ['subscribe', 'input', 'checkbox'],
+        ['priority', 'input', 'radio'],
+        ['country', 'select', 'select-one'],
+        ['skills', 'select', 'select-multiple'],
+      ];
+      const missing = wanted
+        .filter(([name, tag, type]) => !fields.controls.some((c) => c.name === name && c.tag === tag && c.type === type))
+        .map(([name, tag, type]) => `${tag}[type=${type}] name=${name}`);
+      if (missing.length) {
+        fail(
+          `${missing.length} of ${wanted.length} field types is not a real HTML control: ${missing.join('; ')} — ` +
+            `the layer holds ${fields.controls.length} control(s): ` +
+            fields.controls.map((c) => `${c.tag}[${c.type}]${c.name ? `(${c.name})` : ''}`).join(', '),
+        );
+      }
+      const untabbable = fields.controls.filter((c) => !c.focusable).map((c) => `${c.tag}(${c.name})`);
+      if (untabbable.length) {
+        fail(`${untabbable.length} control(s) cannot be focused: ${untabbable.join(', ')} — a form a keyboard cannot reach is not "real HTML controls"`);
+      }
+      if (fields.boxes < fields.controls.length) {
+        fail(`${fields.boxes} widget boxes holding ${fields.controls.length} controls — the box is what positions the control`);
+      }
+
+      // The signature half, measured and reported. Asserted only in the direction that cannot rot: no focusable
+      // control may name itself for a /Sig field, because the clause's box is not a control.
+      await load('signature-sample.pdf', 2);
+      if (
+        !(await settle(
+          async () => (await painted('.pjsr-annotation-layer input[name="title"]')) >= 1,
+        ))
+      ) {
+        fail(
+          `the /Tx field on the signature fixture never painted within 12 s, so the signature count below ` +
+            'would mean nothing — the layer is not painting this document at all',
+        );
+      }
+      const sig = await page.evaluate(() => {
+        const controls = [...document.querySelectorAll('.pjsr-annotation-layer input, .pjsr-annotation-layer select, .pjsr-annotation-layer textarea')];
+        const names = ['sigPlain', 'sigNoRotate', 'sigKid', 'sigAlreadySigned'];
+        return {
+          layers: document.querySelectorAll('.pjsr-annotation-layer').length,
+          sigControls: controls.filter((el) => names.includes(el.name ?? '')).length,
+          boxes: [...document.querySelectorAll('.pjsr-annotation-layer [class*="Widget"]')]
+            .map((el) => String(el.className))
+            .filter((cls) => /sig|signature/i.test(cls)).length,
+          textControls: controls.filter((el) => el.name === 'title').length,
+        };
+      });
+      if (sig.sigControls) {
+        fail(`${sig.sigControls} focusable control(s) stand where FR-16 promises a signature box — capturing a mark is the edit tier's job (§2.4), so the core must not build one`);
+      }
+
+      return `${fields.controls.length} controls in ${fields.boxes} boxes, all focusable (text/textarea/checkbox/radio×3/combo/list); signature document, ${sig.layers} layer(s) mounted: ${sig.boxes} sig boxes, ${sig.sigControls} sig controls — the box half of the clause is #229`;
+    },
+  },
+  {
     name: 'pinch-vs-pan (synthetic touch)',
     mobileOnly: true,
     run: async ({ page, log, viewportBox, load }) => {

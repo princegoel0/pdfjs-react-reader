@@ -437,8 +437,9 @@
       "automated": [
         "src/lib/form.test.ts"
       ],
-      "acceptance": [],
-      "acceptanceWaiver": "The widgets are constructed by pdf.js's own AnnotationLayer, so the clause is proven by rendering the form fixture and asserting the control set in jsdom; no browser check adds evidence the unit tests do not already carry.",
+      "acceptance": [
+        "scripts/browser-matrix.mjs#form-widgets-are-html-controls"
+      ],
       "documentation": [
         "docs/src/pages/Features.tsx"
       ],
@@ -446,10 +447,9 @@
         "src/lib/form.test.ts"
       ],
       "gaps": [
-        "“as real HTML controls” is asserted for none of the six widget types: src/lib/form.test.ts reads parsed field data (`expect(combo?.type).toBe(“select”)` at :67 describes the annotation, not the DOM), the only render-level assertion is that the layer was told to render forms (PdfPage.annotations.test.tsx:185, `renderForms === true`), and no test asks what element a widget became",
-        "the signature widget is asserted nowhere: `Sig` appears in no test file, so “a signature widget renders as its box” — the clause that separates this requirement from FR-32’s capturing — has no evidence at any level"
+        "the signature widget is still asserted nowhere, and now for a harder reason than absence of a test: measured 2026-10-05 in the browser, **none** of the fixture's four /Sig shapes renders anything at all (0 sig boxes, 0 sig controls across both mounted page layers). The engine's SignatureWidgetAnnotationElement (node_modules/pdfjs-dist/build/pdf.mjs:19170-19173) marks a signature renderable only when data.hasOwnCanvas, so \"a signature widget renders as its box\" cannot be satisfied by passing the engine more flags -- it needs a box drawn by this package from the annotation's own rect, which is #229. No test in the repo asserts the box either way, and none should until it exists"
       ],
-      "note": "Collecting widgets and reading their types off a real AcroForm fixture is guarded (form.test.ts:46-115), which is the data half. The rendered half — six control kinds, each a real element a reader can focus and use — is what the clause promises and what the engine builds, and it is currently a reading of PdfPage.tsx rather than a test. A jsdom assertion over the fixture’s rendered annotation layer would cover all six in one mount."
+      "note": "Collecting widgets and reading their types off a real AcroForm fixture is guarded (form.test.ts:46-115), which is the data half. The rendered half is now measured rather than read: scripts/browser-matrix.mjs#form-widgets-are-html-controls (added 2026-10-05, #206) loads form-sample.pdf and asserts, per field name, the element the widget became -- input[text] fullName, textarea notes, input[checkbox] subscribe, three input[radio] priority, select[select-one] country, select[select-multiple] skills -- plus that every one of them is focusable (9 controls, 10 boxes, 0 untabbable on this run). **An acceptance waiver this row carried was wrong and is gone:** it said the control set should be proven in jsdom and that no browser check adds evidence. jsdom does not run pdf.js's AnnotationLayer at all, so a jsdom assertion would have tested a stub; the browser check is the only instrument that can see the elements the clause names. The same row measured the clause's sixth type into a real gap rather than a missing test -- see the gap -- so FR-16 stays partial on the signature box (#229), not on the five kinds that now have evidence."
     },
     "FR-17": {
       "title": "Form Data Sync",

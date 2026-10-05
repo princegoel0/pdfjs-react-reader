@@ -34,6 +34,44 @@ the sentence that moved it.
 
 ### Added
 
+### Added
+
+- **FR-16's "real HTML controls" is now measured in a browser, and it found the half that is not true (`#206`,
+  first half).** The clause lists six widget kinds and says they arrive as real HTML controls. Until today the
+  evidence was `src/lib/form.test.ts` reading parsed field data — `combo?.type === 'select'` describes an
+  annotation object, not something a reader can tab to — and the only render-level assertion was that the layer
+  had been *told* to render forms. `scripts/browser-matrix.mjs#form-widgets-are-html-controls` now asks the DOM:
+  per field name, which element the widget became, and whether it is focusable. Measured 2026-10-05 in chromium
+  153 at 6.3.289 on `form-sample.pdf` — **9 controls in 10 widget boxes, none untabbable**:
+  `input[text] fullName`, `textarea notes`, `input[checkbox] subscribe`, three `input[radio] priority`,
+  `select[select-one] country`, `select[select-multiple] skills`. Plain DOM, so the row runs in all three
+  engines rather than only where CDP exists.
+
+  Two things fell out of writing it. **The row's own acceptance waiver was wrong and is deleted.** It said the
+  control set should be proven in jsdom and that "no browser check adds evidence the unit tests do not already
+  carry" — but jsdom does not run pdf.js's `AnnotationLayer` at all, so a jsdom assertion would have tested a
+  stub while the real element never appeared; the browser row is the only instrument that can see what the
+  clause names. **And the clause's sixth type is not untested, it is unimplemented.** The same row measured
+  `signature-sample.pdf` and found **0 signature boxes and 0 signature controls** across both mounted page layers
+  — for all four shapes the fixture carries, including the `/F 20` NOROTATE one the fixture's own comment
+  expected to pass. The reason is in the engine and cannot be argued around:
+  `SignatureWidgetAnnotationElement` is constructed with `isRenderable: !!parameters.data.hasOwnCanvas`
+  (`node_modules/pdfjs-dist/build/pdf.mjs:19170-19173`), and the `renderForms` escape the other widgets get at
+  `pdf.mjs:18788` does not apply to it. So "a signature widget renders as its box" needs a box drawn by *this*
+  package from the annotation's own rect, which is **`#229`** — and per the protocol nothing codes the fiction in
+  the meantime: FR-16 stays `partial`, the row asserts only what holds (the five kinds, focusability, and the
+  invariant that no focusable control stands where the clause promises a box), and reports the signature count
+  rather than passing on it.
+
+  Three instrumentation faults were found and fixed in the harness, not the viewer, and are worth the list
+  because each one looked like a product failure first: the settle helper compared `waitFor`'s return with
+  `true` when `waitFor` hands back the *value*, so a layer holding six controls read as "never painted"; its
+  predicate then compared a **Promise** with `>= 1`, which is false for any content; and the document arrived
+  scrolled and zoomed from the rows before it, so the mounted pages were not the ones being counted. `check:docs`
+  picked up the arithmetic change the same way it picked up the last two: §8's Chromium cell now says **sixteen**
+  automated browser checks. `verify` green: 118 files, 1,101 tests, docs and register consistent, size reported
+  not failed. Not pushed.
+
 - **FR-47's one-finger clause is now measured in a browser, not argued (`#228`).** The same sentence that
   gained the disclosure duty also says *a one-finger drag on a drawing tool draws rather than scrolls*, and
   until today the package had no evidence for it. What it had was a string: `core-ink.withdrawal.test.ts`
