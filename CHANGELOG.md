@@ -24,21 +24,47 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **32 met, 25 partial, 1
-absent** of 58, on a suite of **1,136 tests in 123 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **33 met, 24 partial, 1
+absent** of 58, on a suite of **1,147 tests in 123 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. Six of those eighteen are already back out:
+below and is the honest number rather than the comfortable one. Seven of those eighteen are already back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
-came back through **#230**, the first Tier-1 work order; and `FR-14`, `FR-15` and `FR-39` through **#231**,
-where writing the assertion for the third found the behaviour missing and moved the code as well. That is
-the direction the count takes from here: down where a guard turns out to be decoration, up where a test is
-shown to bite — and never up on a claim nobody can make fail.
+came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
+where writing the assertion for the third found the behaviour missing and moved the code as well; and
+`FR-17` through **#232**, which moved a second behaviour. That is the direction the count takes from here:
+down where a guard turns out to be decoration, up where a test is shown to bite — and never up on a claim
+nobody can make fail.
 
 ### Added
 
+- **The form hook is finally mounted, and it moved a behaviour on the way (`#232`, 2026-10-05).** `FR-17`
+  reads `met` on it: 33 met, 24 partial, 1 absent, on **1,147 tests in 123 files**.
+
+  The library underneath had been tested since it was written; `usePdfFormValues` — the surface a host
+  actually imports — was in no test file, so `setValue`, `setFormData`, `getFormData`, `reset`, `version`
+  and `isDirty` were each asserted one layer below where anyone meets them.
+  `src/headless/usePdfFormValues.test.tsx` mounts the hook against a store that reproduces the one pdf.js
+  quirk the reads depend on (`getValue` merges the stored object onto the caller's default, which throws
+  unless the default is an object), and holds the two directions of "two-way binding" apart: the hook
+  writing `{value: …}` under each widget's own id and bumping `version`, which is the only reason a mounted
+  annotation layer re-reads stored values at all; and a reader typing into that layer, which writes the
+  same store with no help from the hook, reaching `values` through `refresh()`. Radio fan-out across every
+  kid, the read-only refusal, reset-to-arrival, the JSON coercions a form post actually brings (`"true"` for
+  a checkbox, a bare string for a multi-select), and `isDirty` meaning *differs from the document* rather
+  than *was touched* are each asserted. Eleven counterfactuals, each failing the test that names it.
+
+  **One behaviour changed, because the test that named it would not pass otherwise.** `setValue` and
+  `setFormData` bumped `version` unconditionally, and `version` is a dependency of every mounted page's
+  annotation-layer effect — so writing to a read-only field, or to a name the file does not hold, cost a
+  re-render of every layer on screen and claimed a change the document had refused. Both now bump only when
+  the writer applied something (`writeFormValues` has returned the applied names since it was written, and
+  nothing had been reading them). Nothing about the visible form moves: what moves is that a refused write
+  stops announcing itself as a change to a host watching for one.
+
 - **The search cluster's three unasserted clauses — and writing the first one found a defect (`#231`,
-  2026-10-05).** `FR-14`, `FR-15` and `FR-39` came back to `met`: 32 met, 25 partial, 1 absent now, on
-  **1,136 tests in 123 files**.
+  2026-10-05).** `FR-14`, `FR-15` and `FR-39` came back to `met`: 32 met, 25 partial, 1 absent then, on
+  **1,135 tests in 122 files** (the figures `check:docs` derived while one of this pass's scratch files
+  still sat in `src/` said 123 / 1,136, and the scratch file was never meant to be counted).
 
   **`FR-14` — "scroll the active match into view".** The call existed and nothing reached it: every shell
   test replaces `scrollIntoView` with a no-op (`ViewerParts.composed.test.tsx:49`), so deleting the line

@@ -112,23 +112,26 @@ export function usePdfFormValues(options: UsePdfFormValuesOptions): UsePdfFormVa
     setValues(read());
   }, [read]);
 
-  const setValue = useCallback(
-    (name: string, value: FormValue) => {
-      const store = storageRef.current;
-      if (!store) return;
-      writeFormValues(fieldsRef.current, widgetsRef.current, store, { [name]: value });
-      setVersion((v) => v + 1);
-    },
-    [],
-  );
+  /*
+   * Bumped only when the writer applied something. `version` is what re-renders every mounted page's
+   * annotation layer, and a write the document refused — a read-only field, a name that is not in the form
+   * — changes nothing on screen. Claiming a change then costs a round of layer rebuilds per keystroke of
+   * nothing, and tells a host its reader has work to lose when the file said no.
+   */
+  const setValue = useCallback((name: string, value: FormValue) => {
+    const store = storageRef.current;
+    if (!store) return;
+    const applied = writeFormValues(fieldsRef.current, widgetsRef.current, store, { [name]: value });
+    if (applied.length) setVersion((v) => v + 1);
+  }, []);
 
   const getFormData = useCallback(() => read(), [read]);
 
   const setFormData = useCallback((data: Record<string, FormValue>) => {
     const store = storageRef.current;
     if (!store) return;
-    writeFormValues(fieldsRef.current, widgetsRef.current, store, data);
-    setVersion((v) => v + 1);
+    const applied = writeFormValues(fieldsRef.current, widgetsRef.current, store, data);
+    if (applied.length) setVersion((v) => v + 1);
   }, []);
 
   const reset = useCallback(() => {

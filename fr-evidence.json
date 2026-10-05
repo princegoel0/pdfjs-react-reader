@@ -454,28 +454,27 @@
     },
     "FR-17": {
       "title": "Form Data Sync",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/form.ts",
         "src/headless/usePdfFormValues.ts",
         "src/features/forms.tsx"
       ],
       "automated": [
-        "src/lib/form.test.ts"
+        "src/lib/form.test.ts",
+        "src/headless/usePdfFormValues.test.tsx"
       ],
       "acceptance": [],
-      "acceptanceWaiver": "Two-way binding, plain-object serialisation, reset and dirty tracking are pure data operations asserted on the AcroForm fixture; the browser harness has no form-fill check and one would repeat the unit evidence.",
+      "acceptanceWaiver": "Two-way binding, plain-object serialisation, reset and dirty tracking are data operations, and they are asserted twice over: on the library against the AcroForm fixture, and on the published hook against a store that mirrors pdf.js’s merge behaviour. A browser would add a rendering claim that FR-16 already carries, and would not be able to say anything about a plain object crossing a hook boundary.",
       "documentation": [
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
-        "src/lib/form.test.ts"
+        "src/lib/form.test.ts",
+        "src/headless/usePdfFormValues.test.tsx"
       ],
-      "gaps": [
-        "the published hook is untested: `usePdfFormValues` (src/headless/usePdfFormValues.ts) is imported by no test file — a grep over src/ and scripts/ returns only src/features/forms.tsx:3,39, the definition, the two re-export barrels and check-size.mjs’s bundle marker — so `setValue`, `setFormData`, `getFormData`, `reset`, `version` and `isDirty` are asserted only as functions in src/lib/form.ts and nothing guards the surface a host actually calls",
-        "the dirty flag the clause exists for (“warn before discarding a reader’s work”) reaches a host through that hook, and the only `isDirty` in the tests is a fake feature’s own field (FeatureHost.test.tsx:237)"
-      ],
-      "note": "Two-way write-and-read-back, plain-object serialisation, initial-value reset and dirty comparison are all asserted on the library over the AcroForm fixture (form.test.ts:133,168,171,176,179). The row read `met` on that strength; the clause names a host-facing behaviour, and the host-facing half has no test. An already-issued maturity tag rides on the hook, not on the lib."
+      "gaps": [],
+      "note": "Two-way write-and-read-back, plain-object serialisation, initial-value reset and dirty comparison are asserted on the library over the AcroForm fixture (form.test.ts:133,168,171,176,179), and now on the surface a host calls: src/headless/usePdfFormValues.test.tsx mounts the hook against a fake store and holds the two binding directions apart — the hook writing {value} under each widget id and bumping version for the layer, and a reader’s keystroke reaching the store without the hook and coming back through refresh(). Radio fan-out across every kid, the read-only refusal, the JSON coercions (a string for a checkbox, a scalar for a list), reset-to-arrival and dirty-by-comparison are each asserted, and eleven counterfactuals each failed the test that names them. One behaviour moved with the guard: version is now bumped only when the writer applied something, because a refused write was claiming a change and re-rendering every mounted annotation layer for nothing."
     },
     "FR-18": {
       "title": "Annotations: View",
