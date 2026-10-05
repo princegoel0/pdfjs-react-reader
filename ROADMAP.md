@@ -2588,6 +2588,83 @@ what `0.4` shipped; each is recorded so the later releases inherit the list rath
   them. The licensing question (`Apache-2.0`, not MIT) is a `1.0` decision, and it needs a real answer
   before anything copies engine CSS into this repo.
 
+## Real devices: claim or strike (#141, #156)
+
+Prepared 2026-10-05 so the owner can pick without further work. Nothing here is measured on a device; the point
+of the list is that each line says exactly what it would take. **Recommendation at the bottom.**
+
+### Every claim that stands on a device today
+
+| # | The claim | Where it is written | What would retire it |
+| :--- | :--- | :--- | :--- |
+| 1 | iOS Safari 18 is in the `1.0.0` contract, evidence `unverified`, and §8 requires "Simulator or emulation **plus** a real-device pass per release" | `PRD.md:1125` | A named device, OS build, date and operator against a committed artifact |
+| 2 | Android Chrome 125, same shape: "Chromium engine floor plus a real-device pass per release" | `PRD.md:1126` | as above |
+| 3 | The rule that emulation and a device are *different evidence*, which is what makes rows 1–2 unmet rather than met-by-substitute | `PRD.md:1158` | nothing — this is the policy the other rows cite |
+| 4 | A mobile browser that reports a desktop-class user agent (iPad Safari) still gets the **probed** canvas ceiling, not a UA-derived one | `PRD.md:896` | one page load on that hardware, printing the probe's answer and the ceiling it chose |
+| 5 | FR-45's VoiceOver + Safari pairing is a required release pass, alongside NVDA + Firefox and JAWS + Chromium | `PRD.md:632`, gate bullets at `PRD.md:1181` and `:1195` | an operator pass with the pairing named, dated, and recorded against the release candidate |
+| 6 | "off-screen buffers are cleared, **which is what keeps a 400-page document alive on mobile Safari**" | `README.md:50` | the mechanism is covered (`src/components/PdfPage.tsx:525-535` zeroes the buffer on teardown; `PdfPage.status.test.tsx` walks `released → rendering → rendered`); the *device outcome* has never been observed anywhere |
+| 7 | Profile D — the low-memory device harness — is "a device" in §6's sense | `PRD.md` §6 profile D; the register's FR-49 gap says plainly that it is a **throttled Chromium with a phone-class UA**, 412×915 dpr 3, 6× CDP CPU throttle | the same fixture (`scan-sample.pdf`) run on the hardware the profile claims to stand for |
+| 8 | FR-47's real-touch clauses on the two non-Chromium engines: pinch arbitration, widget tap, and the pen's one-finger drag | `scripts/browser-matrix.mjs#pen-draws-not-scrolls (real touch)` is **Chromium-only** (CDP; Playwright's touchscreen taps but does not drag), so Safari's and Android's arbitration is unmeasured | one manual gesture pass per device, or a WebDriver-Actions touch drag that actually goes through the pipeline |
+| 9 | Every frame and timing figure in the benchmark record | `benchmarks/latest.json`, environment block naming one Windows machine, one Chromium | §6 says a maximum on one device is not a promise, so these are *measures*, reported not failed — a device would make them claims |
+
+### What the emulation cannot stand in for, with the reason measured
+
+* **Headless Chromium produces no scroll delta from a real touch sequence.** #228's row had to read the browser's
+  own `pointercancel` instead of a position change, because `scrollTop` did not move even when the gesture was
+  taken. A device shows both halves; this harness shows one.
+* **The mobile profile delivers no wheel events at all** (`wheel-zoom-and-scroll` skips in every mobile cell), so
+  wheel-zoom behaviour on a phone-tablet hybrid is unmeasured rather than passing.
+* **Firefox and WebKit expose no usable `Touch` construction to page JavaScript in Playwright's builds** — the
+  pinch check skips there with the reason printed (`browser-matrix.mjs`, and #228's Chromium-only skip line). So
+  "we tested Safari" would currently mean "we tested WebKit's CSS engine in a desktop shape".
+
+### The claim path — what a device pass actually runs
+
+1. Serve the playground on the LAN: `npm run dev -- --host` (Vite prints a *Network* URL next to the local one;
+   the device opens that). No build step and no `public/` copy is needed — the dev server already serves
+   `/fixtures/<name>.pdf` from the repo root and `/pdfjs-dist/<folder>/<file>` from the installed engine, which is
+   exactly how `scripts/browser-matrix.mjs` loads its documents, so a device and the matrix are looking at the same
+   bytes. The playground's own header picks the engine and its feature checkboxes mount the tiers.
+2. On the device, paste into the console and keep the output — this is the whole record:
+   `JSON.stringify({ua: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints, dpr: devicePixelRatio,
+   screen: [screen.width, screen.height], mem: navigator.deviceMemory, conn: navigator.connection?.effectiveType})`
+3. Walk the checklist, marking each line pass/fail with the page counts seen: load `long-sample.pdf` and scroll to
+   page 400 (row 6); load `scan-sample.pdf` and zoom to 300 % (rows 4 and 7 — note the ceiling the probe chose
+   and whether the tab survived); pinch on `page-order-sample.pdf` and check the host page did not scroll
+   (row 8); tap a link and a form widget (FR-47's tap clause); arm the pen and draw one stroke with one finger,
+   then confirm the mark survives a download (row 8, and FR-47's disclosure beside it); turn on the OS high-contrast
+   theme (row: FR-44 under a *real* forced-colours palette, which jsdom cannot resolve); and with VoiceOver running,
+   navigate loading → search → forms → annotations (row 5).
+4. Record it where §8's evidence column can cite it: a dated `device/` entry with device model, OS build, engine
+   version, operator, and the pasted JSON. The register rows then gain an `acceptance` line naming that file, and
+   `check:fr-evidence` requires the file to exist because the row cites it.
+
+### The strike path — exact replacement wording, held in reserve
+
+* `README.md:50` — "**Virtualized** — only rows crossing the viewport hold a live canvas, and off-screen buffers
+  are cleared on teardown (`src/components/PdfPage.tsx`, and the `released` state in `PdfPage.status.test.tsx`).
+  **No real device has been touched, so the mobile-Safari survival this is meant to protect is a design reason, not
+  a measurement** — #141."
+* `PRD.md:1125`/`:1126` — `In contract` becomes `No (post-1.0)` with the row kept and the reason named: the
+  package cannot certify a platform it has never run on. This is a scope amendment and only the owner can make it.
+* FR-45 (`PRD.md:632`) — the required VoiceOver + Safari pairing moves to a documented 1.x pass, with §9's gate
+  bullet at `PRD.md:1181` narrowed to the two pairings that have an environment.
+* FR-49 profile D — §6's wording stops calling the throttled Chromium a "device", and its device half moves with
+  rows 1–2.
+* `PRD.md:896` — the desktop-class-UA sentence stays (it is a rule about our own code path, and the probe is
+  measured in Chromium) but gains its "measured in Chromium only" caveat.
+
+### Recommendation
+
+**Take the claim path for §8 and the strike path for README.** They are different kinds of statement: a
+compatibility row marked `unverified` is a ticket, which is what §8's own labels are for — `Yes` + `unverified` is
+not a contradiction and does not need a device to be honest. A README bullet in the *benefits* list is a promise to
+a reader deciding whether to install the package, and it currently claims an outcome no machine here has observed.
+So leave the contract, fix the marketing sentence, and schedule one device session per release train — 30 minutes
+with a phone in hand covers rows 1, 2, 4, 6, 7 and 8, and only row 5 needs a second person with a screen reader.
+Striking §8's rows would be the cheaper edit and the worse document: it would say the package does not intend to
+work on a phone, which the whole of FR-47 and FR-45 assume it does.
+
 ## Spikes and gates
 
 * **Spike A — taken, 2026-09-26.** Each editor type created, `saveDocument()` called, the returned bytes
