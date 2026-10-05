@@ -50,7 +50,7 @@ const value = (flag, fallback) => {
   const at = args.indexOf(flag);
   return at === -1 || at + 1 >= args.length ? fallback : args[at + 1];
 };
-const KNOWN_FLAGS = ['--engines', '--profiles', '--no-json'];
+const KNOWN_FLAGS = ['--engines', '--profiles', '--checks', '--no-json'];
 for (const arg of args) {
   const name = arg.split('=')[0];
   if (name.startsWith('--') && !KNOWN_FLAGS.includes(name)) {
@@ -61,6 +61,16 @@ for (const arg of args) {
 }
 const ONLY_ENGINES = value('--engines', 'chromium,firefox,webkit').split(',');
 const ONLY_PROFILES = value('--profiles', 'desktop,mobile').split(',');
+/**
+ * A name-filtered subset of the checks, for developing one row without re-running eighteen of them.
+ *
+ * The cell's own two verdicts are never filtered out, because a row that leaves an uncaught error behind it
+ * has to keep telling the story: `--checks=print` narrows what runs, not what is reported.
+ */
+const ONLY_CHECKS = value('--checks', '')
+  .split(',')
+  .map((name) => name.trim())
+  .filter(Boolean);
 
 const BROWSERS = { chromium, firefox, webkit };
 
@@ -272,6 +282,28 @@ async function countSubtype(bytes, pageNumber, subtype) {
       count: annotations.filter((annotation) => annotation.subtype === subtype).length,
       all: annotations.map((annotation) => annotation.subtype).join(','),
     };
+  } finally {
+    await doc.loadingTask.destroy();
+  }
+}
+
+/**
+ * One page's box at scale 1, read from the fixture in Node with the legacy engine build.
+ *
+ * The print row needs the PDF's own units to say what resolution a sheet was painted at: the canvas the
+ * browser hands back knows its device pixels and nothing about the document, so `sheet.width / base.width` is
+ * the scale, and only this side of the boundary can supply the denominator.
+ */
+async function basePageDims(file, pageNumber = 1) {
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const doc = await getDocument({
+    data: new Uint8Array(readFileSync(join(repo, 'playground/fixtures', file))),
+    verbosity: 0,
+  }).promise;
+  try {
+    const page = await doc.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 1, rotation: page.rotate % 360 });
+    return { width: viewport.width, height: viewport.height, rotate: page.rotate, pages: doc.numPages };
   } finally {
     await doc.loadingTask.destroy();
   }
@@ -1848,7 +1880,449 @@ const CHECKS = [
     },
   },
   {
+    /*
+     * FR-19: the sheet, in a browser, at the resolution the memory budget paid for.
+     *
+     * Everything the clause says about *planning* is asserted in Node — `print.test.ts` over the ladder and the
+     * refusal, `usePdfPrint.ceilings.test.tsx` against the engine's own byte estimate. What no jsdom run can
+     * show is the sentence's nouns: a **sheet** (a canvas with pixels on it, laid out by a stylesheet that is
+     * only read in print media) and **everything else hidden**. jsdom resolves no media query against a layout,
+     * so the last six rows of `print.css` are, there, a string.
+     *
+     * `window.print()` opens the platform's own dialog, which no headless engine answers, and the pipeline
+     * tears the container down the moment that call returns — so the observer is installed *at that boundary*
+     * and reads the live DOM from inside it. The override is the app's own edge, not a private channel: if the
+     * pipeline never reaches it, `__sheets` stays empty and this row says so. Media emulation is Playwright's
+     * instrument, and where an engine reports `matchMedia('print')` false the row skips rather than accuses.
+     *
+     * Four jobs, in the order their cost arrives, and each read in the media its claim belongs to:
+     *
+     *  - **job one, on screen — what the pipeline hands the platform.** Two sheets for the two pages that were
+     *    selected, painted at the resolution the memory budget allowed (measured against the fixture's own MediaBox
+     *    in Node, so "the highest step" is a ratio and not a hope), with ink on both.
+     *  - **job two, in print media — the sheet shown and everything else put away.** The container block, every
+     *    other direct child of `<body>` at `display: none`, the second page breaking to itself, and the teardown:
+     *    the container gone and the application visible again.
+     *  - **job three — a typed value travels.** The same page printed again after the field is filled, with the
+     *    dark-pixel count taken inside the widget's own box on the sheet. That comparison is the clause's whole
+     *    difference: a stored value that reaches the paper and one that stays in the DOM look identical to a mock.
+     *  - **job four — a selection that cannot fit is refused**, and the platform is never asked: no print call, no
+     *    container, and the error the host is handed names the count that would fit.
+     *
+     * The order within each job is forced too. The scope is chosen on screen and the media flips afterwards,
+     * because in print media Firefox stops hit-testing the toolbar's own icon — and a sheet's styles only exist in
+     * the media they are written for, so the button is *pressed* rather than clicked once the page is in print.
+     * Both were measured after the first versions of this row failed on them; the ordering is in `printWith`.
+     */
+    name: 'print-sheets-hide-the-application',
+    desktopOnly: true,
+    run: async ({ page, load, reveal }) => {
+      const engine = page.context().browser()?.browserType().name();
+      const base = await basePageDims('form-sample.pdf', 1);
+
+      /** Where the `fullName` widget sits on its page, as fractions of the page box. */
+      const fieldFraction = async () =>
+        page.evaluate(() => {
+          const field = document.querySelector('.pjsr-annotation-layer input[name="fullName"]');
+          const canvas = document.querySelector('.pjsr-page-canvas');
+          if (!field || !canvas) return null;
+          const f = field.getBoundingClientRect();
+          const c = canvas.getBoundingClientRect();
+          if (!c.width || !c.height) return null;
+          return {
+            x0: (f.left - c.left) / c.width,
+            x1: (f.right - c.left) / c.width,
+            y0: (f.top - c.top) / c.height,
+            y1: (f.bottom - c.top) / c.height,
+          };
+        });
+
+      const install = (fraction) =>
+        page.evaluate((rect) => {
+          const w = window;
+          w.__sheets = [];
+          w.__errors = [];
+          w.__field = rect;
+          w.print = function print() {
+            const container = document.querySelector('.pjsr-print');
+            const canvases = container ? Array.from(container.querySelectorAll('canvas')) : [];
+            const dark = (data) => {
+              let marks = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                if (Math.abs(255 - data[i]) + Math.abs(255 - data[i + 1]) + Math.abs(255 - data[i + 2]) > 60) {
+                  marks += 1;
+                }
+              }
+              return marks;
+            };
+            w.__sheets.push({
+              printing: document.body.classList.contains('pjsr-printing'),
+              mediaPrint: w.matchMedia('print').matches,
+              container: container ? getComputedStyle(container).display : '(absent)',
+              // Everything the sheet is supposed to take out of the page, read as the browser resolves it.
+              siblings: Array.from(document.body.children)
+                .filter((el) => el !== container)
+                .map(
+                  (el) =>
+                    `${el.tagName.toLowerCase()}.${el.className || el.id || '-'}`.replace(/\s+/g, ' '),
+                ),
+
+              visible: Array.from(document.body.children)
+                .filter((el) => getComputedStyle(el).display !== 'none')
+                .map((el) => el.tagName.toLowerCase()),
+              sheets: canvases.map((canvas, index) => {
+                const box = canvas.getBoundingClientRect();
+                const style = getComputedStyle(canvas);
+                const scratch = document.createElement('canvas');
+                scratch.width = Math.min(240, canvas.width);
+                scratch.height = Math.min(240, canvas.height);
+                const flat = scratch.getContext('2d', { willReadFrequently: true });
+                flat.drawImage(canvas, 0, 0, scratch.width, scratch.height);
+                const whole = flat.getImageData(0, 0, scratch.width, scratch.height).data;
+                let fieldInk = 0;
+                let fieldPixels = 0;
+                if (index === 0 && w.__field) {
+                  const x0 = Math.max(0, Math.floor(w.__field.x0 * canvas.width));
+                  const x1 = Math.min(canvas.width, Math.ceil(w.__field.x1 * canvas.width));
+                  const y0 = Math.max(0, Math.floor(w.__field.y0 * canvas.height));
+                  const y1 = Math.min(canvas.height, Math.ceil(w.__field.y1 * canvas.height));
+                  if (x1 > x0 && y1 > y0) {
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    const patch = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+                    fieldInk = dark(patch);
+                    fieldPixels = (x1 - x0) * (y1 - y0);
+                  }
+                }
+                return {
+                  width: canvas.width,
+                  height: canvas.height,
+                  css: `${Math.round(box.width)}x${Math.round(box.height)}`,
+                  breakBefore: style.breakBefore || style.pageBreakBefore,
+                  inkRatio: dark(whole) / (scratch.width * scratch.height),
+                  fieldInk,
+                  fieldPixels,
+                };
+              }),
+            });
+          };
+          const report = w.console.error.bind(w.console);
+          w.console.error = (...args) => {
+            const last = args[args.length - 1];
+            w.__errors.push(last && last.message ? String(last.message) : String(last));
+            report(...args);
+          };
+        }, fraction);
+
+      const sheetCount = () => page.evaluate(() => window.__sheets.length);
+      const lastSheet = () => page.evaluate(() => window.__sheets[window.__sheets.length - 1] ?? null);
+
+      /**
+       * Choose a scope, press print, and wait for the *new* job to arrive.
+       *
+       * The scope select is driven and the two number fields are not, and that is a product finding rather than
+       * an oversight: choosing "From–to" grows this control from 116 px to 197 px, which is wide enough for the
+       * fold planner to move the whole thing out of the bar into the overflow menu — and nothing opens that menu
+       * as part of the interaction, so the fields a reader has just asked for end up rendered nowhere a pointer
+       * can reach. Measured at 1,100 and 900 px by `.spike/probe-print-fold.mjs`, and filed as **#243**; this
+       * row's first two attempts timed out on exactly that, one on each field.
+       *
+       * "The *selected* pages" is still asserted, through the two scopes that stay reachable while selected: all
+       * of a two-page document, then the single page in front of the reader. A pipeline that printed the whole
+       * file regardless would fail the second of those.
+       */
+      const pickScope = async (scope) => {
+        const pages = await reveal('Print pages');
+        await pages.selectOption(scope);
+        // Put the panel back before reaching for the action. Print's button is a higher-priority control, so it
+        // stays in the bar — and an open overflow menu hangs over it, which leaves the click waiting on a
+        // hit-test the panel keeps winning. Firefox folded the selector at 1,280 px and reached this line;
+        // Chromium did not, which is the reason a row has to be run in more than one engine.
+        if (await page.locator('.pjsr-overflow-menu').count()) {
+          await page.keyboard.press('Escape');
+          await page
+            .waitForSelector('.pjsr-overflow-menu', { state: 'detached', timeout: 5_000 })
+            .catch(() => undefined);
+        }
+        return pages;
+      };
+
+      /**
+       * Start a job, and be in print media by the time it reaches the boundary.
+       *
+       * The click always happens on screen. Both halves of that ordering were measured after the first versions
+       * of this row failed: under emulated print media **Chromium collapses the application's own height**, so
+       * the toolbar's controls stop being visible and the button cannot be reached at all (`reveal` then reports
+       * no control and no overflow menu), and under emulated print media **Firefox stops hit-testing the toolbar's
+       * icon** at its centre, so Playwright refuses the click (`.spike/probe-print-firefox.mjs`: six samples
+       * reading `covered: true`, and `click -> ok` the moment the media goes back). The media is therefore flipped
+       * *while the job is in flight*, gated on the one signal that proves it — the print control becoming its own
+       * abort — which is a commit that necessarily precedes the first page render, and the boundary needs a
+       * render plus a frame.
+       */
+      const barLabels = () =>
+        page.evaluate(() =>
+          Array.from(document.querySelectorAll('.pjsr-toolbar [aria-label], .pjsr-overflow-menu [aria-label]'))
+            .filter((el) => getComputedStyle(el).display !== 'none')
+            .map((el) => `${el.getAttribute('aria-label')}=${getComputedStyle(el).visibility}`)
+            .join(', '),
+        );
+
+      const printWith = async (stepName, scope, after, media = 'screen') => {
+        if (scope) await pickScope(scope);
+        let button = null;
+        try {
+          button = await reveal('Print document');
+        } catch (error) {
+          fail(
+            `${stepName}: ${firstLine(error)} — the bar held: ${(await barLabels()).slice(0, 400)}`,
+          );
+
+        }
+        await button.click();
+        if (media === 'print') {
+          await page
+            .waitForSelector(`${BAR} [aria-label="Cancel printing"]:visible`, { timeout: 15_000 })
+            .catch(() => undefined);
+          await page.emulateMedia({ media: 'print' });
+        }
+        const arrived = await waitFor(async () => ((await sheetCount()) > after ? true : null), 60_000);
+        await page.emulateMedia({ media: 'screen' });
+        if (!arrived) return false;
+        /*
+         * Wait out the end of the job before the next one starts.
+         *
+         * `window.print()` returns *inside* the pipeline's try block, so a row that presses on the moment the
+         * boundary is reached finds the control still reading "Cancel printing" and no `Print document` to press —
+         * which is how this row's second job failed the first time. The clause's claim that the sheet is a moment
+         * rather than a second document is the same fact from the other side, so it is asserted here once and
+         * relied on everywhere: the container detached, the body's print class gone, the application visible
+         * again, and the control back to the one that starts a job.
+         */
+        const ended = await waitFor(
+          async () => ((await page.evaluate(() => !document.querySelector('.pjsr-print'))) ? true : null),
+          15_000,
+        );
+        if (ended !== true) {
+          fail(`${stepName}: the print container was still in the document 15 s after the job reached the printer`);
+        }
+        const restored = await page.evaluate(() => ({
+          printing: document.body.classList.contains('pjsr-printing'),
+          toolbar: getComputedStyle(document.querySelector('.pjsr-toolbar') ?? document.body).display,
+          control: document.querySelector('.pjsr-toolbar [aria-label="Print document"]')
+            ? 'Print document'
+            : document.querySelector('.pjsr-toolbar [aria-label="Cancel printing"]')
+              ? 'still Cancel printing'
+              : '(no print control)',
+        }));
+        if (restored.printing || restored.toolbar === 'none' || restored.control !== 'Print document') {
+          fail(
+            `${stepName}: after the job the body carried pjsr-printing=${restored.printing}, the toolbar read ` +
+              `display: ${restored.toolbar} and the control is "${restored.control}" — a sheet that outlives its ` +
+              'print is the second document the clause rules out',
+          );
+        }
+        return true;
+      };
+
+      // A predictable bar: the search panel, left open by an earlier row, takes the width that folds the
+      // print selector away.
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+
+      await load('form-sample.pdf', 2);
+      /*
+       * To the top, and wait for the widget itself. The rows before this one leave the document scrolled
+       * somewhere of their own — the 1,000-page row ends at page 1,000 — and the virtualizer mounts only the
+       * pages near the viewport, so page 1's annotation layer, and the field this row measures ink inside, is
+       * not in the DOM until the scroll says so. (#228's lesson, applied to the harness's own aim: measure where
+       * the thing actually is.)
+       */
+      await page.evaluate(() => {
+        const el = document.querySelector('.pjsr-viewport');
+        el.scrollTop = 0;
+        el.scrollLeft = 0;
+      });
+      await page
+        .waitForSelector('.pjsr-annotation-layer input[name="fullName"]', { timeout: 30_000 })
+        .catch(() => undefined);
+      const fraction = await fieldFraction();
+      if (!fraction) {
+        return skip(`${engine}: the fullName widget never painted a box to measure, so the sheet had no region to read`);
+      }
+      await install(fraction);
+      const openedWith = await (await reveal('Print pages')).inputValue();
+
+      /*
+       * Job one, on screen media: what the pipeline hands the platform. How many sheets the selection became, at
+       * what resolution, and whether each one carries ink.
+       */
+      const before = await sheetCount();
+      if (!(await printWith('job one', 'all', before, 'screen'))) {
+        return skip(
+          `${engine}: the pipeline never reached window.print() within 60 s, so there was no sheet to read — ` +
+            'the render half is asserted in Node and this row cannot tell a slow engine from a broken one',
+        );
+      }
+      const run1 = await lastSheet();
+      if (run1.sheets.length !== 2) {
+        fail(
+          `the whole of a two-page document (scope arrived as "${openedWith}") reached the printer as ` +
+            `${run1.sheets.length} sheet(s) — one sheet per selected page`,
+        );
+      }
+      const blank = run1.sheets.filter((sheet) => sheet.inkRatio < 0.0005);
+      if (blank.length) {
+        fail(
+          `${blank.length} of ${run1.sheets.length} sheets came to the printer with no ink on them ` +
+            `(ratios ${run1.sheets.map((s) => s.inkRatio.toFixed(5)).join(', ')}) — a blank sheet is the failure ` +
+            'the whole clause exists to avoid',
+        );
+      }
+      const scale = run1.sheets[0].width / base.width;
+      if (scale < 1.5) {
+        fail(
+          `the sheet was painted at ${scale.toFixed(2)}x the PDF unit (${run1.sheets[0].width}x${run1.sheets[0].height} ` +
+            `device px for a ${Math.round(base.width)}x${Math.round(base.height)}pt page): two pages of this size ` +
+            'fit the 256 MB budget at the top step, so the ladder was not tried best-first',
+        );
+      }
+
+      /*
+       * Job two, in print media: the sheet shown and everything else put away. A stylesheet the browser never
+       * reads is not a channel, so this is the job that says what the clause's second sentence is worth — the
+       * container block, the host's own children `display: none`, and the second page breaking to itself.
+       */
+      const styled = await sheetCount();
+      if (!(await printWith('job two', null, styled, 'print'))) {
+        fail('the second job never reached the printer, so the print-media layout could not be read');
+      }
+      const run2 = await lastSheet();
+      if (!run2.mediaPrint) {
+        return skip(
+          `${engine}: matchMedia('print') reports false under Playwright's media emulation, so the sheet's ` +
+            'styles were not readable here — the instrument, not the viewer',
+        );
+      }
+      if (!run2.printing || run2.container !== 'block') {
+        fail(
+          `in print media the body carried pjsr-printing=${run2.printing} and the container was ` +
+            `display: ${run2.container} — the sheet is what the print stylesheet must show`,
+        );
+      }
+      if (run2.visible.length > 1) {
+        fail(
+          `${run2.visible.length} direct children of <body> were still visible in print media (${run2.visible.join(', ')}) ` +
+            `while printing — the clause hides everything else, and the host's own chrome was among them: ${run2.siblings.join(', ')}`,
+        );
+      }
+      if (run2.sheets[1].breakBefore !== 'always' && run2.sheets[1].breakBefore !== 'page') {
+        fail(
+          `the second sheet breaks "${run2.sheets[1].breakBefore}" rather than starting its own page, so two ` +
+            'pages would come out on one sheet',
+        );
+      }
+      const fieldBefore = run2.sheets[0].fieldInk;
+
+      /*
+       * Job three: the value the reader typed has to reach the sheet. The same page is printed again, so the two
+       * ink counts are the same measurement of the same box at the same resolution — and the difference between
+       * them is pixels rather than a call record.
+       *
+       * What this does *not* prove, and a counterfactual said so: dropping `printAnnotationStorage` from the
+       * render params leaves the ink delta exactly the same (`.spike/counterfactual-fr19.mjs`, CF-P1 green),
+       * because the engine's print intent falls back to the document's live `annotationStorage` when no snapshot
+       * is handed to it (`pdfjs-dist/build/pdf.mjs:16494`). The row measures *that the value arrives*; which
+       * storage it arrived from is not separable by pixels, and the snapshot has its own pin in
+       * `src/lib/core-ink.withdrawal.test.ts`.
+       */
+
+      const field = page.locator('.pjsr-annotation-layer input[name="fullName"]').first();
+      await field.click();
+      await field.fill('ADA LOVELACE');
+      if ((await (await field.elementHandle())?.evaluate((el) => el.value)) !== 'ADA LOVELACE') {
+        fail('the typed value never reached the control, so the sheet could not be expected to carry it');
+      }
+      const typed = await sheetCount();
+      if (!(await printWith('job three', 'current', typed, 'print'))) {
+        fail('the third print never reached window.print(), so the typed value could not be read off a sheet');
+      }
+      const run3 = await lastSheet();
+      if (run3.sheets.length !== 1) {
+        fail(
+          `scope "Current page" printed ${run3.sheets.length} sheets where the reader had selected one — the ` +
+            'selector and the job disagree',
+        );
+      }
+      if (run3.sheets[0].width !== run2.sheets[0].width) {
+        fail(
+          `the same page printed at ${run2.sheets[0].width}px before the value and ${run3.sheets[0].width}px after, ` +
+            'so the two ink counts are not comparable',
+        );
+      }
+      const fieldAfter = run3.sheets[0].fieldInk;
+      if (fieldAfter <= fieldBefore) {
+        fail(
+          `the widget's own box on the sheet holds ${fieldAfter} dark pixels of ` +
+            `${run3.sheets[0].fieldPixels} after "ADA LOVELACE" was typed, against ${fieldBefore} before it ` +
+            `(field box measured over ${(fraction.x1 - fraction.x0).toFixed(3)} x ` +
+            `${(fraction.y1 - fraction.y0).toFixed(3)} of the page) — form values are supposed to travel with ` +
+            'the pages',
+        );
+      }
+
+      /*
+       * Job four: a job the budget cannot pay for is refused before the platform is asked. No print arrives,
+       * which is the outcome — so this one clicks and waits a fixed beat rather than polling for a boundary that
+       * must never be reached, and then reads what the host was told. "All pages" of a four-figure document is
+       * the selection a reader makes by not choosing one, which is also the shape #243 leaves reachable.
+       */
+      await page.evaluate(() => {
+        window.__sheets.length = 0;
+        window.__errors.length = 0;
+      });
+      await load('long-sample.pdf', 1000);
+      const big = await basePageDims('long-sample.pdf', 1);
+      await pickScope('all');
+      await (await reveal('Print document')).click();
+      await page.waitForTimeout(4_000);
+      const refused = await page.evaluate(() => ({
+        prints: window.__sheets.length,
+        errors: window.__errors.slice(),
+        container: Boolean(document.querySelector('.pjsr-print')),
+      }));
+      if (refused.prints > 0 || refused.container) {
+        fail(
+          `all ${big.pages} pages of a ${Math.round(big.width)}x${Math.round(big.height)}pt document reached the ` +
+            `printer (${refused.prints} print calls, container present: ${refused.container}) instead of being ` +
+            'refused for exceeding the budget',
+        );
+      }
+      const named = refused.errors.find((line) => /shorter range|pages at a time/i.test(line));
+      if (!named) {
+        fail(
+          `the refusal never reached the host: ${refused.errors.join(' / ') || '(nothing logged)'} — the clause ` +
+            'says a selection that cannot fit is refused *and names the page count that would*',
+        );
+      }
+
+      return (
+        `${engine}: the whole of a two-page document printed ${run1.sheets.length} sheets of a ` +
+        `${base.width.toFixed(0)}x${base.height.toFixed(0)}pt page at ${scale.toFixed(2)}x ` +
+        `(${run1.sheets[0].width}x${run1.sheets[0].height} device px), ink ` +
+        `${run1.sheets.map((sheet) => `${(sheet.inkRatio * 100).toFixed(2)}%`).join('/')}; in print media the ` +
+        `container was display:${run2.container} and ${run2.siblings.length} other body children ` +
+        `"${run2.siblings.join(' ')}" went to none, second sheet breaking "${run2.sheets[1].breakBefore}", and ` +
+        `the container was gone with the toolbar back afterwards; the widget's own ` +
+        `${run3.sheets[0].fieldPixels}px box went ${fieldBefore} → ${fieldAfter} dark px for a typed value, and ` +
+        `"Current page" printed ${run3.sheets.length} of the 2; all ${big.pages} pages of a ` +
+        `${big.width.toFixed(0)}x${big.height.toFixed(0)}pt document refused with no print call and ` +
+        `"${(named ?? '').slice(0, 90)}"`
+      );
+    },
+  },
+  {
     name: 'nothing-came-from-a-cdn',
+    cell: true,
     run: ({ external, local }) => {
       if (external.length) fail(`fetched from a CDN: ${external[0]}`);
       // The engine files counted here are the worker resolved out of `node_modules` by the dev server, not
@@ -1860,6 +2334,7 @@ const CHECKS = [
   },
   {
     name: 'no-uncaught-errors',
+    cell: true,
     run: ({ pageErrors, consoleErrors }) => {
       const noise = consoleErrors.length ? ` (${consoleErrors.length} console errors, first: ${consoleErrors[0]})` : '';
       if (pageErrors.length) fail(`${pageErrors.length} uncaught: ${pageErrors.slice(0, 2).join(' / ')}`);
@@ -2005,7 +2480,14 @@ async function runCell(engineName, profileName, baseUrl) {
       if ((await menu.count()) === 0) {
         fail(`no "${label}" control in the ${profile.viewport.width}px bar, and no overflow menu to look in`);
       }
-      await menu.click();
+      /*
+       * Open the panel; never toggle it. The first version clicked whenever the control was not in the bar, so a
+       * row that asked for a *second* folded control after the menu was already open closed the one it was
+       * reaching into — and then waited for a panel that had just gone away. `print-sheets-hide-the-application`
+       * found it by typing into print's two range fields back to back, and the failure read as a missing input
+       * rather than as this.
+       */
+      if ((await page.locator('.pjsr-overflow-menu').count()) === 0) await menu.click();
       await page.waitForSelector('.pjsr-overflow-menu');
       return control;
     },
@@ -2034,6 +2516,7 @@ async function runCell(engineName, profileName, baseUrl) {
   for (const check of CHECKS) {
     if (check.mobileOnly && !profile.touch) continue;
     if (check.desktopOnly && profile.touch) continue;
+    if (ONLY_CHECKS.length && !check.cell && !ONLY_CHECKS.some((name) => check.name.startsWith(name))) continue;
     const started = Date.now();
     try {
       const detail = await check.run(harness);

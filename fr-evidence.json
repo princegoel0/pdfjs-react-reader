@@ -511,19 +511,23 @@
       ],
       "automated": [
         "src/lib/print.test.ts",
-        "src/headless/usePdfPrint.ceilings.test.tsx"
+        "src/headless/usePdfPrint.ceilings.test.tsx",
+        "scripts/browser-matrix.mjs#print-sheets-hide-the-application"
       ],
-      "acceptance": [],
+      "acceptance": [
+        "scripts/browser-matrix.mjs#print-sheets-hide-the-application"
+      ],
       "documentation": [
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
-        "src/lib/print.test.ts"
+        "src/lib/print.test.ts",
+        "src/headless/usePdfPrint.ceilings.test.tsx"
       ],
       "gaps": [
-        "no acceptance evidence: the print path has never been opened in a browser by the matrix"
+        "the marks half of the clause has never been seen on paper: what the browser row reads is a typed form value reaching the sheet (the widget’s own box went 27 → 1,019 dark pixels for the same page), while an annotation the reader authored and persisted reaching the sheet is asserted offscreen only — closing it needs a fixture that arrives with a stored mark, or the annotate row’s drawn mark printed before and after a save"
       ],
-      "note": "Budget-driven resolution, the refusal that names the page count, form values, persisted marks and the known-broken platform report are all built and asserted by the unit tests. The transient half of the row closed with FR-18: the print pipeline no longer composites in-session strokes it was handed — it takes the page's stored `annotationStorage` and nothing else {EM} so \"there is no transient core drawing capability\" is now a statement about the surface rather than about a caller that could have passed one. What is left is acceptance: the matrix has never rendered the print container, so \"the pages come out at the resolution the budget allowed\" is asserted offscreen and not yet observed on paper."
+      "note": "The clause’s nouns are a sheet and a hidden application, and both are now measured rather than reasoned about. `print-sheets-hide-the-application` installs its observer at `window.print()` — the one boundary the headless harness cannot cross, since no engine answers the platform dialog and the pipeline tears the container down the moment the call returns — and reads the live DOM from inside it. Four jobs, each in the media its claim belongs to: the selected pages painted (two sheets of a 612×792 pt page at 2.00× = 1,224×1,584 device px, ink 0.36 % and 0.58 %, the scale derived against the fixture’s own MediaBox in Node, not asserted against a constant); the sheet shown and everything else put away in print media (`div.root`, the two script-ish children of body all `display: none`, the container `block`, the second sheet breaking `page`); a typed value reaching the pixels inside its own widget box; and a 1,000-page job refused — no print call, no container, and the error the host receives naming the count that would fit (1,849 MB asked against a 256 MB budget). Chromium and Firefox both ran it green on 2026-10-06, 17 ok / 0 failed each, the readings differing the way a rasteriser’s does (0.37 %/0.61 % and 27 → 1,029 dark px in Firefox); WebKit has not — this host could not start it today either, so §8’s third engine stays CI’s. What the row declines to claim is measured too: dropping `printAnnotationStorage` from the render params leaves the ink delta identical (CF-P1 green in `.spike/counterfactual-fr19.mjs`), because the engine’s print intent falls back to the document’s live `annotationStorage` when it is handed no snapshot (pdfjs-dist/build/pdf.mjs:16494) — the row proves the value arrives, not which storage it arrived from, and the snapshot itself stays pinned where a call record can see it. Three things the row learned about its own harness on the way, all written into it: the print scope select is driven and its number fields are not, because choosing \"From–to\" widens the control from 116 to 197 px and the fold planner moves it out of the bar without opening the menu that now holds it "
     },
     "FR-20": {
       "title": "Document Download",

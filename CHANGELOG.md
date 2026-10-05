@@ -27,7 +27,7 @@ not reachable from this machine: §8's pinned browser floors, the engine axis in
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **43 met, 14 partial, 1
 absent** of 58, on a suite of **1,244 tests in 138 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. Sixteen of those eighteen are back out:
+below and is the honest number rather than the comfortable one. Seventeen of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
@@ -36,16 +36,63 @@ turned out not to be a missing test at all; `FR-29` through **#234**, whose two 
 be measured in a browser; `FR-43`/`FR-44`'s painted halves through **#235**, which found that one of the
 channels it was sent to measure did not exist; `FR-33` through **#236**, whose last gap was a branch with
 a fix, a comment and no assertion; `FR-05`, `FR-08`, `FR-10`, `FR-26` and `FR-28` through **#237**, where
-one of the five refused to be a missing test either; and `FR-36` through **#238**, whose two gaps were three
-operations with no abort assertion and turned out to be three half-gaps in the code as well. `FR-24` came back
+one of the five refused to be a missing test either; `FR-36` through **#238**, whose two gaps were three
+operations with no abort assertion and turned out to be three half-gaps in the code as well; and `FR-19`'s
+sheet through **#239**, which was never a missing assertion but a missing measurement — the clause's nouns are a
+printed page and a hidden application, and neither exists in a DOM that resolves no media query. `FR-19` keeps one
+gap, and it is the marks half rather than the sheet half. `FR-24` came back
 to one gap from two, and stayed short: what it cannot yet show is a pixel. `FR-53` and `FR-54` each went from
 three gaps to one, and the sentence each now lacks is a different kind of thing — a measurement nobody has run
 (the writer peer at both ends of its range) and a speaker nobody has (two codes no consumer can receive). §8's
-Chromium row still counts eighteen checks: neither #236, #237 nor #238 added a row. That is the
+Chromium row counts **nineteen** checks: #239 added one, and it ran green in Chromium and Firefox alike. That is the
 direction the count takes from here: down where a guard turns out to be decoration, up where a test is shown
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **The print path, seen in two engines — and the row's second job failed before it passed (#239, 2026-10-06).**
+  `FR-19` keeps one gap, now the narrowest it has been: the sheet has been observed, the marks have not.
+  43 met, 14 partial, 1 absent, and §8's Chromium row moves **eighteen → nineteen** in this commit, because a new
+  check and the figure that counts it are one change (`check:docs` compares the word to the derived count).
+
+  `scripts/browser-matrix.mjs#print-sheets-hide-the-application` installs its observer at `window.print()` itself.
+  That boundary is where the clause's nouns exist: no headless engine answers the platform's dialog, and the
+  pipeline detaches the container the moment the call returns — so the sheet is read from *inside* the call, which
+  is the only state in which it is a print rather than a DOM experiment. Four jobs, each measured in the media its
+  claim belongs to. **The selected pages, painted:** two sheets of a 612×792 pt page at **2.00×** = 1,224×1,584
+  device px, ink 0.36 % and 0.58 %, where the scale is derived by reading the fixture's own MediaBox in Node rather
+  than compared against a constant the row could outlive. **The sheet shown and the application put away,** in
+  emulated print media: `div.root` and the other two children of `<body>` at `display: none`, the container
+  `display: block`, the second page breaking `page`, and the container gone again afterwards. **A typed value
+  reaching the paper:** the widget's own 13,761 px box on the sheet goes from 27 dark pixels to 1,019 when
+  `ADA LOVELACE` is typed — pixels rather than a call record. What that delta does **not** say was measured too:
+  dropping `printAnnotationStorage` from the render params leaves it identical, because the engine's print intent
+  falls back to the document's live `annotationStorage` when handed no snapshot
+  (`pdfjs-dist/build/pdf.mjs:16494`), so the row proves the value arrives and not which storage it arrived from. **A job the budget cannot buy is refused:** all 1,000 pages of
+  `long-sample.pdf` ask for 1,849 MB against a 256 MB ceiling, and the row asserts the *absence* — no print call,
+  no container — plus the error the host receives, which names the count that would fit. Refusing to print and
+  printing blank paper are the same failure under different labels, and only this boundary separates them.
+
+  Chromium and Firefox each ran the whole desktop cell green — 17 ok / 0 failed apiece — and their readings differ
+  the way rasterisers' do (Firefox: 0.37 % / 0.61 % ink, 27 → 1,029 dark px). WebKit was tried again today and
+  still will not start on this host (`0 ok, 1 not runnable`), so §8's third engine stays CI's. Three failures along
+  the way were the harness's own, and all three are now written into the row where the next reader will find them
+  instead of rediscovering them: the media has to flip *during* a job, because Chromium collapses the application's
+  own height in print media and Firefox stops hit-testing the toolbar's icon (measured at
+  `.spike/probe-print-firefox.mjs`, which shows `covered: true` six times running and `click -> ok` the moment the
+  media goes back); a job has to be waited out before the next starts, because `window.print()` returns *inside*
+  the pipeline's `try`, so the control still reads "Cancel printing" the instant the boundary is reached; and
+  `reveal` has to stop toggling the overflow panel it was opening — asking for a second folded control closed the
+  menu it was reaching into, which is why the row's second attempt looked like a missing button. The `reveal` fix
+  is in the shared harness, so every row gets it.
+
+  The from–to number fields are deliberately not driven, and the reason is a product finding filed as **#243**:
+  choosing "From–to" grows that control from 116 px to 197 px, which is wide enough for the fold planner to move
+  the whole selector out of the bar into the overflow menu — and nothing opens the menu as part of the
+  interaction, so a reader who asks for a range finds the two fields they now need rendered nowhere a pointer can
+  reach. Measured at 1,100 and 900 px in `.spike/probe-print-fold.mjs`. "The *selected* pages" is still told apart
+  from "the document": all two pages, then the one page in front of the reader. `--checks=<name>` was added to the
+  matrix script in the same pass, because iterating one row against eighteen neighbours costs four minutes a try.
 
 - **The three contract rows, asserted rather than arranged — and the vacuous pass that found (#238,
   2026-10-06).** `FR-36` moves from partial to met; `FR-53` and `FR-54` each lose two of their three gaps.
