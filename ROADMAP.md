@@ -95,11 +95,11 @@ certified on this machine at all.
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
 | `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108… |
 | `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the one-finger clause is now measured rather than reasoned about, in one engine: `scripts/browse… |
-| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has run green on a runner once -- CI run 37193161535, dev at 15d0888, 2026-10-04… |
+| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has run green on a runner twice -- the second being CI run 37296313715, dev at 2… |
 | `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 3 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
-| `FR-52` | Public API & Export Contract | **partial** | 5/5 | 2 | npm run check:examples has still never executed on a runner. The two gates added beside it have … |
+| `FR-52` | Public API & Export Contract | **partial** | 5/5 | 1 | the /edit, /merge, /features/*, per-feature CSS and /locales/* entries this row classifies as pu… |
 | `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 3 | nothing forbids the root or /headless entry from importing the writer in future — it holds today… |
 | `FR-54` | Stable Error & Cancellation Contract | **partial** | 4/5 | 3 | five of the eighteen published codes are not proven on a path a consumer can reach: `PASSWORD_RE… |
 | `FR-55` | Worker & Source Security Contract | **partial** | 5/5 | 2 | “embedded JavaScript execution remains disabled” is asserted nowhere: `enableScripting: false` i… |

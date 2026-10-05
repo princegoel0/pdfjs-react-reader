@@ -36,6 +36,27 @@ the sentence that moved it.
 
 ### Added
 
+### Added
+
+- **A runner has now seen the whole `verify` chain, and two register gaps closed on its output (`#214`→`#218`→
+  `#208` paying off; observed 2026-10-05).** CI run **37296313715**, dev at `25d7c07`, is green across all
+  fourteen jobs, and the thing that makes it news is a step list rather than a conclusion: `Verify (Node 22.13.0)`
+  ran **Install → Type check → Unit tests → Accessibility audit → Build → Published API maturity tags →
+  Documented counts → Requirement evidence register → Pack → Examples compile against the packed artifact →
+  Bundle size budget**, every one green. `check:examples` had never executed off this machine — #218 had moved it
+  ahead of the size gate and #208 had made that gate report rather than fail, but the proof was still local — and
+  FR-52's gap said exactly that. It is deleted from the row, with the run cited. The browser matrix job went
+  green a second time too, now at sixteen checks a cell, so FR-48's "has run green once" became "twice". What
+  that run does **not** buy: the §8 floor rows are still `unverified` (a current build passing certifies nothing
+  about a pinned floor), Firefox/WebKit still get no real-touch drag (no CDP there), and the tallies for the new
+  cells live in its log rather than in this file — quoted only where read.
+
+  The push itself is worth a line, because the record was wrong when it mattered: `origin/dev` had been
+  described in these notes as reached at `78934bf` when it actually sat at `e3efb87`, so `78934bf` and eight
+  commits after it had never left the machine, and the honest count was fifteen ahead rather than the eleven
+  being quoted. Read the remote (`git rev-list --count origin/dev..dev`) instead of trusting the note — the note
+  is a memory, and that is the whole reason the register exists.
+
 - **FR-16's "real HTML controls" is now measured in a browser, and it found the half that is not true (`#206`,
   first half).** The clause lists six widget kinds and says they arrive as real HTML controls. Until today the
   evidence was `src/lib/form.test.ts` reading parsed field data — `combo?.type === 'select'` describes an
