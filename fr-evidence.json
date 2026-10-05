@@ -1268,7 +1268,7 @@
         "src/lib/ssr.test.ts"
       ],
       "gaps": [
-        "the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108 -- the advertised peer floor -- throws ReferenceError: DOMMatrix is not defined from its own module scope on import, and prints “Please use the `legacy` build in Node.js environments”. 6.3.289 and 6.4.299 import cleanly (62 names each). So this row is proven for the range from 6.3.289 up, and the floor question is task #211 rather than a test to rewrite"
+        "the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108 -- the advertised peer floor -- throws ReferenceError: DOMMatrix is not defined from its own module scope on import, and prints “Please use the `legacy` build in Node.js environments”. 6.3.289 and 6.4.299 import cleanly (62 names each). So this row is proven for the range from 6.3.289 up. That is now a settled consequence rather than an open question: the owner ruled on #211 that `^6.2.108` stays advertised and the gaps inside it are the package's to close -- the touch half was closed by #225 on 2026-10-05, and this half cannot be, because the throw is in the engine's module scope before any of our code runs. A host on exactly that version is told to use the `legacy` build, which this package does not import and does not verify"
       ],
       "note": "Every documented entry imports under bare Node without a DOM and the entry list is read from package.json rather than typed out, so a new subpath cannot escape the check. The tarball half of clause six, which is the part this row was overclaiming, is no longer an overclaim: CI run 37190478169 (2026-10-04) executed check:tarball in the Packaging job at Node 22.13.0, 22 and 24 and passed all three, so the published artifact rather than the repository tree has now been imported with no DOM present on a runner. What remains is the peer floor, which is a range decision (#211) and not a test."
     },
@@ -1277,12 +1277,15 @@
       "state": "partial",
       "implementation": [
         "src/components/ViewerController.tsx",
+        "src/lib/touch-pan.ts",
         "src/styles/viewer.css",
         "src/styles/annotate.css",
         "src/styles/edit.css"
       ],
       "automated": [
-        "src/components/ViewerController.gestures.test.tsx"
+        "src/components/ViewerController.gestures.test.tsx",
+        "src/lib/touch-pan.test.tsx",
+        "src/components/ViewerController.pan.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#pinch-vs-pan (synthetic touch)"
@@ -1291,12 +1294,14 @@
         "docs/src/pages/Shell.tsx"
       ],
       "regressionGuard": [
-        "src/components/ViewerController.gestures.test.tsx"
+        "src/components/ViewerController.gestures.test.tsx",
+        "src/lib/touch-pan.test.tsx",
+        "src/components/ViewerController.pan.test.tsx"
       ],
       "gaps": [
         "the exception the amendment names has a duty attached to it that the package does not carry: a freehand stroke is pointer-only by construction, and the clause now requires the control that offers one to say so. Nothing in `src/features/annotate.tsx`, its labels or its stylesheet discloses it, and no `touchOnly`-style key exists in any of the four catalogs — so a keyboard reader discovers the absence by trying"
       ],
-      "note": "The arbitration itself is built and guarded: the pinch zooms, the host page does not scroll under it, a drawing tool keeps its one-finger drag, and the gesture code is instance-scoped so a second viewer on the same page is not starved -- all of it passes on 6.3.289 and 6.4.299, in jsdom and in three browsers. What moved this row off `met` is a peer-range fact rather than a shell one: the callback that returns the pan to us is a 6.3 addition, so the version at the bottom of our own advertised range swallows it. Until #211 settles the floor, the honest reading is that FR-47 holds on the range we can prove and on every version's keyboard and control equivalents, and does not hold at 6.2.108's touch surface. The amendment also added a duty rather than removing one: the named pointer-only exception has to be disclosed on the control, and it is not — no locale key states it, no test asserts it, which is the second gap this row now carries."
+      "note": "The arbitration itself is built and guarded: the pinch zooms, the host page does not scroll under it, a drawing tool keeps its one-finger drag, and the gesture code is instance-scoped so a second viewer on the same page is not starved -- all of it passes on 6.3.289 and 6.4.299, in jsdom and in three browsers. The peer-range half closed on 2026-10-05 (#225, which implements the owner's #211 ruling rather than waiting on it): `onPanning` is a 6.3 addition, so `src/lib/touch-pan.ts` now asks the installed class whether a two-finger pan it is given comes back as a pan, and scrolls the container itself when it does not -- asked, not versioned, because a patch release that gains or loses the callback moves the answer with it. Measured in Chromium at 6.2.108: 25 ok / 1 skipped / 0 not runnable / 0 failed, the row reading `spread 3 → 3.37, two-finger drag scrolled to 160 and held 3.37` -- the same tally and the same row text the installed 6.3.289 reports, so the floor is now equal to the engine that has the callback rather than a fifth of the range away from it. With the fallback not attached, the same harness at the same floor reports 11 ok / 1 failed and `a two-finger pan moved neither the page nor the scroll position`, so the clause closes on the package's code. The same run also disproved two of this row's own acceptance numbers. The harness ended a synthetic gesture by repeating the lifted fingers in `touches`, which is not what a browser sends, so pdf.js never saw the gesture end and the row reported `the pan also zoomed (3.37 → 3)` for that reason alone; and a floor run whose `node_modules` had been replaced under Vite's dependency cache measured the *previous* engine while its banner named the new one, which is why the harness now refuses to start when the two disagree. The amendment also added a duty rather than removing one: the named pointer-only exception has to be disclosed on the control, and it is not — no locale key states it, no test asserts it, which is the gap this row still carries."
     },
     "FR-48": {
       "title": "Browser & Engine Verification Matrices",
@@ -1318,8 +1323,8 @@
         "scripts/browser-matrix.mjs"
       ],
       "gaps": [
-        "the browser job has run green on a runner once -- CI run 37193161535, dev at 15d0888, 2026-10-04, the run of #214: six engine x profile cells, 67 ok / 5 skipped / 0 not runnable / 0 failed, 6 of 6 engines at or above PRD 8's floors, on pdfjs-dist 6.3.289 -- and the React clause is green beside it (18 and 19, minimum and latest patch, typecheck, unit tests and build). What is still not evidence is the thing the run could not reach: the advertised floor inside a browser (#211, and the engine axis at 6.2.108/#194), the pinned old-version floors PRD 8's execution policy names, and any Edge or hardware environment. The run before this one (37190478169) returned six cells not runnable because the dev server could not resolve pdfjs-react-reader/merge -- a source-layout defect #214 closed, and the reason this row's harness now classifies an unstartable browser as unverified rather than passing is the only reason that failure was informative instead of misleading",
-        "the engine axis inside a browser fails at the advertised floor: with pdfjs-dist swapped to 6.2.108, chromium passes 22 checks and its pinch-vs-pan row reports \"a two-finger pan moved neither the page nor the scroll position\", because that release's TouchManager has no onPanning to hand the pan to. 6.3.289 and 6.4.299 pass it. This is a peer-range decision (task #211), not a matrix to delete",
+        "the browser job has run green on a runner once -- CI run 37193161535, dev at 15d0888, 2026-10-04, the run of #214: six engine x profile cells, 67 ok / 5 skipped / 0 not runnable / 0 failed, 6 of 6 engines at or above PRD 8's floors, on pdfjs-dist 6.3.289 -- and the React clause is green beside it (18 and 19, minimum and latest patch, typecheck, unit tests and build). What is still not evidence is the thing no run here can reach: the advertised floor inside Firefox and WebKit (the floor is measured in Chromium only, and this host cannot start the other two), the pinned old-version floors PRD 8's execution policy names, and any Edge or hardware environment. The run before this one (37190478169) returned six cells not runnable because the dev server could not resolve pdfjs-react-reader/merge -- a source-layout defect #214 closed, and the reason this row's harness now classifies an unstartable browser as unverified rather than passing is the only reason that failure was informative instead of misleading",
+        "the advertised floor inside a browser is green but local: with node_modules holding 6.2.108, chromium x desktop + mobile returns 25 ok / 1 skipped / 0 not runnable / 0 failed on 2026-10-05, the pinch-vs-pan row reading `spread 3 → 3.37, two-finger drag scrolled to 160 and held 3.37`. Two things about that number are not evidence. It is one browser, on one machine, against a checkout that no runner has seen -- and it was obtained only after the harness was corrected, because a synthetic `touchend` that repeats the lifted fingers in `touches` never ends the engine's gesture and had the same row reporting `the pan also zoomed (3.37 → 3)`. The engine axis at both range ends inside a browser is task #194 and still needs the CI job, not a local run",
         "the floors the harness measures are Playwright's current builds, not the pinned per-floor environments PRD 8's execution policy names, so chromium 153 says nothing about 125 and webkit 26 says nothing about Safari 18; that is why those rows stay implemented rather than supported, and not because a check failed",
         "the matrix runs one engine version per checkout (whatever node_modules holds), so the consumer job's two engine cells prove a typecheck and a Vite build rather than a painted page at 6.2.108 or 6.4.299 (task #194)",
         "no Edge, macOS Safari, iOS or Android job exists, and the mobile profile is emulation: its skips are the wheel it does not dispatch and, on Firefox and WebKit, the Touch constructor it does not expose"

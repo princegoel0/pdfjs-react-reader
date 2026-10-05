@@ -18,11 +18,16 @@
  *  - **A capability an engine cannot be shown is reported `skip`, never `ok`.** WebKit and Firefox differ
  *    on media emulation and on mobile context flags; pretending otherwise would turn a gap into a green
  *    row, which is the failure mode this whole file exists to avoid.
+ *  - **The engine reported is the engine the browser ran.** Measuring a peer floor means replacing
+ *    `node_modules/pdfjs-dist` under a running toolchain, and Vite's dependency cache is keyed on the
+ *    lockfile rather than on the package's contents — so the page can be served the *previous* release while
+ *    this file prints the new one. `prebundleMismatch()` refuses that arrangement before a browser starts,
+ *    because 22 document loads timing out against the wrong bundle look exactly like a viewer defect.
  *  - It says nothing about Edge (its own per-release pass), about the `pdfjs-dist` version spread (the
  *    `consumer` job's engine matrix), or about React majors (the `react` job).
  */
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { chromium, firefox, webkit } from 'playwright';
@@ -676,14 +681,14 @@ const CHECKS = [
               screenX: x + dx,
               screenY: y + dy,
             });
-          const fire = (type, list) =>
+          const fire = (type, list, changed = list) =>
             el.dispatchEvent(
               new TouchEvent(type, {
                 bubbles: true,
                 cancelable: true,
                 touches: list,
                 targetTouches: list,
-                changedTouches: list,
+                changedTouches: changed,
               }),
             );
           for (let step = 1; step <= 8; step += 1) {
@@ -691,7 +696,12 @@ const CHECKS = [
             fire(step === 1 ? 'touchstart' : 'touchmove', [mk(1, -gap, 0), mk(2, gap, 0)]);
             await new Promise((r) => setTimeout(r, 16));
           }
-          fire('touchend', [mk(1, -230, 0), mk(2, 230, 0)]);
+          // `touches` is what is *still on the glass*: a real browser reports an empty list at the end of a
+          // two-finger gesture, with the lifted points only in `changedTouches`. Listing them in `touches` too
+          // is a lie the engine honours — pdf.js ends a gesture when fewer than two fingers remain, so an
+          // un-ended pinch left the next gesture measured against the first one's start scale, and this row
+          // reported "the pan also zoomed" at the 6.2.108 floor on 2026-10-05 for that reason alone.
+          fire('touchend', [], [mk(1, -230, 0), mk(2, 230, 0)]);
           return true;
         },
         [cx, cy],
@@ -719,21 +729,21 @@ const CHECKS = [
               screenX: x + ox,
               screenY: y + oy,
             });
-          const fire = (type, list) =>
+          const fire = (type, list, changed = list) =>
             el.dispatchEvent(
               new TouchEvent(type, {
                 bubbles: true,
                 cancelable: true,
                 touches: list,
                 targetTouches: list,
-                changedTouches: list,
+                changedTouches: changed,
               }),
             );
           for (let step = 0; step <= 8; step += 1) {
             fire(step === 0 ? 'touchstart' : 'touchmove', [mk(1, -60, step * 30), mk(2, 60, step * 30)]);
             await new Promise((r) => setTimeout(r, 16));
           }
-          fire('touchend', [mk(1, -60, 240), mk(2, 60, 240)]);
+          fire('touchend', [], [mk(1, -60, 240), mk(2, 60, 240)]);
         },
         [cx, cy],
       );
@@ -1029,6 +1039,45 @@ async function runCell(engineName, profileName, baseUrl) {
 // ---------------------------------------------------------------------------
 // Report
 // ---------------------------------------------------------------------------
+
+/**
+ * Does the browser get the engine this file claims it got?
+ *
+ * Vite's dependency cache is keyed on the lockfile, so replacing `node_modules/pdfjs-dist` with another
+ * release — which is how a peer floor is measured — leaves `deps/pdfjs-dist.js` holding the *previous*
+ * engine, and the page runs that one. Both halves of the mismatch look legitimate from the outside: the
+ * banner prints the version read off `node_modules`, and the symptom is every document-load check timing
+ * out. Measured twice on 2026-10-05, once in each direction — 22 timeouts on a run that called itself
+ * `6.2.108` while its prebundle carried `6.3.289`, then a `6.3.289` run that hung against the `6.2.108`
+ * prebundle the run before it had written. A matrix that reports an engine it did not exercise is worse
+ * than one that fails, so this refuses to start instead.
+ */
+function prebundleMismatch() {
+  const caches = [
+    join(repo, 'node_modules', '.vite', 'deps'),
+    join(repo, 'playground', 'node_modules', '.vite', 'deps'),
+  ];
+  for (const dir of caches) {
+    if (!existsSync(dir)) continue;
+    const file = readdirSync(dir).find((name) => /^pdfjs-dist[a-zA-Z0-9_-]*\.js$/.test(name));
+    if (!file) continue;
+    const found = /version\s*=\s*["'](\d+\.\d+\.\d+)["']/.exec(readFileSync(join(dir, file), 'utf8'));
+    if (found && found[1] !== engineVersion) {
+      return `${relative(repo, join(dir, file))} holds ${found[1]} while node_modules/pdfjs-dist is ${engineVersion}`;
+    }
+  }
+  return null;
+}
+
+const stalePrebundle = prebundleMismatch();
+if (stalePrebundle) {
+  console.error(
+    `FAIL  the browser would not run the engine this matrix claims to measure: ${stalePrebundle}.\n` +
+      '      Remove the dependency cache (`node_modules/.vite`) before trusting anything below this line; the\n' +
+      '      failures that follow are document loads timing out against the wrong bundle, not viewer defects.',
+  );
+  process.exit(2);
+}
 
 const server = await createServer({
   root: join(repo, 'playground'),

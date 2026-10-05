@@ -16,13 +16,16 @@ skipped / 0 failed / 0 not runnable** — the same tally the local run reports, 
 `verify` was red in all three cells at exactly one step, `Bundle size budget`, until the owner ruled on
 **#208** (2026-10-05): the gate now reports growth and blocks only at 200 % of an accepted number, and the
 baseline is re-accepted at today's figures — `core` 31.01 kB gz, the shell entry 65.46, `edit` 6.46 kB over
-core — so `verify` is green again with every number in the diff that moved it. The two gates added beside the
-size step (#215's follow-on) run green ahead of it, and #218 moved `Pack` and `check:examples` in front of it
-too, so a byte budget cannot hide a contract check — that
+core — so `verify` is green again with every number in the diff that moved it. #225 has moved them since, on
+its way to closing the touch half of **#211** at the advertised engine floor: `core` is now **31.70 kB gz**,
+the shell entry **66.40**, `edit` **6.41 kB over core**, and the growth is accepted in that change's own diff
+rather than argued with, which is the first exercise of the ruling rather than a special case. The two gates
+added beside the size step (#215's follow-on) run green ahead of it, and #218 moved `Pack` and `check:examples`
+in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
-absent** of 58, on a suite of **1,070 tests in 113 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,090 tests in 115 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One of those eighteen is already back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass, so the 27 above counts it
@@ -30,6 +33,79 @@ below and is the honest number rather than the comfortable one. One of those eig
 the sentence that moved it.
 
 ### Added
+
+- **The two-finger pan is answered by the package, so FR-47's touch surface holds on the engine advertised as
+  the floor (#225, implementing the owner's #211 ruling).** `PRD.md`'s FR-47 asks for multi-touch gestures
+  *arbitrated explicitly*, and the matrix row that proves the arbitration fires a pinch and then a second
+  gesture — two fingers, same span, travelling together — which must scroll the document. On `6.2.108` that
+  gesture did nothing: not to the document and not to the host page. The cause is in the engine's own source,
+  read off a `npm pack` of the floor release (`6.2.108`'s `TouchManager` destructures
+  `container, isPinchingDisabled, isPinchingStopped, onPinchStart, onPinching, onPinchEnd, signal` and calls
+  `preventDefault` + `stopPropagation` on every two-finger `touchmove`): **there is no `onPanning` to hand the
+  pan back to**, because that callback is a 6.3 addition. #211 was the choice between narrowing the advertised
+  range and carrying the pan ourselves; the owner ruled for the range staying, so `src/lib/touch-pan.ts`
+  carries it.
+
+  It asks rather than reads a label, which is the same reasoning §6.1 uses for the canvas ceiling. The probe
+  builds the installed class against a detached element, fires a fixed-span two-finger move at it, and looks
+  whether a panning callback came back; the answer decides what is attached, and a future `6.2.x` that gained
+  the callback would be detected the day it is installed, while a version string would keep scrolling the
+  document twice for one drag. When the engine does not report panning, `addTwoFingerPan` scrolls — classified
+  by the span tolerance the engine publishes (`MIN_TOUCH_DISTANCE_TO_PINCH`, read off the instance the probe
+  built, with 35 as the fallback), so a pinch and a pan cannot be decided differently by the two halves of one
+  gesture; and once a move widens or narrows the span the gesture stops being a pan for good, the same latch
+  the engine keeps. When it does report panning, nothing of ours is attached: the reporting-engine case asserts
+  the container moves 50 and not 100, because *double scrolling* is the failure this design can create and is
+  therefore the one it has to prove it does not.
+
+  Measured in Chromium with `node_modules/pdfjs-dist` swapped to `6.2.108` (by moving the directory aside, not
+  by `npm i --no-save`, which re-resolves every caret in the tree and so changes the axis nobody is measuring):
+  **25 ok / 1 skipped / 0 not runnable / 0 failed**, the row reading
+  `pointer:coarse true, maxTouchPoints 1: spread 3 → 3.37, two-finger drag scrolled to 160 and held 3.37`. The
+  same two cells on the installed `6.3.289` report the identical tally and the identical row, which is the
+  no-regression half: the floor is now equal to the engine that has the callback rather than a fifth of the
+  advertised range away from it. The counterfactual is what makes the floor number mean the change rather than
+  the swap: same harness, same floor, `addTwoFingerPan` not called — **11 ok / 1 failed**,
+  `a two-finger pan moved neither the page nor the scroll position`, exactly the defect FR-48's gap has carried
+  since 2026-10-04.
+
+  Two measurements had to be disbelieved first, and both were mine rather than the system's. The first floor run
+  reported nothing: every check that loads a document timed out, 22 of them, with no uncaught error on the page —
+  because replacing a package directory behind Vite's back leaves its prebundled dependencies in
+  `node_modules/.vite` holding the *previous* engine, and the harness banner printed `pdfjs-dist 6.2.108` while
+  the browser ran 6.3.289's optimised bundle. Cache moved aside, run repeated — and then the mirror image of the
+  same trap stalled a `6.3.289` run for a quarter of an hour against the `6.2.108` prebundle the floor run had
+  just written. That is now a check rather than a lesson: `prebundleMismatch()` reads the version out of
+  `deps/pdfjs-dist.js`, compares it with the one `node_modules` reports, and exits 2 naming both before a browser
+  starts. It was proved on the live stale state rather than on a fixture — `FAIL the browser would not run the
+  engine this matrix claims to measure: node_modules\.vite\deps\pdfjs-dist.js holds 6.2.108 while
+  node_modules/pdfjs-dist is 6.3.289`. The second bad measurement reported
+  `the pan also zoomed (3.37 → 3)` on the corrected run, and that one was the harness lying about the end of a
+  gesture: `TouchEvent.touches` is what remains on the glass, so a synthetic `touchend` that repeats both lifted
+  fingers in `touches` never ends anything — pdf.js ends a pinch when fewer than two fingers remain, stayed
+  latched, and measured the pan's distances against the pinch's start scale. With `touches: []` at the end, the
+  same row passes. Both are written down in `scripts/browser-matrix.mjs` beside the code, because a harness that
+  synthesises an event shape no browser sends will quietly test nothing for as long as it stays green.
+
+  Cost, against the build before it: **+0.68 kB gz on `core` (31.01 → 31.70), +0.94 kB on the shell entry
+  (65.46 → 66.40), `headless` unmoved at 36.86** — which is the point of the module living on the shell side
+  rather than in the engine glue, and the reason `headless-only` and `merge-only` report `+0.00 kB`. Nothing
+  test-only reached `dist/`: the stand-ins are imported by two test files and no entry. The baseline is
+  re-accepted in this same diff, which is what #208's ruling made of the ritual: the gate reported the growth
+  rather than blocking on it, and the bytes are taken responsibility for by editing `size-baseline.json` next
+  to the code that cost them.
+
+  Guarded by 20 tests in two files. `src/lib/touch-pan.test.tsx` (14) holds the probe's two answers, the
+  tolerance read, the cannot-ask default and the pan's arithmetic in each axis; `src/components/ViewerController.pan.test.tsx`
+  (6) mounts the real shell against each engine shape — the floor's, 6.3's, and a class that throws — and
+  asserts that `enablePinchZoom: false` constructs nothing at all (FR-28's affordance-priced-separately applies
+  to a handler of ours as much as to the engine's). Their headers carry the numbers from the five mutations that
+  were run and restored byte-for-byte. The two engine shapes live in `src/lib/touch-engine-stand-ins.ts`,
+  transcribed from the real classes with what was left out named in the file: neither reproduces the engine's
+  unconfirmed-pinch reversal, and that is why the guard tests decide, not the stand-ins' fidelity. One adjacent
+  defect closed on the way: the effect that builds the manager caught a construction failure and returned
+  *nothing*, so the abort controller that owns those listeners was never released — an engine the peer range
+  outgrew now loses pinch zoom and keeps its cleanup.
 
 - **§6.1's working-set factor now has the host path the row has always advertised (#222, FR-57).**
   `PRD.md:871` reads "Viewport working-set factor | 200 %, host-configurable" and has done since the spec was

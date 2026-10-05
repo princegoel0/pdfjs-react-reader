@@ -9,6 +9,7 @@ import { usePdfPageLabels } from '../headless/usePdfPageLabels';
 import { usePdfSearch, type PdfFindController } from '../headless/usePdfSearch';
 import { usePdfVirtualizer } from '../headless/usePdfVirtualizer';
 import { applyRotation, type PageLayout, type ScaleMode } from '../lib/layout';
+import { addTwoFingerPan, probeTouchPanning } from '../lib/touch-pan';
 import { readCanvasEnvironment, resolveCanvasBudget } from '../lib/canvas';
 import type { CanvasBudget } from '../lib/canvas';
 import { DEFAULT_LABELS, formatLabel, type PdfViewerLabels } from '../lib/labels';
@@ -786,6 +787,11 @@ export function useViewerController({
   // the second one is swallowed on the way in: the gesture reaches us, we do nothing
   // with it, and the browser has been told not to, so the document stops moving
   // halfway through a two-finger scroll.
+  //
+  // `onPanning` is not in the engine advertised as the floor. Rather than read a version string, the
+  // controller asks the installed class whether it reports panning at all (`src/lib/touch-pan.ts`) and, when
+  // it does not, pans the container itself. Both halves share the engine's own span tolerance, so a gesture
+  // cannot be a pinch for one of them and a pan for the other.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !enablePinchZoom) return;
@@ -813,7 +819,17 @@ export function useViewerController({
         },
       });
     } catch {
-      return;
+      // An engine whose constructor this peer range outgrew loses pinch zoom and nothing else. The abort is
+      // still returned: the manager may have registered listeners on the container before it threw, and an
+      // effect that cleans up nothing leaks them across every remount.
+      return () => controller.abort();
+    }
+    // Only after the manager exists: with none, nothing prevents the browser's own two-finger pan, and a
+    // handler of ours on top of it would move the document twice for one drag. A probe that could not ask the
+    // engine answers `reportsPanning: true` for the same reason — an unknown engine keeps the browser's own.
+    const panning = probeTouchPanning(TouchManager);
+    if (!panning.reportsPanning) {
+      addTwoFingerPan(el, { signal: controller.signal, spanTolerance: panning.spanTolerance });
     }
     return () => controller.abort();
   }, [containerRef, enablePinchZoom]);

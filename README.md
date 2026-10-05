@@ -174,11 +174,16 @@ to leave.
 What the floor does not carry is measured, not assumed: `6.2.108` is a **browser-only** release. In a browser
 it loads and runs this package's checks; imported in Node it dies in the engine's own module scope with
 `ReferenceError: DOMMatrix is not defined` and prints "Please use the `legacy` build in Node.js environments",
-so an SSR or Jest host on exactly that version cannot import this package either — and its `TouchManager`
-exposes no `onPanning`, so the two-finger-pan half of touch handling has nothing to be handed. `6.3.289` and
-`6.4.299` — which, with `6.2.108`, are the only releases that exist in this range — do all of it. Whether the
-advertised floor should move to `^6.3.289` is an open decision; until it is made, the range above is what is
-promised and this paragraph is what is known about it.
+so an SSR or Jest host on exactly that version cannot import this package either. Its `TouchManager` also
+exposes no `onPanning`, and because that manager prevents every two-finger `touchmove` before it knows which
+gesture it is holding, a pan on the floor had nothing to be handed and the document simply stopped moving —
+so the package asks the installed engine whether it reports panning and, when it does not, pans the document
+itself (`src/lib/touch-pan.ts`). That was measured in Chromium on `6.2.108` on 2026-10-05: 25 checks ok, 1
+skipped, 0 failed, the pinch-vs-pan row reading `spread 3 → 3.37, two-finger drag scrolled to 160 and held
+3.37`. The Node half is still true and is still FR-46's gap. `6.3.289` and `6.4.299` — which, with
+`6.2.108`, are the only releases that exist in this range — do all of it. The owner decided on 2026-10-05 that
+the advertised floor stays where it is and that this gap is the package's to close rather than the range's to
+narrow; the range above is what is promised and this paragraph is what is known about it.
 
 Your bundler needs to handle ESM and `exports` maps — Vite 5+, webpack 5+, Rollup 4+, esbuild and
 Turbopack all work. There is a CommonJS build beside it — `0.12`'s FR-41 — so every published path ships

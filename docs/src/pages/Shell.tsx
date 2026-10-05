@@ -202,7 +202,11 @@ export function Viewer() {
         A pinch and a two-finger pan are the same physical event until the distance between the
         fingers changes, and the engine claims the whole <code>touchmove</code> before it knows which
         one it is holding — so the viewer answers both: the span growing zooms, the midpoint travelling
-        scrolls the document. The page area also declares <code>touch-action: pan-x pan-y</code> and{' '}
+        scrolls the document. Which half the engine answers varies across the advertised range: releases
+        from <code>6.3</code> hand the pan back through <code>onPanning</code>, and the floor
+        (<code>6.2.108</code>) has no such callback at all, so the package asks the installed class
+        whether a pan it fires comes back — a probe, not a version comparison — and scrolls the
+        container itself when it does not. The page area also declares <code>touch-action: pan-x pan-y</code> and{' '}
         <code>overscroll-behavior: contain</code>, which is the part a listener cannot settle: it tells
         the browser before the gesture starts that panning is the document’s and page zoom is not
         yours, and that running out of document does not chain into the host page.
