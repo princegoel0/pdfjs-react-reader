@@ -25,7 +25,7 @@ in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
-absent** of 58, on a suite of **1,097 tests in 117 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,101 tests in 118 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One of those eighteen is already back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass, so the 27 above counts it
@@ -33,6 +33,59 @@ below and is the honest number rather than the comfortable one. One of those eig
 the sentence that moved it.
 
 ### Added
+
+- **FR-47's one-finger clause is now measured in a browser, not argued (`#228`).** The same sentence that
+  gained the disclosure duty also says *a one-finger drag on a drawing tool draws rather than scrolls*, and
+  until today the package had no evidence for it. What it had was a string: `core-ink.withdrawal.test.ts`
+  required `touch-action: none` in the annotate sheet, and a comment said that rule was the clause. It is
+  not — measured, the editor layer's computed `touch-action` while a tool is armed is `auto`, so the sheet's
+  rule is not what leaves the finger with the page. What the clause actually turns on is the browser's input
+  pipeline: the compositor reads the `touch-action` chain under the point the touch lands and either leaves
+  the pointer sequence alone or takes it for itself, which the page sees as `pointercancel`. A `TouchEvent`
+  built in page JavaScript never reaches that decision, which is why the pinch row above — synthetic events
+  dispatched from the page — could never have answered this one.
+
+  `scripts/browser-matrix.mjs#pen-draws-not-scrolls (real touch)` sends the drag through CDP
+  `Input.dispatchTouchEvent`, which enters the same path a finger does, and pairs it with a control run: the
+  identical gesture with the pen disarmed **must** be cancelled, because if it is not, the harness is not
+  seeing touch-action at all and "no cancel while armed" is an absence of evidence dressed as a measurement.
+  Measured 2026-10-05, chromium 153, 6.3.289, 375×812 dpr 2, `page-order-sample.pdf` at the 3.37 zoom the
+  pinch row leaves behind: armed on `div.pjsr-editor-layer inkEditing` at (88,545) — **10 moves, 0 cancels,
+  one live `<path>` mid-gesture, `0 → 1` ink editors**; disarmed at the same point, on a
+  `section.editorAnnotation` — **cancelled after 1 move, nothing added**. Chromium only, and said in the row:
+  Firefox and WebKit have no CDP here, and Playwright's touchscreen API taps but does not drag.
+
+  Three earlier versions of this row each reported the harness's own aim as a viewer that cancels a finger,
+  and each failure was worth keeping. One aimed with `boundingBox()` *before* arming — and arming the pen adds
+  the #226 sentence to the bar, which at 375 px is a whole extra line that moves the page down. One left the
+  folded overflow menu open under the touch point, so the first `pointerdown` landed on a chrome element with
+  no class and the row read that as a cancelled stroke. One took its point from a canvas that the earlier
+  rows' scroll and zoom had put partly off-screen, and `elementFromPoint` answered `(nothing)` for it. The row
+  now resolves the point per gesture from the canvas's own client rectangle clamped to what is visible,
+  refuses to run unless the armed point is over the editor layer, and compares what it aimed at with what the
+  page recorded receiving the pointer — a disagreement there fails as a harness defect, not as a regression.
+
+  The unit half is `src/features/annotate.armed.test.tsx`: `grep -rn updateMode src/` returned
+  `annotate.tsx:254` and **no test**, so deleting the arming line — the one thing that makes the browser
+  behave differently — left the suite green. Six mutations, each restored byte-for-byte
+  (`.spike/counterfactual-228.mjs`, whose unmutated run is 4 passed / 0 failed): arming no longer reaching the
+  engine → **4 failed**; the pen mapped to the highlighter's mode → **3 failed** (`expected 9 to be 15`); the
+  resting state mapped to ink → **3 failed**; every page told it is editable → **2 failed**; the pages handed
+  no manager → **1 failed**. The browser row on the same first mutation fails at its premise,
+  `arming the pen left the editor layer as "disabled nonEditing", so no drawing tool is active`
+  (`.spike/counterfactual-browser.mjs`). Cost: nothing shipped — the row is harness, the guard is a test — and
+  `size` reports the same figures as before, with `edit` still `6.44 kB gz of 6 kB` and reported rather than
+  failed.
+
+  What the row does not claim, stated rather than left to be found: no scroll delta (headless moved
+  `scrollTop` for reasons that were not the gesture, so the clause is read off the cancellation signal the
+  browser emits, and a device would show both halves — #141/#156); no engine but Chromium; and no tool but the
+  pen, because FR-47 names one exception and measuring the highlighter would have been a claim about a case
+  the clause does not make. The row's count also moved — fourteen automated browser checks now, which §8's
+  Chromium evidence cell and this file's `0.12` header now say. Corrected alongside: the `0.10` entry below
+  states that `isPinchingDisabled` was passed while freehand was armed, and that option appears nowhere in
+  `src/`; and `core-ink.withdrawal.test.ts` now says which relocation its `touch-action` string actually
+  checks instead of borrowing this row's verdict for it.
 
 - **FR-47's named exception is now stated by the controls that offer it (#226).** The amendment the owner
   ruled on 2026-10-04 kept "every gesture has a keyboard or control equivalent" and carved out one

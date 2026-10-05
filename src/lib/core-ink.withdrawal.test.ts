@@ -182,8 +182,11 @@ describe('FR-18: nothing in the core draws, and FR-19 carries no transient marks
     ]) {
       expect(core, `viewer.css still styles ${token}`).not.toContain(token);
     }
-    // Withdrawn from the core, and withdrawn rather than relocated: the feature that draws has its own rule
-    // for the finger, which is FR-47's one-finger-draws clause and is not this sheet's to hold.
+    // Withdrawn from the core, and withdrawn rather than relocated: the feature that draws keeps its own rule
+    // for a finger that starts a drag on an editor box. Not claimed as FR-47's one-finger-draws clause — that
+    // was measured on 2026-10-05 in the browser matrix (`pen-draws-not-scrolls`), where the editor layer's
+    // computed `touch-action` while a tool is armed is `auto`, so this rule is not what leaves the finger with
+    // the page. It is checked here as a *relocation*: the core sheet may not style drawing chrome at all.
     expect(read('src/styles/annotate.css')).toContain('touch-action: none');
     // And no module in the package renders it either, so the rule cannot be re-added by a component that
     // still writes the class.

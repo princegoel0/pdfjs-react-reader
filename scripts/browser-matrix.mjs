@@ -758,6 +758,261 @@ const CHECKS = [
     },
   },
   {
+    /*
+     * FR-47's other touch clause: "a one-finger drag on a drawing tool draws rather than scrolls".
+     *
+     * The pinch above is dispatched from page JavaScript, and that will not answer this one. Whether a finger
+     * becomes a stroke or becomes a scroll is decided in the browser's input pipeline: the compositor reads the
+     * `touch-action` chain under the point the touch lands and either leaves the pointer sequence alone or
+     * takes it for itself, which the page sees as `pointercancel`. A `TouchEvent` built in the page never
+     * reaches that decision — it only proves the engine's handlers run, which is a different sentence. So the
+     * drag goes in through CDP `Input.dispatchTouchEvent`, which enters the same path a finger does.
+     *
+     * Chromium only, and said plainly: Firefox and WebKit have no CDP here, and Playwright's touchscreen API
+     * taps but does not drag. An invented substitute would be exactly the kind of claim this matrix exists not
+     * to make.
+     *
+     * The disarmed half is the load-bearing control, not a second case. If the *same* gesture with the pen off
+     * is not cancelled, this harness is not seeing touch-action at all, and "no cancel while armed" would be an
+     * absence of evidence dressed as a measurement — so that arm fails the check with its own message.
+     *
+     * Measured 2026-10-05, chromium 153 at 6.3.289, mobile 375×812 dpr 2, page-order-sample at the zoom the
+     * pinch row left behind (3.37, so page 1 is 2059×2665 CSS px and only part of it is on screen): the armed
+     * finger at (88,545) delivered ten `pointermove`s with **zero `pointercancel`**, held one live `<path>` in
+     * the page mid-gesture, and came out with `0 → 1` ink editors; the same gesture with the pen off was
+     * cancelled after the first move, on a `section.editorAnnotation`, and added nothing.
+     *
+     * Two things this row does not claim. It reports `scrollTop` before and after but does not assert on it —
+     * the aim resets the scroll itself, and headless Chromium moved the position for reasons that are not the
+     * gesture, so the clause is read off the cancellation signal the browser emits rather than off a position
+     * that would need a real device to mean anything. And it is not evidence for the `touch-action: none` rule
+     * in the annotate sheet: the editor layer's computed value while a tool is armed is `auto`, so the rule is
+     * not what leaves the finger with the page. What that rule is for has to be said by its own guard, not by
+     * borrowing this row's verdict.
+     */
+    name: 'pen-draws-not-scrolls (real touch)',
+    mobileOnly: true,
+    run: async ({ page, load, reveal }) => {
+      const engine = page.context().browser()?.browserType().name();
+      if (engine !== 'chromium') {
+        return skip(`${engine}: no CDP input pipeline to send a real one-finger drag through`);
+      }
+      // The pen is a feature control, and the playground only mounts the tier when it is asked for.
+      await page.locator('.app-features label', { hasText: 'annotate' }).locator('input').check();
+      await load('page-order-sample.pdf', 20);
+
+      await page.evaluate(() => {
+        window.__drag = { events: [], cancels: 0, moves: 0, first: null };
+        const name = (node) =>
+          `${node?.tagName?.toLowerCase()}.${node?.className?.baseVal ?? node?.className ?? ''}`;
+        for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+          window.addEventListener(
+            type,
+            (event) => {
+              window.__drag.events.push(`${type}@${name(event.target)}`);
+              if (type === 'pointerdown' && !window.__drag.first) {
+                window.__drag.first = {
+                  x: Math.round(event.clientX),
+                  y: Math.round(event.clientY),
+                  pointerType: event.pointerType,
+                  name: name(event.target),
+                };
+              }
+              if (type === 'pointercancel') window.__drag.cancels += 1;
+              if (type === 'pointermove' && event.pointerType === 'touch') window.__drag.moves += 1;
+            },
+            { capture: true, passive: true },
+          );
+        }
+      });
+
+      const read = () =>
+        page.evaluate(() => {
+          const layer = document.querySelector('.pjsr-editor-layer');
+          const page1 = document.querySelector('.pjsr-page');
+          return {
+            pressed:
+              document.querySelector('.pjsr-toolbar [aria-label="Ink"]')?.getAttribute('aria-pressed') ?? '?',
+            layerClass: layer ? layer.className.replace('pjsr-editor-layer', '').trim() : '(no editor layer)',
+            livePaths: (page1?.querySelectorAll('path') ?? []).length,
+            inkEditors: document.querySelectorAll('.pjsr-editor-layer .inkEditor').length,
+            cancels: window.__drag.cancels,
+            moves: window.__drag.moves,
+            first: window.__drag.first,
+            scrolled: Math.round(document.querySelector('.pjsr-viewport')?.scrollTop ?? -1),
+          };
+        });
+
+      const reset = () =>
+        page.evaluate(() => {
+          window.__drag = { events: [], cancels: 0, moves: 0, first: null };
+        });
+
+      /**
+       * Arm or disarm through the bar's own control. At 375 px the tool group is folded into the overflow
+       * menu, and the menu opens over the page — so it is dismissed again before the finger lands, and the
+       * press is keyboard rather than click: the menu renders under the playground's own panel, which
+       * intercepts a pointer, while FR-45 requires the button to be pressable from the keyboard anyway. The
+       * engine's ink mode is what is under test, not the geometry of a tap on the toggle.
+       */
+      const pressInk = async () => {
+        const pen = await reveal('Ink');
+        await pen.focus();
+        await page.keyboard.press('Enter');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(350);
+        return pen;
+      };
+
+      const cdp = await page.context().newCDPSession(page);
+
+      /*
+       * Aim at the page, and aim again for every gesture — from inside the page.
+       *
+       * Three first versions of this row each read the harness's own aim as a viewer that cancels a touch
+       * drag. One aimed with `boundingBox()` before arming, and arming the pen makes the bar show its
+       * pointer-only sentence (FR-47's disclosure, #226), which on a 375 px bar is a whole extra line that
+       * moves the page down; one left the overflow menu open under the finger; one took a point from a canvas
+       * that the earlier rows' zoom (the pinch row leaves it at 3.37) and scroll had put off-screen. So the
+       * point now comes from the canvas's own client rectangle clamped to what is visible, it is resolved
+       * again for every gesture, and the page is asked twice — what is under that point, and what actually
+       * received the pointer.
+       */
+      const aim = () =>
+        page.evaluate(() => {
+          const scroller = document.querySelector('.pjsr-viewport');
+          scroller.scrollTop = 0;
+          scroller.scrollLeft = 0;
+          const win = `${window.innerWidth}×${window.innerHeight}`;
+          const rect = document.querySelector('.pjsr-page-canvas')?.getBoundingClientRect();
+          if (!rect) return { error: 'there is no page canvas to aim at', win };
+          const left = Math.max(rect.left, 0);
+          const top = Math.max(rect.top, 0);
+          const width = Math.min(rect.right, window.innerWidth) - left;
+          const height = Math.min(rect.bottom, window.innerHeight) - top;
+          if (width < 60 || height < 120) {
+            return { error: `page 1 holds only ${Math.round(width)}×${Math.round(height)} visible px`, win };
+          }
+          // Left of centre and near the top: page 1 of this fixture carries annotations in the middle, and a
+          // gesture that lands on one of them is the engine selecting a mark rather than the clause being asked.
+          const x = Math.round(left + width * 0.2);
+          const y = Math.round(top + Math.min(40, height * 0.15));
+          const hit = document.elementFromPoint(x, y);
+          const name = (node) =>
+            node ? `${node.tagName.toLowerCase()}.${node.className?.baseVal ?? node.className ?? ''}` : '(nothing)';
+          return {
+            x,
+            y,
+            name: name(hit),
+            layer: hit?.closest('.pjsr-editor-layer') instanceof Element,
+            page: hit?.closest('.pjsr-page') instanceof Element,
+            win,
+            canvas: `${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}×${Math.round(rect.height)}`,
+          };
+        });
+
+      /**
+       * One finger, straight down, sixteen CSS px at a time.
+       *
+       * `wantLayer` is the premise: while a drawing tool is armed the editor layer is what is under the finger,
+       * and if it is not, the gesture is aimed at chrome and its answer means nothing. The control run has no
+       * such requirement — with nothing armed the page itself takes the touch. Both runs then compare what the
+       * aim said with what the page recorded on arrival, because a disagreement there is a harness defect and
+       * has to read as one rather than as a regression in the viewer.
+       */
+      const drag = async ({ wantLayer }) => {
+        const at = await aim();
+        if (at.error) fail(`cannot aim a one-finger drag: ${at.error} in a ${at.win} window`);
+        if (wantLayer && !at.layer) {
+          fail(
+            `the armed touch point (${at.x},${at.y}) is over "${at.name}", not the editor layer (canvas ` +
+              `${at.canvas}, window ${at.win}) — the gesture would not be a stroke on the page`,
+          );
+        }
+        if (!at.page) fail(`the touch point (${at.x},${at.y}) is not over a page at all ("${at.name}")`);
+        await reset();
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart',
+          touchPoints: [{ x: at.x, y: at.y, id: 1 }],
+        });
+        let mid = null;
+        for (let step = 1; step <= 10; step += 1) {
+          await cdp.send('Input.dispatchTouchEvent', {
+            type: 'touchMove',
+            touchPoints: [{ x: at.x, y: at.y + step * 16, id: 1 }],
+          });
+          await page.waitForTimeout(20);
+          if (step === 5) mid = await read();
+        }
+        // `touches` is what is still on the glass; see the pinch row above for what happens when it lies.
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForTimeout(700);
+        const after = await read();
+        const landed = after.first;
+        if (landed && (Math.abs(landed.x - at.x) > 4 || Math.abs(landed.y - at.y) > 4)) {
+          fail(
+            `aimed at (${at.x},${at.y}) "${at.name}" but the page received the pointer at (${landed.x},` +
+              `${landed.y}) on "${landed.name}" in a ${at.win} window — the two coordinate spaces disagree, so ` +
+              'this row would be measuring its own aim',
+          );
+        }
+        return { mid, after, at };
+      };
+
+      await pressInk();
+      const armed = await read();
+      if (armed.pressed !== 'true') fail(`the pen did not report itself armed (aria-pressed "${armed.pressed}")`);
+      if (!armed.layerClass.includes('inkEditing')) {
+        fail(`arming the pen left the editor layer as "${armed.layerClass}", so no drawing tool is active`);
+      }
+      const drawn = await drag({ wantLayer: true });
+      // The stroke the finger made is committed by the engine when the mode changes, so the count that proves
+      // it was *drawn* is read after the tool comes off — which is also how a reader gets their mark into the
+      // document they then save.
+      await pressInk();
+      const committed = await read();
+
+      if (drawn.mid.cancels || drawn.after.cancels) {
+        fail(
+          `the browser took the gesture while the pen was armed (${drawn.after.cancels} pointercancel over ` +
+            `${drawn.after.moves} moves, first hit ${JSON.stringify(drawn.after.first)}) — a cancelled pointer ` +
+            'draws nothing',
+        );
+      }
+      if (!drawn.mid.livePaths) {
+        fail(`no stroke was painted mid-drag (${JSON.stringify(drawn.mid)}), so the finger drew nothing`);
+      }
+      if (committed.inkEditors <= 0) {
+        fail(`a one-finger drag with the pen armed committed ${committed.inkEditors} ink editors`);
+      }
+
+      // The control: the identical gesture with nothing armed must be taken by the browser.
+      const off = await drag({ wantLayer: false });
+      if (!off.after.cancels) {
+        fail(
+          `the control gesture was not cancelled either (${off.after.moves} moves, 0 cancels, first hit ` +
+            `${JSON.stringify(off.after.first)}): this harness is not seeing touch-action, so the armed arm of ` +
+            'this check proves nothing about the finger',
+        );
+      }
+      if (off.after.inkEditors !== committed.inkEditors) {
+        fail(
+          `the disarmed drag added an ink editor (${committed.inkEditors} → ${off.after.inkEditors}): the ` +
+            'gesture was a drawing even though the pen was off',
+        );
+      }
+
+      return (
+        `armed on "${drawn.at.name}" at (${drawn.at.x},${drawn.at.y}) of ${drawn.at.canvas} in ` +
+        `${drawn.at.win}: ${drawn.after.moves} moves, ${drawn.after.cancels} cancel, ` +
+        `${drawn.mid.livePaths} live path mid-drag, ${armed.inkEditors}→${committed.inkEditors} ink editors, ` +
+        `layer "${armed.layerClass}", scroll ${armed.scrolled}→${committed.scrolled} | disarmed at ` +
+        `(${off.at.x},${off.at.y}) on "${off.at.name}": cancelled after ${off.mid.moves} move(s), ` +
+        `${off.after.inkEditors} editors unchanged`
+      );
+    },
+  },
+  {
     name: 'forced-colours',
     desktopOnly: true,
     run: async ({ page, load }) => {

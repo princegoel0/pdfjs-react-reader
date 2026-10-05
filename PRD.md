@@ -1107,7 +1107,7 @@ never be called `supported` or `certified` on the strength of a look.
 
 | Environment | In contract | Evidence state | Minimum | Evidence required |
 | :--- | :--- | :--- | :--- | :--- |
-| Chrome / Chromium | Yes | implemented | 125 | Thirteen automated browser checks run in Chromium today; a pinned floor job that fails on regression is what moves this row to `supported` |
+| Chrome / Chromium | Yes | implemented | 125 | Fourteen automated browser checks run in Chromium today; a pinned floor job that fails on regression is what moves this row to `supported` |
 | Edge | Yes | unverified | 125-equivalent Chromium engine | Edge-specific job per release on a reproducible binary; no job exists yet |
 | Firefox | Yes | unverified | 124 provisional package floor | A pinned Firefox 124 runner through the full suite against the React and `pdfjs-dist` matrices |
 | Safari (macOS) | Yes | unverified | 18 | A reproducible Safari 18 / WebKit runner; the engine floor requires `light-dark()` and the nesting selector, so a stale WebKit fails the engine rather than the page |
