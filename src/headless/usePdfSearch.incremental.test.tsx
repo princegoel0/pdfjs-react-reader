@@ -204,7 +204,14 @@ describe('answering before the document is finished', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('re-reads only the page a form field was typed into', async () => {
+  /*
+   * FR-39's per-page invalidation, titled for what it proves. It used to say "re-reads only the page a
+   * form field was typed into", which is a claim about *why* a host calls this and about form values in
+   * particular — and the amended clause says plainly that a typed value never enters the index, because
+   * `getTextContent()` reports a field's label and not what the reader wrote. What the assertion shows is
+   * narrower and is the whole offer: one page named, one page re-read, the other fifty-nine untouched.
+   */
+  it('re-reads the one page it was named and none of the others', async () => {
     const doc = docWithHits([7]);
     const { result } = renderHook(() => usePdfSearch({ doc: doc.doc, focusPage: 0 }));
 

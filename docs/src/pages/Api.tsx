@@ -162,10 +162,11 @@ export function Api() {
               <code>PdfViewerHandle</code>
             </td>
             <td>
-              The imperative escape hatch: <code>goToPage</code>, <code>zoomTo</code>, <code>fitTo</code>,{' '}
-              <code>setLayout</code>, <code>rotatePage</code>, <code>retryPage</code>,{' '}
-              <code>openSidebar</code>, <code>toggleFullscreen</code>, <code>search</code>,{' '}
-              <code>replaceDocument</code>.
+              The imperative escape hatch: <code>goToPage</code>, <code>zoomTo</code>, <code>zoomBy</code>,{' '}
+              <code>fitTo</code>, <code>setLayout</code>, <code>rotate</code>, <code>rotatePage</code>,{' '}
+              <code>retryPage</code>, <code>openSidebar</code>, <code>toggleFullscreen</code>,{' '}
+              <code>search</code> and <code>invalidatePages</code> — twelve, every page they name 1-based.
+              <code>replaceDocument</code> is on the controller a host-written layout receives, not here.
             </td>
           </tr>
         </tbody>

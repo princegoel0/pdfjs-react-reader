@@ -372,7 +372,7 @@
     },
     "FR-14": {
       "title": "Match Highlighting",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/highlight.ts",
         "src/components/PdfPage.tsx"
@@ -380,7 +380,8 @@
       "automated": [
         "src/lib/highlight.test.tsx",
         "src/components/a11y.page.test.tsx",
-        "src/components/ViewerController.search.test.tsx"
+        "src/components/ViewerController.search.test.tsx",
+        "src/components/PdfPage.marks.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#search-marks-matches"
@@ -390,16 +391,15 @@
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
-        "src/lib/highlight.test.tsx"
+        "src/lib/highlight.test.tsx",
+        "src/components/PdfPage.marks.test.tsx"
       ],
-      "gaps": [
-        "“scroll the active match into view” is asserted nowhere: the call exists (src/components/PdfPage.tsx:968-978, `querySelector(“.pjsr-mark--active”)?.scrollIntoView({ block: “center” })`) but the only `scrollIntoView` assertions in the tree are the thumbnail strip’s (PdfThumbnail.test.tsx:286), and ViewerParts.composed.test.tsx:49 replaces the method with a no-op for every shell test, so deleting the call would leave the suite green"
-      ],
-      "note": "Native `mark` nodes, the active match’s distinguishing class and `aria-current`, and the non-colour channel that survives forced colours are each asserted (highlight.test.tsx:36-47, a11y.page.test.tsx:164, forced-colors.test.ts:86-93). The scroll is the third clause of the sentence and the only one with no failing test behind it."
+      "gaps": [],
+      "note": "Native `mark` nodes, the active match’s distinguishing class and `aria-current`, and the non-colour channel that survives forced colours are each asserted (highlight.test.tsx:36-47, a11y.page.test.tsx:164, forced-colors.test.ts:86-93). The third clause — the scroll — is now asserted too, and so is the window around it: src/components/PdfPage.marks.test.tsx installs its own `scrollIntoView` on the prototype (the shell tests stub it away, which is what hid the clause) and holds four things apart: the active element moves and no other, one navigation moves it once however many times the index publishes, a page mounted by scrolling into the range does not move at all, and a request older than the window is not honoured with a jump."
     },
     "FR-15": {
       "title": "Search Controls",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/components/SearchBox.tsx",
         "src/lib/search.ts",
@@ -407,7 +407,9 @@
       ],
       "automated": [
         "src/components/SearchBox.counter.test.tsx",
+        "src/components/SearchBox.controls.test.tsx",
         "src/lib/search.test.ts",
+        "src/headless/usePdfSearch.controls.test.tsx",
         "src/components/ViewerController.search.test.tsx"
       ],
       "acceptance": [
@@ -418,13 +420,12 @@
         "README.md"
       ],
       "regressionGuard": [
-        "src/components/SearchBox.counter.test.tsx"
+        "src/components/SearchBox.counter.test.tsx",
+        "src/components/SearchBox.controls.test.tsx",
+        "src/headless/usePdfSearch.controls.test.tsx"
       ],
-      "gaps": [
-        "next and previous are never navigated: `nextMatch` and `prevMatch` appear in the test tree only as `vi.fn()` stubs (SearchBox.counter.test.tsx:49-50, ViewerController.search.test.tsx:77-78), so the wrap-around arithmetic at src/headless/usePdfSearch.ts:485 has no assertion and an inverted direction or an off-by-one at either end would pass",
-        "case sensitivity is asserted on the pure matcher (search.test.ts:75,171) but no test toggles the control in the bar, so the option’s journey from the button to the matcher is unguarded"
-      ],
-      "note": "Whole-word matching, the counter’s position-within-total and its provisional form are all asserted (search.test.ts:103-135, SearchBox.counter.test.tsx:76). The navigation half of the clause — next, previous, and what happens at the ends of the list — is code no test has ever run."
+      "gaps": [],
+      "note": "Whole-word matching, the counter’s position-within-total and its provisional form were already asserted. The navigation half now is too: the wrap-around is walked in both directions at both ends (and the degenerate one-match and no-match lists stay where they are), and the bar’s buttons are held to the record they hand the matcher — `caseSensitive` and `wholeWord` arriving as `false` when off rather than as absent keys, which is not the same search. Counterfactuals on 2026-10-05: an inverted direction, a clamping end, an option dropped between the call and the plan (both options, separately), a decorative case button and an Enter that re-runs a finished search each failed their test."
     },
     "FR-16": {
       "title": "AcroForm Support",
@@ -1049,7 +1050,7 @@
     },
     "FR-39": {
       "title": "Incremental, Viewport-Prioritised Indexing",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/headless/usePdfSearch.ts",
         "src/lib/search.ts"
@@ -1057,21 +1058,21 @@
       "automated": [
         "src/headless/usePdfSearch.incremental.test.tsx",
         "src/lib/search.abort.test.ts",
-        "src/lib/search.parity.test.ts"
+        "src/lib/search.parity.test.ts",
+        "src/headless/usePdfSearch.controls.test.tsx",
+        "src/components/ViewerController.search.test.tsx"
       ],
       "acceptance": [],
       "documentation": [
         "docs/src/pages/Headless.tsx"
       ],
       "regressionGuard": [
-        "src/headless/usePdfSearch.incremental.test.tsx"
+        "src/headless/usePdfSearch.incremental.test.tsx",
+        "src/headless/usePdfSearch.controls.test.tsx"
       ],
-      "gaps": [
-        "the document-swap half of the restated clause is asserted nowhere: `usePdfSearch.ts:282-286` resets the index when `doc` changes, and no test swaps a document and asserts the previous matches are gone",
-        "per-page invalidation is offered to the host on the headless hook (invalidatePages, src/headless/usePdfSearch.ts:130) and asserted there (usePdfSearch.incremental.test.tsx:217), but the shell never surfaces it — no `PdfViewerHandle` path reaches it, and `invalidatePages` in the shell tests is a `vi.fn()` stub",
-        "the test that covers invalidation is titled as though a typed form field were re-found (“re-reads only the page a form field was typed into”), which the amended clause no longer promises and the assertion does not show — it proves one page re-reads and the others do not"
-      ],
-      "note": "Viewport-first order, the outward walk and the provisional channel (complete:false making total and counts floors) are met and measured. The restated clause moved the target: invalidation is the host’s call, per page, and annotation storage is not part of the index; what is left unasserted is a document swap dropping its index and a shell that never exposes the per-page call."
+      "gaps": [],
+      "note": "Viewport-first order, the outward walk and the provisional channel (complete:false making total and counts floors) were met and measured. The two clauses that were not are now: a replaced document discards its index — asserted through the swap, including the race where a page of the old file answers after the swap and after a later invalidation — and per-page invalidation is offered to the host, which needed a code move as well as a test: the hook had `invalidatePages` and `PdfViewerHandle` did not, so the clause’s “offered to the host” was true only for a host that imports the hook. Writing the swap test found a defect: the walk checked its run id only before each `await`, so a document replaced mid-index kept its in-flight page, published the old file’s matches and reported the old file’s page count as the new one’s progress. That is fixed in src/headless/usePdfSearch.ts:425-432, and the two tests that name it fail when the check is moved back. A write-side guard was also tried, measured to have no reachable consequence with the publish-side check in place, and removed.",
+      "acceptanceWaiver": "The order pages are read in, the provisional flag and the one-page re-read are asserted against a stubbed engine whose reads the test releases by hand — the only way to make “answered after one page of sixty” a fact rather than a race, since a browser cannot be asked to slow its worker on demand. What a browser does prove about this index (the marks, the counter, the active match) is cited on FR-14 and FR-15, where the same walk is visible on screen."
     },
     "FR-40": {
       "title": "Injectable External Index",

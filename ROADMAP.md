@@ -61,8 +61,8 @@ certified on this machine at all.
 | `FR-11` | Thumbnails | **met** | 5/5 | 0 | — |
 | `FR-12` | Jump-to-Page | **met** | 5/5 | 0 | — |
 | `FR-13` | Text Indexing | **met** | 5/5 | 0 | — |
-| `FR-14` | Match Highlighting | **partial** | 5/5 | 1 | “scroll the active match into view” is asserted nowhere: the call exists (src/components/PdfPage… |
-| `FR-15` | Search Controls | **partial** | 5/5 | 2 | next and previous are never navigated: `nextMatch` and `prevMatch` appear in the test tree only … |
+| `FR-14` | Match Highlighting | **met** | 5/5 | 0 | — |
+| `FR-15` | Search Controls | **met** | 5/5 | 0 | — |
 | `FR-16` | AcroForm Support | **partial** | 5/5 | 1 | the signature widget is still asserted nowhere, and now for a harder reason than absence of a te… |
 | `FR-17` | Form Data Sync | **partial** | 4/5 | 2 | the published hook is untested: `usePdfFormValues` (src/headless/usePdfFormValues.ts) is importe… |
 | `FR-18` | Annotations: View | **met** | 5/5 | 0 | — |
@@ -86,7 +86,7 @@ certified on this machine at all.
 | `FR-36` | Cancellation Tokens | **partial** | 4/5 | 2 | two of the operations the clause lists have no cancellation assertion: src/components/PdfThumbna… |
 | `FR-37` | Published State Models | **partial** | 4/5 | 1 | “both unions are produced, not merely declared” is not true of `destroyed`: it is produced at sr… |
 | `FR-38` | Source Utilities | **met** | 4/5 | 0 | — |
-| `FR-39` | Incremental, Viewport-Prioritised Indexing | **partial** | 4/5 | 3 | the document-swap half of the restated clause is asserted nowhere: `usePdfSearch.ts:282-286` res… |
+| `FR-39` | Incremental, Viewport-Prioritised Indexing | **met** | 4/5 | 0 | — |
 | `FR-40` | Injectable External Index | **met** | 4/5 | 0 | — |
 | `FR-41` | Dual Module Output | **met** | 5/5 | 0 | — |
 | `FR-42` | Document Merge | **met** | 4/5 | 0 | — |

@@ -279,7 +279,18 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
     }
   }, []);
 
-  // A new document invalidates everything outstanding.
+  /*
+   * A new document invalidates everything outstanding — and this is the line where that claim was false.
+   *
+   * `reset()` already moved `runIdRef`, so a swap did retire the walk. What it did not do was *stop* it:
+   * both of the loop's run-id checks sat before an `await`, so the page already in flight came home after
+   * the reset and the walk went on to publish — the old document's matches folded out of the slots it had
+   * just refilled, and the old document's page count reported as this one's progress. Measured by
+   * `usePdfSearch.controls.test.tsx`, which fails in that shape when the check is moved back.
+   *
+   * FR-39's "when the document itself is replaced … the index built for the old one is discarded with it"
+   * is the requirement, and a discard that happens one publish too late is not a discard.
+   */
   useEffect(() => {
     reset('idle');
     setPagesTotal(0);
@@ -411,6 +422,14 @@ export function usePdfSearch(options: UsePdfSearchOptions): UsePdfSearchResult {
             if (runIdRef.current !== runId) return;
             if (signalRef.current?.aborted) throw abortError('Text indexing was aborted.', 'SEARCH_CANCELLED');
             await scanPages([page]);
+            /*
+             * Checked again after the read, because a run can be superseded while a page is in flight, and
+             * a retired walk has nothing left to publish: `total` in the numbers below is the page count of
+             * the document this pass started on, so publishing it into the state a new document owns is the
+             * same lie as keeping its matches — progress about an index that was discarded. `invalidatePages`
+             * already re-checks after its own await; this loop is the one that was missing it.
+             */
+            if (runIdRef.current !== runId) return;
             indexed++;
             sinceFlush++;
             const now = Date.now();

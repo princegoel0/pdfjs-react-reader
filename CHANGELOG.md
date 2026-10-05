@@ -24,18 +24,62 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **29 met, 28 partial, 1
-absent** of 58, on a suite of **1,110 tests in 119 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **32 met, 25 partial, 1
+absent** of 58, on a suite of **1,136 tests in 123 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. Three of those eighteen are already back out:
-`FR-06` was closed in the code by #219 and re-synced in the register the same pass, and `FR-30` and `FR-32`
-came back through **#230**, the first Tier-1 work order, where the assertion had to be written before the row
-could be re-earned — on guards that count layer constructions, hold the reader's focus across a zoom step,
-read page trees out of written bytes, and refuse to believe a fixture that cannot hold two signature boxes.
-That is the direction the count takes from here: down where a guard turns out to be decoration, up where a
-test is shown to bite.
+below and is the honest number rather than the comfortable one. Six of those eighteen are already back out:
+`FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
+came back through **#230**, the first Tier-1 work order; and `FR-14`, `FR-15` and `FR-39` through **#231**,
+where writing the assertion for the third found the behaviour missing and moved the code as well. That is
+the direction the count takes from here: down where a guard turns out to be decoration, up where a test is
+shown to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **The search cluster's three unasserted clauses — and writing the first one found a defect (`#231`,
+  2026-10-05).** `FR-14`, `FR-15` and `FR-39` came back to `met`: 32 met, 25 partial, 1 absent now, on
+  **1,136 tests in 123 files**.
+
+  **`FR-14` — "scroll the active match into view".** The call existed and nothing reached it: every shell
+  test replaces `scrollIntoView` with a no-op (`ViewerParts.composed.test.tsx:49`), so deleting the line
+  kept the suite green. `src/components/PdfPage.marks.test.tsx` installs its own on the prototype — which
+  is also what lets it name *which element* moved — and holds four things apart: the active mark moves and
+  no other; one navigation moves the page once, however many times the index publishes; a page mounted by
+  scrolling into the match range does not move at all; and a request older than the window the page holds
+  open is refused rather than honoured with a jump.
+
+  **`FR-15` — next, previous, and the two switches.** `nextMatch` and `prevMatch` had never been navigated
+  anywhere: they were `vi.fn()` stubs in two files. The wrap is now walked in both directions at both ends,
+  the one-match and empty cases stay where they are, and the bar's buttons are held to the *record* they
+  hand the matcher — `{caseSensitive: false, wholeWord: false, regex: false}` rather than absent keys, which
+  is not the same search to a hook that resolves its defaults off that object. Whole-word and case were
+  asserted on the pure matcher and never on the journey from the control: pressing **Aa** now has to arrive
+  as a `search()` carrying the flag, and Enter must not re-run a search that already ran.
+
+  **`FR-39` — "the index built for the old one is discarded", and "offered to the host".** The first half
+  had no test; writing one found a defect. A document replaced mid-index left the walk running: it checked
+  its run id only *before* each `await`, so the page already in flight came home after the reset, and the
+  loop went on to publish — the previous document's matches under the new document's counter, and the
+  previous file's page count reported as progress. One check moved (after the await, where a superseded run
+  is actually detectable) closes it, and two tests hold it: one for the swap itself, one for the ordinary
+  sequence after it — a swap and then an invalidation, which is now a call a host can make. **A second
+  guard was written, measured to have no reachable consequence with the first in place, and removed**
+  (`.spike/counterfactual-swap.mjs`): a stale write that can never be published is not a hazard, and a line
+  of defensive code that cannot fail is a line nobody can justify to the next reader.
+
+  The second half was not a missing test but a missing surface: `invalidatePages` lived on the headless hook
+  since `0.11` and `PdfViewerHandle` never carried it, so the clause's "offered to the host" was true only
+  for a host that imports the hook rather than the viewer. The handle has it now — **1-based**, like every
+  other page it names, converted at the handle, and written into all four places the surface is listed
+  (which is also where an older error went: `replaceDocument` appeared as a handle member in two of them,
+  and it is on the controller a host-written layout receives). Eleven members became twelve.
+
+  **Eleven counterfactuals on these guards** (`.spike/counterfactual-t1b.mjs`), each failing the test that
+  names it: the wrong element centred, the freshness window open for ever, a spent navigation honoured
+  again, the direction inverted, the ends clamped instead of wrapped, each option dropped between the call
+  and the plan, a decorative case button, Enter re-running a finished search, and the two swap cases. One
+  further test was added *because* its counterfactual first passed: the spent-stamp guard was unreachable
+  while every rerender in the file handed the effect identical dependencies.
 
 - **Tier 1 opens: the edit tier's two unasserted claims are asserted, and a fixture had to grow for one
   of them (`#230`, 2026-10-05).** The clause-by-clause audit found rows whose cited guard asserted less

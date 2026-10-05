@@ -344,7 +344,9 @@ viewer.current?.search('indemnity');
 ```
 
 `goToPage · zoomTo · zoomBy · fitTo · setLayout · rotate · rotatePage · retryPage · openSidebar ·
-toggleFullscreen · search · replaceDocument` are the whole surface. The change events fire for what
+toggleFullscreen · search · invalidatePages` are the whole surface, and every page they name is 1-based.
+(`replaceDocument` is on the controller a host-written layout receives rather than on the handle: a ref
+cannot take a document the shell's own state would then not know about.) The change events fire for what
 the user did, not for what mounted: a fit mode resolving to 87 % during load does not announce itself
 as a change.
 

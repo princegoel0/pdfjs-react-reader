@@ -60,6 +60,7 @@ const HANDLE: [string, string][] = [
   ['openSidebar(open, tab?)', 'Opens the sidebar. The tab argument is a string, and the only tabs that exist are the ones mounted: `thumbnails` is core, while `outline`, `layers`, `attachments` and the edit tier’s `edit` need their feature.'],
   ['toggleFullscreen()', 'Needs a user gesture, like every fullscreen request.'],
   ['search(query, options?)', 'Runs a search and reveals the search bar. `options` takes the same `caseSensitive`, `wholeWord` and `regex` flags the find bar exposes, and several words in one query means all of them on a page.'],
+  ['invalidatePages(pages)', 'Drops the index’s cached text for these **1-based** pages and re-reads just them, so a page whose text changed costs one page and not a whole-document pass. FR-39’s per-page invalidation, which lived on the headless hook until the handle carried it out. What it is not: a way to make a typed form value searchable — the index holds a page’s content stream, and `getTextContent()` reports a field’s label rather than what the reader wrote.'],
 ];
 
 

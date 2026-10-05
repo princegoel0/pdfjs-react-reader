@@ -1088,6 +1088,19 @@ export function useViewerController({
         setSearchOpen(true);
         searchRef.current.search(query, options);
       },
+      /*
+       * FR-39: "Invalidation is per page and is offered to the host." The hook has had the call since
+       * `0.11` and the shell has not, which left a host that composes `PdfViewer` — rather than
+       * `usePdfSearch` — with no way to say a page is no longer what was indexed. Converted here,
+       * because every page this handle names is 1-based and the index's pages are not.
+       *
+       * Optional on a host-written controller: a find strategy that keeps its own index has nothing
+       * in ours to drop, so the call is answered rather than failing.
+       */
+      invalidatePages: (pages) => {
+        if (!pages.length) return;
+        searchRef.current.invalidatePages?.(pages.map((page) => page - 1));
+      },
     }),
     // Every setter above is stable: the state functions are `useState` setters, and `retryPage` is a
     // `useCallback` with no dependencies, so the handle keeps one identity for the life of the viewer.

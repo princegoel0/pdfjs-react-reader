@@ -175,7 +175,16 @@ describe('undo of an apply', () => {
     // here even when the page tree matched, because the object numbers would have moved.
     expect(Buffer.compare(restored, order())).toBe(0);
     expect(kidsOf(restored)).toEqual(before);
-    expect(statusText()).toBe(DEFAULT_LABELS.pagesApplyReverted);
+    /*
+     * Waited for, not read. The live region writes its words one timer after the notice changes — that
+     * delay is the whole reason a region mounting already holding its text still announces nothing — so a
+     * synchronous assertion here passes on an idle machine and fails inside the full suite. It did exactly
+     * that on 2026-10-05, which is the evidence for the rule rather than a comment asking for one.
+     */
+    await waitFor(() => expect(statusText()).toBe(DEFAULT_LABELS.pagesApplyReverted), {
+      timeout: 2000,
+      interval: 20,
+    });
 
     // One level, spent: a second press has no snapshot behind it, and the control says so rather
     // than sitting there enabled over nothing.

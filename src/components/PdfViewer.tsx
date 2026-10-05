@@ -224,6 +224,21 @@ export interface PdfViewerHandle {
   toggleFullscreen: () => void;
   /** Runs a document search and shows the search bar. */
   search: (query: string, options?: SearchOptions) => void;
+  /**
+   * Drop the index's cached text for these pages and re-read just them, so a page whose text changed
+   * is re-indexed on its own rather than costing a whole-document pass.
+   *
+   * **1-based, like every other page this handle names** — one less than the number
+   * `usePdfSearch`'s own `invalidatePages` takes. FR-39 is the requirement, and "offered to the host"
+   * is the half the handle is for: the hook had the call and the shell did not.
+   *
+   * What it is *not*: a way to follow an edit. The index holds a page's content stream, and
+   * `getTextContent()` reports a form field's label rather than the value a reader typed, so nothing
+   * typed in a session becomes searchable by calling this — the cheap re-read is the whole offer.
+   * With a host-written `find` controller that does not implement it, this does nothing, because the
+   * index that would be dropped is theirs.
+   */
+  invalidatePages: (pages: number[]) => void;
 }
 
 /**
