@@ -1209,6 +1209,7 @@
       "implementation": [
         "src/components/a11y.audit.test.tsx",
         "src/components/a11y.page.test.tsx",
+        "src/components/axe-audit-harness.ts",
         "src/lib/keyboard.ts",
         "src/lib/page-announcement.ts",
         "src/components/ViewerParts.tsx",
@@ -1217,6 +1218,8 @@
       "automated": [
         "src/components/a11y.audit.test.tsx",
         "src/components/a11y.page.test.tsx",
+        "src/components/a11y.harness.test.tsx",
+        "src/lib/a11y-serial.test.ts",
         "src/lib/page-announcement.test.ts",
         "src/components/ViewerAnnouncement.test.tsx"
       ],
@@ -1230,6 +1233,8 @@
       ],
       "regressionGuard": [
         "src/components/a11y.audit.test.tsx",
+        "src/components/a11y.harness.test.tsx",
+        "src/lib/a11y-serial.test.ts",
         "src/lib/page-announcement.test.ts",
         "src/components/ViewerAnnouncement.test.tsx"
       ],
@@ -1238,7 +1243,7 @@
         "44 px targets and contrast are asserted as CSS declarations, not measured: jsdom performs no layout",
         "axe runs against a rule set the audit test itself declares incomplete"
       ],
-      "note": "Automated axe, DOM structure, instance-scoped keys, generated ids, reduced motion and keyboard paging are all covered by checks that fail when they regress; what is missing is the human and platform-specific evidence the requirement says an automated audit cannot replace. The clause “page-change announcements” was not missing from the code by design — it was simply absent, and this row did not say so: the page region is focusable and labelled, the search counter is a polite live region, and neither is the reader’s position, which is the one thing a page of images cannot show. It is built now — one polite region per viewer instance, the sentence from `labels.pageOf` so it is the host’s language and the page’s own name when the document labels its pages (FR-12), and a quiet period that restarts on every move so a scroll announces the place the reader ended up once rather than every page they passed. Four counterfactuals, each restoring the source by checksum: announcing on mount reddens three rows at once (the opening page, out-and-back, and the pair), removing the quiet period reddens the burst and the out-and-back case, hard-coding English reddens the catalog row in both files, and advancing “what was last told” when the page moves rather than when the sentence is spoken reddens the case where the reader ends where they started."
+      "note": "Automated axe, DOM structure, instance-scoped keys, generated ids, reduced motion and keyboard paging are all covered by checks that fail when they regress; what is missing is the human and platform-specific evidence the requirement says an automated audit cannot replace. The clause “page-change announcements” was not missing from the code by design — it was simply absent, and this row did not say so: the page region is focusable and labelled, the search counter is a polite live region, and neither is the reader’s position, which is the one thing a page of images cannot show. It is built now — one polite region per viewer instance, the sentence from `labels.pageOf` so it is the host’s language and the page’s own name when the document labels its pages (FR-12), and a quiet period that restarts on every move so a scroll announces the place the reader ended up once rather than every page they passed. Four counterfactuals, each restoring the source by checksum: announcing on mount reddens three rows at once (the opening page, out-and-back, and the pair), removing the quiet period reddens the burst and the out-and-back case, hard-coding English reddens the catalog row in both files, and advancing “what was last told” when the page moves rather than when the sentence is spoken reddens the case where the reader ends where they started. The audit’s own reliability was defect #216, now fixed and guarded: axe-core holds one module-level run lock, so a single audit that lost its CPU and timed out turned every audit behind it in the same file into `Axe is already running` — measured on 2026-10-05 with the machine oversubscribed, 7 failed tests of which 6 were the lock and none was an accessibility rule. The audits now run in their own vitest project (`poolOptions.forks.singleFork`, `sequence.groupOrder: 1`, so one audit at a time and only after the parallel projects finish), every run goes through a queue that refuses to overlap and names the harness when it finds the lock held, no audit test runs more than one audit, and `src/lib/a11y-serial.test.ts` reads the real config object so the arrangement cannot decay when someone adds a fourth audit file. `testTimeout` is unchanged at vitest’s 5 s, as ruled: an audit that needs longer than that is a measurement, not something to hide. Under the same load afterwards: no audit failure at all, three plain timeouts elsewhere (`ssr.test.ts` ×2, `edit.test.tsx` ×1) recorded here as remaining contention sensitivity rather than fixed."
     },
     "FR-46": {
       "title": "SSR-Safe Module Graph",

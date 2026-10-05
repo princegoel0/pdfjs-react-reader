@@ -15,7 +15,7 @@
  */
 import { act, cleanup, render } from '@testing-library/react';
 import { useEffect } from 'react';
-import axe from 'axe-core';
+import { runAudit, violationList } from './axe-audit-harness';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OutlineView } from './OutlineView';
 import { PasswordPrompt } from './PasswordPrompt';
@@ -116,22 +116,21 @@ function OutlineTree({ entries }: { entries: OutlineEntry[] }) {
   );
 }
 
-/** The report is only useful if it says which node and which rule, so the ids and targets come along. */
-async function run(node: Element) {
-  const { violations, incomplete, passes } = await axe.run(node as HTMLElement, {
-    runOnly: {
-      type: 'tag',
-      values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
-    },
-  });
+/*
+ * Every audit goes through `runAudit` (#216): axe-core holds one module-level run lock, an audit that cannot
+ * get CPU is timed out without releasing it, and every later audit in the file then fails on `Axe is already
+ * running` — a red suite that names no accessibility problem. The queue is what serialises the runs; the
+ * `a11y` project in `vitest.config.ts` is what stops fifteen sibling files competing for the CPU in the
+ * first place.
+ */
+const run = async (node: Element) => {
+  const { violations, incomplete, passes } = await runAudit(node);
   return {
-    violations: violations.map(
-      (v) => `${v.id} — ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
-    ),
+    violations: violationList({ violations }),
     incomplete: incomplete.map((rule) => rule.id),
     passed: passes.length,
   };
-}
+};
 
 const expectClean = async (node: Element, label: string) => {
   const { violations, passed } = await run(node);
@@ -159,16 +158,22 @@ describe('the shell, audited', () => {
     await expectClean(container, 'password prompt');
   });
 
-  it('is clean with the sidebar open on each tab', async () => {
-    const { container } = render(<Shell />);
-    for (const tab of ['thumbnails', 'outline', 'layers', 'attachments'] as const) {
+  /*
+   * One test per tab, not four audits inside one test. A loop shares a single timeout between them and
+   * reports the fourth tab's trouble as "the sidebar test failed", which is the same failure shape #216
+   * had: the last thing to run is the one that runs out of time, and the name on the failure is not the
+   * thing that went wrong.
+   */
+  for (const tab of ['thumbnails', 'outline', 'layers', 'attachments'] as const) {
+    it(`is clean with the sidebar open on the ${tab} tab`, async () => {
+      const { container } = render(<Shell />);
       act(() => {
         controller?.setSidebarOpen(true);
         controller?.setSidebarTab(tab);
       });
       await expectClean(container, `sidebar: ${tab}`);
-    }
-  });
+    });
+  }
 
   it('is clean with the search bar open', async () => {
     const { container } = render(<Shell />);

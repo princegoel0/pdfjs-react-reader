@@ -61,7 +61,7 @@ React DOM, `pdfjs-dist`, and one optional writer.
 | Names on `/edit` | **36**, on `/merge` **13** | `dist/edit.d.ts`, `dist/merge.d.ts` |
 | Distinct public names, by maturity | **320** — 263 stable, 57 experimental, 0 deprecated, plus **15** in the `removed` ledger (FR-18). The split is measured, not asserted: `npm run check:maturity` prints it, and whether 57 experimental names is the right number to carry into `1.0.0` is the owner's open decision **#207** | `api-maturity.json`, audited by `npm run check:maturity` |
 | Source files (non-test) | **80**, 17,169 lines | `src/**` |
-| Test files / tests | **111 files / 1,060 tests**, in two projects (`node`, `dom`) | `npm run test` |
+| Test files / tests | **113 files / 1,070 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
 | Stylesheets | 9, from 24 to 1,372 lines | `src/styles/` |
 | Fixtures | 22 PDFs, produced by 18 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded; `vector-sample.pdf` is the only one whose cost is operators — four A1 sheets, 336 clipped cells each, 12,922 engine-reported operators a page and 0.51 MB on disk; `oversize-sample.pdf` is the only one with a page no renderer may paint — 612×792, 12,000×9,000 and 200,000×600 pt, which is the edge-case suite's sixth shape and the 0.25-minimum refusal in 1,023 bytes | `playground/fixtures/`, `scripts/make-*.mjs` |
 | Benchmark | `npm run bench` measures §6's four profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). All four have committed fixtures: C is `vector-sample.pdf` with the engine's own time taken separately through `playground/raw.html`, and D is `scan-sample.pdf` on the committed low-memory harness — 412×915 at dpr 3 with an Android user agent and 6× CDP CPU throttling, zoomed through the toolbar's overflow menu. The report is **`benchmarks/latest.json`, tracked**: §6's environment fields, each fixture's sha256, and p50/p95/max per sampled number with p99 only where there are 100+ samples. `src/lib/benchmark-record.test.ts` is what keeps that file an evidence rather than an artifact of the last run | `scripts/benchmark.mjs`, `benchmarks/latest.json`, `ROADMAP.md` §1 `FR-49` |
@@ -883,11 +883,15 @@ place a reader's palette can actually be tested rather than described.
 
 ---
 
-## 17. Tests: 111 files, 1,060 tests, two projects
+## 17. Tests: 113 files, 1,070 tests, three projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
-from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library). Parenthesised counts are the
-files this section has ever itemised; the rest are named, not counted, so a stale figure cannot appear here.
+from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library) except the audits, which are
+**`a11y`** — `src/**/a11y.*.test.tsx` in one fork, started after the other two projects finish, because
+axe-core holds one run lock and an audit that loses its CPU turns the ones behind it into failures that
+name nothing (#216; `src/lib/a11y-serial.test.ts` keeps that arrangement from decaying). Parenthesised
+counts are the files this section has ever itemised; the rest are named, not counted, so a stale figure
+cannot appear here.
 
 * Logic: `assets` `attachments` `canvas` `download` `editing-state` `features` `form` `fullscreen`
   `keyboard` `labels` `layout` `link-service` `optional-content` `outline` `page-plan`

@@ -12,7 +12,7 @@
  * mounted the true ones and to the `0.12` matrix.
  */
 import { act, cleanup, render, waitFor } from '@testing-library/react';
-import axe from 'axe-core';
+import { runAudit, violationList } from './axe-audit-harness';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { PdfPage } from './PdfPage';
@@ -137,12 +137,12 @@ function mountPage() {
   );
 }
 
+// Serialised through the harness: #216's failure was not a violation, it was an audit that lost its CPU and
+// left axe-core's run lock set for every audit behind it.
 async function audit(node: Element) {
-  const { violations, passes } = await axe.run(node as HTMLElement, {
-    runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
-  });
+  const { violations, passes } = await runAudit(node);
   expect(passes.length, 'the page rendered nothing').toBeGreaterThan(0);
-  return violations.map((v) => `${v.id} — ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
+  return violationList({ violations });
 }
 
 describe('the page, audited', () => {

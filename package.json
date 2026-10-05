@@ -218,7 +218,7 @@
     "build:docs": "vite build docs",
     "preview:docs": "vite preview docs --port 4173",
     "test": "vitest run",
-    "a11y": "vitest run src/components/a11y.audit.test.tsx src/components/a11y.page.test.tsx",
+    "a11y": "vitest run --project a11y",
     "test:browsers": "node scripts/browser-matrix.mjs",
     "probe:canvas": "node scripts/canvas-probe.mjs",
     "probe:worker": "node scripts/worker-default-browser.mjs",

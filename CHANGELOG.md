@@ -19,7 +19,7 @@ the two gates added beside it (#215's follow-on) run green ahead of that step, a
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
-absent** of 58, on a suite of **1,060 tests in 111 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,070 tests in 113 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One of those eighteen is already back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass, so the 27 above counts it
@@ -979,6 +979,32 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   stops at `size` for the one reason it is meant to: core at 30.68 kB against the accepted 29.09 kB baseline
   and `edit` at 6.43 kB of its 6 kB ceiling, which is decision #208 and not something a gate should be talked
   out of.
+
+### Fixed
+
+- **One slow axe audit no longer reddens the audits behind it (#224, closes #216; FR-45).** The symptom was a
+  busy machine turning the accessibility suite into a wall of `Axe is already running`, which reads like six
+  WCAG failures and is none: axe-core holds one module-level run lock, an audit that vitest has already timed
+  out does not release it, and every audit after it in the same file fails on the lock instead of running. The
+  failure was reproduced before anything was changed — `vitest run --project dom` with 32 busy processes on 16
+  cores: **7 failed tests, 6 of them on the lock, none on a rule.** Three changes, and the timeout is not one
+  of them. The audit files moved into their own vitest project (`poolOptions.forks.singleFork: true`,
+  `sequence.groupOrder: 1`), so one audit runs at a time and it runs *after* the fifty-odd parallel jsdom files
+  have finished, which is where the contention came from; every run goes through a queue in  `src/components/axe-audit-harness.ts` that refuses to overlap and, when it finds the lock held, fails as
+  `#216: … this is the harness losing its serialisation` rather than as a violation; and the sidebar test that
+  audited four tabs inside one 5-second budget is now one test per tab, since a loop puts the last tab's
+  problem on the first tab's name. `src/lib/a11y-serial.test.ts` reads the real config object (imported, not
+  scraped) and fails if an audit file is ever left in the parallel project, if the serialisation or the group
+  order is dropped, or if a `--project`-naming script or CI step omits the audit project. Measured again under
+  the same oversubscription: **no audit failure at all**, three plain timeouts elsewhere
+  (`src/lib/ssr.test.ts` twice, `src/edit.test.tsx` once) — those are contention sensitivity in other files,
+  recorded rather than hidden, and #216's own harm is gone. Four counterfactuals, each restored by checksum:
+  `runAudit` reduced to a bare `axe.run` fails all 3 harness tests with axe's lock message; deleting
+  `singleFork`, `groupOrder`, or the DOM project's exclusion each fails exactly the config assertion that owns
+  it; and the *first* version of the config guard passed with the serialisation line deleted, because it was
+  regex-parsing the config text — that version is gone, and the sentence about it is in the file.
+  `testTimeout` stays at vitest's 5 s by ruling: an audit that genuinely needs longer is a measurement, and a
+  suite that cannot report one is the thing that should fail. The suite is **1,070 tests in 113 files**.
 
 ## [0.11.0] — 2026-10-01
 
