@@ -23,6 +23,7 @@ export const DE_LABELS: PdfViewerLabels = Object.freeze({
   highlightTool: 'Hervorhebung',
   freeTextTool: 'Text hinzufügen',
   inkTool: 'Freihand',
+  inkNeedsPointer: 'Zeichnen geht nur mit Maus, Stift oder Finger — eine Tastatursteuerung gibt es dafür nicht',
   deleteAnnotation: 'Ausgewählte Anmerkung löschen',
   highlightColour: 'Farbe der Hervorhebung',
   highlightAdded: 'Hervorhebung hinzugefügt',

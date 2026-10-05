@@ -92,7 +92,7 @@ Core, in every import of the shell:
   area declares `touch-action: pan-x pan-y`, so the browser never pinch-zooms its own page underneath a
   zoom that is the viewer's to make, and a gesture the viewer consumes still reaches the host's listeners
   with `defaultPrevented` set — nothing outside the viewer's own container is claimed.
-- **Localisable** — every string in the shell lives in one typed catalog, 136 labels since `0.12` withdrew the ink controls; override
+- **Localisable** — every string in the shell lives in one typed catalog, 137 labels since `0.12` withdrew the ink controls and the pen gained its disclosure; override
   the subset you need and the rest keeps its English default, or take a complete language from
   `pdfjs-react-reader/locales/de`, `/fr` or `/es` — 2.39–2.42 kB gzipped each, and a separate entry so
   importing the viewer never hands you a language you did not ask for.

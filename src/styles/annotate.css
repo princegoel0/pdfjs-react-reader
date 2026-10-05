@@ -287,6 +287,43 @@
   }
 }
 
+/*
+ * FR-47's one named exception, stated on the control that offers it: a freehand mark has no keyboard
+ * equivalent, and the pen says so in its own accessible description.
+ *
+ * Clipped rather than `display: none`, for two reasons that are the same reason: a description on an element
+ * that is not in the accessibility tree is no description, and the `aria-describedby` on the pen's button is
+ * a reference that must resolve whether or not the tool is armed. The same clipping the editor announcements
+ * use (`.pjsr-alert`) is used here, because that is the shape that stays in the tree.
+ *
+ * When the pen *is* armed the sentence is allowed to take its box back, because a sighted reader with a
+ * keyboard learns the absence by drawing nothing otherwise — and it is the armed state that has the room, the
+ * bar having folded nothing away to make it.
+ */
+.pjsr-annotate-hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  color: var(--pjsr-muted-fg);
+}
+
+.pjsr-annotate[data-ink-armed='true'] .pjsr-annotate-hint {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+  font-size: 11px;
+}
+
 /* The colour the next mark will use, shown as a plate rather than only a word:
  * "Pink" and "Red" are one letter apart in a collapsed select, and the reader is
  * choosing a paint. The border keeps a near-white colour from vanishing into the

@@ -25,7 +25,7 @@ in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **27 met, 30 partial, 1
-absent** of 58, on a suite of **1,090 tests in 115 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,097 tests in 117 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One of those eighteen is already back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass, so the 27 above counts it
@@ -33,6 +33,50 @@ below and is the honest number rather than the comfortable one. One of those eig
 the sentence that moved it.
 
 ### Added
+
+- **FR-47's named exception is now stated by the controls that offer it (#226).** The amendment the owner
+  ruled on 2026-10-04 kept "every gesture has a keyboard or control equivalent" and carved out one
+  exception — a freehand stroke is a pointer act, and there is no key-by-key way to make the mark — with a
+  duty attached to it: *where the package offers one it says so on the control rather than leaving the
+  reader to discover the absence*. The package offers two such controls, and neither said anything a
+  keyboard reader could hear. The pen button's entire content was the word "Ink"; the signing pad had a
+  sentence, and it lived in a `title`, which is what a mouse shows you — no hover on a touch device, and
+  the reader the clause protects is the one with no pointer to begin with.
+
+  The pen now carries `aria-describedby` to a sentence of its own — a new `inkNeedsPointer` key, so the
+  catalogs are 137 strings and all four answer it — and the element it points at is in the tree
+  **whatever the armed tool is**, because a description that exists only while the pen is armed is an
+  invalid reference the rest of the time. It is hidden by clipping, the way the editor announcements' live
+  region already is, since `display: none` would take it out of the accessibility tree along with its
+  pixels; and when the pen *is* armed — `data-ink-armed` on the group — the sheet gives the sentence its
+  box back, because the absence a screen reader hears at the button is one a sighted keyboard reader would
+  otherwise learn by drawing nothing. The disclosure sits on the pen alone: FR-47 names one exception, and
+  a bar that warns beside every button has stopped telling anyone anything. The pad's sentence moved out of
+  the `title` into a paragraph the panel renders beside the other thing it refuses to let the reader
+  assume — that a drawn mark is not a cryptographic signature — with `aria-describedby` carrying the same
+  reference, and the `title` gone so the sentence is read once.
+
+  Five mutations, each restored byte-for-byte (`.spike/counterfactual-226.mjs`, whose unmutated run reported
+  7 passed / 0 failed): `aria-describedby={undefined}` on the pen → **2 failed**,
+  `the pen carries no description at all: expected null to be truthy`; the hint element rendered only while
+  armed → **2 failed**, the resting state answering `expected undefined to be 'Drawing needs a mouse, a pen
+  or a fin…'`; the sentence on all three tools → **1 failed**, `Highlight is not the exception FR-47 names,
+  so it declares nothing: expected '_r_2_' to be null`; `display: none` in the clip block → **1 failed** on
+  the stylesheet case, which exists because jsdom resolves no CSS; and the `title` put back on the pad →
+  **2 failed**. Cost: +0.02 kB gz on `core` and on `annotate`, +0.05 on `edit`'s increment, +0.03–0.05 on
+  the three catalogs — every one inside the noise line the gate reports rather than fails on, so no baseline
+  moved.
+
+  What the duty does *not* close, and what this pass found out while checking: the same FR-47 sentence also
+  says a one-finger drag on an armed drawing tool draws rather than scrolls, and nothing anywhere
+  demonstrates that a drag draws. The only evidence is a declaration — `core-ink.withdrawal.test.ts`
+  requires `touch-action: none` in the annotate sheet — and the matrix has no check that arms the pen. The
+  reason the arrangement probably works is that the engine arms its one-finger guard *after* the first
+  `pointerdown` has gone (which is what `ViewerController.gestures.test.tsx` proves for a widget tap), but
+  "probably" is not a requirement's answer, so FR-47 keeps a gap and #228 opens for it. Said plainly at the
+  same time: the `0.10` entry below claims `isPinchingDisabled` was passed while freehand was armed, and it
+  never was — that option appears nowhere in `src/`. The claim is left where it was written, because that
+  is the record of what was believed on 2026-10-01, and the correction is here rather than in the history.
 
 - **The two-finger pan is answered by the package, so FR-47's touch surface holds on the engine advertised as
   the floor (#225, implementing the owner's #211 ruling).** `PRD.md`'s FR-47 asks for multi-touch gestures
@@ -514,7 +558,7 @@ call only the owner can make.
   tree actually builds — core 31.01 kB gz, the shell entry 65.46 kB gz, `edit` 6.46 kB over core — which is
   the reviewed-change half of the same rule, and why `npm run size` is now green without any code having
   shrunk. `verify` was the last gate red for this reason and is green now: `npm run verify` exits 0 end to end
-  — 113 files and 1,070 tests, then `build`, `size`, `check:packaging`, `check:examples`, `check:maturity` and
+  — 115 files and 1,090 tests, then `build`, `size`, `check:packaging`, `check:examples`, `check:maturity` and
   `check:fr-evidence` — and the size numbers in the [Unreleased] state paragraph are the ones that run printed. PRD §6, README, `CODE_REFERENCE.md` and the
   docs site's Introduction and Compatibility pages were restated to match; the requirement text moved in the
   `Amended` entry above, on the owner's instruction, not to fit the tool.
@@ -1130,7 +1174,7 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   it; and the *first* version of the config guard passed with the serialisation line deleted, because it was
   regex-parsing the config text — that version is gone, and the sentence about it is in the file.
   `testTimeout` stays at vitest's 5 s by ruling: an audit that genuinely needs longer is a measurement, and a
-  suite that cannot report one is the thing that should fail. The suite is **1,070 tests in 113 files**.
+  suite that cannot report one is the thing that should fail. The suite was **1,070 tests in 113 files** at that moment; #225 and #226 have since taken it to 1,097 in 117.
 
 ## [0.11.0] — 2026-10-01
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AnnotationEditorType, AnnotationEditorUIManager } from 'pdfjs-dist';
 import { HighlightIcon, PenIcon, TextIcon, TrashIcon } from '../components/icons';
 import { usePdfFeaturePublish, usePdfFeatureShell, usePdfFeatureState } from '../components/FeatureHost';
@@ -285,11 +285,19 @@ function AnnotateRunner() {
 const TOOLS: readonly {
   tool: Exclude<AnnotateTool, 'none'>;
   label: keyof PdfViewerLabels;
+  /**
+   * The key that says, on this control, what it cannot be done with. FR-47 names exactly one exception to its
+   * "every gesture has a keyboard or control equivalent" — a freehand stroke — and requires the control that
+   * offers one to say so rather than leaving the reader to find it out by arming the tool. Only the pen
+   * carries it, because the amendment names only the pen: the highlighter and the text tool are not the
+   * exception, and a bar that warns beside every button has stopped telling anyone anything.
+   */
+  hint?: keyof PdfViewerLabels;
   icon: typeof HighlightIcon;
 }[] = [
   { tool: 'highlight', label: 'highlightTool', icon: HighlightIcon },
   { tool: 'free-text', label: 'freeTextTool', icon: TextIcon },
-  { tool: 'ink', label: 'inkTool', icon: PenIcon },
+  { tool: 'ink', label: 'inkTool', hint: 'inkNeedsPointer', icon: PenIcon },
 ];
 
 /**
@@ -312,10 +320,18 @@ function AnnotateToolsControl() {
   const shell = usePdfFeatureShell();
   const state = usePdfFeatureState<AnnotateFeatureState>();
   const labels = shell.labels;
+  // One id for the whole bar, not one per tool: exactly one control has something to declare, and a
+  // `useId` per button would put three descriptions in the tree where the requirement asks for a sentence.
+  const hintId = useId();
 
   return (
-    <div className="pjsr-annotate" role="group" aria-label={labels.annotationTools}>
-      {TOOLS.map(({ tool, label, icon: Icon }) => (
+    <div
+      className="pjsr-annotate"
+      role="group"
+      aria-label={labels.annotationTools}
+      data-ink-armed={state.tool === 'ink' ? 'true' : 'false'}
+    >
+      {TOOLS.map(({ tool, label, hint, icon: Icon }) => (
         <button
           key={tool}
           type="button"
@@ -323,11 +339,19 @@ function AnnotateToolsControl() {
           aria-pressed={state.tool === tool}
           aria-label={labels[label]}
           title={labels[label]}
+          aria-describedby={hint ? hintId : undefined}
           onClick={() => state.setTool(state.tool === tool ? 'none' : tool)}
         >
           <Icon />
         </button>
       ))}
+      {/* The pen's own exception, said on the pen's button. Present whatever the armed tool is, because an
+          `aria-describedby` that points at a missing element is a broken reference rather than a hint — and
+          when the pen *is* armed the sheet lets the sentence show, since the fact a screen reader hears at
+          the button is one a sighted keyboard reader would otherwise only learn by drawing nothing. */}
+      <span id={hintId} className="pjsr-annotate-hint">
+        {labels.inkNeedsPointer}
+      </span>
       <span
         className="pjsr-annotate-swatch"
         style={{ backgroundColor: state.highlightColor }}

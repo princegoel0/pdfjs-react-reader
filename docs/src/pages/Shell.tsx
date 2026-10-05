@@ -217,10 +217,13 @@ export function Viewer() {
         own listener learns it was consumed, rather than never hearing about it. A surface that needs the
         finger outright asks for it in CSS rather than winning a race: the annotation feature's own sheet
         sets <code>touch-action: none</code> on its editor layer, which the browser reads before any
-        listener runs. Every gesture has a route that is not a gesture: the zoom select and{' '}
+        listener runs. Nearly every gesture has a route that is not a gesture: the zoom select and{' '}
         <code>zoomTo</code>/<code>zoomBy</code>, the arrow and page keys on the focused region, the
         sidebar’s own scroll, and a <code>src</code> that is yours to set — the drop is a convenience
-        over that, not the only way to change document.
+        over that, not the only way to change document. The one exception is a freehand mark: FR-47 names
+        it, and the control that offers it says so, in{' '}
+        <code>inkNeedsPointer</code> on the pen button and a line of the panel beside the signing pad, so
+        the absence is stated rather than discovered by trying.
       </p>
       <p>
         Drag-and-drop is off by default for the same reason the shell never navigates: a viewer whose
@@ -231,7 +234,7 @@ export function Viewer() {
 
       <h2>Labels</h2>
       <p>
-        Every string in the shell — 136 of them, from <code>aria-label</code>s to the
+        Every string in the shell — 137 of them, from <code>aria-label</code>s to the
         “3 of 416 · p12” counter — lives in one typed catalog with an English default. Pass a partial
         object and only the keys you name change:
       </p>

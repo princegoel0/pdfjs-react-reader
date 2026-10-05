@@ -1278,6 +1278,8 @@
       "implementation": [
         "src/components/ViewerController.tsx",
         "src/lib/touch-pan.ts",
+        "src/features/annotate.tsx",
+        "src/edit.tsx",
         "src/styles/viewer.css",
         "src/styles/annotate.css",
         "src/styles/edit.css"
@@ -1285,7 +1287,9 @@
       "automated": [
         "src/components/ViewerController.gestures.test.tsx",
         "src/lib/touch-pan.test.tsx",
-        "src/components/ViewerController.pan.test.tsx"
+        "src/components/ViewerController.pan.test.tsx",
+        "src/features/annotate.pointer-duty.test.tsx",
+        "src/edit.pointer-duty.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#pinch-vs-pan (synthetic touch)"
@@ -1296,12 +1300,14 @@
       "regressionGuard": [
         "src/components/ViewerController.gestures.test.tsx",
         "src/lib/touch-pan.test.tsx",
-        "src/components/ViewerController.pan.test.tsx"
+        "src/components/ViewerController.pan.test.tsx",
+        "src/features/annotate.pointer-duty.test.tsx",
+        "src/edit.pointer-duty.test.tsx"
       ],
       "gaps": [
-        "the exception the amendment names has a duty attached to it that the package does not carry: a freehand stroke is pointer-only by construction, and the clause now requires the control that offers one to say so. Nothing in `src/features/annotate.tsx`, its labels or its stylesheet discloses it, and no `touchOnly`-style key exists in any of the four catalogs — so a keyboard reader discovers the absence by trying"
+        "the clause that a one-finger drag on an armed drawing tool draws rather than scrolls has no assertion that a drag draws. The only evidence is a declaration -- `src/lib/core-ink.withdrawal.test.ts:187` requires `touch-action: none` in `annotate.css` -- and no check in `scripts/browser-matrix.mjs` arms the pen or makes a mark, so what the shell's own touch arbiter does with that first finger is reasoned about (the engine arms its one-finger guard after the `pointerdown` has already gone, which is what `ViewerController.gestures.test.tsx` asserts for a widget tap) rather than measured. Task #228. Corrected on the way rather than left in the history: the `0.10` entry states that `isPinchingDisabled` was passed while freehand was armed, and that option is not passed anywhere in `src/`"
       ],
-      "note": "The arbitration itself is built and guarded: the pinch zooms, the host page does not scroll under it, a drawing tool keeps its one-finger drag, and the gesture code is instance-scoped so a second viewer on the same page is not starved -- all of it passes on 6.3.289 and 6.4.299, in jsdom and in three browsers. The peer-range half closed on 2026-10-05 (#225, which implements the owner's #211 ruling rather than waiting on it): `onPanning` is a 6.3 addition, so `src/lib/touch-pan.ts` now asks the installed class whether a two-finger pan it is given comes back as a pan, and scrolls the container itself when it does not -- asked, not versioned, because a patch release that gains or loses the callback moves the answer with it. Measured in Chromium at 6.2.108: 25 ok / 1 skipped / 0 not runnable / 0 failed, the row reading `spread 3 → 3.37, two-finger drag scrolled to 160 and held 3.37` -- the same tally and the same row text the installed 6.3.289 reports, so the floor is now equal to the engine that has the callback rather than a fifth of the range away from it. With the fallback not attached, the same harness at the same floor reports 11 ok / 1 failed and `a two-finger pan moved neither the page nor the scroll position`, so the clause closes on the package's code. The same run also disproved two of this row's own acceptance numbers. The harness ended a synthetic gesture by repeating the lifted fingers in `touches`, which is not what a browser sends, so pdf.js never saw the gesture end and the row reported `the pan also zoomed (3.37 → 3)` for that reason alone; and a floor run whose `node_modules` had been replaced under Vite's dependency cache measured the *previous* engine while its banner named the new one, which is why the harness now refuses to start when the two disagree. The amendment also added a duty rather than removing one: the named pointer-only exception has to be disclosed on the control, and it is not — no locale key states it, no test asserts it, which is the gap this row still carries."
+      "note": "The arbitration itself is built and guarded: the pinch zooms, the host page does not scroll under it, a drawing tool keeps its one-finger drag, and the gesture code is instance-scoped so a second viewer on the same page is not starved -- all of it passes on 6.3.289 and 6.4.299, in jsdom and in three browsers. The peer-range half closed on 2026-10-05 (#225, which implements the owner's #211 ruling rather than waiting on it): `onPanning` is a 6.3 addition, so `src/lib/touch-pan.ts` now asks the installed class whether a two-finger pan it is given comes back as a pan, and scrolls the container itself when it does not -- asked, not versioned, because a patch release that gains or loses the callback moves the answer with it. Measured in Chromium at 6.2.108: 25 ok / 1 skipped / 0 not runnable / 0 failed, the row reading `spread 3 → 3.37, two-finger drag scrolled to 160 and held 3.37` -- the same tally and the same row as the installed 6.3.289. With the fallback not attached, the same harness at the same floor reports 11 ok / 1 failed and `a two-finger pan moved neither the page nor the scroll position`, so the clause closes on the package's code. The same run also disproved two of this row's own acceptance numbers: the harness ended a synthetic gesture by repeating the lifted fingers in `touches`, which is not what a browser sends, so pdf.js never saw the gesture end; and a `node_modules` engine swap can leave Vite's prebundle holding the previous release while the banner names the new one, which is why the harness now refuses to start on that mismatch. The disclosure half of the amendment's duty landed the same day (#226): the pen's button carries an `aria-describedby` sentence -- a new `inkNeedsPointer` key, so the catalogs are 137 strings -- said whether or not the tool is armed, on the pen only, and hidden by clipping rather than by leaving the accessibility tree; the signing pad's existing sentence moved out of its `title`, which only a mouse can see, into a paragraph the panel renders and the pad points at. Both are guarded (`src/features/annotate.pointer-duty.test.tsx`, `src/edit.pointer-duty.test.tsx`), and every one of the five mutations that break them was measured to fail. What keeps the row `partial` is now the one-finger clause's evidence rather than anything the amendment asked for."
     },
     "FR-48": {
       "title": "Browser & Engine Verification Matrices",

@@ -801,6 +801,7 @@ function SignatureSection() {
   const [hasMark, setHasMark] = useState(false);
   const labels = shell.labels;
   const padId = `pad-${useId()}`;
+  const padHintId = `${padId}-hint`;
   /*
    * Published from the Runner's effect, so a panel's first render sees `{}` — every feature
    * panel reads through a default for that reason, and a list assumed present takes the whole
@@ -944,6 +945,12 @@ function SignatureSection() {
       <label className="pjsr-sign-label" htmlFor={padId}>
         {labels.drawSignature}
       </label>
+      {/* FR-47's other pointer-only surface, and the reason this sentence is a line of its own rather than the
+          pad's `title`: a tooltip reaches a mouse, which is the one input that never needed telling. Read out
+          at the control by the `aria-describedby` below, and seen by anyone looking at the panel. */}
+      <p className="pjsr-sign-note" id={padHintId}>
+        {labels.signatureNeedsPointer}
+      </p>
       <canvas
         id={padId}
         ref={canvasRef}
@@ -952,7 +959,7 @@ function SignatureSection() {
         height={SIGNATURE_PAD.height}
         role="img"
         aria-label={labels.drawSignature}
-        title={labels.signatureNeedsPointer}
+        aria-describedby={padHintId}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture?.(event.pointerId);
           drawingRef.current = true;

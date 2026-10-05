@@ -94,7 +94,7 @@ certified on this machine at all.
 | `FR-44` | High Contrast & Forced Colours | **partial** | 5/5 | 3 | two of the clause’s three named signals are read in a real browser and one is not: the `forced-c… |
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
 | `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108… |
-| `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the exception the amendment names has a duty attached to it that the package does not carry: a f… |
+| `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the clause that a one-finger drag on an armed drawing tool draws rather than scrolls has no asse… |
 | `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has run green on a runner once -- CI run 37193161535, dev at 15d0888, 2026-10-04… |
 | `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 3 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |

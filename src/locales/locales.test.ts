@@ -75,8 +75,8 @@ describe.each(Object.entries(CATALOGS))('%s catalog', (code, catalog) => {
 
 it('has a key list the catalogs were written against', () => {
   // 123 in `0.6`, 131 in `0.7`, 134 at the `0.8` freeze, 144 with the signature panel, 146 with the
-  // partial search counter, 147 with the reason a save was refused, and 136 once the core freehand ink
-  // surface was withdrawn (FR-18): a catalog cannot gain — or lose — a string that three language files
-  // then fail to carry.
-  expect(KEYS.length).toBe(136);
+  // partial search counter, 147 with the reason a save was refused, 136 once the core freehand ink
+  // surface was withdrawn (FR-18), and 137 with the sentence the pen owes its keyboard reader (FR-47):
+  // a catalog cannot gain — or lose — a string that three language files then fail to carry.
+  expect(KEYS.length).toBe(137);
 });

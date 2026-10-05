@@ -61,7 +61,7 @@ React DOM, `pdfjs-dist`, and one optional writer.
 | Names on `/edit` | **36**, on `/merge` **13** | `dist/edit.d.ts`, `dist/merge.d.ts` |
 | Distinct public names, by maturity | **320** — 263 stable, 57 experimental, 0 deprecated, plus **15** in the `removed` ledger (FR-18). The split is measured, not asserted: `npm run check:maturity` prints it, and whether 57 experimental names is the right number to carry into `1.0.0` is the owner's open decision **#207** | `api-maturity.json`, audited by `npm run check:maturity` |
 | Source files (non-test) | **80**, 17,169 lines | `src/**` |
-| Test files / tests | **115 files / 1,090 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
+| Test files / tests | **117 files / 1,097 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
 | Stylesheets | 9, from 24 to 1,372 lines | `src/styles/` |
 | Fixtures | 22 PDFs, produced by 18 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded; `vector-sample.pdf` is the only one whose cost is operators — four A1 sheets, 336 clipped cells each, 12,922 engine-reported operators a page and 0.51 MB on disk; `oversize-sample.pdf` is the only one with a page no renderer may paint — 612×792, 12,000×9,000 and 200,000×600 pt, which is the edge-case suite's sixth shape and the 0.25-minimum refusal in 1,023 bytes | `playground/fixtures/`, `scripts/make-*.mjs` |
 | Benchmark | `npm run bench` measures §6's four profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). All four have committed fixtures: C is `vector-sample.pdf` with the engine's own time taken separately through `playground/raw.html`, and D is `scan-sample.pdf` on the committed low-memory harness — 412×915 at dpr 3 with an Android user agent and 6× CDP CPU throttling, zoomed through the toolbar's overflow menu. The report is **`benchmarks/latest.json`, tracked**: §6's environment fields, each fixture's sha256, and p50/p95/max per sampled number with p99 only where there are 100+ samples. `src/lib/benchmark-record.test.ts` is what keeps that file an evidence rather than an artifact of the last run | `scripts/benchmark.mjs`, `benchmarks/latest.json`, `ROADMAP.md` §1 `FR-49` |
@@ -396,7 +396,7 @@ monitor switch repainting these pages) ·
 
 **UI and language**
 
-`className` · `style` · `labels` (override any subset of the 136 strings) · `controls` (say which
+`className` · `style` · `labels` (override any subset of the 137 strings) · `controls` (say which
 toolbar items are hidden, reordered, re-prioritised, or added — §12) · `find` (a `PdfFindController` you
 provide, so *your* Ctrl-F drives *this* search) · `features` (the tiers you mounted)
 
@@ -812,7 +812,7 @@ merge-only consumer path measures **0.78 kB**.
 
 ## 15. Languages
 
-`src/lib/labels.ts` is the source of truth: **one typed catalog of 136 strings** — the number `src/locales/locales.test.ts` asserts, every one of them
+`src/lib/labels.ts` is the source of truth: **one typed catalog of 137 strings** — the number `src/locales/locales.test.ts` asserts, every one of them
 English, every string in the shell coming from it (toolbar labels, `aria-label`s, the "3 of 416 · p12"
 counter, error messages). `{page}`-style slots are filled by `formatLabel`.
 
@@ -820,8 +820,8 @@ counter, error messages). `{page}`-style slots are filled by `formatLabel`.
 * Three complete languages ship: `locales/de`, `/es`, `/fr` — typed as the **complete** catalog, so a new
   key in English makes all three fail to build until it's answered; each frozen; each a separate entry.
 * `src/locales/locales.test.ts` asserts what a type can't: the key list matches exactly (the count is
-  asserted, and it moved 123 → 131 → 134 → 144 → 147 → **136** as tiers landed and FR-18 took the ink
-  strings back out), no value is empty or padded, every
+  asserted, and it moved 123 → 131 → 134 → 144 → 147 → 136 → **137** as tiers landed, FR-18 took the ink
+  strings back out and FR-47 gave the pen its disclosure), no value is empty or padded, every
   `{slot}` survives with its name intact, and the catalog *translates* rather than echoing English back
   (four exceptions, each named in the test).
 * `labels` overrides are **read when the control renders**, not when the viewer mounts: a partial
@@ -889,7 +889,7 @@ place a reader's palette can actually be tested rather than described.
 
 ---
 
-## 17. Tests: 115 files, 1,090 tests, three projects
+## 17. Tests: 117 files, 1,097 tests, three projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
 from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library) except the audits, which are
@@ -990,7 +990,10 @@ cannot appear here.
   **`ViewerController.pan` (6)** — the two-finger pan across the advertised engine range, the first on the
   probe and the arithmetic, the second on the shell mounted against an engine that reports panning, one that
   does not, and one that cannot be constructed at all (`src/lib/touch-engine-stand-ins.ts` holds the first two
-  shapes, transcribed from the real classes, and is not a test file)
+  shapes, transcribed from the real classes, and is not a test file);
+  **`annotate.pointer-duty` (5)** and **`edit.pointer-duty` (2)** — FR-47's disclosure duty, the pen's
+  `aria-describedby` resolving in both armed states and the signing pad's sentence living in a paragraph
+  rather than a `title`, one of each pair read off the sheet the build ships because jsdom resolves no CSS
 
 Recipes that took real time to learn, and are worth reusing: a click handler that `void`s an async write
 means you **cannot await it** — settle on `waitFor`, not a fixed timer, and clear mocks only after

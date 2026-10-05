@@ -19,6 +19,13 @@ export interface PdfViewerLabels {
   freeTextTool: string;
   inkTool: string;
   /**
+   * Said *on* the pen control, because FR-47's one named exception is this tool: a freehand stroke is a
+   * pointer act with no key-by-key equivalent, and a reader who cannot see the page is owed that fact before
+   * they arm the tool rather than discovering it by arming it and getting nothing. The same sentence in a
+   * `title` would only reach a mouse, which is the one input that never needed telling.
+   */
+  inkNeedsPointer: string;
+  /**
    * The Delete control the annotate group adds. The engine's own toolbar has one,
    * but its buttons are icon-only with the label behind a `data-l10n-id` this
    * viewer never resolves, so it has no accessible name — which is why the group
@@ -212,6 +219,7 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   highlightTool: 'Highlight',
   freeTextTool: 'Add text',
   inkTool: 'Ink',
+  inkNeedsPointer: 'Drawing needs a mouse, a pen or a finger — there is no keyboard equivalent',
   deleteAnnotation: 'Delete selected annotation',
   highlightColour: 'Highlight colour',
   highlightAdded: 'Highlight added',

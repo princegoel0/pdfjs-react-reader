@@ -32,7 +32,7 @@ export function Api() {
       <p>
         One package, several specifiers, because what you import is what you download. Nothing in the
         shell imports a feature, so naming a feature is the only way to get its code; the catalogs are
-        separate for the same reason — a language is 134 strings and you should not be handed one you
+        separate for the same reason — a language is 137 strings and you should not be handed one you
         did not ask for.
       </p>
       <table className="doc-table">
