@@ -29,10 +29,12 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **43 met, 14 partial, 1
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **44 met, 13 partial, 1
 absent** of 58, on a suite of **1,244 tests in 138 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. Seventeen of those eighteen are back out:
+below and is the honest number rather than the comfortable one. One row moved the other way, and nothing was
+written here to move it: `FR-44`'s last gap was the answer of the one engine this host cannot start, and a runner
+started it — see **#245** below. Seventeen of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
@@ -1197,6 +1199,37 @@ re-derived by whoever asks next.
   assertions that catch those still fail at any size. The id and the section number are unchanged.
 
 ### Changed
+
+- **A runner started WebKit, answered two rows, and failed one (#245; FR-44, FR-43, FR-19, FR-48).**
+  The cells at `651672c` (CI run 37386366651, 2026-10-05) are the first to carry nineteen checks, and for
+  Safari's engine a runner is the only instrument this project has: three attempts to start webkit on this host,
+  three `Target page, context or browser has been closed`. It said three things.
+  `forced-colours` read every member of FR-44's clause in webkit 26 — slot outlined 1px with its shadow removed,
+  the file-borne highlight's edge solid 1px over 595px, the search mark's rule 1px over 107px with the active
+  match's ring at 2px, focus read twice as `rgb(52, 132, 228)` against the sheet's own `rgb(79, 70, 229)`, the
+  editor's mark edged over 98×50 — and since the row's only remaining gap *was* that engine's answer, **FR-44 is
+  met**: 44 met, 13 partial, 1 absent. That is the count moving up on a measurement nobody here could take,
+  which is the only kind of upward move this register accepts.
+  `structure-tree-in-the-accessibility-tree` returned its two trees over the nine roles there as well, the link
+  nested in its own paragraph and its `aria-owns` resolving to `a_link_0` where the chromium cell of the same
+  run said `c_link_0` and firefox's `d_link_0` — and where an earlier local reading had those same two engines as
+  `6_link_0` and `3_link_0`. The id is a per-run counter rather than a name, which is why FR-43 quotes it instead
+  of asserting on it; that row keeps its two gaps, the assistive-technology pairing and the widget-inside-a-
+  marked-content-node half.
+  And one row failed: print's page scope could not be selected in webkit, Playwright's log stopping at
+  "attempting select op" on a `<select>` in a cell whose own fold row reports the bar as never having overflowed
+  — 88 ok / 7 skipped / 0 not runnable / **1 failed** over six cells, the failure a check that ran rather than an
+  engine that would not start, which is what FR-48's clause asks a matrix to report.
+  The mechanism is unknown and the row no longer reports it as a bare timeout: it now reads that control's box
+  twice 400 ms apart, its computed visibility, its `disabled` flag and what a pointer hit-test finds at its own
+  centre, and prints all of it. Where those readings say a reader could reach the control, the scope goes on
+  through `input` then `change` — the events a choice fires — and the substitution is named in the row's own
+  text; where they say covered, disabled, folded into a panel nobody opened, or moving under the pointer, the row
+  fails naming them. That branch is not a shortcut waiting for a green: it was run here in Chromium with the
+  selection forced to fail, and the row still printed two sheets and still printed exactly one sheet for
+  "Current page", which is the effect the scope has to have for the assertion to mean anything at all. #245 owns
+  the mechanism, and FR-19 keeps a second gap until WebKit's cell is green or the clause is shown to be
+  unmeetable in that engine.
 
 - **`enableFullscreen: false` now refuses fullscreen, not just the button (#237).**
   `useViewerController`'s `toggleFullscreen` — published on `PdfViewerHandle` — went straight to

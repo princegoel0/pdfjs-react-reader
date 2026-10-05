@@ -2030,9 +2030,77 @@ const CHECKS = [
        * of a two-page document, then the single page in front of the reader. A pipeline that printed the whole
        * file regardless would fail the second of those.
        */
+      /**
+       * What a control looks like to a pointer, read in the page under test.
+       *
+       * `covered` is the field that separates the two stories a stuck selection can mean: a control a reader
+       * cannot use, and a control Playwright merely will not drive. It hit-tests the element's own centre, which
+       * is where a click lands.
+       */
+      const reachOf = (locator) =>
+        locator
+          .evaluate((el) => {
+            const box = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+            const name = (n) => (n ? `${n.tagName.toLowerCase()}.${String(n.className ?? '').split(' ')[0]}` : 'none');
+            return {
+              box: `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}`,
+              visible: style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0,
+              disabled: Boolean(el.disabled),
+              covered: hit === null || !(hit === el || el.contains(hit) || hit.contains(el)),
+              hit: name(hit),
+              inMenu: Boolean(el.closest('.pjsr-overflow-menu')),
+              inSizer: Boolean(el.closest('.pjsr-toolbar-sizer')),
+            };
+          })
+          .catch((error) => ({ unreadable: String(error?.message ?? error).split('\n')[0].slice(0, 120) }));
+
+      /** Where the engine made the row drive a control the way a choice would rather than by selection. */
+      const scopeNotes = [];
+
       const pickScope = async (scope) => {
         const pages = await reveal('Print pages');
-        await pages.selectOption(scope);
+        try {
+          await pages.selectOption(scope);
+        } catch (error) {
+          /*
+           * WebKit's first reading of this row failed on exactly this line on the runner (CI 37386366651, dev at
+           * 651672c, 2026-10-05): the call log ends at "attempting select op" for a select the same cell's
+           * toolbar-fold row reports as inline and un-folded, and this host cannot start WebKit to look closer —
+           * three attempts now, all `Target page, context or browser has been closed`. So the runner is the only
+           * instrument, and it has to carry its own diagnosis: the row reads the control twice 400 ms apart and
+           * decides between the two stories. Visible, enabled, unmoving and uncovered at its own centre is a
+           * control a reader can use, so the value goes on it the way a choice puts it — `input` then `change`,
+           * the events the app listens for — and the substitution is printed in the row's own text. Anything
+           * else (covered, disabled, folded into a panel nobody opened, moving under the pointer) is this
+           * package's failure, and the row fails naming the readings.
+           */
+          const before = await reachOf(pages);
+          await page.waitForTimeout(400);
+          const after = await reachOf(pages);
+          const usable = before.visible && !before.disabled && !before.covered && before.box === after.box;
+          if (!usable) {
+            fail(
+              `the "${scope}" scope control could not be used: ${firstLine(error)} — ${JSON.stringify(before)} ` +
+                `then ${JSON.stringify(after)}; the bar held ${(await barLabels()).slice(0, 300)}`,
+            );
+          }
+          await pages.evaluate((el, value) => {
+            el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          }, scope);
+          scopeNotes.push(
+            `"${scope}" set through the change event, ${engine} refusing the selection (${firstLine(error)}; ` +
+              `${before.hit} at its centre, ${before.box}, unchanged 400 ms later)`,
+          );
+        }
+        // The substitution above is only worth making if the app took it: the scope is read back off the same
+        // control the reader would look at, so a value the panel accepted and the state did not is a failure.
+        if ((await pages.inputValue()) !== scope) {
+          fail(`the scope select reads "${await pages.inputValue()}" after being set to "${scope}"`);
+        }
         // Put the panel back before reaching for the action. Print's button is a higher-priority control, so it
         // stays in the bar — and an open overflow menu hangs over it, which leaves the click waiting on a
         // hit-test the panel keeps winning. Firefox folded the selector at 1,280 px and reached this line;
@@ -2316,7 +2384,10 @@ const CHECKS = [
         `${run3.sheets[0].fieldPixels}px box went ${fieldBefore} → ${fieldAfter} dark px for a typed value, and ` +
         `"Current page" printed ${run3.sheets.length} of the 2; all ${big.pages} pages of a ` +
         `${big.width.toFixed(0)}x${big.height.toFixed(0)}pt document refused with no print call and ` +
-        `"${(named ?? '').slice(0, 90)}"`
+        `"${(named ?? '').slice(0, 90)}"` +
+        // An engine that would not take the selection says so here rather than passing quietly: the scopes are
+        // what make the third job's one-page sheet mean "current" instead of "whatever the default was".
+        (scopeNotes.length ? `; ${scopeNotes.join('; ')}` : '')
       );
     },
   },

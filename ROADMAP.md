@@ -66,7 +66,7 @@ certified on this machine at all.
 | `FR-16` | AcroForm Support | **partial** | 5/5 | 1 | the signature widget is still asserted nowhere, and now for a harder reason than absence of a te… |
 | `FR-17` | Form Data Sync | **met** | 4/5 | 0 | — |
 | `FR-18` | Annotations: View | **met** | 5/5 | 0 | — |
-| `FR-19` | High-Fidelity Printing | **partial** | 5/5 | 1 | the marks half of the clause has never been seen on paper: what the browser row reads is a typed… |
+| `FR-19` | High-Fidelity Printing | **partial** | 5/5 | 2 | the marks half of the clause has never been seen on paper: what the browser row reads is a typed… |
 | `FR-20` | Document Download | **met** | 4/5 | 0 | — |
 | `FR-21` | Opt-In Feature Registration | **met** | 5/5 | 0 | — |
 | `FR-22` | Per-Feature Stylesheets | **met** | 5/5 | 0 | — |
@@ -91,11 +91,11 @@ certified on this machine at all.
 | `FR-41` | Dual Module Output | **met** | 5/5 | 0 | — |
 | `FR-42` | Document Merge | **met** | 4/5 | 0 | — |
 | `FR-43` | Structure-Tree Integration | **partial** | 5/5 | 2 | the announcement is read from the accessibility tree, not from an assistive technology: the row … |
-| `FR-44` | High Contrast & Forced Colours | **partial** | 5/5 | 1 | every member of the clause is now painted and read in a real browser, in two engines: the page s… |
+| `FR-44` | High Contrast & Forced Colours | **met** | 5/5 | 0 | — |
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
 | `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108… |
 | `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the one-finger clause is now measured rather than reasoned about, in one engine: `scripts/browse… |
-| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has run green on a runner twice -- the second being CI run 37296313715, dev at 2… |
+| `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job has run on a runner three times and gone green twice -- the green second being C… |
 | `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 3 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
