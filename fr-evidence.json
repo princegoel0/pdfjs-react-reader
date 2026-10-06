@@ -1517,7 +1517,7 @@
     },
     "FR-54": {
       "title": "Stable Error & Cancellation Contract",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/errors.ts",
         "src/lib/abort.ts",
@@ -1539,7 +1539,6 @@
       "automated": [
         "src/lib/errors.test.ts",
         "src/lib/errors.engine-classes.test.ts",
-        "src/lib/error-codes.coverage.test.ts",
         "src/lib/source.test.ts",
         "src/lib/pdf-write.test.ts",
         "src/lib/pdf-write.codes.test.ts",
@@ -1549,7 +1548,8 @@
         "src/headless/usePdfDocument.codes.test.tsx",
         "src/headless/usePdfPrint.ceilings.test.tsx",
         "src/components/PdfPage.retry.test.tsx",
-        "src/components/ViewerController.retry.test.tsx"
+        "src/components/ViewerController.retry.test.tsx",
+        "src/lib/error-codes.coverage.test.ts"
       ],
       "acceptance": [],
       "acceptanceWaiver": "Every code is produced on a path the node and dom harnesses already run — a refused source, a 401, a dismissed password prompt, a cancelled load, render, index and writer pass, a print job over the memory budget, a plan naming a page that is not there — and each is asserted by its own test. No row of the browser matrix injects a failure today, so browser evidence here would be a claim rather than a record; the matrix is about engines and environments, not about error vocabulary.",
@@ -1560,16 +1560,14 @@
       "regressionGuard": [
         "src/lib/errors.test.ts",
         "src/lib/errors.engine-classes.test.ts",
-        "src/lib/error-codes.coverage.test.ts",
         "src/lib/pdf-write.codes.test.ts",
         "src/headless/usePdfDocument.codes.test.tsx",
         "src/headless/usePdfDocument.status.test.tsx",
-        "src/components/PdfPage.retry.test.tsx"
+        "src/components/PdfPage.retry.test.tsx",
+        "src/lib/error-codes.coverage.test.ts"
       ],
-      "gaps": [
-        "two published codes have no producer anywhere in the package: `RENDER_CANCELLED` is the name `toPdfError` gives a real `RenderingCancelledException`, and every call site that catches one returns before reaching the wrapper (FR-36 says a cancellation is not an ordinary failure), while `UNSUPPORTED_FEATURE` has no throw site at all — the engine's `NotImplementedException` is not exported by the build this package imports, and no path of ours can raise it. §3.6 advertises both as codes a host can branch on, and the mapping for each is now proven against the engine's own class, so what is missing is a speaker rather than a test"
-      ],
-      "note": "The clause is about the whole vocabulary, so the read was run over the whole list: eighteen codes, and for each one the file that produces it and the tests that name it. The list splits three ways — twelve codes are thrown by a named site in the package, four more (`AUTH_ERROR`, `HTTP_ERROR`, `NETWORK_ERROR`, `PASSWORD_INVALID`) are the classifier's answer to a field on the engine's own object, and two have no producer at all, which is the single gap left here and says exactly which two and why. What this pass closed: `PASSWORD_REQUIRED` and `WORKER_ERROR` are now asserted at the load path that diagnoses them (`usePdfDocument.codes.test.tsx`, four cases — the third of them exists because a counterfactual found the worker diagnosis's *message* half unasserted, so every failed load on an undetected worker would have told the host to pin a worker it had already pinned); `WRITER_ERROR` at the one producer a caller can reach, with its three internal sites shown to be unreachable-by-construction by pinning the caller-facing edge instead — every arrangement a host can send is a `CONFIGURATION_ERROR` carrying the numbers a host would need; and the whole name table re-asserted against the engine's *real* exception classes rather than a plain `Error` with `name` assigned, which is where `PasswordException#code`, `ResponseException#status` and `#missing` either are or are not what the map reads. Ten mutations, all red. Two of them bought a case rather than passing: dropping the writer wrapper's own idempotence guard changed nothing until an `UNKNOWN_ERROR` arrived — the one code the outer `toPdfError` would let fall through to the writer's own — and dropping the worker message test changed nothing at all, so both are asserted now. `src/lib/error-codes.coverage.test.ts` then makes the list itself a gate: a nineteenth code with no test naming it fails the suite, so the row cannot go stale by growing. The two codes with no speaker are a §3.6 question rather than a test question — either each gets a producer or the published list drops it — and an amendment has been put to the owner instead of a fiction coded in the meantime."
+      "gaps": [],
+      "note": "The row’s last gap was two published codes with no speaker, and #242 closed it from the engine side rather than the list side. `CODE_BY_ENGINE_NAME` keyed on five names that appear in **no** shipped bundle of any release in the peer range — measured 2026-10-07 over 6.2.108, 6.3.289 and 6.4.299: `MissingPDFException`, `XRefException`, `UnknownException`, `InvalidCanvasContext` and `NotImplementedException`. The last was the only claimed producer of `UNSUPPORTED_FEATURE`, so §3.6 was advertising a branch no object could reach, and the name is gone (Amended, and a breaking change to a published union before 1.0 — Removed). Meanwhile the name pdf.js *does* stamp as its catch-all, `UnknownErrorException`, was absent from the table: `wrapReason` rebuilds five names across the worker boundary and folds every other reason into that one, so a worker that said something unmodelled arrived as `UNKNOWN_ERROR`, the wrapper’s shrug, when `WORKER_ERROR` is the code that means exactly that. Fixed by adding the row, asserted against the engine’s own stamped set. Two cases in `src/lib/error-codes.coverage.test.ts` now refuse both shapes of the mistake — a table key the installed engine does not stamp, and a published code with no throw site, no classifier assertion and no engine class — each proven red by a mutation and restored by checksum, so the vocabulary cannot rot back into a list of plausible-sounding names. What remains a design decision rather than a defect: `RENDER_CANCELLED` is produced only by classification, because every call site that catches the engine’s cancellation returns before the wrapper — FR-36’s rule that a cancellation is not an ordinary failure, and a page whose paint was stopped reports `cancelled` through `onStatusChange` instead. A Chromium probe measured that `RenderTask.cancel()` is the only way a render is cancelled at all (a second proxy rendering the same page, `cleanup()` on either proxy, and a second render over the same canvas all left the first task fulfilled), so the code is a diagnosis for a case the package prevents, and it is written that way rather than as a promise a host should handle."
     },
     "FR-55": {
       "title": "Worker & Source Security Contract",

@@ -24,7 +24,14 @@
  *    A code from §3.6's list beside a message is the whole of what makes one of ours.
  */
 
-/** §3.6's initial vocabulary. Extensible, and no value here is ever reused for a different meaning. */
+/**
+ * §3.6's vocabulary. Extensible, and no value here is ever reused for a different meaning.
+ *
+ * A name belongs here because something *produces* it: a call site in this package, or a class the installed
+ * engine can deliver (see `CODE_BY_ENGINE_NAME`). `src/lib/error-codes.coverage.test.ts` holds that rule, which
+ * is what took `UNSUPPORTED_FEATURE` out in #242 — its only claimed producer was a table row for an exception
+ * class that exists in no shipped `pdfjs-dist`, so the name advertised a branch no object could ever reach.
+ */
 export const PDF_ERROR_CODES = [
   'INVALID_SOURCE',
   'NETWORK_ERROR',
@@ -37,7 +44,6 @@ export const PDF_ERROR_CODES = [
   'SEARCH_CANCELLED',
   'WORKER_ERROR',
   'CONFIGURATION_ERROR',
-  'UNSUPPORTED_FEATURE',
   'RESOURCE_LIMIT',
   'SOURCE_NOT_ALLOWED',
   'ALREADY_SIGNED',
@@ -118,21 +124,43 @@ export function describeOrigin(href: string): string {
  * Matched on `name` because that is the part that survives a worker hop: pdf.js rebuilds these from a
  * serialized payload, so the class identity is gone while `name` and the extra fields (`status`, `missing`,
  * `code`) are not. Anything not in here is `UNKNOWN_ERROR` — never a guess at something nearby.
+ *
+ * **The keys are the engine's own list, not a guess at it.** `wrapReason` in `build/pdf.mjs` is the function
+ * that decides what crosses the boundary, and measured across 6.2.108, 6.3.289 and 6.4.299 it passes through
+ * exactly five classes and rebuilds five names, folding *anything else* into `UnknownErrorException`:
+ * `AbortException`, `InvalidPDFException`, `PasswordException`, `ResponseException`, `UnknownErrorException`.
+ * Two more are stamped in the build but thrown on this side of it — `RenderingCancelledException` by
+ * `RenderTask.cancel()`, and the platform's own `AbortError`, which this package keeps on the instance its
+ * `abortError()` returns. That is the whole set, and `src/lib/error-codes.coverage.test.ts` reads the installed
+ * engine and refuses a key outside it.
+ *
+ * What that gate removed is worth keeping in mind, because five of the eleven keys in this table's previous
+ * shape could never have fired: `MissingPDFException`, `XRefException`, `UnknownException`,
+ * `InvalidCanvasContext` and `NotImplementedException` are names no shipped bundle stamps (the first two and
+ * the third are pdf.js 4/5 vocabulary that 6 replaced with `UnknownErrorException` and the `XRef*Exception`
+ * family, which `wrapReason` rebuilds as `UnknownErrorException` anyway; the fourth was never thrown here at
+ * all). Each was a branch that read like a diagnosis and was a comment. The fourth row down here is the one
+ * they should have been: the engine's own catch-all, which reaches a host as `WORKER_ERROR` rather than as
+ * `UNKNOWN_ERROR`, because "the worker said something the engine did not model" is exactly what that code
+ * means.
  */
-const CODE_BY_ENGINE_NAME: Record<string, PdfErrorCode> = {
+export const CODE_BY_ENGINE_NAME: Record<string, PdfErrorCode> = {
   InvalidPDFException: 'PDF_PARSE_ERROR',
-  MissingPDFException: 'PDF_PARSE_ERROR',
-  XRefException: 'PDF_PARSE_ERROR',
   PasswordException: 'PASSWORD_REQUIRED',
   ResponseException: 'NETWORK_ERROR',
   AbortException: 'LOAD_CANCELLED',
+  UnknownErrorException: 'WORKER_ERROR',
   // The platform's own name, which is also what this package's `abortError` keeps on the instance so every
   // existing cancellation filter still matches it. A caller that knows better passes the code as a hint.
   AbortError: 'LOAD_CANCELLED',
+  /*
+   * Real, stamped, and never produced by this package today: every call site that catches it returns before
+   * reaching the wrapper, because FR-36 says a cancellation is not an ordinary failure and a page whose paint
+   * was stopped by our own teardown reports `cancelled` through `onStatusChange` instead. It stays because the
+   * engine *can* raise it — measured in Chromium, `task.cancel()` is the only way a render is cancelled, and
+   * this is the code for the day that stops being true.
+   */
   RenderingCancelledException: 'RENDER_CANCELLED',
-  UnknownException: 'WORKER_ERROR',
-  InvalidCanvasContext: 'WORKER_ERROR',
-  NotImplementedException: 'UNSUPPORTED_FEATURE',
 };
 
 /**

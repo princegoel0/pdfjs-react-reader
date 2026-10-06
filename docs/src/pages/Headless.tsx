@@ -220,9 +220,9 @@ const onPageStatus = useCallback((pageNumber: number, state: PdfPageStatus) => {
 
 INVALID_SOURCE     NETWORK_ERROR      HTTP_ERROR           AUTH_ERROR
 PASSWORD_REQUIRED  PASSWORD_INVALID   LOAD_CANCELLED       RENDER_CANCELLED
-SEARCH_CANCELLED   WORKER_ERROR       CONFIGURATION_ERROR  UNSUPPORTED_FEATURE
-RESOURCE_LIMIT     SOURCE_NOT_ALLOWED ALREADY_SIGNED       PDF_PARSE_ERROR
-WRITER_ERROR       UNKNOWN_ERROR      // 18 codes; PDF_ERROR_CODES is the list
+SEARCH_CANCELLED   WORKER_ERROR       CONFIGURATION_ERROR  RESOURCE_LIMIT
+SOURCE_NOT_ALLOWED ALREADY_SIGNED     PDF_PARSE_ERROR      WRITER_ERROR
+UNKNOWN_ERROR      // 17 codes; PDF_ERROR_CODES is the list
 
 const onError = (error: PdfError) => {
   if (isCancellationCode(error.code)) return;        // the reader stopped it; not a fault

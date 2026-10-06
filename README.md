@@ -111,14 +111,14 @@ Opt-in, one import each:
 | `features/forms` | AcroForm widgets — text, checkbox, radio, choice, button — wired to pdf.js annotation storage, with `createFormsFeature({ onChange })` and programmatic get/set/reset. | 1.99 kB |
 | `features/outline` | The bookmarks sidebar tab. | 0.88 kB |
 | `features/layers` | A sidebar tab listing the document's optional-content groups, switching one and having every page redraw. | 1.21 kB |
-| `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.43 kB |
+| `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.44 kB |
 | `features/annotate` | Marking up the document: pdf.js's own editor manager behind three tools — highlight, free text, ink — with a highlight colour from the engine's palette, and a Delete that is live only while a mark is selected. Undo and redo are on the state the feature publishes, so the controls are yours to place. | 2.02 kB |
 | `features/structure` | The document's own structure tree, as accessibility structure: headings, lists, tables and named figures become `role`d elements that own the words they describe, for the one class of PDF that declares them. Contributes no control and no panel — there is nothing for a reader to press — and fetches its peer payload only for a document that says it is tagged. | 0.74 kB |
 | `edit` | Whole pages, and a file that no longer depends on a reader: a **Pages** sidebar tab that moves, turns and removes pages through a plan you can step back before writing anything, then applies it, extracts the planned pages as a new file, or splits the list at any row into two. Plus **Flatten**, which bakes every mark and field value into the page so it survives a viewer with no editor to show it.
   A **Sign** section appears in that tab when the document has signature fields: draw a mark, choose a box, and it is
   written into the field's appearance. It is a picture of a signature — the file is never given a signature value, and
   a box that already holds a real one is refused rather than covered over. One of the two tiers with its own dependency — `@cantoo/pdf-lib`, an *optional* peer, imported by nothing else in the package. | 6.44 kB |
-| `merge` | Combining pages from two or more documents into a **third file**: `mergeDocuments({ sources, order })` copies the pages it is told to copy, in the order it is told, and `usePdfMerge` is the state a picker needs — pages per source, the plan, and the write. No component, because which documents may be merged and what happens to the result are the host's business; [Recipes](https://princegoel0.github.io/pdfjs-react-reader/#/recipes) shows the writer bare. A page may be taken twice here, which the page plan inside one document refuses; a source is never written, which the tests assert by hashing. What does not cross the boundary is the interactive form: a page arrives with its widget annotations, not with the `AcroForm` that binds them. | its own entry: 1.75 kB |
+| `merge` | Combining pages from two or more documents into a **third file**: `mergeDocuments({ sources, order })` copies the pages it is told to copy, in the order it is told, and `usePdfMerge` is the state a picker needs — pages per source, the plan, and the write. No component, because which documents may be merged and what happens to the result are the host's business; [Recipes](https://princegoel0.github.io/pdfjs-react-reader/#/recipes) shows the writer bare. A page may be taken twice here, which the page plan inside one document refuses; a source is never written, which the tests assert by hashing. What does not cross the boundary is the interactive form: a page arrives with its widget annotations, not with the `AcroForm` that binds them. | its own entry: 1.70 kB |
 
 All nine together cost 16.30 kB, less than their sum, because they share the shell they attach to.
 They are also the reference for writing your own: the contract and the authoring hooks are public.
@@ -300,8 +300,12 @@ export function ContractViewer({
 }
 ```
 
-Eighteen codes ship, from `INVALID_SOURCE` to `UNKNOWN_ERROR`, and `PDF_ERROR_CODES` is the list. A code
-is never reused for a different meaning. Three of them are cancellations — `LOAD_CANCELLED`,
+Seventeen codes ship, from `INVALID_SOURCE` to `UNKNOWN_ERROR`, and `PDF_ERROR_CODES` is the list. A code
+is never reused for a different meaning, and a code is in the list because something produces it — a throw
+site in this package, or an exception class the installed engine actually stamps — which is a rule
+`src/lib/error-codes.coverage.test.ts` enforces rather than claims; it is what took `UNSUPPORTED_FEATURE`
+out (#242), the name whose only claimed producer was a table row for a class no shipped `pdfjs-dist`
+contains. Three of them are cancellations — `LOAD_CANCELLED`,
 `RENDER_CANCELLED`, `SEARCH_CANCELLED` — and a cancellation never reaches an error callback at all: a load
 you abort reads `status: 'cancelled'`, a page you scroll out reads `cancelled`, and an aborted index goes
 back to `idle`. Both ends of the page path can be started again — `handle.retryPage(page)` re-queues one
@@ -613,24 +617,24 @@ release close: every figure below is the one `npm run size` measured and wrote t
 
 | What you import | Size | Over core |
 | --- | --- | --- |
-| `PdfViewer`, no features — pages, text, search, thumbnails, chrome | 32.41 kB | — |
-| `+ printFeature` | 34.83 kB | +2.42 kB |
-| `+ downloadFeature` | 33.27 kB | +0.86 kB |
-| `+ formsFeature` | 34.40 kB | +1.99 kB |
-| `+ outlineFeature` | 33.29 kB | +0.88 kB |
-| `+ layersFeature` | 33.62 kB | +1.21 kB |
-| `+ attachmentsFeature` | 33.84 kB | +1.43 kB |
-| `+ annotateFeature` | 34.43 kB | +2.02 kB |
-| `+ structureFeature` | 33.15 kB | +0.74 kB |
-| `+ editFeature` | 38.85 kB | +6.44 kB |
-| All nine | 48.71 kB | +16.30 kB |
-| A single headless hook (`usePdfDocument`) | 5.57 kB | — |
-| A merge, on its own (`/merge`, writer and hook) | 1.75 kB | separate entry, not over core |
-| The same two shipped paths as CommonJS (`index.cjs`, `headless.cjs`) | 60.50 / 32.10 kB | the other format, not another feature |
+| `PdfViewer`, no features — pages, text, search, thumbnails, chrome | 32.35 kB | — |
+| `+ printFeature` | 34.77 kB | +2.42 kB |
+| `+ downloadFeature` | 33.22 kB | +0.86 kB |
+| `+ formsFeature` | 34.35 kB | +1.99 kB |
+| `+ outlineFeature` | 33.24 kB | +0.88 kB |
+| `+ layersFeature` | 33.57 kB | +1.21 kB |
+| `+ attachmentsFeature` | 33.79 kB | +1.44 kB |
+| `+ annotateFeature` | 34.38 kB | +2.02 kB |
+| `+ structureFeature` | 33.10 kB | +0.74 kB |
+| `+ editFeature` | 38.80 kB | +6.44 kB |
+| All nine | 48.65 kB | +16.30 kB |
+| A single headless hook (`usePdfDocument`) | 5.52 kB | — |
+| A merge, on its own (`/merge`, writer and hook) | 1.70 kB | separate entry, not over core |
+| The same two shipped paths as CommonJS (`index.cjs`, `headless.cjs`) | 60.72 / 32.32 kB | the other format, not another feature |
 | A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.34–2.38 kB | separate entry, not over core |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
-68.01 kB for `index.js` and 37.35 kB for `headless.js`, each with `styles.css`. `edit.js` and `merge.js`
+68.23 kB for `index.js` and 37.57 kB for `headless.js`, each with `styles.css`. `edit.js` and `merge.js`
 are the two shipped files that import the writer, so a host that never names either path never loads it. What the `core` figure does not show is that adding an entry point
 moves it: a new tsup entry reshuffles the shared chunks every path is built from, which is why the *Over
 core* column, not the base row, is the number that describes what a feature costs you.

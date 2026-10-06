@@ -477,7 +477,6 @@ RENDER_CANCELLED
 SEARCH_CANCELLED
 WORKER_ERROR
 CONFIGURATION_ERROR
-UNSUPPORTED_FEATURE
 RESOURCE_LIMIT
 SOURCE_NOT_ALLOWED
 ALREADY_SIGNED
@@ -486,8 +485,11 @@ WRITER_ERROR
 UNKNOWN_ERROR
 ```
 
-The vocabulary is extensible without reusing an existing code for a different meaning. Cancellation codes
-are not treated as ordinary failures. Public callbacks, promises and state models must preserve the
+A name belongs in this list because something produces it: a call site in the package, or an exception class the
+installed engine can deliver across its own boundary. A code with no producer is not a spare — it is a branch a
+host may write, test by inspection, and never reach, so the vocabulary is asserted against both sources rather
+than kept by hand. The list is extensible without reusing an existing code for a different meaning. Cancellation
+codes are not treated as ordinary failures. Public callbacks, promises and state models must preserve the
 cancellation/failure distinction.
 
 ### 3.7 Feature contract

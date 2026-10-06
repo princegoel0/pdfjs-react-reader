@@ -192,10 +192,29 @@ describe('toPdfError: the engine vocabulary mapped onto ours', () => {
   });
 
   it('reads a worker that cannot start as a worker failure, and anything unrecognised as unknown', () => {
-    expect(toPdfError(engineError('UnknownException')).code).toBe('WORKER_ERROR');
-    expect(toPdfError(engineError('NotImplementedException')).code).toBe('UNSUPPORTED_FEATURE');
+    // The engine's own catch-all: `wrapReason` folds any reason it does not model into this one, so a worker
+    // that says something unexpected arrives named, and #242 is the reason it now reads as WORKER_ERROR rather
+    // than as the wrapper's shrug.
+    expect(toPdfError(engineError('UnknownErrorException')).code).toBe('WORKER_ERROR');
     expect(toPdfError(new Error('something with no name at all')).code).toBe('UNKNOWN_ERROR');
     expect(toPdfError('a thrown string').message).toBe('a thrown string');
+  });
+
+  it('refuses to invent a code for a name the engine does not stamp', () => {
+    // The five names here are the ones this table used to carry keys for. None of them is stamped by any
+    // shipped `pdfjs-dist` bundle in the peer range — measured over 6.2.108, 6.3.289 and 6.4.299 — so a row
+    // for one is a branch that can only be exercised by a test that makes the object up. `NotImplemented` was
+    // the case that mattered: it was the *only* claimed producer of a published code, and §3.6 advertised
+    // that code to every host on the strength of it.
+    for (const name of [
+      'NotImplementedException',
+      'MissingPDFException',
+      'XRefException',
+      'UnknownException',
+      'InvalidCanvasContext',
+    ]) {
+      expect(toPdfError(engineError(name)).code, `${name} is not an engine name`).toBe('UNKNOWN_ERROR');
+    }
   });
 
   it('never re-wraps a PdfError, so a precise code chosen deep down survives the trip out', () => {

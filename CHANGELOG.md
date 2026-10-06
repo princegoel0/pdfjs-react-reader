@@ -29,8 +29,8 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **45 met, 12 partial, 1
-absent** of 58, on a suite of **1,272 tests in 144 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **46 met, 11 partial, 1
+absent** of 58 — the eighteenth move being #242’s, which took `FR-54` out of *partial* — on a suite of **1,275 tests in 144 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
 this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
@@ -1298,6 +1298,19 @@ re-derived by whoever asks next.
   assertions that catch those still fail at any size. The id and the section number are unchanged.
 
 - **`FR-43` Structure-Tree Integration** gains a sentence rather than losing one. Where a behaviour of the tier   needs an engine newer than the package floor, the feature declares that behaviour’s own minimum on its contract   and reports whether the installed engine meets it, so a host reads the degradation instead of discovering it: a   link announced with the words it is drawn over is `6.3.289` and up, and below that the link keeps its destination   as its name while the heading, list, table and figure hierarchy still arrives. **Reason:** #194’s engine axis   measured that the advertised floor has no such code at all — `enableLinkOwnership` appears zero times in 6.2.108’s   `build/pdf.mjs` and twice in each of 6.3.289 and 6.4.299 — so the clause’s consequence sits inside a range the   package promises and cannot deliver. The owner ruled on 2026-10-07 against moving the peer floor for one   capability, which leaves the specification to say what *met* means for a host on `6.2.108`; the alternative was a   locked target spec asserting something its own contract makes false, and nothing codes the fiction. The id and the   title are unchanged, and the rest of the sentence stands as it was, the untagged degrade included.
+- **§3.6 Error contract** loses `UNSUPPORTED_FEATURE` from its published vocabulary, and gains the rule that
+  decided it should: a name belongs in the list because something produces it — a throw site in this package, or
+  an exception class the installed engine actually stamps — because a code with no producer is not a spare, it is
+  a branch a host may write, review, and never reach. **Reason:** #242 read the table that back this claim goes
+  through (`CODE_BY_ENGINE_NAME` in `src/lib/errors.ts`) against the shipped bundles of every release in the peer
+  range, measured 2026-10-07 at 6.2.108, 6.3.289 and 6.4.299, and `NotImplementedException` appears **zero** times
+  in each: there is no object the engine can raise that would arrive with that name, so the row could only ever be
+  exercised by a test making the object up. The published list had been advertising the branch to every host on
+  the strength of it. Dropping a member of a published union is a breaking change; `1.0.0` has not shipped, the
+  name has never been in a release a consumer could install, and nothing could produce it, so the cost falls on
+  nobody — which is exactly the reasoning §5.5 asks for before a name moves, written here rather than assumed.
+  The section number and every other name are unchanged.
+
 
 ### Changed
 
@@ -2048,6 +2061,12 @@ re-derived by whoever asks next.
 
 ### Removed
 
+- **`UNSUPPORTED_FEATURE` leaves `PdfErrorCode`, `PDF_ERROR_CODES` and §3.6's list (#242), taking the published
+  vocabulary from eighteen names to seventeen.** Nothing produced it: its only claimed source was a classifier row
+  for an exception class that exists in no shipped `pdfjs-dist` in the peer range. A host that wrote the branch
+  could never have hit it, and a name that can only be tested by inspection is not part of a contract — it is a
+  comment in a union. Breaking in form, costless in fact, and pre-1.0 by §5.5's own rule.
+
 - **The core freehand ink surface (FR-18), withdrawn from `.` and `/headless`.** The shell could draw, and
   `annotateFeature` could draw, and only one of those two paths survives a save: the core's strokes were an
   SVG overlay that printed and never reached the document, so a reader who picked the wrong pen lost their
@@ -2229,6 +2248,30 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   inside the re-accepted baseline it names.)
 
 ### Fixed
+
+- **The error wrapper's engine-name table was keyed on five names that no shipped engine stamps, and missed the
+  one the engine uses as its catch-all (#242; FR-54).** `src/lib/errors.ts` classifies a failure by the `name`
+  string that survives pdf.js's worker hop, which is the right mechanism and had gone stale inside:
+  `MissingPDFException`, `XRefException`, `UnknownException`, `InvalidCanvasContext` and
+  `NotImplementedException` appear zero times in `build/pdf.mjs` and `build/pdf.worker.mjs` at 6.2.108, 6.3.289
+  and 6.4.299 (the first three are pdf.js 4/5 vocabulary that 6 folded into `UnknownErrorException` and the
+  `XRef*Exception` family; the fourth was never thrown here at all), so five branches were decoration. Meanwhile
+  `wrapReason` — the function that decides what crosses the boundary — passes five classes through and rebuilds
+  five names from a serialized reason, **folding anything else into `UnknownErrorException`**, and that name was
+  not in the table: a worker that said something the engine did not model arrived as `UNKNOWN_ERROR`, the
+  wrapper's shrug, when `WORKER_ERROR` is the code that means precisely *the worker failed*. So the fix is one row
+  added and five removed, and a host that was branching on `WORKER_ERROR` gets the failures it was asking about.
+  `src/lib/error-codes.coverage.test.ts` now derives both halves rather than trusting either: every table key must
+  be a name the *installed* engine stamps (scanned out of the bundles, so the check moves with the peer range and
+  is green at both ends of CI's engine axis) or one this package stamps itself, and every published code must have
+  a throw site, a classifier assertion, or a backed table row. Both cases were proven red by mutation and restored
+  by checksum — putting `NotImplementedException` back fails naming it, and adding a plausible `TIMEOUT` code with
+  nothing behind it fails naming that too. `RENDER_CANCELLED` stays, honestly labelled: its class is real and
+  `RenderTask.cancel()` throws it, but every call site here returns before the wrapper because FR-36 says a
+  cancellation is not an ordinary failure, and a probe in Chromium measured that `cancel()` is the only way a
+  render is ever cancelled — a second proxy painting the same page, `cleanup()` on either proxy, and a second
+  render over the same canvas all left the first task fulfilled. It is the diagnosis for a case this package
+  prevents, and §3.6 says so instead of implying a host should handle it.
 
 - **A signature widget the engine gives no element left the reader no box on the page (#229; FR-16).**
   `FR-16` names six interactive field types and adds a sentence about the sixth: *"A signature widget renders as
