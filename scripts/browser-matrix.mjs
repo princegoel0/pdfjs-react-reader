@@ -2030,34 +2030,83 @@ const CHECKS = [
        * of a two-page document, then the single page in front of the reader. A pipeline that printed the whole
        * file regardless would fail the second of those.
        */
-      /**
-       * What a control looks like to a pointer, read in the page under test.
-       *
-       * `covered` is the field that separates the two stories a stuck selection can mean: a control a reader
-       * cannot use, and a control Playwright merely will not drive. It hit-tests the element's own centre, which
-       * is where a click lands.
-       */
-      const reachOf = (locator) =>
-        locator
-          .evaluate((el) => {
-            const box = el.getBoundingClientRect();
-            const style = getComputedStyle(el);
-            const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-            const name = (n) => (n ? `${n.tagName.toLowerCase()}.${String(n.className ?? '').split(' ')[0]}` : 'none');
-            return {
-              box: `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}`,
-              visible: style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0,
-              disabled: Boolean(el.disabled),
-              covered: hit === null || !(hit === el || el.contains(hit) || hit.contains(el)),
-              hit: name(hit),
-              inMenu: Boolean(el.closest('.pjsr-overflow-menu')),
-              inSizer: Boolean(el.closest('.pjsr-toolbar-sizer')),
-            };
-          })
-          .catch((error) => ({ unreadable: String(error?.message ?? error).split('\n')[0].slice(0, 120) }));
-
       /** Where the engine made the row drive a control the way a choice would rather than by selection. */
       const scopeNotes = [];
+
+      /**
+       * Six readings of the print scope control over three seconds, taken out of the DOM rather than through a
+       * locator.
+       *
+       * The first version asked Playwright to `evaluate` on the locator it had just failed to act on, and in
+       * webkit that probe timed out twice — sixty seconds of instrument waiting for the element it was supposed
+       * to be describing — which reports "the harness is slow", not what the viewer is doing. So the selector is
+       * read straight out of the page: every match of the label, each with its box, whether it is painted,
+       * whether a pointer landing at its centre hits it, and whether it is disabled; plus the bar's own
+       * clientWidth against its scrollWidth and whether an overflow panel exists, because the question being
+       * answered is whether the fold planner is under pressure at this viewport.
+       */
+      const scopeSamples = async (count = 6) => {
+        const runs = [];
+        for (let i = 0; i < count; i += 1) {
+          runs.push(
+            await page.evaluate(() => {
+              const bar = document.querySelector('.pjsr-toolbar');
+              const shape = (el) => {
+                const box = el.getBoundingClientRect();
+                const style = getComputedStyle(el);
+                const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+                return {
+                  where: el.closest('.pjsr-overflow-menu')
+                    ? 'menu'
+                    : el.closest('.pjsr-toolbar-sizer')
+                      ? 'sizer'
+                      : 'bar',
+                  box: `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}`,
+                  painted:
+                    box.width > 0 && box.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
+                  covered: !(hit !== null && (hit === el || el.contains(hit) || hit.contains(el))),
+                  disabled: Boolean(el.disabled),
+                };
+              };
+              return {
+                matches: Array.from(
+                  document.querySelectorAll(
+                    '.pjsr-toolbar [aria-label="Print pages"], .pjsr-overflow-menu [aria-label="Print pages"]',
+                  ),
+                ).map(shape),
+                bar: bar ? `${bar.clientWidth}/${bar.scrollWidth}` : 'none',
+                panel: Boolean(document.querySelector('.pjsr-overflow-menu')),
+              };
+            }),
+          );
+          if (i < count - 1) await page.waitForTimeout(500);
+        }
+        return runs;
+      };
+
+      /** The samples as one line, plus whether a reader could have used the control in each of them. */
+      const describeSamples = (runs) => {
+        const usable = runs.map(
+          (run) => run.matches.find((m) => m.where === 'bar' && m.painted && !m.covered && !m.disabled) ?? null,
+        );
+        const found = usable.filter(Boolean);
+        const boxes = [...new Set(found.map((m) => m.box))];
+        return {
+          usable: found.length,
+          agreed: boxes.length === 1,
+          total: runs.length,
+          text:
+            `${found.length}/${runs.length} samples saw a usable control, at ${boxes.join(' then ') || 'no box'}; ` +
+            `bar clientWidth/scrollWidth ${[...new Set(runs.map((r) => r.bar))].join(' ')}; panel present ` +
+            `${[...new Set(runs.map((r) => r.panel))].join(' or ')}; first sample held ${
+              runs[0].matches.length
+                ? runs[0].matches
+                    .map((m) => `${m.where} ${m.box}${m.painted ? '' : ' unpainted'}${m.covered ? ' covered' : ''}`)
+                    .join(' | ')
+                : 'nothing carrying that label'
+            }`,
+        };
+      };
 
       const pickScope = async (scope) => {
         const pages = await reveal('Print pages');
@@ -2065,26 +2114,21 @@ const CHECKS = [
           await pages.selectOption(scope);
         } catch (error) {
           /*
-           * WebKit's first reading of this row failed on exactly this line on the runner (CI 37386366651, dev at
-           * 651672c, 2026-10-05): the call log ends at "attempting select op" for a select the same cell's
-           * toolbar-fold row reports as inline and un-folded, and this host cannot start WebKit to look closer —
-           * three attempts now, all `Target page, context or browser has been closed`. So the runner is the only
-           * instrument, and it has to carry its own diagnosis: the row reads the control twice 400 ms apart and
-           * decides between the two stories. Visible, enabled, unmoving and uncovered at its own centre is a
-           * control a reader can use, so the value goes on it the way a choice puts it — `input` then `change`,
-           * the events the app listens for — and the substitution is printed in the row's own text. Anything
-           * else (covered, disabled, folded into a panel nobody opened, moving under the pointer) is this
-           * package's failure, and the row fails naming the readings.
+           * WebKit has now failed this line twice and told two different stories: on CI run 37386366651 (dev at
+           * 651672c) Playwright resolved the `<select>` as visible and then could not act on it, and on CI run
+           * 37390542384 (dev at 3f12174) the same locator never resolved at all. A control that is intermittently
+           * on screen in a bar its own fold row reports as not overflowed is a layout question rather than an
+           * automation one, and this host cannot start webkit to look closer — three attempts, all
+           * `Target page, context or browser has been closed` — so the runner carries the instrument. The
+           * samples decide which story is true. Six agreeing on one painted, uncovered, enabled box is a control
+           * a reader can use, so the value goes on it the way a choice puts it — `input` then `change`, the
+           * events the app listens for — and the substitution is printed in the row's own text. Anything else,
+           * including a box that appears in some samples and not in others, is this package's failure, and the
+           * row fails with every sample in the message.
            */
-          const before = await reachOf(pages);
-          await page.waitForTimeout(400);
-          const after = await reachOf(pages);
-          const usable = before.visible && !before.disabled && !before.covered && before.box === after.box;
-          if (!usable) {
-            fail(
-              `the "${scope}" scope control could not be used: ${firstLine(error)} — ${JSON.stringify(before)} ` +
-                `then ${JSON.stringify(after)}; the bar held ${(await barLabels()).slice(0, 300)}`,
-            );
+          const seen = describeSamples(await scopeSamples());
+          if (seen.usable !== seen.total || !seen.agreed) {
+            fail(`the "${scope}" scope control could not be used: ${firstLine(error)} — ${seen.text}`);
           }
           await pages.evaluate((el, value) => {
             el.value = value;
@@ -2092,8 +2136,8 @@ const CHECKS = [
             el.dispatchEvent(new Event('change', { bubbles: true }));
           }, scope);
           scopeNotes.push(
-            `"${scope}" set through the change event, ${engine} refusing the selection (${firstLine(error)}; ` +
-              `${before.hit} at its centre, ${before.box}, unchanged 400 ms later)`,
+            `"${scope}" set through the change event because ${engine} refused the selection ` +
+              `(${firstLine(error)}) on a control six samples agreed a reader could use (${seen.text})`,
           );
         }
         // The substitution above is only worth making if the app took it: the scope is read back off the same

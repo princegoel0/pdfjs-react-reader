@@ -29,12 +29,12 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **44 met, 13 partial, 1
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **43 met, 14 partial, 1
 absent** of 58, on a suite of **1,244 tests in 138 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. One row moved the other way, and nothing was
-written here to move it: `FR-44`'s last gap was the answer of the one engine this host cannot start, and a runner
-started it — see **#245** below. Seventeen of those eighteen are back out:
+below and is the honest number rather than the comfortable one. One row moved up on a runner's reading of an
+engine this host cannot start, and came back down on the next reading of it: `FR-44` and **#245**/**#246** below
+are that story, and it is why the count is 43 rather than 44. Seventeen of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
@@ -1200,6 +1200,30 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **A reading that does not repeat is not evidence (#246; FR-44, FR-19, FR-48).** CI run 37390542384 (dev at
+  `3f12174`, 2026-10-06) ran the matrix again: **87 ok / 7 skipped / 0 not runnable / 2 failed**, and both
+  failures were *the same cell* — webkit desktop — while chromium and firefox read every row green for the second
+  run running. Nothing about `forced-colours` had changed between them, and yet where the day before that cell
+  had read all six members of FR-44's clause, it now reported *"the search made 1 marks and none of them was the
+  resting kind, so the clause's first colour-only signal had nothing to be read on"*. The row asks the sheet to
+  show a resting search mark and the active one; in this engine the walk had published a single match, which was
+  the active one — the same cell's `search-marks-matches` row has read `1 of 1 so far · p1` → `1 of 20 · p1` on
+  **one** mark where Chromium reports two, so the row's premise is engine-dependent and it was **assumed rather
+  than waited for**. `FR-44` is back to `partial` with that as its gap. The retreat is the useful part: the row
+  went up on a measurement this host cannot take and down on the next one from the same instrument, with no code
+  touching that row in between — which is what a register that only ever moves one way is worth.
+  The cell's other half is #245's print row, and it disagreed with itself too: the previous run resolved the
+  page-scope `<select>` as visible and then could not act on it, this one never resolved it at all. My #245 probe
+  hung thirty seconds *twice* doing that — sixty seconds of instrument waiting on the element it was supposed to
+  be describing, which is a report about the harness and not the viewer, and five minutes off a cell in a job
+  with a twenty-five minute ceiling. The row now samples the control six times over three seconds straight out of
+  the DOM — box, whether it is painted, whether a pointer landing at its centre hits it, whether it is disabled —
+  alongside the bar's own clientWidth against its scrollWidth and whether an overflow panel exists, and takes the
+  `change`-event substitution only where all six agree on one usable box; otherwise it fails with every sample in
+  the message. Two mutations of that branch, both run here: force the selection to fail and the row still prints
+  two sheets with the substitution named in its text; make the samples look for a label the bar does not carry and
+  it fails saying so, which is the difference between a probe that reports and a probe that waits.
+
 - **A runner started WebKit, answered two rows, and failed one (#245; FR-44, FR-43, FR-19, FR-48).**
   The cells at `651672c` (CI run 37386366651, 2026-10-05) are the first to carry nineteen checks, and for
   Safari's engine a runner is the only instrument this project has: three attempts to start webkit on this host,
@@ -1209,7 +1233,9 @@ re-derived by whoever asks next.
   match's ring at 2px, focus read twice as `rgb(52, 132, 228)` against the sheet's own `rgb(79, 70, 229)`, the
   editor's mark edged over 98×50 — and since the row's only remaining gap *was* that engine's answer, **FR-44 is
   met**: 44 met, 13 partial, 1 absent. That is the count moving up on a measurement nobody here could take,
-  which is the only kind of upward move this register accepts.
+  which is the only kind of upward move this register accepts. **It lasted one run.** The run after it read the
+  same row in the same engine differently, #246 is that record, and `FR-44` is `partial` again — the sentence
+  above is kept because it is what that run showed, and the one below is what the next one did.
   `structure-tree-in-the-accessibility-tree` returned its two trees over the nine roles there as well, the link
   nested in its own paragraph and its `aria-owns` resolving to `a_link_0` where the chromium cell of the same
   run said `c_link_0` and firefox's `d_link_0` — and where an earlier local reading had those same two engines as
