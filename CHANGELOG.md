@@ -2019,7 +2019,15 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   the ⋯ panel — which is what #243 was for — with the value arriving on the `change` event because Playwright
   still cannot drive a native `<select>` in that engine, and the row now prints which door it used. One green of
   one cell is a reading rather than a pass, so the rule this repository set after FR-44's engine contradicted
-  itself applies once more: the run after this decides whether #245 closes. The suite is **1,246 tests in 139
+  itself applies once more: the run after this decides whether #245 closes.
+  **It did.** CI 37437044810 repeated the reading exactly — 89 ok / 7 skipped / 0 not runnable / 0 failed, webkit's
+  print row green again with the same numbers (ink 0.36 %/0.57 %, the widget's box 16 → 933 dark px, "Current page"
+  1 of 2, a typed "From–to 2–2" 1, the 1,000-page refusal) — on a commit whose only difference from the first is
+  this register and this file, so the row that agreed with itself twice is one version of the row. **#243 and #245
+  close**, and FR-19's browser evidence is now all three of §8's engines rather than two; the gap that carried
+  eleven runs of engine history is deleted, with the history condensed into the row's own note. Four of those runs
+  were mis-reported by this package's instrument, and the shape of every fix was the same: wait for the state the
+  claim is about, and print what was seen while waiting. The suite is **1,246 tests in 139
   files**.
 
 - **The React peer job was running a different suite from `verify` (#244; FR-48, FR-45).**
