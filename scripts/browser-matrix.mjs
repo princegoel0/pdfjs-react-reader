@@ -2186,6 +2186,9 @@ const CHECKS = [
 
       const pickScope = async (scope) => {
         let pages = await reveal('Print pages');
+        // Which door the value came in by is part of what the next engine's reading means, so it is carried to
+        // the read-back rather than being inferred from the absence of a note.
+        let how = `${engine} took the selection through Playwright's selectOption`;
         try {
           await pages.selectOption(scope);
         } catch (error) {
@@ -2230,11 +2233,35 @@ const CHECKS = [
             `"${scope}" set through the change event because ${engine} refused the selection ` +
               `(${firstLine(error)}) on a control six samples agreed a reader could use (${seen.text})`,
           );
+          how = `${engine} refused the selection (${firstLine(error)}) and the value went on through the change event`;
         }
         // The substitution above is only worth making if the app took it: the scope is read back off the same
         // control the reader would look at, so a value the panel accepted and the state did not is a failure.
-        if ((await pages.inputValue()) !== scope) {
-          fail(`the scope select reads "${await pages.inputValue()}" after being set to "${scope}"`);
+        //
+        // CI run 37428185484 reached this line in webkit and reported `the scope select reads "all" after being
+        // set to "all"` — which is not a contradiction, it is a second bug in *this* check: the message read the
+        // value again, so it printed the settled value while the comparison had failed on an earlier one. What
+        // webkit actually did was take the selection and expose a different value for a moment afterwards, and the
+        // row has no way to say which that moment held because it never looked twice. So the read is polled, the
+        // values it sees are kept, and the path that set the value is named: a select that settles is the app
+        // agreeing with the control, and a select that never does is a failure worth its whole sequence.
+        const seenValues = [];
+        const settled = await waitFor(async () => {
+          const now = await pages.inputValue();
+          if (now === scope) return true;
+          if (seenValues[seenValues.length - 1] !== now) seenValues.push(now);
+          return null;
+        }, 3_000);
+        if (!settled) {
+          fail(
+            `the scope select never read "${scope}" — it read ${seenValues.length ? `"${seenValues.join('", "')}"` : '(nothing)'} ` +
+              `over 3 s after ${how}`,
+          );
+        }
+        if (seenValues.length) {
+          scopeNotes.push(
+            `"${scope}" settled on the select after ${seenValues.length} other reading(s): "${seenValues.join('", "')}" — ${how}`,
+          );
         }
         // Put the panel back before reaching for the action. Print's button is a higher-priority control, so it
         // stays in the bar — and an open overflow menu hangs over it, which leaves the click waiting on a

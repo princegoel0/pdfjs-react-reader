@@ -1989,9 +1989,20 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   cuts, how many pixels it takes (#241's claim, stated as a measurement). Probed in Chromium at 1,100 px, where
   print's scope really does fold, the row runs green end to end through the panel; with the selection forced to
   fail, the substitution reads *"6/6 samples saw a usable control in the menu at 608,275 116x32; overflow button
-  present 32x32; panel open; rows Enter fullscreen | Print pages"*. Whether WebKit is clipped by the viewer's own
-  box, folded at its own metrics at 1,246 px, or simply green is now a question the next run answers in one of
-  those three sentences. The suite is **1,246 tests in 139 files**.
+  present 32x32; panel open; rows Enter fullscreen | Print pages"*.
+  The eighth run (CI 37428185484) then got **past** reachability in WebKit — the control was found and the
+  selection taken — and died on the row's own read-back, which said `the scope select reads "all" after being set
+  to "all"`. That sentence is a third harness bug of the same shape: the check read the value, compared it, and
+  then **read it again** to build the message, so it printed the settled value while the failure had happened on an
+  earlier one. WebKit's intermediate reading is therefore not in the record, and the row now polls that read for
+  three seconds, keeps every distinct value, names the door the value came in by (Playwright's selection or the
+  `change`-event substitution — a note is thrown away when a row fails, so the old message could not say), and
+  fails with the sequence if it never settles. Proven red rather than assumed: making the substitution write the
+  wrong scope in a Chromium cell at 1,100 px fails with
+  `the scope select never read "all" — it read "current" over 3 s after chromium refused the selection … and the
+  value went on through the change event`. Whether WebKit is clipped by the viewer's own box, folded at its own
+  metrics at 1,246 px, or simply slow to publish the value is now a question the next run answers in its own
+  numbers. The suite is **1,246 tests in 139 files**.
 
 - **The React peer job was running a different suite from `verify` (#244; FR-48, FR-45).**
   `npm i --no-save --no-package-lock react@…` does not swap one package: npm re-resolves the whole tree from
