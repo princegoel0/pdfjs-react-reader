@@ -1975,7 +1975,9 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   and a zoom step moves nothing. `PdfPage` mounts the result in a `.pjsr-sig-layer` that is `aria-hidden` and never
   takes a pointer: an empty signature field has nothing for a screen reader to say that the box does not already
   show, and capturing a mark into it is `FR-29`'s editing tier (§2.4), not rendering.
-  Measured on `signature-sample.pdf`, chromium 153 at 6.3.289: **5 boxes drawn and 1 left to the engine**, and the
+  Measured on `signature-sample.pdf`, in all six of CI's engine × profile cells (run 37471520882, `dev` at `0c79446`,
+  chromium / firefox / webkit at desktop and mobile, 89 ok / 7 skipped / 0 failed) and locally in chromium 153 at
+  6.3.289: **5 boxes drawn and 1 left to the engine**, and the
   box drawn for `sigPlain` agrees with the element the engine positions for the identical rect to within **0.002 of
   the page** — the cross-check that says this package's arithmetic is the engine's arithmetic. Turn page 2 through
   90° and the two boxes on it hold their page share beside that element while the pixel aspect keeps its product;
