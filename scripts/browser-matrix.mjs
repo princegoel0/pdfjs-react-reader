@@ -2311,13 +2311,26 @@ const CHECKS = [
        * presence is printed, and the panel's rows are named: that is the difference between the planner folding
        * on webkit's metrics at 1,246 px and the control genuinely vanishing.
        */
-      const scopeSamples = async (count = 6) => {
-        const runs = [];
-        for (let i = 0; i < count; i += 1) {
-          runs.push(
-            await page.evaluate(() => {
-              const bar = document.querySelector('.pjsr-toolbar');
-              const shape = (el) => {
+      /*
+       * One reading of every copy of the print scope control, taken inside the page — and when a value is handed
+       * to it, the write that reading has just authorised. `#248` is why the two are the same function: the row
+       * described the control with DOM readings (good) and then read its value back through a bare locator call
+       * (bad), so every one of its nine runner failures has been reported as
+       * `locator.inputValue: Timeout 30000ms exceeded … waiting for locator('.pjsr-toolbar [aria-label="Print pages"]:visible')`,
+       * which does not say which of the row's five reads it was, which scope had just been set, whether the panel
+       * was open at that instant, or which of the three states the copies were in. A message like that cannot be
+       * compared with the next one, which is how a row stays a mystery for nine runs.
+       */
+      const readScopeControl = (write) =>
+        page.evaluate(
+          ([label, value]) => {
+            const bar = document.querySelector('.pjsr-toolbar');
+            const elements = Array.from(
+              document.querySelectorAll(
+                `.pjsr-toolbar [aria-label="${label}"], .pjsr-overflow-menu [aria-label="${label}"]`,
+              ),
+            );
+            const shape = (el, i) => {
                 const box = el.getBoundingClientRect();
                 const style = getComputedStyle(el);
                 const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
@@ -2342,6 +2355,7 @@ const CHECKS = [
                   }
                 }
                 return {
+                  i,
                   where: el.closest('.pjsr-overflow-menu')
                     ? 'menu'
                     : el.closest('.pjsr-toolbar-sizer')
@@ -2355,25 +2369,64 @@ const CHECKS = [
                     box.width > 0 && box.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
                   covered: !(hit !== null && (hit === el || el.contains(hit) || hit.contains(el))),
                   disabled: Boolean(el.disabled),
+                  value: 'value' in el ? String(el.value) : null,
                 };
               };
+              const matches = elements.map(shape);
+              const panel = Boolean(document.querySelector('.pjsr-overflow-menu'));
+              const reachable = (m) => m.painted && !m.covered && !m.disabled && !m.clippedBy;
+              // (a) inline in the bar or (b) in a panel that is open — both a reader can use; (c) nowhere.
+              const usable =
+                matches.find((m) => reachable(m) && (m.where === 'bar' || (m.where === 'menu' && panel))) ?? null;
+              let wrote = null;
+              if (value !== null && usable) {
+                const el = elements[usable.i];
+                el.value = value;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                wrote = `the ${usable.where} copy at ${usable.box}`;
+              }
               const more = document.querySelector('.pjsr-toolbar [aria-label="More controls"]');
               const moreBox = more?.getBoundingClientRect();
               return {
-                matches: Array.from(
-                  document.querySelectorAll(
-                    '.pjsr-toolbar [aria-label="Print pages"], .pjsr-overflow-menu [aria-label="Print pages"]',
-                  ),
-                ).map(shape),
+                label,
+                matches,
+                usable,
+                /** What a report says instead of "no match": the copies, each with the reason it was or was not usable. */
+                copies: matches.length
+                  ? matches
+                      .map(
+                        (m) =>
+                          `${m.where} ${m.box} group ${m.group} value "${m.value}"` +
+                          `${m.painted ? '' : ' unpainted'}${m.covered ? ' covered' : ''}` +
+                          `${m.disabled ? ' disabled' : ''}${m.clippedBy ? ` cut by ${m.clippedBy}` : ''}`,
+                      )
+                      .join(' | ')
+                  : 'nothing carrying that label',
+                wrote,
+                value: usable ? usable.value : null,
                 more: more
                   ? `present ${Math.round(moreBox.width)}x${Math.round(moreBox.height)}`
                   : 'no button in the bar',
-                panel: Boolean(document.querySelector('.pjsr-overflow-menu')),
+                panel,
                 rows: Array.from(document.querySelectorAll('.pjsr-overflow-label')).map((node) => node.textContent),
                 bar: bar ? `${bar.clientWidth}/${bar.scrollWidth}` : 'none',
               };
-            }),
-          );
+            },
+          ['Print pages', write ?? null],
+        );
+
+      /** One line, from one reading — the shape every failure message on this row now ends with. */
+      const stateOf = (r) =>
+        `panel ${r.panel ? 'open' : 'closed'}, ${
+          r.usable ? `usable copy in the ${r.usable.where} at ${r.usable.box} reading "${r.usable.value}"` : 'no usable copy'
+        }, copies ${r.copies}, overflow button ${r.more}, panel rows ${r.rows.join(' | ') || '(none)'}, ` +
+        `bar clientWidth/scrollWidth ${r.bar}`;
+
+      const scopeSamples = async (count = 6) => {
+        const runs = [];
+        for (let i = 0; i < count; i += 1) {
+          runs.push(await readScopeControl(null));
           if (i < count - 1) await page.waitForTimeout(500);
         }
         return runs;
@@ -2381,13 +2434,7 @@ const CHECKS = [
 
       /** The samples as one line, plus whether a reader could have used the control in each of them. */
       const describeSamples = (runs) => {
-        const reachable = (m) => m.painted && !m.covered && !m.disabled && !m.clippedBy;
-        const usable = runs.map(
-          (run) =>
-            run.matches.find(
-              (m) => reachable(m) && (m.where === 'bar' || (m.where === 'menu' && run.panel)),
-            ) ?? null,
-        );
+        const usable = runs.map((run) => run.usable);
         const found = usable.filter(Boolean);
         const boxes = [...new Set(found.map((m) => m.box))];
         const places = [...new Set(found.map((m) => m.where))];
@@ -2421,7 +2468,7 @@ const CHECKS = [
       };
 
       const pickScope = async (scope) => {
-        let pages = await reveal('Print pages');
+        const pages = await reveal('Print pages');
         // Which door the value came in by is part of what the next engine's reading means, so it is carried to
         // the read-back rather than being inferred from the absence of a note.
         let how = `${engine} took the selection through Playwright's selectOption`;
@@ -2458,16 +2505,23 @@ const CHECKS = [
           if (seen.usable !== seen.total || !seen.agreed) {
             fail(`the "${scope}" scope control could not be used: ${firstLine(error)} — ${seen.text}`);
           }
-          // The copy acted on is resolved after the panel came back, not the locator that timed out before it.
-          pages = page.locator('.pjsr-toolbar [aria-label="Print pages"]:visible').first();
-          await pages.evaluate((el, value) => {
-            el.value = value;
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-          }, scope);
+          /*
+           * The write and the description are one reading now. The old version re-resolved a locator after the
+           * samples had already agreed the control was usable, and the two could disagree about *which* copy they
+           * meant — the panel's or the bar's — because `.first()` takes the first in DOM order and both exist.
+           * `readScopeControl(scope)` puts the value on the copy the reachability rule just selected and says
+           * which that was, so the note names the door rather than implying it.
+           */
+          const wrote = await readScopeControl(scope);
+          if (!wrote.wrote) {
+            fail(
+              `the "${scope}" scope could not be written although six samples agreed the control was usable ` +
+                `(${seen.text}); the reading at the write was ${stateOf(wrote)}`,
+            );
+          }
           scopeNotes.push(
             `"${scope}" set through the change event because ${engine} refused the selection ` +
-              `(${firstLine(error)}) on a control six samples agreed a reader could use (${seen.text})`,
+              `(${firstLine(error)}) on ${wrote.wrote}, a control six samples agreed a reader could use`,
           );
           how = `${engine} refused the selection (${firstLine(error)}) and the value went on through the change event`;
         }
@@ -2481,9 +2535,17 @@ const CHECKS = [
         // row has no way to say which that moment held because it never looked twice. So the read is polled, the
         // values it sees are kept, and the path that set the value is named: a select that settles is the app
         // agreeing with the control, and a select that never does is a failure worth its whole sequence.
+        /*
+         * Polled in the page, not through a locator. `locator.inputValue()` waits thirty seconds for an element
+         * that may have folded away, and when it gives up the message names only the selector — which is every
+         * failure this row has ever printed on the runner. The read is instant, and the failure carries the state
+         * of the moment it gave up: panel open or closed, which copies exist, where each is, what each reads.
+         */
         const seenValues = [];
+        let last = null;
         const settled = await waitFor(async () => {
-          const now = await pages.inputValue();
+          last = await readScopeControl(null);
+          const now = last.value;
           if (now === scope) return true;
           if (seenValues[seenValues.length - 1] !== now) seenValues.push(now);
           return null;
@@ -2491,7 +2553,7 @@ const CHECKS = [
         if (!settled) {
           fail(
             `the scope select never read "${scope}" — it read ${seenValues.length ? `"${seenValues.join('", "')}"` : '(nothing)'} ` +
-              `over 3 s after ${how}`,
+              `over 3 s after ${how}; at the last reading, ${stateOf(last)}`,
           );
         }
         if (seenValues.length) {
@@ -2648,7 +2710,24 @@ const CHECKS = [
         return skip(`${engine}: the fullName widget never painted a box to measure, so the sheet had no region to read`);
       }
       await install(fraction);
-      const openedWith = await (await reveal('Print pages')).inputValue();
+      /*
+       * What the scope held before any job, read the same way — and if there is no copy a reader could use at
+       * *this* point, the row says so in the row's own words instead of letting a thirty-second locator timeout
+       * report it as a bare selector. CI runs 37500226195 and 37501699590 each failed with that selector message
+       * and no scope named; this is one of the two lines it can only have been (#248).
+       *
+       * `reveal()` first, and that is not decoration. The full local run of 2026-10-06 caught the first version of
+       * this line failing in chromium and firefox both with `copies sizer … unpainted covered, overflow button
+       * present`: by the time this row runs, the bar is folded and the only copy of the control is inside a panel
+       * nothing has opened — so the reader has to be opened like the old locator did, or a row that asks for a
+       * folded control reports it missing. Reading the state is an addition to that step, never a replacement.
+       */
+      await reveal('Print pages');
+      const opening = await readScopeControl(null);
+      if (!opening.usable) {
+        fail(`before job one, the print scope had no copy a reader could use: ${stateOf(opening)}`);
+      }
+      const openedWith = opening.value;
 
       /*
        * Job one, on screen media: what the pipeline hands the platform. How many sheets the selection became, at
@@ -2824,6 +2903,7 @@ const CHECKS = [
        * that had moved. The bar now measures a growing control at its widest state, so the fold is decided before
        * the reader touches anything and these fields stay where their own select is.
        */
+      // The range is the state where the control grows, so it is read back through the same instrument.
       await pickScope('range');
       await (await reveal('First page to print')).fill('2');
       await (await reveal('Last page to print')).fill('2');

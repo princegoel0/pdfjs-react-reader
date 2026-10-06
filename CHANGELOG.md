@@ -1231,6 +1231,40 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **Print's WebKit row now says what it saw, instead of waiting thirty seconds on a selector (#248; FR-19,
+  FR-48).** Nine runner failures of one row, nine messages about the message: every one has arrived as
+  `locator.inputValue: Timeout 30000ms exceeded … waiting for locator('.pjsr-toolbar [aria-label="Print pages"]:visible')`,
+  which names no scope, no door, no panel state and no copy — so nothing in the log distinguishes "the fold planner
+  hid it" from "the harness looked in the wrong place" from "the value never settled", and the row's own earlier
+  fixes could only guess which of those they were aiming at. The row reads its control in the page now, and the same
+  reading does both jobs: the value goes on the copy the reachability rule has just selected (so the write cannot
+  land on a different copy than the one the description approved), the read-back is polled against the DOM on a
+  three-second budget instead of waiting thirty seconds on a locator, and a failure ends with the state of the
+  instant it gave up — panel open or closed, every copy with its box, its group width, its value and the reason it
+  was or was not usable, the ⋯ button's own box, and the bar's `clientWidth` against its `scrollWidth`. Proven red
+  twice in Chromium on 2026-10-06, both in seconds rather than half-minutes: aiming the reader at a label no copy
+  carries fails at once with `panel closed, no usable copy, copies nothing carrying that label, overflow button no
+  button in the bar, bar clientWidth/scrollWidth 1246/1246`, and making the read-back predicate unsatisfiable fails
+  after 3 s naming the scope, the door the value came in by and the box it last read. **The alternation claim made
+  earlier today is withdrawn** — the two identical failures at 17:05 and 17:16 on 2026-10-06 sit either side of two
+  greens that read this same row end to end, so the row still alternates and two of a kind are a sample of two, not
+  a change of pattern; what is new is that the next reading will be comparable with the last. One detail from the
+  failing cell already leans the open question: that WebKit desktop cell's own `toolbar-fold` row reported no
+  overflow at 1,280 px, which settles nothing on its own — a different document, a different bar — but makes the
+  read as live a suspect as the planner, which is exactly the distinction this row could not previously make.
+
+  The instrument was wrong on its first run, and the full matrix is what said so. Reading the control in the page
+  looked like a *replacement* for `reveal('Print pages')`, so the opening read stopped opening the panel — and by the
+  time this row runs in the complete suite the bar **is** folded in Chromium and Firefox alike, so the new message
+  fired twice on the harness's own omission: `panel closed, no usable copy, copies sizer 907,152 116x32 group
+  197x32 value "all" unpainted covered, overflow button present 32x32`. `reveal()` is back before the read, because
+  a row that asks for a folded control has to unfold it the way a reader would. Two things came out of being wrong
+  locally: that message is exactly right about a state nobody had described — the only copy was the hidden measuring
+  one, the ⋯ button was there, nothing was open — and the isolated `--checks=print-sheets` run, which passed, is not
+  the gate, because whether this control is folded depends on what the earlier rows leave on screen. Run the matrix
+  whole: with the unfolding step back in front of the read, the four cells this host can start read **60 ok / 4
+  skipped / 0 failed**, the same tally as before the change — which is what a fix to the instrument should produce.
+
 - **The docs site's size tables, and every CI tally in the documents, are derived or gone (#240; FR-23, FR-48).**
   Two kinds of hand-copy were live at once. The numbers: `Introduction.tsx` priced a whole footprint table from a
   release nine behind — `core` 29.09 kB where the gate measures 32.41, `annotate` +1.86 where it measures +2.02,
