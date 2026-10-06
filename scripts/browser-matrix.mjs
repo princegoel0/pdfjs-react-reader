@@ -2054,6 +2054,9 @@ const CHECKS = [
       /** Where the engine made the row drive a control the way a choice would rather than by selection. */
       const scopeNotes = [];
 
+      /** Where the engine needed more than one frame to hand the application back after a job. */
+      const restoreNotes = [];
+
       /**
        * Six readings of the print scope control over three seconds, taken out of the DOM rather than through a
        * locator.
@@ -2335,20 +2338,52 @@ const CHECKS = [
         if (ended !== true) {
           fail(`${stepName}: the print container was still in the document 15 s after the job reached the printer`);
         }
-        const restored = await page.evaluate(() => ({
-          printing: document.body.classList.contains('pjsr-printing'),
-          toolbar: getComputedStyle(document.querySelector('.pjsr-toolbar') ?? document.body).display,
-          control: document.querySelector('.pjsr-toolbar [aria-label="Print document"]')
-            ? 'Print document'
-            : document.querySelector('.pjsr-toolbar [aria-label="Cancel printing"]')
-              ? 'still Cancel printing'
-              : '(no print control)',
-        }));
-        if (restored.printing || restored.toolbar === 'none' || restored.control !== 'Print document') {
+        const reading = () =>
+          page.evaluate(() => ({
+            printing: document.body.classList.contains('pjsr-printing'),
+            toolbar: getComputedStyle(document.querySelector('.pjsr-toolbar') ?? document.body).display,
+            control: document.querySelector('.pjsr-toolbar [aria-label="Print document"]')
+              ? 'Print document'
+              : document.querySelector('.pjsr-toolbar [aria-label="Cancel printing"]')
+                ? 'still Cancel printing'
+                : '(no print control)',
+          }));
+        const settled = (r) => !r.printing && r.toolbar !== 'none' && r.control === 'Print document';
+        /*
+         * The container is removed by the pipeline and the control's label is React's, so the two land one
+         * commit apart: asking once, on the frame the container went away, reads a sheet that has finished and a
+         * button that has not been re-rendered yet. CI run 37432005740 did exactly that in webkit — the first
+         * time that engine got this far in this row — and reported `pjsr-printing=false, display: flex, and the
+         * control is "still Cancel printing"`, which is an instrument reading its own race, not a sheet that
+         * outlived its print. So the restoration is waited for, the readings it took are kept, and a button that
+         * never comes back fails with all of them: that would be the clause's failure, and it would be named.
+         */
+        const readings = [];
+        const restoreDeadline = Date.now() + 10_000;
+        let restored = await reading();
+        while (!settled(restored) && Date.now() < restoreDeadline) {
+          if (!readings.length || JSON.stringify(readings[readings.length - 1]) !== JSON.stringify(restored)) {
+            readings.push(restored);
+          }
+          await page.waitForTimeout(50);
+          restored = await reading();
+        }
+        if (!settled(restored)) {
+          const shown = [...readings];
+          const last = JSON.stringify(restored);
+          if (!shown.length || JSON.stringify(shown[shown.length - 1]) !== last) shown.push(restored);
+          const seen = shown
+            .map((r) => `pjsr-printing=${r.printing}, toolbar display: ${r.toolbar}, control "${r.control}"`)
+            .join(' then ');
           fail(
-            `${stepName}: after the job the body carried pjsr-printing=${restored.printing}, the toolbar read ` +
-              `display: ${restored.toolbar} and the control is "${restored.control}" — a sheet that outlives its ` +
-              'print is the second document the clause rules out',
+            `${stepName}: 10 s after the job reached the printer the application had not come back — ${seen} — ` +
+              'a sheet that outlives its print is the second document the clause rules out',
+          );
+        }
+        if (readings.length) {
+          restoreNotes.push(
+            `${engine} returned the control to "Print document" ${readings.length} reading(s) after the ` +
+              `container detached (${readings.map((r) => r.control).join(', ')})`,
           );
         }
         return true;
@@ -2623,6 +2658,7 @@ const CHECKS = [
           ? '; the first print-media job reached the printer before the emulation landed, so the row waited for ' +
             "matchMedia('print') and ran that job again"
           : '') +
+        (restoreNotes.length ? `; ${[...new Set(restoreNotes)].join('; ')}` : '') +
         // An engine that would not take the selection says so here rather than passing quietly: the scopes are
         // what make the third job's one-page sheet mean "current" instead of "whatever the default was".
         (scopeNotes.length ? `; ${scopeNotes.join('; ')}` : '')

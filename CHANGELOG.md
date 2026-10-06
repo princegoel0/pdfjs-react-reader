@@ -2000,9 +2000,16 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   fails with the sequence if it never settles. Proven red rather than assumed: making the substitution write the
   wrong scope in a Chromium cell at 1,100 px fails with
   `the scope select never read "all" — it read "current" over 3 s after chromium refused the selection … and the
-  value went on through the change event`. Whether WebKit is clipped by the viewer's own box, folded at its own
-  metrics at 1,246 px, or simply slow to publish the value is now a question the next run answers in its own
-  numbers. The suite is **1,246 tests in 139 files**.
+  value went on through the change event`.
+  The ninth run (CI 37432005740) answered WebKit's reachability question and exposed a third reading of the same
+  family: WebKit reached the folded scope control, took the selection, read it back, ran the first two jobs, and
+  then failed on the row's *restoration* check — `pjsr-printing=false, the toolbar read display: flex and the
+  control is "still Cancel printing"`. The container and the body class are removed by the pipeline; the button's
+  label is React's `isPrinting`, which commits on the next tick, so a single reading taken on the frame the
+  container vanished is the harness racing itself rather than a sheet that outlived its print. The restoration is
+  now polled for ten seconds with every distinct reading kept, and a button that never comes back fails with the
+  sequence — red proved in Chromium by making the predicate unsatisfiable. The suite is **1,246 tests in 139
+  files**.
 
 - **The React peer job was running a different suite from `verify` (#244; FR-48, FR-45).**
   `npm i --no-save --no-package-lock react@…` does not swap one package: npm re-resolves the whole tree from
