@@ -153,6 +153,38 @@ function checkEngineAxis(ciText) {
   return problems;
 }
 
+/**
+ * The lockfile's root entry is a *copy* of `package.json`, and a copy is the kind of thing that goes stale:
+ * `engines.node` sat at `>=20` in the lock for weeks after the Node floor moved to 22.13.0, and nothing noticed,
+ * because `npm ci` installs from the lock rather than reconciling it against the manifest. The floor is an
+ * FR-41/FR-48 claim that hosts read, so the comparison belongs to something that runs.
+ */
+function checkLockMirror(lockText = read('package-lock.json')) {
+  const lock = JSON.parse(lockText);
+  const root = lock.packages?.[''];
+  if (!root) return ['package-lock.json has no root ("") entry to compare with package.json'];
+  const problems = [];
+  for (const field of ['engines', 'peerDependencies']) {
+    const wanted = pkg[field] ?? {};
+    const mirrored = root[field] ?? {};
+    for (const [key, value] of Object.entries(wanted)) {
+      if (JSON.stringify(mirrored[key]) !== JSON.stringify(value)) {
+        problems.push(
+          `package-lock.json's root ${field}.${key} is ${JSON.stringify(mirrored[key])} — ` +
+            '`package.json` says ' + JSON.stringify(value) + ' (run `npm install` so the lock mirrors the manifest)',
+        );
+      }
+    }
+    for (const key of Object.keys(mirrored)) {
+      if (!(key in wanted)) problems.push(`package-lock.json's root ${field}.${key} has no counterpart in package.json`);
+    }
+  }
+  if (root.version !== pkg.version) {
+    problems.push(`package-lock.json's root version is ${root.version}, package.json says ${pkg.version}`);
+  }
+  return problems;
+}
+
 const maturity = JSON.parse(read('api-maturity.json'));
 const tagValues = Object.values(maturity.tags);
 const byState = (state) => tagValues.filter((t) => (typeof t === 'string' ? t : t.state) === state).length;
@@ -424,6 +456,52 @@ const AXIS_SELFTESTS = [
     name: 'the benchmark stops being gated and runs in every cell',
     expect: 'no step is gated on an engine version',
     apply: (t) => t.replace("        if: matrix.engine == '6.4.299'\n", ''),
+  },
+];
+
+// ---------------------------------------------------------------------------
+// The lockfile's mirrored manifest fields — the drift this rule exists for is the one it found: `engines.node`
+// at `>=20` in the lock while `package.json` had moved the Node floor to 22.13.0, invisible to `npm ci`.
+// ---------------------------------------------------------------------------
+
+function withoutLockRoot(text) {
+  const lock = JSON.parse(text);
+  delete lock.packages[''];
+  return JSON.stringify(lock);
+}
+
+function withLockRootField(text, field, key, value) {
+  const lock = JSON.parse(text);
+  lock.packages[''][field] = { ...lock.packages[''][field], [key]: value };
+  return JSON.stringify(lock);
+}
+
+function withLockRootVersion(text, version) {
+  const lock = JSON.parse(text);
+  lock.packages[''].version = version;
+  return JSON.stringify(lock);
+}
+
+const LOCK_SELFTESTS = [
+  {
+    name: 'the lock keeps an old Node floor after the contract moves',
+    expect: 'root engines.node is',
+    apply: (t) => withLockRootField(t, 'engines', 'node', '>=20'),
+  },
+  {
+    name: 'the lock keeps an old engine peer floor',
+    expect: 'root peerDependencies.pdfjs-dist is',
+    apply: (t) => withLockRootField(t, 'peerDependencies', 'pdfjs-dist', '^6.0.0'),
+  },
+  {
+    name: 'the lock’s root version falls behind the manifest',
+    expect: 'root version is',
+    apply: (t) => withLockRootVersion(t, '0.0.1'),
+  },
+  {
+    name: 'the lock has no root entry to compare',
+    expect: 'no root',
+    apply: withoutLockRoot,
   },
 ];
 
@@ -768,6 +846,7 @@ function audit() {
     ...RULES.flatMap((rule) => checkRule(rule, textFor(rule.file))),
     ...checkProhibited(textOrNull),
     ...checkEngineAxis(textFor('.github/workflows/ci.yml')),
+    ...checkLockMirror(),
     ...checkSizeFigures(sizeState),
     ...checkReadmeFigures({ figures: sizeState.figures, readme: textFor('README.md') }),
   ];
@@ -874,6 +953,19 @@ function selfTest() {
       console.log(`  caught  axis: ${scenario.name} — ${hit.slice(0, 110)}`);
     } else {
       console.log(`  MISSED  axis: ${scenario.name} — the rule saw ${found.length ? `"${found[0].slice(0, 60)}"` : 'nothing'}`);
+    }
+  }
+  // The lockfile mirror, perturbed the way a manifest edit drifts: one field left behind, and the root removed
+  // so the comparison has nothing to read.
+  for (const scenario of LOCK_SELFTESTS) {
+    expected += 1;
+    const found = checkLockMirror(scenario.apply(read('package-lock.json')));
+    const hit = found.find((p) => p.includes(scenario.expect));
+    if (hit) {
+      caught += 1;
+      console.log(`  caught  lock: ${scenario.name} — ${hit.slice(0, 110)}`);
+    } else {
+      console.log(`  MISSED  lock: ${scenario.name} — the rule saw ${found.length ? `"${found[0].slice(0, 60)}"` : 'nothing'}`);
     }
   }
   // README's tables, perturbed the way they drift: a number left behind, and a row reworded out of reach.

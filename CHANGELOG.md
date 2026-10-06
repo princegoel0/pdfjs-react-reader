@@ -1278,6 +1278,15 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **The lockfile's copy of the manifest is now compared to the manifest, and the first thing it caught was the Node
+  floor (#249's side-find, 2026-10-07).** `package-lock.json` carries a mirrored root entry — `engines`,
+  `peerDependencies`, `version` — and that copy said `"node": ">=20"` for weeks after `package.json` moved the floor
+  to `22.13.0`, which is FR-41's and §8's claim about where the package runs. Nothing noticed, because `npm ci`
+  installs *from* the lock rather than reconciling it with the manifest, and every job here uses `npm ci`. The lock
+  line is corrected and `scripts/check-docs.mjs` now refuses the two drifting again on three fields, with four
+  `--selftest` scenarios (an old Node floor, an old engine peer floor, a root version left behind, and the root
+  entry deleted so the comparison reads nothing) — 45 perturbations, all caught.
+
 - **The engine axis ran at the advertised floor and found a promise that does not hold there (#194's first reading;
   FR-43, FR-48, FR-53; decision filed as #249, 2026-10-07).** CI run 37519895887 (`dev` at `1689941`) is the first
   that carried the axis — the run before it was cancelled by this workflow's own `cancel-in-progress`, which is what
