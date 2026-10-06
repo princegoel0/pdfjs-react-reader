@@ -951,6 +951,36 @@ const CHECKS = [
             'would mean nothing — the layer is not painting this document at all',
         );
       }
+      /*
+       * The anchor of every comparison below is the element the engine builds for the one widget it renders on
+       * its own canvas — and that widget is on **page 2**. Waiting only for page 1's `/Tx` control is not the
+       * same wait: CI run 37472575777 failed this row in firefox·mobile with `layer classes seen: (none)`, six
+       * cells deep in a job where every row before it has scrolled, zoomed and swapped documents, so the read
+       * landed while the second page's layer was still empty. Reproduced alone, the same cell passes, which is
+       * the signature of a precondition the row never waited for rather than a widget that cannot render. Wait
+       * for the anchor itself, and if it still does not arrive say what was on screen.
+       */
+      if (
+        !(await settle(
+          async () => (await painted('.pjsr-annotation-layer section.norotate')) >= 1,
+          12_000,
+        ))
+      ) {
+        const where = await page.evaluate(() => ({
+          pages: [...document.querySelectorAll('.pjsr-page-canvas')].map(
+            (el) => el.getAttribute('aria-label') ?? '(unnamed)',
+          ),
+          layerChildren: [...document.querySelectorAll('.pjsr-annotation-layer')].map((el) => el.childElementCount),
+          sigBoxes: document.querySelectorAll('.pjsr-sig-box').length,
+          scroll: Math.round(document.querySelector('.pjsr-viewport')?.scrollTop ?? -1),
+        }));
+        fail(
+          'the one /Sig widget the engine renders on its own canvas produced no element within 12 s, so the ' +
+            `comparison that anchors the drawn boxes has nothing to read against — what was on screen: ${JSON.stringify(
+              where,
+            )} — this names where the read landed; it is not a finding that the widget cannot render`,
+        );
+      }
       const readSig = () => {
         /** Fractions of the layer the element lives in, so the assertions survive any zoom the row left on. */
         const frac = (el, root) => {
@@ -994,9 +1024,8 @@ const CHECKS = [
       }
       if (!sig.engineRect) {
         fail(
-          'the one /Sig widget the engine renders on its own canvas produced no element, so the comparison that ' +
-            `anchors the drawn boxes is gone (layer classes seen: ${sig.engineClass}) — re-read the fixture and ` +
-            'this row together rather than trusting the box count alone',
+          'the engine element the wait above just saw is gone at the read — the layer was rebuilt between them ' +
+            `(layer classes seen: ${sig.engineClass}), so no comparison below can be trusted`,
         );
       }
       const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 0.002);

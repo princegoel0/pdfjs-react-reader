@@ -1231,6 +1231,32 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **Two greens did not settle print's row, and this file said it did (#245 reopened as #248; FR-19, FR-48).**
+  CI run 37472575777 — a push whose diff is the register and the changelog, the same shape as the two runs
+  counted as the repeat — came back **87 ok / 7 skipped / 0 not runnable / 2 failed**. One failure was
+  `print-sheets-hide-the-application` timing out at 30 s on a visible `[aria-label="Print pages"]` in webkit,
+  the reachability line that has failed, been fixed, and failed again across six runs of this row. The exit
+  condition #245 was closed on was "two consecutive greens of one version of the row", argued from FR-44's
+  self-contradiction, and this run shows what such a condition cannot buy: a run is a **reading**, so two
+  agreeing readings are a sample of two, and a sample of two cannot tell a fixed row from an intermittent one
+  that happened to land green twice. What does settle a row is making it fail on purpose and seeing it fail for
+  the reason it claims — which is why this row's five self-inflicted messages were the better evidence than its
+  tally, and why #248 is opened rather than a sentence added to a ticket already marked closed. The next run
+  (37483082866, `dev` at `781fd88`) is green in every cell again, 89 ok / 0 failed, which is the alternating
+  pattern this entry records instead of explaining away.
+
+- **#229's browser row read page 2 before page 2 existed (FR-16).**
+  The same run's other failure was the signature row in firefox·mobile: `the one /Sig widget the engine renders
+  on its own canvas produced no element … (layer classes seen: (none))`. The row waited for page 1's `/Tx`
+  control to paint and then read the anchor that lives on **page 2**, six cells deep in a job where every
+  earlier row had scrolled, zoomed and swapped documents; run alone the same cell passes, which is a
+  precondition the harness never waited for rather than a widget that cannot render. It now waits for the anchor
+  itself and, when it never arrives, prints what was on screen
+  (`{"pages":["Page 1","Page 2"],"layerChildren":[1,1],"sigBoxes":5,…}`), with the wait proven red by aiming it
+  at a selector that cannot exist. Nothing about the drawn box disagreed: the count was 5 and the field names
+  were right in every cell that read them.
+
+
 - **A reading that does not repeat is not evidence (#246; FR-44, FR-19, FR-48).** CI run 37390542384 (dev at
   `3f12174`, 2026-10-06) ran the matrix again: **87 ok / 7 skipped / 0 not runnable / 2 failed**, and both
   failures were *the same cell* — webkit desktop — while chromium and firefox read every row green for the second
