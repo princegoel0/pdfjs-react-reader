@@ -124,16 +124,19 @@ So the narrative table keeps its job, which the generated block cannot do: it re
 measurement that retired a requirement, the engine behaviour that turned out to be impossible, the premise a
 test was built on and then corrected. Read it for the reasoning. Read the block above for the state.
 
-Two rows are not explainable that way and are open questions rather than history:
+Two rows once sat in that gap as live questions rather than history, and both have been answered since:
 
-* **`FR-16`** — the narrative says `partial` over the signature widget; the register says `met`, on the basis
-  that every declared widget kind reaches a real HTML control and the engine constructs them. Your read of that
-  sentence decides which is right, because a bot overwriting a claim you wrote deliberately is how a nuance
-  gets lost.
-* **`FR-39`** — the register says `partial` because invalidation satisfies its words and not its intent: a page
-  edit re-reads the content stream, which cannot see `annotationStorage`, so a form or ink edit never becomes
-  searchable. That is a pdf.js limit, documented in the module. Whether the clause should be restated or
-  withdrawn is a specification decision, not a code one.
+* **`FR-16`** — the register's `met` rested on "every declared widget kind reaches a real HTML control, and the
+  engine constructs them", which left the `/Sig` box drawn by nobody wherever the engine gave no element.
+  **#229** built that box here — `signatureBoxes()` in `src/lib/form.ts`, painted by a pointer-inert
+  `.pjsr-sig-layer` in `PdfPage` — so the row's `met` and this file's reason are now the same claim rather than
+  two, and the signature half of the clause is measured in a browser instead of argued.
+* **`FR-39`** — **#206** asked whether to restate or withdraw the sentence that would have made an edited page
+  searchable, and the answer was the restatement (locked in with #217's amendment): extraction reads the page's
+  content stream, `annotationStorage` is not in it, and the row now says so in its own words while "offered to
+  the host" names the host-facing per-page `invalidatePages`. Both halves are guarded — the swap and its race in
+  `src/headless/usePdfSearch.incremental.test.tsx`, the handle member in `ViewerController`'s published handle —
+  which is why the register reads `met` with no gap rather than `partial` with an argument.
 
 ### The order of work
 

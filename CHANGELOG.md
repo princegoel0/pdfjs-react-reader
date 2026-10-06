@@ -1278,6 +1278,17 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **`ROADMAP.md` stopped asking two questions it had already answered (#206, 2026-10-07).** Its
+  "open questions rather than history" block still listed `FR-16` (whether the register's `met` may rest on the
+  engine constructing every widget) and `FR-39` (whether to restate or withdraw the sentence that would make an
+  edited page searchable). Both were settled in code and in the lock: **#229** drew the `/Sig` box that the
+  engine leaves unpainted (`signatureBoxes()` in `src/lib/form.ts`, a pointer-inert `.pjsr-sig-layer`, read in a
+  browser), and #217's amendment is the restatement #206 asked for — extraction reads the content stream,
+  `annotationStorage` is not in it, and "offered to the host" now names the per-page `invalidatePages` that
+  `ViewerController`'s published handle actually carries. The block records the answers and the guards instead of
+  re-asking, because an open question that outlives its own decision is how the next work order spends its time
+  on a settled one. Nothing moved in `fr-evidence.json`: `FR-16` and `FR-39` were already `met` with no gaps.
+
 - **Print's scope read-back now separates the control a reader can use from the state the app holds, because the
   instrument the last change built answered the question it was made for (#248; FR-19, FR-48).** CI run
   37515055554 (`dev` at `a068dea`, 2026-10-07 — a push whose diff is the ready-shell audit) went green in thirteen
