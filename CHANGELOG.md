@@ -2008,7 +2008,18 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   label is React's `isPrinting`, which commits on the next tick, so a single reading taken on the frame the
   container vanished is the harness racing itself rather than a sheet that outlived its print. The restoration is
   now polled for ten seconds with every distinct reading kept, and a button that never comes back fails with the
-  sequence — red proved in Chromium by making the predicate unsatisfiable. The suite is **1,246 tests in 139
+  sequence — red proved in Chromium by making the predicate unsatisfiable.
+  The tenth run (CI 37434962866) took that wait and went green in **all six cells** — 89 ok / 7 skipped / 0 not
+  runnable / 0 failed — and WebKit drove print's row end to end for the first time: two sheets at 2.00×, the
+  print-media layout complete, the typed value reaching its own box (16 → 933 dark px against Chromium's
+  18 → 1,005), "Current page" 1 of 2, a typed "From–to 2–2" 1, and the 1,000-page job refused. The button that had
+  read "still Cancel printing" came back on the first polled reading, so the teardown is one commit apart rather
+  than stuck. That run settles two things about Safari rather than despite it: print's page scope really does fold
+  at 1,246 px there (the row measures the group at 206 px against Chromium's 197), and it is *reachable* through
+  the ⋯ panel — which is what #243 was for — with the value arriving on the `change` event because Playwright
+  still cannot drive a native `<select>` in that engine, and the row now prints which door it used. One green of
+  one cell is a reading rather than a pass, so the rule this repository set after FR-44's engine contradicted
+  itself applies once more: the run after this decides whether #245 closes. The suite is **1,246 tests in 139
   files**.
 
 - **The React peer job was running a different suite from `verify` (#244; FR-48, FR-45).**
