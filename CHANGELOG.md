@@ -1236,6 +1236,13 @@ re-derived by whoever asks next.
   that measures itself as not overflowing while one of its own controls is rendered nowhere but the sizer is
   **#243**'s fold planner reached by a second route — webkit's metrics at the *default* scope rather than the
   From–to width — which makes #243 a defect in the planner rather than a defect in one control.
+  The runner has since settled the other half, and the answer was ours rather than the engine's: on CI run
+  37392699425 (dev at `8790959`) webkit desktop read `forced-colours` **green** with the corrected wait — all six
+  members, in its own palette, the edge that Chromium reports as `rgb(0, 0, 0)` serialised there as
+  `color(srgb 0 0 0 / 0.45)` and the focus ring as `rgb(52, 132, 228)`. WebKit was never unable to paint a resting
+  mark; the row had simply read the walk before it got one. `FR-44` stays `partial` because its gap now asks for two
+  consecutive green readings after a self-contradiction and this is the first, and the browser job's only remaining
+  failure is print's scope control — #245/#243, a product fix, not a test one.
 
 - **A runner started WebKit, answered two rows, and failed one (#245; FR-44, FR-43, FR-19, FR-48).**
   The cells at `651672c` (CI run 37386366651, 2026-10-05) are the first to carry nineteen checks, and for
