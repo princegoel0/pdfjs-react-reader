@@ -137,6 +137,24 @@ function floorVerdict(engineName, version) {
   return { claimed, actual: version, major, status: major >= claimed ? 'ok' : 'fail' };
 }
 
+/**
+ * Dotted-release comparison for the *engine* axis (#194), numeric per segment.
+ *
+ * The §8 floor check above compares browser majors, which are single integers; a `pdfjs-dist` release is not, and
+ * `'6.10.0' < '6.2.0'` is true as a string and false as a release. Missing segments read as zero, so `6.3` is
+ * below `6.3.289` — the answer a feature's declared minimum needs when the loaded engine reports less than it.
+ */
+function releaseAtLeast(have, want) {
+  const a = String(have ?? '').split(/[.\-+]/).map((part) => Number.parseInt(part, 10) || 0);
+  const b = String(want).split(/[.\-+]/).map((part) => Number.parseInt(part, 10) || 0);
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x > y;
+  }
+  return true;
+}
+
 for (const [kind, chosen, known] of [
   ['--engines', ONLY_ENGINES, Object.keys(BROWSERS)],
   ['--profiles', ONLY_PROFILES, Object.keys(PROFILES)],
@@ -1824,10 +1842,28 @@ const CHECKS = [
       if (!dom.link) {
         fail('the tagged fixture carries a link annotation and the annotation layer mounted none, so the ownership half of the clause could not be asked');
       }
-      if (dom.link.ownsCount === 0) {
+      /*
+       * The engine axis (#194) reads this row at the advertised floor as well as at the current release, and the
+       * floor has no link-ownership code at all: `enableLinkOwnership` appears twice in 6.3.289's `build/pdf.mjs`
+       * and not once in 6.2.108's, which is what the first axis run showed in all three engines. The tier says so
+       * itself — `structureFeature.engineRequirements`, minimum 6.3.289 — and this is the same number, kept from
+       * drifting by `src/features/structure.engine-floor.test.tsx`. Below the minimum the row asserts the
+       * *declared* shape rather than the wanted one, because a row that only ever checks the happy case cannot
+       * notice an engine gaining or losing the behaviour, which is the whole point of declaring a boundary.
+       */
+      const LINK_OWNERSHIP_MINIMUM = '6.3.289';
+      const ownsLinks = releaseAtLeast(engineVersion, LINK_OWNERSHIP_MINIMUM);
+      if (ownsLinks && dom.link.ownsCount === 0) {
         fail(
-          `the link annotation owns nothing in the structure tree (aria-owns ${JSON.stringify(dom.link.owns)}): ` +
+          `the link annotation owns nothing in the structure tree on ${engineVersion} (aria-owns ${JSON.stringify(dom.link.owns)}): ` +
             'an unlabelled control is what a reader gets when the widget and its words are not connected',
+        );
+      }
+      if (!ownsLinks && (dom.link.ownsCount !== 0 || dom.link.name !== '')) {
+        fail(
+          `the link owns ${dom.link.ownsCount} element(s) and reads "${dom.link.name}" on ${engineVersion}, which is ` +
+            `below the declared minimum ${LINK_OWNERSHIP_MINIMUM} — the engine moved and ` +
+            'either the feature’s `engineRequirements` or this row is now out of date',
         );
       }
 
@@ -1851,15 +1887,24 @@ const CHECKS = [
         fail('the accessibility tree has no list items, so the list is a run of text again');
       }
       const linkLine = linkAt >= 0 ? lines[linkAt].trim() : '(no link node in the snapshot)';
-      if (!nestedUnderParagraph) {
-        fail(
-          `the link is not announced inside its owning paragraph (paragraph at line ${paragraphAt + 1}, link ` +
-            `at line ${linkAt + 1}: "${linkLine}") — it owns ${dom.link.ownsCount} structure element(s), which ` +
-            'is the wiring, but the tree still reads it flat',
-        );
-      }
-      if (!/link "See the annual statement"/.test(snapshot)) {
-        fail(`the link is announced with no name: "${linkLine}"`);
+      if (!ownsLinks) {
+        // Nothing is asserted about the link below the minimum except that the layer still rendered it: what it
+        // is *called* there is the destination URL, which is the degradation the feature declares rather than a
+        // defect, and the row's own text carries what the engine produced so a run reads as a measurement.
+        if (linkAt < 0) {
+          fail(`the annotation layer mounted a link element but the accessibility tree has no link node at all on ${engineVersion}`);
+        }
+      } else {
+        if (!nestedUnderParagraph) {
+          fail(
+            `the link is not announced inside its owning paragraph (paragraph at line ${paragraphAt + 1}, link ` +
+              `at line ${linkAt + 1}: "${linkLine}") — it owns ${dom.link.ownsCount} structure element(s), which ` +
+              'is the wiring, but the tree still reads it flat',
+          );
+        }
+        if (!/link "See the annual statement"/.test(snapshot)) {
+          fail(`the link is announced with no name: "${linkLine}"`);
+        }
       }
 
       // The figure's alternative text, which arrives from `/Alt` and nowhere else.
@@ -1882,9 +1927,15 @@ const CHECKS = [
       return (
         `untagged first: 0 trees, ${untagged.spans} spans, ${untaggedFetch} requests for the viewer chunk; ` +
         `then tagged: ${dom.roots} tree(s) over ${dom.roles.join('/')} after ${taggedFetch - untaggedFetch} ` +
-        `fetch of ${viewerRequests[0] ?? '?'}, the heading called by its text, link owns ` +
-        `${dom.link.ownsCount} in-tree element(s) (${dom.link.owns.map((o) => `${o.id.slice(-8)}→${o.role}`).join(', ')}) ` +
-        `and is announced as a named link inside its paragraph; figure named "${(figure ?? '').slice(0, 34)}" from /Alt`
+        `fetch of ${viewerRequests[0] ?? '?'}, the heading called by its text; ` +
+        (ownsLinks
+          ? `link owns ${dom.link.ownsCount} in-tree element(s) ` +
+            `(${dom.link.owns.map((o) => `${o.id.slice(-8)}→${o.role}`).join(', ')}) and is announced as a named ` +
+            'link inside its paragraph'
+          : `engine ${engineVersion} is below the tier's declared ${LINK_OWNERSHIP_MINIMUM} minimum, so the link ` +
+            `is asserted absent rather than wired: owns ${dom.link.ownsCount}, label ${JSON.stringify(dom.link.name)}, ` +
+            `announced as ${JSON.stringify(linkLine.slice(0, 60))}`) +
+        `; figure named "${(figure ?? '').slice(0, 34)}" from /Alt`
       );
     },
   },

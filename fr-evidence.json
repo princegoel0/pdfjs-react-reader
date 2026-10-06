@@ -1174,12 +1174,15 @@
       "state": "partial",
       "implementation": [
         "src/features/structure.tsx",
+        "src/lib/engine-version.ts",
         "src/components/PdfPage.tsx"
       ],
       "automated": [
         "src/lib/tagged.test.ts",
         "src/components/PdfPage.structure.test.tsx",
-        "src/features/structure.test.tsx"
+        "src/features/structure.test.tsx",
+        "src/lib/engine-version.test.ts",
+        "src/features/structure.engine-floor.test.tsx"
       ],
       "acceptance": [
         "scripts/browser-matrix.mjs#structure-tree-in-the-accessibility-tree"
@@ -1188,10 +1191,11 @@
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
-        "src/components/PdfPage.structure.test.tsx"
+        "src/components/PdfPage.structure.test.tsx",
+        "src/features/structure.engine-floor.test.tsx"
       ],
       "gaps": [
-        "the tier's link-ownership half does not exist in the advertised floor release. CI run 37519895887 (2026-10-07) failed `structure-tree-in-the-accessibility-tree` in all three engines' desktop cells on pdfjs-dist 6.2.108 -- the link annotation reaches the tree with `aria-owns` empty, which is the unlabelled control the clause refuses -- and the same check is green on 6.3.289 and 6.4.299 in the same job. Measured twice, because a runner reading and a source reading are different claims: the engine module itself has no link-ownership code at 6.2.108 (`enableLinkOwnership` appears 0 times in `build/pdf.mjs`, 853,537 bytes, and 2 times in the 860,384-byte 6.3.289 and the 860,818-byte 6.4.299), and `npm view pdfjs-dist versions` says the only 6.x releases published are 6.0.227, 6.1.200, 6.2.108, 6.3.289 and 6.4.299 -- so the boundary is not a patch level, it is the next release line, and there is nothing between them to test. What the package does about that is a contract decision (#249): raise the peer floor to 6.3.289, or keep `^6.2.108` and give the feature a declared engine minimum that the code states and the docs show, or implement the ownership here. Nothing has been coded in the meantime, because the alternatives promise different things to different hosts.",
+        "the clause’s consequence — a link announced with the words it is drawn over — is an engine capability, and the release the peer range opens with does not have it. `enableLinkOwnership` appears 0 times in 6.2.108’s `build/pdf.mjs` (853,537 bytes) and 2 times in 6.3.289’s (860,384) and 6.4.299’s (860,818), and the published 6.x line is 6.0.227 → 6.1.200 → 6.2.108 → 6.3.289 → 6.4.299, so the boundary is a release line with nothing in between. #249’s ruling let the tier say this about itself instead of moving the range: `structureFeature.engineRequirements` carries the behaviour, its minimum and what the reader gets below it, the state publishes `linkOwnershipAvailable`, and the browser row asserts the degradation rather than the wiring whenever the installed engine is below the boundary — so a host on `6.2.108` still has an honest sentence to read, and what it does not have is the ownership. Measured both ways on 2026-10-06 in Chromium desktop at each engine: `link owns 1 in-tree element(s) (a_link_0→span)` at 6.3.289 against `engine 6.2.108 is below the tier’s declared 6.3.289 minimum, so the link is asserted absent rather than wired: owns 0, label \"\"` at the floor. Two counterfactuals bite: publishing `linkOwnershipAvailable: true` at the floor fails the state case, and moving the matrix’s constant off `6.3.289` fails the case that keeps the two files on one boundary.",
         "the announcement is read from the accessibility tree, not from an assistive technology: the row asks Playwright’s aria snapshot, which each engine serves from its own inspector protocol, and in Chromium it shows the heading called by its text, three list items, the link named and nested inside its paragraph, and the figure named from `/Alt`. The NVDA/JAWS/VoiceOver pairings §8 lists have no runner, no operator and no record (#141, #156 — the same evidence FR-45 owes), and two engines have seen it — Chromium and Firefox both returned 2 trees over the nine roles, the link nested in its own paragraph and its `aria-owns` resolving in the tree each of them built (the element ids differ by engine, `6_link_0` against `3_link_0`, which is the engine’s numbering rather than a fact this package authors) — while a runner has now run it in three: the webkit 26 cell on CI run 37386366651, dev at 651672c, 2026-10-05 returned 2 trees over the same nine roles with the link nested inside its own paragraph and its `aria-owns` resolving in the tree that engine built — `a_link_0` there against `c_link_0` in chromium and `d_link_0` in firefox in the same run, where the local reading quoted below had the same two engines as `6_link_0` and `3_link_0`. The string is a per-run engine counter, not a fact this package authors, and Safari’s engine has now read this row even though this host cannot start it",
         "the clause’s noun is a widget and the measurement is a link. `tagged-sample.pdf` carries exactly one annotation — a Link — which is what `aria-owns` and the engine’s `enableLinkOwnership` are written for, so ownership is proven for the annotation the file has. A form *field* inside a marked-content node is still unmeasured, because no tagged fixture holds one: `form-sample.pdf` declares no structure tree and `tagged-sample.pdf` declares no fields"
       ],
@@ -1487,12 +1491,14 @@
       "state": "partial",
       "implementation": [
         "package.json",
+        "src/lib/engine-version.ts",
         "scripts/tarball-check.mjs",
         "scripts/check-packaging.mjs"
       ],
       "automated": [
         "scripts/tarball-check.mjs",
-        "src/lib/dependency-boundary.test.ts"
+        "src/lib/dependency-boundary.test.ts",
+        "src/features/structure.engine-floor.test.tsx"
       ],
       "acceptance": [
         ".github/workflows/ci.yml"
@@ -1506,9 +1512,9 @@
         "src/lib/dependency-boundary.test.ts"
       ],
       "gaps": [
-        "the advertised range and a requirement inside it now contradict each other, and the measurement that found it is #194's engine axis: `^6.2.108` is the contract, and at exactly that floor the engine has no link-ownership path at all, so `FR-43`'s promise is false for the release the range opens with (see that row's gap -- the boundary is 6.3.289, and the published 6.x line has nothing in between). Whether the range moves or the feature gains a declared minimum is #249, and it is an owner call because each answer tells a different set of hosts what they must upgrade. The older half of this gap is now measured rather than promised: the consumer job runs the packed tarball against both ends of the `pdfjs-dist` contract (the `6.2.108` floor and a pinned current 6.x) and the React job both majors at their minimum patch, but `@cantoo/pdf-lib` is installed exactly once, from the lockfile, so the writer peer's `^2.11.1` is asserted as far as semver resolves it and no further"
+        "the engine contract is proven unevenly across its two halves. `pdfjs-dist` is now verified *inside* the range, not only at its edges as an install: the `browser` job paints a page at `6.2.108` and at `6.4.299`, and the tier whose behaviour differs between them declares that on its own contract instead of letting `^6.2.108` imply it (#249, and `FR-43` for the reading). `@cantoo/pdf-lib` is the half that is still a promise: it is installed exactly once, from the lockfile, so its advertised `^2.11.1` is asserted as far as semver resolves it and no further — which is precisely the difference this clause’s last sentence draws, that npm acceptance is not a support claim."
       ],
-      "note": "Two of the three gaps this row carried are closed by one file. `src/lib/dependency-boundary.test.ts` walks the module graph the way a bundler does — value imports, re-exports and dynamic imports are edges, `import type` is not, comments are stripped first — and asserts the boundary in four directions: the sources that hold `@cantoo/pdf-lib` are found by scanning `src/` rather than listed, so the ban cannot be satisfied by moving the import into a new file; the root and `/headless` entries reach none of them; `/edit` and `/merge` reach at least one, which is what stops the previous pair passing on a walk that resolved nothing; and of the thirteen advertised JS entries, exactly those two compile the peer in. The last case covers the row's remaining sentence — every bare specifier a shipped module imports is declared in the manifest, with *shipped* derived as \"reachable from an advertised door\", which is what keeps the dev-only axe harness out of the set without an allow-list. Three counterfactuals are red: the barrel re-exporting the writer, the peer promoted into `dependencies`, and the walk losing its separator normalisation. The last is how the first version of this guard passed vacuously on Windows — `relative()` answers with backslashes, so every resolved edge was a different string than the ones the ban was written against, and only the case asserting the *opposite* noticed. What stays open is the range itself: an install that resolves is not a version that works, and only the floor is pinned in a gate."
+      "note": "The range and the requirement inside it no longer contradict each other, which is what this row’s gap said it was waiting on: the package floor stayed `^6.2.108` and the capability that needs more than that is declared by the feature that needs it, on `PdfFeature.engineRequirements`, so \"semver acceptance is not a support claim\" is now carried by a field rather than by a sentence in a table. `src/lib/dependency-boundary.test.ts` still walks the module graph the way a bundler does — value imports, re-exports and dynamic imports are edges, `import type` is not, comments stripped first — and asserts the boundary in four directions: the sources holding `@cantoo/pdf-lib` are found by scanning `src/` rather than listed, so the ban cannot be satisfied by moving the import into a new file; the root and `/headless` entries reach none of them; `/edit` and `/merge` reach at least one, which is what stops the previous pair passing on a walk that resolved nothing; and of the thirteen advertised JS entries, exactly those two compile the peer in. Three counterfactuals are red: the barrel re-exporting the writer, the peer promoted into `dependencies`, and the walk losing its separator normalisation — the last is how the first version of this guard passed vacuously on Windows, because `relative()` answers with backslashes, so every resolved edge was a different string than the ones the ban was written against, and only the case asserting the *opposite* noticed. What stays open is the writer peer’s own range, and the row says so above rather than in a note."
     },
     "FR-54": {
       "title": "Stable Error & Cancellation Contract",

@@ -56,12 +56,12 @@ React DOM, `pdfjs-dist`, and one optional writer.
 | `engines` field | `node >= 22.13.0`, and it is no longer the only engine statement the package makes: `npm run check:packaging` parses §8's two Node rows out of `PRD.md`, requires them to agree with each other and with this field, and refuses a CI pin below them | `package.json` `engines`, `scripts/check-packaging.mjs` |
 | Files published | `["dist"]` only — no `src/`, no playground, no docs | `package.json` `files` |
 | Importable subpaths | **25** (12 JS entries + 3 languages + 9 stylesheets + `package.json`) | `package.json` `exports` |
-| Names on the main entry | **239** | `node scripts/inventory.mjs`, over `dist/index.d.ts` — all four rows below were re-run against today's `dist` on 2026-10-04; the previous figures (234 / 187 / 32 / 9) predate the names `0.12`'s first six packages published |
+| Names on the main entry | **240** | `node scripts/inventory.mjs`, over `dist/index.d.ts` — re-run against today's `dist` on 2026-10-06 (239 / 197 / 32 / 9 held from 2026-10-04 until #249 put the feature contract's `T PdfEngineRequirement` on the barrel) |
 | Names on `/headless` | **197** | the same, over `dist/headless.d.ts` |
 | Names on `/edit` | **36**, on `/merge` **13** | `dist/edit.d.ts`, `dist/merge.d.ts` |
-| Distinct public names, by maturity | **320** — 263 stable, 57 experimental, 0 deprecated, plus **15** in the `removed` ledger (FR-18). The split is measured, not asserted: `npm run check:maturity` prints it, and whether 57 experimental names is the right number to carry into `1.0.0` is the owner's open decision **#207** | `api-maturity.json`, audited by `npm run check:maturity` |
-| Source files (non-test) | **87**, 18,309 lines | `src/**`, counted by `node scripts/check-docs.mjs` (`wc -l` semantics, test files excluded). 80 / 17,169 was the figure when §2 was last re-run by hand; the touch-fallback module, its engine stand-ins, this script, the handle member and walk guard of #231, the form hook’s refusal to claim a change it did not make, #238’s three cancellation guards (an already-aborted token performs no work on the print, attachment and thumbnail paths), #243’s measuring context, #241’s panel bound, #229’s signature box rule, #175’s ready-document shell mount and #247’s shared ready-shell harness (the jsdom answers, the page proxy, and the fold fake that lets the ⋯ panel mount) have moved it since |
-| Test files / tests | **142 files / 1,264 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
+| Distinct public names, by maturity | **323** — 263 stable, 60 experimental, 0 deprecated, plus **15** in the `removed` ledger (FR-18). The split is measured, not asserted: `npm run check:maturity` prints it, and whether 60 experimental names is the right number to carry into `1.0.0` is the owner's open decision **#207** | `api-maturity.json`, audited by `npm run check:maturity` |
+| Source files (non-test) | **88**, 18,408 lines | `src/**`, counted by `node scripts/check-docs.mjs` (`wc -l` semantics, test files excluded). 80 / 17,169 was the figure when §2 was last re-run by hand; the touch-fallback module, its engine stand-ins, this script, the handle member and walk guard of #231, the form hook’s refusal to claim a change it did not make, #238’s three cancellation guards (an already-aborted token performs no work on the print, attachment and thumbnail paths), #243’s measuring context, #241’s panel bound, #229’s signature box rule, #175’s ready-document shell mount and #247’s shared ready-shell harness (the jsdom answers, the page proxy, and the fold fake that lets the ⋯ panel mount) and #249’s engine-version helper — the comparison a feature uses to declare that one of its own behaviours needs an engine newer than the package floor — have moved it since |
+| Test files / tests | **144 files / 1,272 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
 | Stylesheets | 9, from 24 to 1,337 lines | `src/styles/`, same command (`structure.css` is the small one, `viewer.css` the large) |
 | Fixtures | 22 PDFs, produced by 18 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded; `vector-sample.pdf` is the only one whose cost is operators — four A1 sheets, 336 clipped cells each, 12,922 engine-reported operators a page and 0.51 MB on disk; `oversize-sample.pdf` is the only one with a page no renderer may paint — 612×792, 12,000×9,000 and 200,000×600 pt, which is the edge-case suite's sixth shape and the 0.25-minimum refusal in 1,023 bytes | `playground/fixtures/`, `scripts/make-*.mjs` |
 | Benchmark | `npm run bench` measures §6's four profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). All four have committed fixtures: C is `vector-sample.pdf` with the engine's own time taken separately through `playground/raw.html`, and D is `scan-sample.pdf` on the committed low-memory harness — 412×915 at dpr 3 with an Android user agent and 6× CDP CPU throttling, zoomed through the toolbar's overflow menu. The report is **`benchmarks/latest.json`, tracked**: §6's environment fields, each fixture's sha256, and p50/p95/max per sampled number with p99 only where there are 100+ samples. `src/lib/benchmark-record.test.ts` is what keeps that file an evidence rather than an artifact of the last run | `scripts/benchmark.mjs`, `benchmarks/latest.json`, `ROADMAP.md` §1 `FR-49` |
@@ -172,7 +172,7 @@ if `require()` and `import()` expose different names.
 | `pdfjs-react-reader/features/layers` | `layersFeature`, 1 type |
 | `pdfjs-react-reader/features/annotate` | `annotateFeature`, `createEditorEventBus`, 2 types |
 | `pdfjs-react-reader/features/attachments` | `attachmentsFeature`, 1 type |
-| `pdfjs-react-reader/features/structure` | `structureFeature`, 1 type — no control, no panel, no factory: its entire surface is page props |
+| `pdfjs-react-reader/features/structure` | `structureFeature`, 1 type, plus `STRUCTURE_LINK_OWNERSHIP_MINIMUM` and `structureLinkOwnershipAvailable` (#249) — no control, no panel, no factory: its surface is page props and the two names that say which engine half of the promise the installed engine keeps |
 | `pdfjs-react-reader/locales/de` \| `/es` \| `/fr` | One complete language each; **separate entries so importing the viewer never hands you a language you didn't ask for** |
 | `pdfjs-react-reader/styles.css` | The shell theme |
 | `…/print.css` `forms.css` `outline.css` `layers.css` `annotate.css` `attachments.css` `structure.css` `edit.css` | A feature's CSS, only needed if you mount that feature. `structure.css` is the one of them that is not cosmetic: its rule is what keeps an accessibility layer out of the page's layout |
@@ -195,9 +195,9 @@ index pair
 written once rather than twenty times. `node scripts/inventory.mjs` prints the flat list per entry, so a
 disagreement between this section and the build is a fact about this section.
 
-Across all twelve entries the surface is **320 distinct names** (510 name-slots; 181 names are reachable
+Across all twelve entries the surface is **323 distinct names** (510 name-slots; 181 names are reachable
 from more than one entry, which is what the barrels are for) — measured 2026-10-04 by `node
-scripts/inventory.mjs`, the tool §22 tells a reader to run before believing this section. Each of the 320
+scripts/inventory.mjs`, the tool §22 tells a reader to run before believing this section. Each of the 323
 carries a maturity state in `api-maturity.json`, and the split belongs in that file and in the command's own
 output rather than here: a tag or a count copied into prose is a tag or a count that can drift from the thing
 that is checked, and this paragraph's own previous figures — 315 / 272 / 43, from before FR-18 took fifteen
@@ -222,7 +222,7 @@ are the host's own layout; `ViewerSidebar` takes `children` to replace the shell
 `useViewerController` `T ViewerController`
 
 ### Feature contract (write your own feature)
-`T PdfFeature` `T AnyPdfFeature` `T PdfFeatureControl` `T PdfFeaturePanel` `T PdfFeatureKeyBinding`
+`T PdfFeature` `T PdfEngineRequirement` `T AnyPdfFeature` `T PdfFeatureControl` `T PdfFeaturePanel` `T PdfFeatureKeyBinding`
 `T PdfViewerShell` `T FeaturePageProps` `T FeaturePublication` `T FeatureKeyEvent` `NO_FEATURES`
 `findFeatureKey` `mergeFeaturePageProps` `orderFeatures` `samePublication` — plus the authoring hooks
 `usePdfFeatureShell` `usePdfFeaturePublish` `usePdfFeatureState` `usePdfFeatureOptions`
@@ -232,7 +232,9 @@ are the host's own layout; `ViewerSidebar` takes `children` to replace the shell
 dependency and a dependency cycle with `CONFIGURATION_ERROR` before anything mounts, and returns the
 list with every dependency ahead of its dependents. `T PdfFeature` carries the three fields the contract
 added with it — `dependsOn`, `stylesheets` and `cleanup` — and the shell validates the list itself, so a
-host only calls it to build their own bar in the order the Runners were mounted.
+host only calls it to build their own bar in the order the Runners were mounted. `engineRequirements`, the
+fourth, arrived with #249 and is a different kind of field: it says nothing about other features, only that
+one named behaviour of this one needs an engine newer than the package floor, and what a reader gets below it.
 
 ### Headless hooks
 `usePdfDocument` `usePdfVirtualizer` `usePdfSearch` `usePdfOutline` `usePdfPrint` `usePdfDownload`
@@ -912,7 +914,7 @@ focus **twice** — palette on, then off — so the ring seen is the sheet's re-
 
 ---
 
-## 17. Tests: 142 files, 1,264 tests, three projects
+## 17. Tests: 144 files, 1,272 tests, three projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
 from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library) except the audits, which are
@@ -922,7 +924,7 @@ name nothing (#216; `src/lib/a11y-serial.test.ts` keeps that arrangement from de
 counts are the files this section has ever itemised; the rest are named, not counted, so a stale figure
 cannot appear here.
 
-* Logic: `assets` `attachments` `canvas` `download` `editing-state` `features` `form` `fullscreen`
+* Logic: `assets` `attachments` `canvas` `download` `editing-state` **`engine-version` (4)** `features` `form` `fullscreen`
   `keyboard` `labels` `layout` `link-service` `optional-content` `outline` `page-plan`
   `pdf-write` (30) `print` `search` (35) `signature` `source` (17) `toolbar` `worker` `zoom` `locales`
   (16) — plus `abort` (13) `retry` (29) `search.abort` (4) and **`source.classify` (39)**, the rule that
@@ -1000,6 +1002,11 @@ cannot appear here.
   **`features/structure` (10)** — the gate counted by reads of the peer class (zero for an untagged file,
   one for a tagged one), both `MarkInfo` shapes, the document changing under it, and the merged page props
   carrying the class rather than only the switch;
+  **`features/structure.engine-floor` (4)** (#249) — the same tier read at each side of the boundary it declares
+  for itself: the requirement is *on* the feature (its behaviour, its minimum, what a reader gets below it), the
+  published state is `false` at `6.2.108` and `true` at `6.3.289`, and the fourth case refuses the arrangement
+  where `scripts/browser-matrix.mjs` asserts a different release than the contract names. Only the engine's
+  reported version is stubbed, so the comparison and the publication run for real;
   **`features/annotate.lifecycle` (5)** — the manager's whole lifetime as FR-29 states it: built with the
   document whose `annotationStorage` an incremental save commits, once per document, rebuilt *and disposed* on a
   swap, untouched by a page coming and going while that page's own layer is rebuilt against the same instance,
@@ -1330,7 +1337,7 @@ Nothing here should be taken on trust. Each of these re-derives a number above:
 node scripts/check-docs.mjs                     # §2's counts are now a gate, not a courtesy (#213): importable subpaths, the maturity split, source files and lines, test files, stylesheet count and range, fixtures and generators (including "all of them tracked"), CI job count, PRD §8's browser-check count, and the version the docs site prints. Since #240 it also holds the docs site's size tables to `docs/src/size-figures.json` — every published tier must have a figure, no page may index a key the gate never measured, no size cell may be typed by hand — and it refuses a CI run tally or a browser cell's ok/skip reading in `ROADMAP.md` or in any docs page, because those are the two figures no checkout can re-derive. Since #194 it reads the workflow's engine axes too: the two peer jobs must name the same pair, that pair must contain `package.json`'s advertised floor and nothing else, and the benchmark step must name a version one of the cells actually runs. It also compares `package-lock.json`'s mirrored root entry (`engines`, `peerDependencies`, `version`) with `package.json`: that copy had been saying `node >=20` since before the floor moved to 22.13.0, and no job noticed because `npm ci` installs from the lock instead of reconciling it. `--selftest` perturbs every figure it reads, one capture at a time, writes each banned figure back in, moves the axis six ways and the lock mirror four; it requires every one to be caught
 npm run check:docs                              # the same, as the step `verify` and CI's Verify job run
 grep -rc "" src/**/*.ts src/**/*.tsx            # file inventory (§2)
-npm run test                                    # 1,264 tests in 142 files (§2, §17)
+npm run test                                    # 1,272 tests in 144 files (§2, §17)
 npm run a11y                                    # the axe audit on its own (FR-45); it also runs inside the line above
 npm run test:browsers                           # FR-48: the §8 browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; it exits non-zero if a check fails *or* if an engine never started, because a row with no job behind it is not a tested row
 npm run probe:canvas                            # FR-57: the §6.1 probe against real Chromium — the ceiling it answers with, the ceiling a mobile UA lowers it to, and the frame every surface landed on

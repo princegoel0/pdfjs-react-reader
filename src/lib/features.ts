@@ -238,6 +238,16 @@ export interface PdfFeatureKeyBinding<S extends object = FeaturePublication> {
   run(state: S, shell: PdfViewerShell, event: FeatureKeyEvent): void;
 }
 
+/** One behaviour a feature offers only from a given `pdfjs-dist` release, and what happens below it. */
+export interface PdfEngineRequirement {
+  /** What the behaviour is, in the words a host would put in its own docs. */
+  behaviour: string;
+  /** The lowest `pdfjs-dist` version in which the engine can do it, as a dotted release. */
+  minimum: string;
+  /** What the feature does instead, on an engine below `minimum`. */
+  below: string;
+}
+
 export interface PdfFeature<S extends object = FeaturePublication> {
   id: string;
   /**
@@ -300,6 +310,17 @@ export interface PdfFeature<S extends object = FeaturePublication> {
    * sheet that is not published, or stops declaring one it needs.
    */
   stylesheets?: readonly string[];
+  /**
+   * Behaviours this feature only offers from some `pdfjs-dist` release up.
+   *
+   * The engine contract is a range, and a range is allowed to contain a release where one behaviour simply has no
+   * code behind it — the peer floor `6.2.108` is like that for the structure tier's link ownership. Saying so on
+   * the feature value is what makes that visible to a host before it mounts: a promise the installed engine cannot
+   * keep is a silent gap otherwise, and the reader of an accessibility feature has no way to tell "untested here"
+   * from "does not exist here". `below` is what the feature does *instead*, because a degraded behaviour is a
+   * different thing from a missing one and the host has to be able to tell its readers which happened.
+   */
+  engineRequirements?: readonly PdfEngineRequirement[];
   /**
    * Releases what this feature owns when the shell unregisters it.
    *

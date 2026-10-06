@@ -44,9 +44,11 @@ export function Compatibility() {
               and <code>6.4.299</code> as an axis of its own — a page painted at each end, not only a bundle built at
               them — and its first reading found a difference inside the advertised range: at{' '}
               <code>6.2.108</code> the engine has no link-ownership code, so <code>structureFeature</code>’s promise
-              that a widget is announced with the words it owns holds only from <code>6.3.289</code> up. What to do
-              about that is #249; every run is recorded by id under <code>FR-48</code> in{' '}
-              <code>fr-evidence.json</code>
+              that a widget is announced with the words it owns holds only from <code>6.3.289</code> up. #249 kept{' '}
+              <code>^6.2.108</code> and let the tier say so itself:{' '}
+              <code>structureFeature.engineRequirements</code> declares that behaviour’s minimum and what happens
+              below it, and the feature’s state carries <code>linkOwnershipAvailable</code>. Every run is recorded by
+              id under <code>FR-48</code> in <code>fr-evidence.json</code>
             </td>
             <td>The engine. Rendering, text, annotations, editing and printing all go straight to it.</td>
           </tr>

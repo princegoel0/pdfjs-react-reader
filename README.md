@@ -113,14 +113,14 @@ Opt-in, one import each:
 | `features/layers` | A sidebar tab listing the document's optional-content groups, switching one and having every page redraw. | 1.21 kB |
 | `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.43 kB |
 | `features/annotate` | Marking up the document: pdf.js's own editor manager behind three tools — highlight, free text, ink — with a highlight colour from the engine's palette, and a Delete that is live only while a mark is selected. Undo and redo are on the state the feature publishes, so the controls are yours to place. | 2.02 kB |
-| `features/structure` | The document's own structure tree, as accessibility structure: headings, lists, tables and named figures become `role`d elements that own the words they describe, for the one class of PDF that declares them. Contributes no control and no panel — there is nothing for a reader to press — and fetches its peer payload only for a document that says it is tagged. | 0.36 kB |
+| `features/structure` | The document's own structure tree, as accessibility structure: headings, lists, tables and named figures become `role`d elements that own the words they describe, for the one class of PDF that declares them. Contributes no control and no panel — there is nothing for a reader to press — and fetches its peer payload only for a document that says it is tagged. | 0.74 kB |
 | `edit` | Whole pages, and a file that no longer depends on a reader: a **Pages** sidebar tab that moves, turns and removes pages through a plan you can step back before writing anything, then applies it, extracts the planned pages as a new file, or splits the list at any row into two. Plus **Flatten**, which bakes every mark and field value into the page so it survives a viewer with no editor to show it.
   A **Sign** section appears in that tab when the document has signature fields: draw a mark, choose a box, and it is
   written into the field's appearance. It is a picture of a signature — the file is never given a signature value, and
   a box that already holds a real one is refused rather than covered over. One of the two tiers with its own dependency — `@cantoo/pdf-lib`, an *optional* peer, imported by nothing else in the package. | 6.44 kB |
 | `merge` | Combining pages from two or more documents into a **third file**: `mergeDocuments({ sources, order })` copies the pages it is told to copy, in the order it is told, and `usePdfMerge` is the state a picker needs — pages per source, the plan, and the write. No component, because which documents may be merged and what happens to the result are the host's business; [Recipes](https://princegoel0.github.io/pdfjs-react-reader/#/recipes) shows the writer bare. A page may be taken twice here, which the page plan inside one document refuses; a source is never written, which the tests assert by hashing. What does not cross the boundary is the interactive form: a page arrives with its widget annotations, not with the `AcroForm` that binds them. | its own entry: 1.75 kB |
 
-All nine together cost 15.92 kB, less than their sum, because they share the shell they attach to.
+All nine together cost 16.30 kB, less than their sum, because they share the shell they attach to.
 They are also the reference for writing your own: the contract and the authoring hooks are public.
 (Measured on this build; see [Size](#size) for how each row is produced and why a tier that
 parses files is allowed the kilobytes that costs.)
@@ -149,7 +149,7 @@ plan lives: rows move by button or by drag, each carries its own controls, the b
 
 | Package | Required | Tested with |
 | --- | --- | --- |
-| `pdfjs-dist` | `^6.2.108` | 6.3.289, the version installed here and the one CI's `verify` job runs. CI builds a throwaway consumer against `6.2.108` and `6.4.299`, and since #194 its `browser` matrix carries that same pair as an axis, so a page is painted at both ends of the range rather than only compiled: the swap happens inside the install that pins the rest of the tree, and the cell refuses to run if the disk is not the version it asked for. **The first run through it found a difference the range hides:** at `6.2.108` the engine has no link-ownership code at all, so `structureFeature`'s promise that a widget is announced with the words it owns does not hold on the floor release — it does on `6.3.289` and later, and there is no published 6.x in between. What to do about that (#249) is a contract decision: raise the floor, give the feature a declared engine minimum, or implement the ownership here. Each reading is recorded under `FR-48` in `fr-evidence.json` |
+| `pdfjs-dist` | `^6.2.108` | 6.3.289, the version installed here and the one CI's `verify` job runs. CI builds a throwaway consumer against `6.2.108` and `6.4.299`, and since #194 its `browser` matrix carries that same pair as an axis, so a page is painted at both ends of the range rather than only compiled: the swap happens inside the install that pins the rest of the tree, and the cell refuses to run if the disk is not the version it asked for. **The first run through it found a difference the range hides:** at `6.2.108` the engine has no link-ownership code at all (`enableLinkOwnership` appears nowhere in its `build/pdf.mjs`), so a link is not given the words it is drawn over — it does on `6.3.289` and later, and there is no published 6.x in between. #249 settled that by letting the *feature* declare its floor instead of moving the package's: `structureFeature.engineRequirements` names `6.3.289` for that one behaviour and says what happens below it, `structureFeature`’s state carries `linkOwnershipAvailable`, and `^6.2.108` stays the peer range because the rest of the tier works there. The matrix’s structure row reads the same boundary and, below it, asserts the degradation instead of the wiring — so a release that silently *gains* the ownership trips the row. Each reading is recorded under `FR-48` in `fr-evidence.json` |
 | `react` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, both verified locally. The 18 pass was re-run on 2026-09-29 with `@types/react@18`: `npm run verify` end to end — typecheck, all 449 tests then in the suite, both bundles, the size gate. The `react` matrix job has since run on CI: all four cells (18 and 19, minimum and latest patch) passed typecheck, the suite and the build on 2026-10-04 |
 | `react-dom` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, swapped in alongside `react` for the same run |
 | `@cantoo/pdf-lib` | `^2.11.1`, **optional** — only `editFeature` asks for it | 2.11.1 |
@@ -621,9 +621,9 @@ release close: every figure below is the one `npm run size` measured and wrote t
 | `+ layersFeature` | 33.62 kB | +1.21 kB |
 | `+ attachmentsFeature` | 33.84 kB | +1.43 kB |
 | `+ annotateFeature` | 34.43 kB | +2.02 kB |
-| `+ structureFeature` | 32.77 kB | +0.36 kB |
+| `+ structureFeature` | 33.15 kB | +0.74 kB |
 | `+ editFeature` | 38.85 kB | +6.44 kB |
-| All nine | 48.33 kB | +15.92 kB |
+| All nine | 48.71 kB | +16.30 kB |
 | A single headless hook (`usePdfDocument`) | 5.57 kB | — |
 | A merge, on its own (`/merge`, writer and hook) | 1.75 kB | separate entry, not over core |
 | The same two shipped paths as CommonJS (`index.cjs`, `headless.cjs`) | 60.50 / 32.10 kB | the other format, not another feature |

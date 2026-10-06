@@ -17,9 +17,9 @@
     "core+layers": 33.62,
     "core+annotate": 34.43,
     "core+attachments": 33.84,
-    "core+structure": 32.77,
+    "core+structure": 33.15,
     "core+edit": 38.85,
-    "all": 48.33,
+    "all": 48.71,
     "headless-only": 5.57,
     "merge-only": 1.75
   },
@@ -45,8 +45,8 @@
     "layers": 1.21,
     "annotate": 2.02,
     "attachments": 1.43,
-    "structure": 0.36,
+    "structure": 0.74,
     "edit": 6.44,
-    "all": 15.92
+    "all": 16.3
   }
 }

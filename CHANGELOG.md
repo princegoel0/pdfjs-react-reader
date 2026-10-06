@@ -30,7 +30,7 @@ in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **45 met, 12 partial, 1
-absent** of 58, on a suite of **1,264 tests in 142 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,272 tests in 144 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
 this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
@@ -59,6 +59,27 @@ direction the count takes from here: down where a guard turns out to be decorati
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **A feature can now declare that one of its own behaviours needs an engine newer than the package floor, and
+  `structureFeature` is the first to (#249; FR-43, FR-53, FR-48, 2026-10-07).** The owner's ruling on #194's finding was
+  to keep `^6.2.108` and let the tier state its own boundary, because raising the floor for one accessibility
+  capability would ask every host to upgrade for a promise that already holds for everything else there. Three pieces
+  make that a fact rather than a sentence: `PdfFeature.engineRequirements` (§3.7's feature metadata, so the declaration
+  travels with the feature and not with a table), `src/lib/engine-version.ts` — `readEngineVersion()` off the installed
+  engine and `engineAtLeast()` comparing it segment by segment, because `6.10.0` is not greater than `6.9.0` to a
+  string — and `structureFeature`'s state publishing `linkOwnershipAvailable`, which is `false` at the floor and `true`
+  from 6.3.289. The browser row reads the same boundary and, below it, asserts the *degradation* instead of the wiring:
+  at 6.2.108 the link is named by its destination (`title="https://example.com/annual-statement"`, no `aria-label`,
+  `aria-owns` empty) and the row now fails if an engine *gains* the ownership while the contract still says it is
+  absent, so the declared floor cannot quietly rot upward. Measured both ways in Chromium desktop, each engine with
+  `node_modules` swapped the way CI swaps it: `link owns 1 in-tree element(s) (a_link_0→span)` at 6.3.289 against
+  `engine 6.2.108 is below the tier's declared 6.3.289 minimum, so the link is asserted absent rather than wired: owns
+  0, label ""` at the floor — both green, which is the point of a branch. Two counterfactuals, both restored by
+  checksum: publishing `linkOwnershipAvailable: true` at the floor fails with *the state promised ownership at the
+  floor*, and moving the matrix's constant off 6.3.289 fails the case that keeps the contract and the harness on one
+  boundary. `PRD.md` FR-43 is amended to say what *met* means at the floor (Amended, above), the docs pages and README
+  now name the declared minimum instead of asking what to do about it, and `FR-43` and `FR-53` keep gaps that say what
+  is still genuinely open rather than what has been decided.
 
 - **The browser matrix gained an engine axis, so a page is painted at both ends of the contract it is claimed
   against (#194, 2026-10-07).** `PRD.md` FR-48 asks for "the published engine floor `6.2.108` and the latest
@@ -1173,13 +1194,13 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Amended
 
-Eight statements moved across three rulings (2026-10-04, 2026-10-05, and 2026-10-05 again on #207), and each
-moved as the lock requires: the
-id or section is unchanged, the whole requirement is restated, and the reason is written here to stay. Nothing
+Nine statements moved across four rulings (2026-10-04, 2026-10-05, 2026-10-05 again on #207, and 2026-10-07 on
+#249), and each moved as the lock requires: the id or section is unchanged, the whole requirement is restated,
+and the reason is written here to stay. Nothing
 in this list is a requirement weakened to match the code — in every case the sentence was saying something the
 package does not do, or cannot do on the engine we advertise, one of them (`FR-47`) gained a promise instead of
 losing one, and the last (§6's bundle budgets) changed what a budget is *allowed to do*, which is the kind of
-call only the owner can make. The two added under #207 are a different kind of amendment from the other six:
+call only the owner can make. The two added under #207 are a different kind of amendment from the other seven:
 neither is about what the package does, but about what a *promise* is founded on — when a name counts as
 stable, and what the published pre-1.0 line is allowed to permit. They are recorded here rather than in prose
 because §5.5 and §9 are the contract a consumer reads, and an unstated baseline is a baseline that will be
@@ -1276,6 +1297,8 @@ re-derived by whoever asks next.
   feature — an arriving dependency, a static import of a tier, a second copy of something — and the marker
   assertions that catch those still fail at any size. The id and the section number are unchanged.
 
+- **`FR-43` Structure-Tree Integration** gains a sentence rather than losing one. Where a behaviour of the tier   needs an engine newer than the package floor, the feature declares that behaviour’s own minimum on its contract   and reports whether the installed engine meets it, so a host reads the degradation instead of discovering it: a   link announced with the words it is drawn over is `6.3.289` and up, and below that the link keeps its destination   as its name while the heading, list, table and figure hierarchy still arrives. **Reason:** #194’s engine axis   measured that the advertised floor has no such code at all — `enableLinkOwnership` appears zero times in 6.2.108’s   `build/pdf.mjs` and twice in each of 6.3.289 and 6.4.299 — so the clause’s consequence sits inside a range the   package promises and cannot deliver. The owner ruled on 2026-10-07 against moving the peer floor for one   capability, which leaves the specification to say what *met* means for a host on `6.2.108`; the alternative was a   locked target spec asserting something its own contract makes false, and nothing codes the fiction. The id and the   title are unchanged, and the rest of the sentence stands as it was, the untagged degrade included.
+
 ### Changed
 
 - **The lockfile's copy of the manifest is now compared to the manifest, and the first thing it caught was the Node
@@ -1299,13 +1322,13 @@ re-derived by whoever asks next.
   shows `enableLinkOwnership` appears **zero** times in 6.2.108's `build/pdf.mjs` (853,537 bytes) and twice in 6.3.289
   (860,384) and 6.4.299 (860,818), and `npm view pdfjs-dist versions` says the published 6.x line above the floor is
   exactly 6.2.108 → 6.3.289 → 6.4.299. So the boundary is not a patch level; there is no release between them to
-  test, and the feature is not "flaky at the floor", it is absent there. **Nothing has been coded in response**,
+  test, and the feature is not "flaky at the floor", it is absent there. the finding was filed rather than coded,
   because the three ways out promise different things to different hosts and that is the owner's call (#249): raise
   the peer floor to 6.3.289, keep `^6.2.108` and give `structureFeature` a declared engine minimum that the code
   states and the docs show, or implement the ownership in this package. `FR-43` and `FR-53` now carry the finding as
   a gap each and `FR-48`'s engine-axis gap is rewritten from the reading it was waiting for — which is what a
   mechanism is for: it was built to look, and the first thing it saw was a contradiction between the range advertised
-  and a requirement inside it.
+  and a requirement inside it. **The ruling came the same day and the second of those three options is built** — #249 below is that work order, and the gaps this entry leaves on `FR-43` and `FR-53` are rewritten in its diff rather than left standing.
 
 - **`ROADMAP.md` stopped asking two questions it had already answered (#206, 2026-10-07).** Its
  Its

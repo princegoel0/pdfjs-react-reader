@@ -151,7 +151,10 @@ export function Features() {
               No control, no panel, no key — the tree is how the page <em>is</em>, not a view of it. Its cost is this
               row&apos;s last column; the ~50 kB of pdf.js viewer it reads is a lazy <code>import()</code> taken only
               for a document that declares itself tagged, and it is fetched at runtime, so it is not in your bundle and
-              not in this table.
+              not in this table. One part of it needs a newer engine than the package does: a link given the words it
+              sits over is <code>6.3.289</code> and up, and the tier says so on{' '}
+              <code>engineRequirements</code> and through the <code>linkOwnershipAvailable</code> flag in its state, so
+              a host on <code>6.2.108</code> reads which half it has rather than discovering it.
             </td>
             <td>
               <code>pdfjs-react-reader/structure.css</code>

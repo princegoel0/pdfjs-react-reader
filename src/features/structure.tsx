@@ -1,12 +1,39 @@
 import { useEffect, useState } from 'react';
 import { toPdfError } from '../lib/errors';
+import { engineAtLeast, readEngineVersion } from '../lib/engine-version';
 import { usePdfFeaturePublish, usePdfFeatureShell } from '../components/FeatureHost';
 import { STRUCTURE_FEATURE_ID } from '../lib/feature-ids';
 import type { PdfFeature, PdfStructTreeLayerBuilder } from '../lib/features';
 
+/**
+ * The first `pdfjs-dist` release whose annotation layer connects a link to the structure elements it lies on.
+ *
+ * Measured, not looked up: `enableLinkOwnership` appears twice in 6.3.289's `build/pdf.mjs` and not at all in
+ * 6.2.108's, and CI's engine axis read the same way — the link reaches the tree with `aria-owns` empty and no
+ * `aria-label` in chromium, firefox and webkit at the floor, and named-and-owned from 6.3.289 up. The published
+ * 6.x line above the floor is 6.2.108 → 6.3.289 → 6.4.299, so this boundary has no release on either side of it
+ * to be unsure about.
+ */
+export const STRUCTURE_LINK_OWNERSHIP_MINIMUM = '6.3.289';
+
+/** Whether the loaded engine can own links; an unreadable engine version reads as *cannot*. */
+export function structureLinkOwnershipAvailable(engineVersion = readEngineVersion()): boolean {
+  return engineAtLeast(engineVersion, STRUCTURE_LINK_OWNERSHIP_MINIMUM);
+}
+
 export interface StructureFeatureState {
   /** pdf.js's builder, from the moment it has been fetched and the document has said it is tagged. */
   structTreeLayerBuilder: PdfStructTreeLayerBuilder | null;
+  /**
+   * Whether this engine connects a link to the words it is drawn over.
+   *
+   * Below {@link STRUCTURE_LINK_OWNERSHIP_MINIMUM} the hierarchy still arrives — headings, lists, tables, a
+   * figure's `/Alt` — and only the link does not: it is announced by its destination URL, which is what a browser
+   * falls back to when a layer gives it neither a label nor owned text. A host that tells its readers something
+   * about document structure needs to be able to say which of the two happened, and that is not discoverable
+   * from the DOM after the fact.
+   */
+  linkOwnershipAvailable: boolean;
 }
 
 /**
@@ -78,7 +105,10 @@ function StructureRunner() {
     };
   }, [doc, reportError]);
 
-  usePdfFeaturePublish<StructureFeatureState>({ structTreeLayerBuilder: builder });
+  usePdfFeaturePublish<StructureFeatureState>({
+    structTreeLayerBuilder: builder,
+    linkOwnershipAvailable: structureLinkOwnershipAvailable(),
+  });
   return null;
 }
 
@@ -112,6 +142,15 @@ function StructureRunner() {
 export const structureFeature: PdfFeature<StructureFeatureState> = {
   id: STRUCTURE_FEATURE_ID,
   stylesheets: ['pdfjs-react-reader/structure.css'],
+  engineRequirements: [
+    {
+      behaviour: 'a link annotation is announced with the words it is drawn over',
+      minimum: STRUCTURE_LINK_OWNERSHIP_MINIMUM,
+      below:
+        'the tree, its headings, lists, tables and figure names all arrive; the link alone is announced by its ' +
+        'destination URL, because the engine gives it no label and owns no text',
+    },
+  ],
   Runner: StructureRunner,
   /*
    * Both halves, from two sources: the extraction switch is static, and the builder is the published one

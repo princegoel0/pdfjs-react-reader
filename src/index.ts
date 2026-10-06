@@ -39,6 +39,7 @@ export {
   type FeaturePageProps,
   type FeaturePublication,
   type FeatureKeyEvent,
+  type PdfEngineRequirement,
   type PdfFeature,
   type PdfFeatureControl,
   type PdfFeatureKeyBinding,
