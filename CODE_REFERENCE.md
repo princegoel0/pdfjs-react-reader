@@ -114,11 +114,15 @@ bundle*. §20 carries that as a documentation duty, not a measurement.
 ### 2.1 What the CommonJS half costs
 
 tsup splits the ESM output into `chunk-*.js` shared between entries and writes the CJS output as one
-self-contained file per entry. Both consequences are measured on this build rather than assumed: the
-shell entry is **50.83 kB** of CJS against **56.79 kB** of ESM graph — one gzip stream beats fifteen
-small ones — while the shell *plus* headless together is **75.31 kB** of CJS against **60.19 kB** of
-ESM, because nine chunk files are shared by the ESM pair and none is shared by the CJS one. A CJS host
-naming one path pays slightly less; a CJS host naming two pays about a quarter more.
+self-contained file per entry. Both consequences were measured on the build that introduced them (**#189**,
+2026-10-01): the shell entry was **50.83 kB** of CJS against **56.79 kB** of ESM graph — one gzip stream beats
+fifteen small ones — while the shell *plus* headless together was **75.31 kB** of CJS against **60.19 kB** of
+ESM, because nine chunk files are shared by the ESM pair and none is shared by the CJS one. Those four numbers
+are that build's, quoted here as the history of the decision; the pair the gate re-measures on every build is
+the per-entry one, and it is in `docs/src/size-figures.json` since #240: **60.50 kB** `shell (cjs)` against
+**68.01 kB** `shell`, **32.10 kB** `headless (cjs)` against **37.35 kB** `headless`. A CJS host naming one path
+pays less than the ESM graph for it, and naming two pays for each in full, because nothing is shared between
+CJS entries — the reason the together figure has no ESM counterpart worth quoting today.
 
 `check-size.mjs` ratchets both shipped CJS paths (`shell (cjs)`, `headless (cjs)`) for that reason: a
 format nobody measures is a format that can grow.

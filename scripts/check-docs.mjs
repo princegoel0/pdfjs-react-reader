@@ -28,7 +28,9 @@
  * measured and how a whole footprint table kept a `core` from nine releases ago (#240). Now `npm run size` writes
  * `docs/src/size-figures.json` and the docs pages render that file, so the rule below can hold the two together
  * without a bundler: every feature the export map publishes must be in the figures, every key a page indexes must
- * exist, and no size cell may be typed by hand again.
+ * exist, and no size cell may be typed by hand again. `README.md` is markdown and cannot import anything, so its
+ * two size tables are held to the same file by row — and a row this script can no longer find is itself a failure,
+ * because a table reworded out of the gate is a table that stopped being checked.
  *
  * `--selftest` perturbs each documented figure in memory and requires the perturbation to be caught, so the
  * gate cannot pass by matching nothing. It writes nothing to disk.
@@ -308,6 +310,143 @@ const PROHIBITED_SELFTESTS = [
 ];
 
 // ---------------------------------------------------------------------------
+// README's two size tables (#240) — the same measurement, quoted in the file a consumer reads first.
+// ---------------------------------------------------------------------------
+
+/** The catalog figures as a range, which is how both places in README quote them. */
+const catalogRange = (f) => {
+  const sizes = Object.entries(f.kB)
+    .filter(([label]) => label.startsWith('catalog:'))
+    .map(([, kB]) => kB)
+    .sort((a, b) => a - b);
+  return [sizes[0], sizes.at(-1)];
+};
+
+/**
+ * The docs site renders the figures file directly; README is markdown, so it is held to it instead. Each entry
+ * names a row by the words around its number rather than by its position, and a row that cannot be found is
+ * reported — a table reworded out of this list is a table nobody checks again, which is the failure mode the
+ * whole gate exists to refuse.
+ */
+const README_ROWS = [
+  { what: 'the core row', pattern: /no features[^|]*\| ([\d.]+) kB \| —/, want: (f) => [f.kB.core] },
+  {
+    what: 'the all-nine row',
+    pattern: /^\| All nine \| ([\d.]+) kB \| \+([\d.]+) kB \|/m,
+    want: (f) => [f.kB.all, f.overCore.all],
+  },
+  {
+    what: 'the headless-hook row',
+    pattern: /A single headless hook[^|]*\| ([\d.]+) kB/,
+    want: (f) => [f.kB['headless-only']],
+  },
+  { what: 'the merge row', pattern: /A merge, on its own[^|]*\| ([\d.]+) kB/, want: (f) => [f.kB['merge-only']] },
+  {
+    what: 'the edit tier cost',
+    // The row runs over four lines, so this walks from its start to the first cost cell after it.
+    pattern: /^\| `edit` \|[\s\S]*?\| ([\d.]+) kB \|/m,
+    want: (f) => [f.overCore.edit],
+  },
+  {
+    what: 'the merge entry cost',
+    pattern: /its own entry: ([\d.]+) kB/,
+    want: (f) => [f.kB['merge-only']],
+  },
+  {
+    what: 'the CommonJS shipped paths',
+    pattern: /as CommonJS[^|]*\| ([\d.]+) \/ ([\d.]+) kB/,
+    want: (f) => [f.kB['shell (cjs)'], f.kB['headless (cjs)']],
+  },
+  { what: 'the catalog row', pattern: /locale catalog[^|]*\| ([\d.]+)–([\d.]+) kB/, want: catalogRange },
+  { what: 'the catalog bullet', pattern: /`\/fr` or `\/es` — ([\d.]+)–([\d.]+) kB gzipped/, want: catalogRange },
+  {
+    what: 'the shipped-entry sums',
+    pattern: /gives\r?\n?([\d.]+) kB for `index\.js` and ([\d.]+) kB for `headless\.js`/,
+    want: (f) => [f.kB.shell, f.kB.headless],
+  },
+  { what: 'the all-nine sentence', pattern: /All nine together cost ([\d.]+) kB/, want: (f) => [f.overCore.all] },
+];
+
+/** Every `+ xFeature` row of README's size table, read off the table rather than listed here. */
+function readmeFeatureRows(text, figures) {
+  const problems = [];
+  for (const [, name, size, over] of text.matchAll(/^\| `\+ (\w+)Feature` \| ([\d.]+) kB \| \+([\d.]+) kB \|/gm)) {
+    const key = name.toLowerCase();
+    if (!(key in figures.overCore)) {
+      problems.push(`README.md quotes a \`+ ${name}Feature\` row that the gate measures no figure for (key ${key}).`);
+      continue;
+    }
+    const want = [figures.kB[`core+${key}`], figures.overCore[key]];
+    for (const [i, stated] of [size, over].entries()) {
+      if (Number(stated) !== want[i]) {
+        problems.push(
+          `README.md's \`+ ${name}Feature\` row says ${[size, over][i]} kB, the gate measured ${want[i]} (${
+            i ? 'over core' : 'the path itself'
+          }).`,
+        );
+      }
+    }
+  }
+  return problems;
+}
+
+/** The feature table's cost column, keyed by the entry name in each row. */
+function readmeCostColumn(text, figures) {
+  const problems = [];
+  for (const [, name, stated] of text.matchAll(/^\| `features\/(\w+)` \|.*\| ([\d.]+) kB \|/gm)) {
+    if (!(name in figures.overCore)) {
+      problems.push(`README.md costs \`features/${name}\` at ${stated} kB, which the gate measures no figure for.`);
+      continue;
+    }
+    if (Number(stated) !== figures.overCore[name]) {
+      problems.push(
+        `README.md costs \`features/${name}\` at ${stated} kB over core; \`npm run size\` measured ${figures.overCore[name]}.`,
+      );
+    }
+  }
+  return problems;
+}
+
+function checkReadmeFigures({ figures, readme }) {
+  if (!figures || typeof figures.kB !== 'object' || typeof figures.overCore !== 'object') return [];
+  const problems = [];
+  for (const row of README_ROWS) {
+    const match = readme.match(row.pattern);
+    if (!match) {
+      problems.push(`README.md ${row.what}: no row matches the pattern this rule reads, so that figure is unchecked.`);
+      continue;
+    }
+    const want = row.want(figures);
+    match.slice(1, want.length + 1).forEach((stated, i) => {
+      if (Number(stated) !== want[i]) {
+        problems.push(`README.md ${row.what}: the file says ${stated} kB, the gate measured ${want[i]}.`);
+      }
+    });
+  }
+  return [...problems, ...readmeFeatureRows(readme, figures), ...readmeCostColumn(readme, figures)];
+}
+
+const README_SIZE_SELFTESTS = [
+  {
+    name: 'a size-table row falls behind the gate',
+    apply: (readme) =>
+      readme.replace(/\| `PdfViewer`, no features[^|]*\| ([\d.]+) kB/, (m, n) => m.replace(n, '29.09')),
+    expect: 'the core row',
+  },
+  {
+    name: 'the cost column falls behind',
+    apply: (readme) =>
+      readme.replace(/^\| `features\/outline` \|(.*)\| [\d.]+ kB \|/m, '| `features/outline` |$1| 0.98 kB |'),
+    expect: 'features/outline',
+  },
+  {
+    name: 'a quoted row is reworded out of the gate',
+    apply: (readme) => readme.replace('A single headless hook', 'A bare headless hook'),
+    expect: 'the headless-hook row',
+  },
+];
+
+// ---------------------------------------------------------------------------
 // The docs site's size figures (#240) — a cross-file rule, because its whole point is that two files agree.
 // ---------------------------------------------------------------------------
 
@@ -506,10 +645,12 @@ function audit() {
       return null;
     }
   };
+  const sizeState = readSizeFigures();
   return [
     ...RULES.flatMap((rule) => checkRule(rule, textFor(rule.file))),
     ...checkProhibited(textOrNull),
-    ...checkSizeFigures(readSizeFigures()),
+    ...checkSizeFigures(sizeState),
+    ...checkReadmeFigures({ figures: sizeState.figures, readme: textFor('README.md') }),
   ];
 }
 
@@ -601,6 +742,20 @@ function selfTest() {
       console.log(`  caught  prose: ${scenario.name} — ${hit.slice(0, 110)}`);
     } else {
       console.log(`  MISSED  prose: ${scenario.name} — ${scenario.id} did not see it in ${scenario.file}`);
+    }
+  }
+  // README's tables, perturbed the way they drift: a number left behind, and a row reworded out of reach.
+  const readmeText = read('README.md');
+  const readmeFigures = readSizeFigures().figures;
+  for (const scenario of README_SIZE_SELFTESTS) {
+    expected += 1;
+    const found = checkReadmeFigures({ figures: readmeFigures, readme: scenario.apply(readmeText) });
+    const hit = found.find((p) => p.includes(scenario.expect));
+    if (hit) {
+      caught += 1;
+      console.log(`  caught  readme: ${scenario.name} — ${hit.slice(0, 100)}`);
+    } else {
+      console.log(`  MISSED  readme: ${scenario.name} — no problem named "${scenario.expect}"`);
     }
   }
   // The size-figure rule, perturbed one way at a time — each case is a distinct return of the hand-copy.

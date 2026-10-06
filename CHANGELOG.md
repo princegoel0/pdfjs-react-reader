@@ -1261,6 +1261,16 @@ re-derived by whoever asks next.
   why `peers` now ships with both attached. `FR-23` gains the figures file, the three pages and `check-docs` as
   its automated guard, and `FR-48` gains `check-docs` as a guard over the prose that describes it.
 
+  `README.md` is markdown and cannot import anything, so it is held to the file instead: its feature cost column,
+  its footprint table and its shipped-entry sums are now the measured numbers — core **32.41 kB**, all nine
+  **48.33 kB (+15.92 over core)**, a headless hook **5.57 kB**, `/merge` alone **1.75 kB**, the catalogs
+  **2.34–2.38 kB**, the CommonJS paths **60.50 / 32.10 kB** — and `check:docs` fails when one drifts *or* when a
+  row is reworded out of the list it reads, because an anchor it can no longer find is a table that stopped being
+  checked. `CODE_REFERENCE` §2.1's CommonJS pair is now dated to the build that produced it (#189) beside today's
+  per-entry pair rather than presented as this build's. The run this commit pushed read **88 ok / 7 skipped /
+  0 not runnable / 1 failed**: print's row in webkit, on #248's line, on a diff that touches nothing in it — the
+  fourteenth reading, recorded as one reading and nothing more.
+
 - **Two greens did not settle print's row, and this file said it did (#245 reopened as #248; FR-19, FR-48).**
   CI run 37472575777 — a push whose diff is the register and the changelog, the same shape as the two runs
   counted as the repeat — came back **87 ok / 7 skipped / 0 not runnable / 2 failed**. One failure was
