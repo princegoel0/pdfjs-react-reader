@@ -1251,7 +1251,11 @@ re-derived by whoever asks next.
   a change of pattern; what is new is that the next reading will be comparable with the last. One detail from the
   failing cell already leans the open question: that WebKit desktop cell's own `toolbar-fold` row reported no
   overflow at 1,280 px, which settles nothing on its own — a different document, a different bar — but makes the
-  read as live a suspect as the planner, which is exactly the distinction this row could not previously make.
+  read as live a suspect as the planner, which is exactly the distinction this row could not previously make. The
+  run that carried the new instrument went green end to end — six cells, **89 ok / 7 skipped / 0 failed**, print's
+  row in all three engines — which settles nothing: a green reading is one reading, and the state line prints only
+  on a failure. What changed is that the next red reading of this row will say what the bar, the panel and every
+  copy of the control were doing at the moment it gave up.
 
   The instrument was wrong on its first run, and the full matrix is what said so. Reading the control in the page
   looked like a *replacement* for `reveal('Print pages')`, so the opening read stopped opening the panel — and by the
