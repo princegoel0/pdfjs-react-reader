@@ -845,19 +845,25 @@ const CHECKS = [
      * `input[checkbox] subscribe`, three `input[radio] priority`, `select[select-one] country`,
      * `select[select-multiple] skills` — all with `tabIndex >= 0`, inside nine widget boxes.
      *
-     * The clause's sixth type is the one this row cannot assert, and it says so in its report rather than
-     * quietly narrowing: **none** of the fixture's four `/Sig` widgets produces anything. The engine's
-     * `SignatureWidgetAnnotationElement` marks a signature renderable only when `data.hasOwnCanvas`
-     * (`node_modules/pdfjs-dist/build/pdf.mjs:19170-19173`), and the shapes this fixture carries — `/F 4` with
-     * no appearance, `/F 4` with one, a `/Kids` widget, and `/F 20` (NOROTATE) — produced zero boxes on either
-     * page, including the NOROTATE one the fixture's own comment expected to pass. So "a signature widget
-     * renders as its box" is a gap for us to close in our own layer, not an assertion to write in the engine's
-     * image; #229 carries it. What IS asserted about signatures is the thing that stays true either way: a
-     * signature box is not a control, so nothing on those two pages is a focusable widget named for a `/Sig`
-     * field.
+     * The clause's sixth type is the one that needed this package to draw something, and this row asserts it rather
+     * than reporting it now. Measured on `signature-sample.pdf` (2026-10-06, chromium 6.3.289): of its six `/Sig`
+     * widgets, the one the engine flags `hasOwnCanvas` gets an element — `section.norotate`, at exactly the rect the
+     * fixture carries — and the other five get **no element in the layer at all**. Sampling the painted canvas
+     * inside each of those five rects, four read **0 % ink**; the fifth, `sigAlreadySigned`, reads 4.03 %, because
+     * the canvas paints the appearance the file carries for it. The box is drawn over that one too, and the reason
+     * is the same measurement: the flags do not predict what the canvas paints — `sigKid` declares an appearance and
+     * reads 0 % — so a rule that tried to skip "already visible" fields would be guessing, while the clause asks
+     * for the widget to render as its box. An earlier reading of this row said "none of the widgets produces
+     * anything", which was the detector's fault rather than the viewer's: it looked for a class matching `sig`, and
+     * the engine names its element for the rotation flag instead. So a box for every widget the engine will not give
+     * an element to is drawn by the core (#229), and what is asserted below is that it lands where the engine would
+     * have put its own — compared against the one element the engine did make, on a field whose rect is identical.
+     *
+     * What also stays true either way, and is still asserted: a signature box is not a control. Nothing on those
+     * two pages may be focusable and named for a `/Sig` field, and the drawn box may not take the pointer.
      */
     name: 'form-widgets-are-html-controls',
-    run: async ({ page, load }) => {
+    run: async ({ page, load, reveal, jumpTo }) => {
       /*
        * Back to the top, then wait for the layer. The rows before this one leave the document scrolled (the
        * 1,000-page row jumps to its last sheet) and zoomed, and the virtualizer only mounts the pages that are
@@ -933,8 +939,7 @@ const CHECKS = [
         fail(`${fields.boxes} widget boxes holding ${fields.controls.length} controls — the box is what positions the control`);
       }
 
-      // The signature half, measured and reported. Asserted only in the direction that cannot rot: no focusable
-      // control may name itself for a /Sig field, because the clause's box is not a control.
+      // The signature half: the box the clause asks for, measured against the one widget the engine paints itself.
       await load('signature-sample.pdf', 2);
       if (
         !(await settle(
@@ -942,27 +947,149 @@ const CHECKS = [
         ))
       ) {
         fail(
-          `the /Tx field on the signature fixture never painted within 12 s, so the signature count below ` +
+          `the /Tx field on the signature fixture never painted within 12 s, so the signature counts below ` +
             'would mean nothing — the layer is not painting this document at all',
         );
       }
-      const sig = await page.evaluate(() => {
-        const controls = [...document.querySelectorAll('.pjsr-annotation-layer input, .pjsr-annotation-layer select, .pjsr-annotation-layer textarea')];
+      const readSig = () => {
+        /** Fractions of the layer the element lives in, so the assertions survive any zoom the row left on. */
+        const frac = (el, root) => {
+          const r = el.getBoundingClientRect();
+          const b = root.getBoundingClientRect();
+          return [(r.left - b.left) / b.width, (r.top - b.top) / b.height, r.width / b.width, r.height / b.height];
+        };
+        const px = (el) => {
+          const r = el.getBoundingClientRect();
+          return [r.width, r.height];
+        };
         const names = ['sigPlain', 'sigNoRotate', 'sigKid', 'sigAlreadySigned', 'sigTwoBoxes'];
+        const controls = [...document.querySelectorAll('.pjsr-annotation-layer input, .pjsr-annotation-layer select, .pjsr-annotation-layer textarea')];
+        const engine = document.querySelector('.pjsr-annotation-layer section.norotate');
+        const boxes = [...document.querySelectorAll('.pjsr-sig-box')].map((el) => {
+          const r = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return {
+            name: el.getAttribute('data-pjsr-field-name') ?? '(no name)',
+            rect: frac(el, el.closest('.pjsr-sig-layer')),
+            size: px(el),
+            secondPage: el.closest('.pjsr-page') === document.querySelectorAll('.pjsr-page')[1],
+            takesPointer: hit !== null && (hit === el || el.contains(hit)),
+          };
+        });
         return {
           layers: document.querySelectorAll('.pjsr-annotation-layer').length,
           sigControls: controls.filter((el) => names.includes(el.name ?? '')).length,
-          boxes: [...document.querySelectorAll('.pjsr-annotation-layer [class*="Widget"]')]
-            .map((el) => String(el.className))
-            .filter((cls) => /sig|signature/i.test(cls)).length,
-          textControls: controls.filter((el) => el.name === 'title').length,
+          engineRect: engine ? frac(engine, engine.closest('.pjsr-annotation-layer')) : null,
+          engineSize: engine ? px(engine) : null,
+          engineClass: engine ? String(engine.className) : '(none)',
+          boxes,
         };
-      });
+      };
+      const sig = await page.evaluate(readSig);
       if (sig.sigControls) {
-        fail(`${sig.sigControls} focusable control(s) stand where FR-16 promises a signature box — capturing a mark is the edit tier's job (§2.4), so the core must not build one`);
+        fail(
+          `${sig.sigControls} focusable control(s) stand where FR-16 promises a signature box — capturing a mark ` +
+            "is the edit tier's job (§2.4), so the core must not build one",
+        );
+      }
+      if (!sig.engineRect) {
+        fail(
+          'the one /Sig widget the engine renders on its own canvas produced no element, so the comparison that ' +
+            `anchors the drawn boxes is gone (layer classes seen: ${sig.engineClass}) — re-read the fixture and ` +
+            'this row together rather than trusting the box count alone',
+        );
+      }
+      const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 0.002);
+      const want = ['sigAlreadySigned', 'sigKid', 'sigPlain', 'sigTwoBoxes', 'sigTwoBoxes'];
+      const got = sig.boxes.map((b) => b.name).sort();
+      if (got.join(',') !== want.join(',')) {
+        fail(
+          `the signature fixture holds six /Sig widgets, one of which the engine paints itself, so five boxes are ` +
+            `expected and ${sig.boxes.length} were drawn (fields: ${got.join(', ') || 'none'}) — the clause is ` +
+            '"a signature widget renders as its box", and a widget with no element in the layer has nothing a ' +
+            'reader can see or aim at',
+        );
+      }
+      // `sigPlain` carries the same rect as `sigNoRotate` (72,660,272,720 on a 612×792 page), on the page the
+      // engine did render — so a box that agrees with that element's fractions agrees with the engine's own
+      // coordinate system, at whatever zoom the row happens to be at.
+      const plain = sig.boxes.find((b) => b.name === 'sigPlain');
+      if (!near(plain.rect, sig.engineRect)) {
+        fail(
+          `the drawn box for sigPlain sits at ${plain.rect.map((v) => v.toFixed(4)).join(', ')} of its page while ` +
+            `the engine's own element for the identical rect sits at ${sig.engineRect.map((v) => v.toFixed(4)).join(', ')} — ` +
+            'a box that does not land on its widget is not the widget\u2019s box',
+        );
+      }
+      const grabbing = sig.boxes.filter((b) => b.takesPointer);
+      if (grabbing.length) {
+        fail(
+          `${grabbing.length} signature box(es) take the pointer (${grabbing.map((b) => b.name).join(', ')}) — the ` +
+            'box says where a signature goes, it is not the thing you sign into, and the edit tier owns the click',
+        );
       }
 
-      return `${fields.controls.length} controls in ${fields.boxes} boxes, all focusable (text/textarea/checkbox/radio×3/combo/list); signature document, ${sig.layers} layer(s) mounted: ${sig.boxes} sig boxes, ${sig.sigControls} sig controls — the box half of the clause is #229`;
+      /*
+       * The rotation leg. A box that lands only while the page stands upright is not the widget's box: the
+       * fixture carries a NOROTATE field precisely because rotation is where annotation geometry goes wrong, and
+       * a unit test can only model the transform rather than measure it. So page 2 turns, and every box on it has
+       * to keep the share of the page it covers while its pixel aspect inverts — with the engine's own element on
+       * that page doing the same, which is the half read off pdf.js rather than off our own arithmetic.
+       */
+      const turned = sig.boxes.filter((b) => b.secondPage);
+      if (!turned.length) {
+        fail(
+          `none of the ${sig.boxes.length} drawn boxes was on page 2, so the rotation leg had nothing to turn ` +
+            `(pages seen: ${sig.boxes.map((b) => b.name).join(', ')})`,
+        );
+      }
+      const share = (r) => r[2] * r[3];
+      const aspect = (s) => s[0] / s[1];
+      const before = {
+        boxes: turned.map((b) => ({ name: b.name, share: share(b.rect), aspect: aspect(b.size) })),
+        engineShare: share(sig.engineRect),
+        engineAspect: aspect(sig.engineSize),
+      };
+      await jumpTo(2);
+      await (await reveal('Rotate clockwise')).click();
+      await page.waitForTimeout(1_500);
+      const spun = await page.evaluate(readSig);
+      const after = {
+        boxes: spun.boxes.filter((b) => b.secondPage).map((b) => ({ name: b.name, share: share(b.rect), aspect: aspect(b.size) })),
+        engineShare: spun.engineRect ? share(spun.engineRect) : null,
+        engineAspect: spun.engineSize ? aspect(spun.engineSize) : null,
+      };
+      const drift = [];
+      for (const b of before.boxes) {
+        const moved = after.boxes.find((x) => x.name === b.name);
+        if (!moved) {
+          drift.push(`${b.name}'s box disappeared when the page turned`);
+          continue;
+        }
+        if (Math.abs(moved.share - b.share) > 0.002) {
+          drift.push(`${b.name} covers ${(moved.share * 100).toFixed(2)} % of the turned page and ${(b.share * 100).toFixed(2)} % of the upright one`);
+        }
+        if (Math.abs(moved.aspect * b.aspect - 1) > 0.08) {
+          drift.push(`${b.name} kept its aspect (${b.aspect.toFixed(2)} → ${moved.aspect.toFixed(2)}) instead of inverting it`);
+        }
+      }
+      if (after.engineShare === null || Math.abs(after.engineShare - before.engineShare) > 0.002) {
+        drift.push(`the engine's own element changed its page share (${(before.engineShare * 100).toFixed(2)} % → ${after.engineShare === null ? 'gone' : `${(after.engineShare * 100).toFixed(2)} %`})`);
+      }
+      if (after.engineAspect !== null && Math.abs(after.engineAspect * before.engineAspect - 1) > 0.08) {
+        drift.push(`the engine's element kept its aspect (${before.engineAspect.toFixed(2)} → ${after.engineAspect.toFixed(2)}) while our boxes did something else`);
+      }
+      if (drift.length) {
+        fail(
+          `page 2 turned 90° and the signature boxes did not follow it the way the engine's own element does — ` +
+            `${drift.join('; ')}`,
+        );
+      }
+      // Leave the viewer as found: a page still turned would be the next row's unasked-for premise.
+      await (await reveal('Rotate counterclockwise')).click();
+      await page.waitForTimeout(1_000);
+
+      return `${fields.controls.length} controls in ${fields.boxes} boxes, all focusable (text/textarea/checkbox/radio×3/combo/list); signature document, ${sig.layers} layer(s) mounted, ${sig.boxes.length} boxes drawn and 1 left to the engine (${sig.engineClass}, agreeing with sigPlain's box to within 0.002 of the page), ${before.boxes.length} of them holding through a 90° turn of page 2 alongside the engine's element, no sig control focusable, none taking the pointer`;
     },
   },
   {

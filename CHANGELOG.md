@@ -29,13 +29,15 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **44 met, 13 partial, 1
-absent** of 58, on a suite of **1,244 tests in 138 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **45 met, 12 partial, 1
+absent** of 58, on a suite of **1,257 tests in 140 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
 this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
-wrote for itself has been satisfied twice: `FR-44` and **#245**/**#246** below are that whole exchange, and the
-count is 44 because of a repeat rather than a hope. Seventeen of those eighteen are back out:
+wrote for itself has been satisfied twice: `FR-44` and **#245**/**#246** below are that whole exchange, and that
+count moved on a repeat rather than a hope. Seventeen of those eighteen are back out, and the eighteenth is back
+out too: `FR-16` was short of a behaviour rather than an assertion, and **#229** built it — the `/Sig` box drawn by
+this package, measured in a browser, which is why that one is in *Fixed* below and not here:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
@@ -1951,6 +1953,45 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   inside the re-accepted baseline it names.)
 
 ### Fixed
+
+- **A signature widget the engine gives no element left the reader no box on the page (#229; FR-16).**
+  `FR-16` names six interactive field types and adds a sentence about the sixth: *"A signature widget renders as
+  its box."* The five control types have been measured in a browser since #206; the sixth was recorded here as a
+  gap whose text was itself a mismeasurement. It said **none** of the fixture's `/Sig` widgets renders anything —
+  but the detector had matched a class containing `sig`, and the engine does position an element for the one widget
+  whose flags make it renderable. `SignatureWidgetAnnotationElement`
+  (`node_modules/pdfjs-dist/build/pdf.mjs:19170-19173`) gives a `/Sig` widget an element only when
+  `data.hasOwnCanvas`, so the other five — `/F 4` with no appearance, `/F 4` with one, a `/Kids` widget — leave the
+  layer with no element in it at all, and no flag passed to the engine changes that. Sampling the painted page canvas
+  inside those five rects reads **0 % ink for four of them**; the fifth, `sigAlreadySigned`, reads **4.03 %**,
+  because the canvas draws the appearance the file carries for a signed field. Its box is drawn over it all the same,
+  and for the reason that same sampling gives: the flags do not predict what the canvas paints — `sigKid` declares an
+  appearance and reads 0 % — so a rule that skipped the "already visible" fields would be guessing, where the clause
+  asks that the widget render as its box.
+  The box is therefore drawn by this package:
+  `signatureBoxes()` (`src/lib/form.ts`) takes each such widget, puts **both** corners of its rect through the
+  page's own `convertToViewportPoint` — the call the engine makes for its own elements, which is why a turned page
+  keeps its geometry instead of losing its aspect — and divides by the viewport, so the box is a share of the page
+  and a zoom step moves nothing. `PdfPage` mounts the result in a `.pjsr-sig-layer` that is `aria-hidden` and never
+  takes a pointer: an empty signature field has nothing for a screen reader to say that the box does not already
+  show, and capturing a mark into it is `FR-29`'s editing tier (§2.4), not rendering.
+  Measured on `signature-sample.pdf`, chromium 153 at 6.3.289: **5 boxes drawn and 1 left to the engine**, and the
+  box drawn for `sigPlain` agrees with the element the engine positions for the identical rect to within **0.002 of
+  the page** — the cross-check that says this package's arithmetic is the engine's arithmetic. Turn page 2 through
+  90° and the two boxes on it hold their page share beside that element while the pixel aspect keeps its product;
+  no `/Sig` field is a focusable control, and no box intercepts the pointer. Six counterfactuals, each naming a
+  different assertion: keeping the widget the engine paints itself → the unit test's `expected [ { id: 's1', …(5) }
+  ] to deeply equal []` **and**, in the browser, `five boxes are expected and 6 were drawn (fields: sigAlreadySigned,
+  sigKid, sigNoRotate, sigPlain, sigTwoBoxes, sigTwoBoxes)`; reading the rect instead of the viewport → three unit
+  failures, the sharpest being `expected 83.33… to be close to 9.09…`; dropping the degenerate-size guard → a box
+  drawn for a zero-area rect; dropping the `/Sig` filter → `expected [ 'title', 'sigPlain' ] to deeply equal [
+  'sigPlain' ]`; and making the layer take the pointer → `1 signature box(es) take the pointer (sigPlain)`.
+  `src/lib/form.test.ts` names the rule (`FR-16: which signature widgets need a box drawn, and where it goes`, six
+  tests) and `scripts/browser-matrix.mjs#form-widgets-are-html-controls` measures it. FR-16's gap list is now empty
+  and the row is **met**, which moves the register to **45 met, 12 partial, 1 absent**; the clause's boundary did
+  not move with it. Size after this change, reported rather than blocked per **#208**: `core` **32.41 kB gz**
+  (+0.71 over the accepted baseline), the shell entry **68.01 kB gz**, `edit` **6.44 kB over core**, and the core
+  stylesheet 1,313 → **1,337 lines** for the two rules the box needs. The suite is **1,257 tests in 140 files**.
 
 - **The ⋯ panel kept its lower rows out of reach of a pointer (#241; FR-45, FR-28).**
   `.pjsr-viewer` clips with `overflow: clip`, and a clip is not a scroll container: content past it is not painted,

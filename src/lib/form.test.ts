@@ -10,6 +10,7 @@ import {
   groupWidgets,
   readFormValues,
   readInitialValues,
+  signatureBoxes,
   writeFormValues,
   type AnnotationValueStore,
   type FormWidget,
@@ -180,5 +181,89 @@ describe('form values round-trip', () => {
     const initial = { skills: ['PDF'] };
     expect(formValuesDiffer({ skills: ['PDF'] }, initial)).toBe(false);
     expect(formValuesDiffer({ skills: ['PDF', 'JS'] }, initial)).toBe(true);
+  });
+});
+
+describe('FR-16: which signature widgets need a box drawn, and where it goes', () => {
+  /** A 612×792 page at `scale`, PDF y bottom-up — the transform a real viewport applies at rotation 0. */
+  const flat = (scale = 1) => ({
+    width: 612 * scale,
+    height: 792 * scale,
+    convertToViewportPoint: (x: number, y: number): [number, number] => [x * scale, (792 - y) * scale],
+  });
+  /** The same page turned 90°: the box follows the viewport, not the raw rect. */
+  const turned = {
+    width: 792,
+    height: 612,
+    convertToViewportPoint: (x: number, y: number): [number, number] => [792 - y, x],
+  };
+
+  const sig = (id: string, fieldName: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    subtype: 'Widget',
+    fieldType: 'Sig',
+    fieldName,
+    rect: [72, 660, 272, 720],
+    ...extra,
+  });
+
+  it('draws the signature widgets and nothing else', () => {
+    const boxes = signatureBoxes(
+      [
+        { id: 't1', subtype: 'Widget', fieldType: 'Tx', fieldName: 'title', rect: [72, 730, 272, 746] },
+        sig('s1', 'sigPlain'),
+        { id: 'l1', subtype: 'Link', rect: [0, 0, 40, 20] },
+      ],
+      flat(),
+    );
+    expect(boxes.map((b) => b.name)).toEqual(['sigPlain']);
+  });
+
+  it('leaves the widget the engine renders on its own canvas to the engine', () => {
+    expect(signatureBoxes([sig('s1', 'sigNoRotate', { hasOwnCanvas: true })], flat())).toEqual([]);
+    // The flag is what separates them, not an appearance stream: a widget whose `/N` is the empty form this
+    // package writes for `flatten()` still gets no element, so it still needs the box.
+    expect(signatureBoxes([sig('s2', 'sigAlreadySigned', { hasAppearance: true })], flat())).toHaveLength(1);
+  });
+
+  it('gives every widget of one field its own box', () => {
+    const boxes = signatureBoxes(
+      [sig('a', 'sigTwoBoxes'), { ...sig('b', 'sigTwoBoxes'), rect: [72, 460, 172, 490] }],
+      flat(),
+    );
+    expect(boxes).toHaveLength(2);
+    expect(boxes.map((b) => b.id)).toEqual(['a', 'b']);
+    expect(boxes[1]).toMatchObject({ left: 72 / 612, top: (792 - 490) / 792, width: 100 / 612, height: 30 / 792 });
+  });
+
+  it('lands where the engine puts its own element', () => {
+    const [box] = signatureBoxes([sig('s1', 'sigNoRotate')], flat());
+    if (!box) throw new Error('no box was drawn, so there is nothing to compare with the engine');
+    // The four numbers are the inline style of the element the engine did make for the same rect, read out of a
+    // real browser (`section.norotate` in `.pjsr-annotation-layer`: 11.7647 % / 9.09091 % / 32.6797 % / 7.57576 %),
+    // so this is the rule checked against the engine's own arithmetic rather than a number chosen here.
+    expect(box.left * 100).toBeCloseTo(11.7647, 3);
+    expect(box.top * 100).toBeCloseTo(9.09091, 3);
+    expect(box.width * 100).toBeCloseTo(32.6797, 3);
+    expect(box.height * 100).toBeCloseTo(7.57576, 3);
+  });
+
+  it('follows the viewport through a rotation and a zoom step', () => {
+    // Under the 90° model the rect's y-extent becomes the x-extent, which is the point of asking the viewport
+    // instead of dividing the rect by the page box: the box the engine gives its own element is what this has
+    // to agree with, and `form-widgets-are-html-controls` measures that in a browser.
+    const [rotated] = signatureBoxes([sig('s1', 'sigPlain')], turned);
+    expect(rotated).toMatchObject({ left: 72 / 792, top: 72 / 612, width: 60 / 792, height: 200 / 612 });
+    // Fractions, so a zoom step moves nothing: the same rect at 2x reads the same box as at 1x.
+    expect(signatureBoxes([sig('s1', 'sigPlain')], flat(2))).toEqual(signatureBoxes([sig('s1', 'sigPlain')], flat()));
+  });
+
+  it('skips what cannot be a box at all', () => {
+    expect(signatureBoxes([{ id: 'z', subtype: 'Widget', fieldType: 'Sig', rect: [0, 0, 0, 0] }], flat())).toEqual(
+      [],
+    );
+    expect(signatureBoxes([{ id: 'n', subtype: 'Widget', fieldType: 'Sig' }], flat())).toEqual([]);
+    // A viewport with no size has nothing to be a fraction of — nothing is painted rather than Infinity.
+    expect(signatureBoxes([sig('s1', 'sigPlain')], { ...flat(), width: 0, height: 0 })).toEqual([]);
   });
 });

@@ -21,6 +21,8 @@ import { applyHighlights, unwrapMarks } from '../lib/highlight';
 import { attachmentMimeType } from '../lib/attachments';
 import { downloadBytes } from '../lib/download';
 import type { AnnotationValueStore } from '../lib/form';
+import { signatureBoxes } from '../lib/form';
+import type { SignatureBox } from '../lib/form';
 import type { OptionalContentConfigHandle } from '../lib/optional-content';
 import type { PdfStructTreeLayer, PdfStructTreeLayerBuilder } from '../lib/features';
 import type { PageDims } from '../lib/layout';
@@ -344,6 +346,8 @@ export const PdfPage = memo(function PdfPage({
    * been rebuilt in the same tick anyway, and an unchanged value bails out.
    */
   const [hasEditable, setHasEditable] = useState(false);
+  // The `/Sig` widgets the engine gives no element, as boxes over their own rects — see `signatureBoxes`.
+  const [sigBoxes, setSigBoxes] = useState<SignatureBox[]>([]);
   const xfaRef = useRef<HTMLDivElement | null>(null);
   const xfaDivRef = useRef<HTMLDivElement | null>(null);
   const taskRef = useRef<RenderTask | null>(null);
@@ -755,6 +759,9 @@ export const PdfPage = memo(function PdfPage({
       // Read here rather than in another effect: this fetch already happens for the layer,
       // and the answer is what the canvas render below needs to know.
       setHasEditable(annotations.some((a) => a.isEditable === true));
+      // Same fetch, second reading: the engine renders a `/Sig` widget only when it owns a canvas, and the
+      // clause wants the box either way, so this is where the ones it skips become known (#229).
+      setSigBoxes(signatureBoxes(annotations, at));
       container.replaceChildren();
       await layer.render({
         annotations,
@@ -1049,6 +1056,31 @@ export const PdfPage = memo(function PdfPage({
        */}
       <div ref={textLayerRef} className="pjsr-text-layer textLayer" style={layerStyle} />
       <div ref={annotationRef} className="pjsr-annotation-layer" style={layerStyle} />
+      {/*
+       * A `/Sig` widget the engine gives no canvas of its own gets no element in the annotation layer either —
+       * measured as five of the fixture's six widgets leaving the layer with nothing in it, and four of those five
+       * with 0 % ink inside their own rect — so the box `FR-16` asks for is drawn here. It is a mark on the page
+       * rather than a control (capturing a signature is the editing tier's job), so the layer never takes a
+       * pointer, and it carries no name in the accessibility tree because an empty signature field has nothing to
+       * read out that the box itself says.
+       */}
+      {sigBoxes.length > 0 && (
+        <div className="pjsr-sig-layer" aria-hidden="true" style={layerStyle}>
+          {sigBoxes.map((box) => (
+            <div
+              key={box.id}
+              className="pjsr-sig-box"
+              data-pjsr-field-name={box.name || undefined}
+              style={{
+                left: `${(box.left * 100).toFixed(4)}%`,
+                top: `${(box.top * 100).toFixed(4)}%`,
+                width: `${(box.width * 100).toFixed(4)}%`,
+                height: `${(box.height * 100).toFixed(4)}%`,
+              }}
+            />
+          ))}
+        </div>
+      )}
       {annotationEditorUIManager && (
         <div ref={editorRef} className="pjsr-editor-layer" style={layerStyle} />
       )}

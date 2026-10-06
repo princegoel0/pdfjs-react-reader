@@ -63,7 +63,7 @@ certified on this machine at all.
 | `FR-13` | Text Indexing | **met** | 5/5 | 0 | — |
 | `FR-14` | Match Highlighting | **met** | 5/5 | 0 | — |
 | `FR-15` | Search Controls | **met** | 5/5 | 0 | — |
-| `FR-16` | AcroForm Support | **partial** | 5/5 | 1 | the signature widget is still asserted nowhere, and now for a harder reason than absence of a te… |
+| `FR-16` | AcroForm Support | **met** | 5/5 | 0 | — |
 | `FR-17` | Form Data Sync | **met** | 4/5 | 0 | — |
 | `FR-18` | Annotations: View | **met** | 5/5 | 0 | — |
 | `FR-19` | High-Fidelity Printing | **partial** | 5/5 | 1 | the marks half of the clause has never been seen on paper: what the browser row reads is a typed… |

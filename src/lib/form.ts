@@ -356,3 +356,97 @@ export async function collectWidgets(doc: PDFDocumentProxy): Promise<FormWidget[
   widgetCache.set(doc, widgets);
   return widgets;
 }
+
+/**
+ * A `/Sig` widget that renders no box of its own, in fractions of the page.
+ *
+ * Fractions rather than pixels because they survive a zoom step: the engine positions its own annotation
+ * elements the same way (`left: 11.7647%`), and the layer re-renders only when the page or its rotation
+ * changes, not when the reader zooms.
+ */
+export interface SignatureBox {
+  /** pdf.js's annotation id, so two widgets of one field are two boxes. */
+  id: string;
+  /** The field's fully-qualified name, empty when the document does not carry one. */
+  name: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** What `getAnnotations` says about a widget, of which only these five members are read. */
+export interface WidgetAnnotationLike {
+  id?: string;
+  subtype?: string;
+  fieldType?: string;
+  /** True when the engine gives this widget its own canvas — and so paints it without us. */
+  hasOwnCanvas?: boolean;
+  rect?: number[];
+  fieldName?: string;
+}
+
+/** The part of a `PageViewport` a box needs: its size, and the corner transform that folds rotation in. */
+export interface BoxViewport {
+  width: number;
+  height: number;
+  /** The engine types this as an open-ended array, so the caller checks what it gets back. */
+  convertToViewportPoint(x: number, y: number): number[];
+}
+
+/**
+ * The signature widgets nothing will give an element, as boxes over their own rects.
+ *
+ * Measured on `signature-sample.pdf`: of its six `/Sig` widgets the one the engine marks `hasOwnCanvas` gets an
+ * element (`class="norotate"`, at the rect the engine computed) and the other five get none. Sampling the painted
+ * canvas inside those five rects, four read 0 % ink and the fifth reads 4.03 % — the appearance the file already
+ * carries for a signed field. The box goes over that one too: the flags do not predict what the canvas paints
+ * (`sigKid` declares an appearance and reads 0 %), and the clause asks that the widget render as its box rather
+ * than that this package guess which fields a reader can already see.
+ *
+ * `hasOwnCanvas === true` is the only exclusion, because that is the case the engine already renders; a widget
+ * whose `/N` is an empty form (this package writes one for every appearance-less widget, so `flatten()` survives)
+ * still gets its box. Both corners go through the viewport because a rotated page's rect is in unrotated space.
+ */
+export function signatureBoxes(
+  annotations: Iterable<WidgetAnnotationLike>,
+  viewport: BoxViewport,
+): SignatureBox[] {
+  const boxes: SignatureBox[] = [];
+  if (!(viewport.width > 0) || !(viewport.height > 0)) return boxes;
+  for (const a of annotations) {
+    if (a.subtype !== 'Widget' || a.fieldType !== 'Sig') continue;
+    if (a.hasOwnCanvas === true) continue;
+    const rect = a.rect;
+    const [x0, y0, x1, y1] = rect ?? [];
+    if (typeof x0 !== 'number' || typeof y0 !== 'number' || typeof x1 !== 'number' || typeof y1 !== 'number') {
+      continue;
+    }
+    const [ax, ay] = viewport.convertToViewportPoint(x0, y0);
+    const [bx, by] = viewport.convertToViewportPoint(x1, y1);
+    // A viewport that answers with anything short of four numbers is not describing a page, and a box from it
+    // would be arithmetic on undefined rather than a place on the paper.
+    if (
+      typeof ax !== 'number' ||
+      typeof ay !== 'number' ||
+      typeof bx !== 'number' ||
+      typeof by !== 'number'
+    ) {
+      continue;
+    }
+    const left = Math.min(ax, bx);
+    const right = Math.max(ax, bx);
+    const top = Math.min(ay, by);
+    const bottom = Math.max(ay, by);
+    if (!(right > left) || !(bottom > top)) continue;
+    boxes.push({
+      id: a.id ?? `${x0},${y0},${x1},${y1}`,
+      name: a.fieldName ?? '',
+      left: left / viewport.width,
+      top: top / viewport.height,
+      width: (right - left) / viewport.width,
+      height: (bottom - top) / viewport.height,
+    });
+  }
+  return boxes;
+}

@@ -425,7 +425,7 @@
     },
     "FR-16": {
       "title": "AcroForm Support",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/components/PdfPage.tsx",
         "src/lib/form.ts",
@@ -438,15 +438,14 @@
         "scripts/browser-matrix.mjs#form-widgets-are-html-controls"
       ],
       "documentation": [
+        "docs/src/pages/Introduction.tsx",
         "docs/src/pages/Features.tsx"
       ],
       "regressionGuard": [
         "src/lib/form.test.ts"
       ],
-      "gaps": [
-        "the signature widget is still asserted nowhere, and now for a harder reason than absence of a test: measured 2026-10-05 in the browser, **none** of the fixture's /Sig widgets renders anything at all -- 0 sig boxes, 0 sig controls across both mounted page layers, now over five `/Sig` fields and six widget boxes rather than four fields and four (the fixture grew the two-box field FR-32's plural needed, and the count was re-read on it the same day). The engine's SignatureWidgetAnnotationElement (node_modules/pdfjs-dist/build/pdf.mjs:19170-19173) marks a signature renderable only when data.hasOwnCanvas, so \"a signature widget renders as its box\" cannot be satisfied by passing the engine more flags -- it needs a box drawn by this package from the annotation's own rect, which is #229. No test in the repo asserts the box either way, and none should until it exists"
-      ],
-      "note": "Collecting widgets and reading their types off a real AcroForm fixture is guarded (form.test.ts:46-115), which is the data half. The rendered half is now measured rather than read: scripts/browser-matrix.mjs#form-widgets-are-html-controls (added 2026-10-05, #206) loads form-sample.pdf and asserts, per field name, the element the widget became -- input[text] fullName, textarea notes, input[checkbox] subscribe, three input[radio] priority, select[select-one] country, select[select-multiple] skills -- plus that every one of them is focusable (9 controls, 10 boxes, 0 untabbable on this run). **An acceptance waiver this row carried was wrong and is gone:** it said the control set should be proven in jsdom and that no browser check adds evidence. jsdom does not run pdf.js's AnnotationLayer at all, so a jsdom assertion would have tested a stub; the browser check is the only instrument that can see the elements the clause names. The same row measured the clause's sixth type into a real gap rather than a missing test -- see the gap -- so FR-16 stays partial on the signature box (#229), not on the five kinds that now have evidence."
+      "gaps": [],
+      "note": "Collecting widgets and reading their types off a real AcroForm fixture is guarded (form.test.ts:46-115), which is the data half. The rendered half is measured rather than read: scripts/browser-matrix.mjs#form-widgets-are-html-controls (added 2026-10-05, #206) loads form-sample.pdf and asserts, per field name, the element the widget became -- input[text] fullName, textarea notes, input[checkbox] subscribe, three input[radio] priority, select[select-one] country, select[select-multiple] skills -- plus that every one of them is focusable (9 controls in 10 boxes, 0 untabbable on the last run). **An acceptance waiver this row carried was wrong and is gone:** it said the control set should be proven in jsdom and that no browser check adds evidence. jsdom does not run pdf.js's AnnotationLayer at all, so a jsdom assertion would have tested a stub; the browser check is the only instrument that can see the elements the clause names. The clause's sixth type was the open half, and #229 closed it on 2026-10-06 by drawing the box in this package instead of asking the engine for one: `SignatureWidgetAnnotationElement` (node_modules/pdfjs-dist/build/pdf.mjs:19170-19173) gives a /Sig widget an element only when `data.hasOwnCanvas`, so five of the fixture's six widgets left the layer with nothing in it and a reader had nothing to aim at. Sampling the painted page canvas inside those five rects reads 0 % ink for four of them; the fifth (`sigAlreadySigned`) reads 4.03 %, because the canvas draws the appearance the file carries for a signed field -- and it gets its box too, since the flags do not predict what the canvas paints (`sigKid` declares an appearance and reads 0 %) and the clause asks for the widget to render as its box rather than for a guess about which fields a reader can already see. `signatureBoxes()` (src/lib/form.ts) now turns each such rect through the page's own viewport into a percentage box and PdfPage mounts them in a pointer-inert `.pjsr-sig-layer`. Measured on the same fixture: 5 boxes drawn and 1 left to the engine, and the box this package draws for the NOROTATE widget agrees with the element the engine positions for it to within 0.002 of the page -- the cross-check that says the viewport math is the engine's math, and it holds through a 90° turn of page 2, where two boxes keep their page share beside the engine's element. The cross-check also corrects the gap text this row deleted: it said **none** of the fixture's /Sig widgets renders anything, which was a detector matching a class containing `sig` rather than a reading of the layer -- the engine does position an element for the one widget whose flag set makes it renderable, and that is the one this rule leaves alone. What stays outside the clause is its own boundary: capturing a mark into a box is FR-29's editing tier, not rendering, and no sig box is a focusable control or takes the pointer -- both asserted."
     },
     "FR-17": {
       "title": "Form Data Sync",

@@ -676,6 +676,30 @@
   user-select: none;
 }
 
+/*
+ * A signature widget the engine gives no element — `pdf.js` renders a `/Sig` widget only when it owns a canvas,
+ * and the fixture's five that do not leave the annotation layer with nothing in them and four of them with no ink
+ * where they sit. `FR-16` asks that a signature widget render as its box, so the box is drawn from the widget's
+ * own rect, in page percentages for the same reason the engine's own elements use them: a zoom step moves no
+ * geometry. Under the annotation layer's `z-index: 2` deliberately, so a field that does carry artwork keeps its
+ * artwork on top of the outline, and transparent to the pointer throughout: the box says where a signature goes,
+ * it is not the thing you sign into — that is the editing tier. A dashed 1 px edge is the whole of its vocabulary,
+ * so a palette that drops colours still leaves the separation (`FR-44`).
+ */
+.pjsr-sig-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.pjsr-sig-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed var(--pjsr-muted-fg);
+  border-radius: var(--pjsr-radius);
+}
+
 .pjsr-annotation-layer svg.quadrilateralsContainer {
   contain: strict;
   width: 0;

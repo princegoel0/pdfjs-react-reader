@@ -38,12 +38,12 @@ export function Introduction() {
         </li>
         <li>
           <strong>Forms, annotation editing, page editing, printing and download as features.</strong>{' '}
-          Interactive AcroForm widgets (text, checkbox, radio, choice, button) wired to pdf.js annotation
-          storage; highlight, free text and ink marks that are real PDF annotations and go back into the
-          file on save; a <strong>Pages</strong> tab that moves, turns, removes, extracts and splits whole
-          pages, and a flatten that bakes the marks in so they survive a viewer with no editor; a print
-          pipeline that renders every page at print intent; a save that can carry your edits. Each is an
-          import, and each is measured in the Footprint table below.
+          Interactive AcroForm widgets (text, checkbox, radio, choice, button, and a signature widget that renders
+          as its box) wired to pdf.js annotation storage; highlight, free text and ink marks that are real PDF
+          annotations and go back into the file on save; a <strong>Pages</strong> tab that moves, turns, removes,
+          extracts and splits whole pages, and a flatten that bakes the marks in so they survive a viewer with no
+          editor; a print pipeline that renders every page at print intent; a save that can carry your edits. Each
+          is an import, and each is measured in the Footprint table below.
         </li>
         <li>
           <strong>XFA forms render.</strong> A pure-XFA document is painted from its own template instead
