@@ -30,7 +30,7 @@ in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **45 met, 12 partial, 1
-absent** of 58, on a suite of **1,260 tests in 141 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,264 tests in 142 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
 this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
@@ -59,6 +59,34 @@ direction the count takes from here: down where a guard turns out to be decorati
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **axe over the shell with a document on screen, and over the ⋯ panel that only a fake can open (#247,
+  2026-10-07).** `src/components/a11y.ready.test.tsx` (4) is FR-45's automated leg applied to the state the
+  shell spends its life in — the mount #175 made possible — and it is the first audit of two things that had
+  none: the populated toolbar, sidebar and page tree together, and the overflow panel anywhere. Measured reach
+  of the first case: 19 rules over 244 nodes — 2 pages with their canvas, text layer and annotation layer, 4
+  thumbnails, the toolbar's 10 controls plus the sizer copy, one `aria-live` region, 25 buttons, 37
+  `aria-label`ed elements, 0 violations, and `color-contrast` + `aria-hidden-focus` incomplete. The second case
+  presses PageDown and audits again; the third folds the bar and opens the panel; the fourth appends a
+  `role="listitem"` to the `tablist` and requires `aria-required-children`, because an audit that cannot report
+  a violation is not evidence. **One claim the file was written with did not survive measuring**: the
+  whole-shell run was justified as the place a duplicated generated id would surface. It is not — the mount has
+  **two** ids, both the sidebar's own tab and panel, and the only `aria-labelledby` between them stays inside
+  that one part; every other control is named by `aria-label`. What the whole-tree run actually adds is the
+  *states*, so that is what it now says, and the id check stays as a floor with the measured count in its
+  message. The panel needed a fifth jsdom answer: the fold planner reads each control's `offsetWidth`, jsdom
+  answers 0, ten 0-wide controls fit any bar, and `plan.showMenu` was therefore false at every viewport —
+  `readyFold.itemWidth` is opt-in and off by default so nothing else changes shape (at 320 px with 150 px items
+  the bar keeps 2 controls and the panel carries 8 rows over 7 labelled controls). Two counterfactuals, each
+  restored by checksum: faking the load back to `loading` reddens every case on *"the shell mounted a document,
+  not a waiting notice"* with `{pages: 0, thumbnails: 0}`, and switching the fold fake off reddens the panel
+  case naming *"the bar did not fold at 320px, so the panel was never audited"*. The mount is now shared, and
+  split: `ready-shell-harness.tsx` (the jsdom answers and the mount) and `ready-fake-document.ts` (the page
+  proxy, which imports no component) — a `vi.mock` factory that reaches a module importing the mocked hook stops
+  the run at collection with **no error and no output**, which is how the first version of this work order
+  presented itself. No row changed state: `FR-45` keeps its three gaps, rewritten where the run falsified one
+  (jsdom now reports two incomplete rules *and* a `target-size` "pass" over 6 nodes in a 0×0 layout, which is
+  why a green axe run is evidence about structure and naming and never about geometry).
 
 - **The composed shell mounted under jsdom against a document that had finished loading (#175, 2026-10-06).**
   `src/components/ViewerLayout.ready.test.tsx` (3) is the first test to drive `useViewerController` and

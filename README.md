@@ -595,7 +595,9 @@ under `(pointer: coarse)`, 32 px with a mouse.
 - Every text token clears WCAG AA contrast, measured rather than assumed.
 - Touch targets reach 44 px with 8 px gaps on coarse pointers; `prefers-reduced-motion` is honoured.
 - Conformance is audited rather than inspected: axe-core runs the WCAG 2.0, 2.1 and 2.2 A and AA rules
-  over the shell and every primitive in the test suite (`npm run a11y`, and a named step in CI). What it
+  over the shell and every primitive in the suite (`npm run a11y`, and a named step in CI) — including the
+  shell with a document on screen, again after a keyboard page change, and with the toolbar folded and its
+  overflow panel open (`src/components/a11y.ready.test.tsx`, #247). What it
   cannot see without a layout — contrast, target size, and whether an assistive technology really
   announces what the DOM says — is listed in that file. `npm run test:browsers` now drives three engines
   through the claims jsdom cannot make, and does not yet measure those.
