@@ -26,7 +26,7 @@
  *    expected null to be truthy`, in both armed states;
  *  - the described element rendered only while the pen is armed: **2 failed** — the resting one answering
  *    `expected undefined to be 'Drawing needs a mouse, a pen or a fin…'`, and the "nowhere else" case answering
- *    `expected  to have a length of 1 but got +0`. A reference that does not resolve is exactly the case a
+ *    `expected [] to have a length of 1 but got +0`. A reference that does not resolve is exactly the case a
  *    screen reader meets most of the time, because the bar spends its life unarmed;
  *  - the sentence put on all three buttons: **1 failed** — `Highlight is not the exception FR-47 names, so it
  *    declares nothing: expected '_r_2_' to be null`;

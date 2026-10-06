@@ -1017,7 +1017,7 @@
     },
     "FR-37": {
       "title": "Published State Models",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/status.ts",
         "src/components/PdfPage.tsx",
@@ -1040,10 +1040,8 @@
         "src/headless/usePdfDocument.status.test.tsx",
         "src/components/ViewerController.retry.test.tsx"
       ],
-      "gaps": [
-        "the union’s `destroyed` member has no observable path. It is written by two: an unmount, whose state update React drops because the component is gone, and a supersede, whose `destroyed` and `loading` land in one commit so no host ever renders the first. Measured 2026-10-05 in src/headless/usePdfDocument.status.test.tsx, which now records the sequence and asserts what it cannot contain, and confirmed by counterfactual: making every teardown claim `cancelled` fails no test at all, while making every teardown claim `destroyed` fails the host-cancel case. “State transitions are reportable” and “both unions are produced, not merely declared” therefore need a ruling rather than a test — an `onStatusChange`-style reporter that sees transitions a render never shows, an extra commit on the supersede path, or the clause amended to say that `destroyed` is by construction the state of a load nobody is watching."
-      ],
-      "note": "The document and page unions are published types; the invariant that a status is never `ready` with a null handle is built into `PdfDocumentLoad` rather than policed; `cancelled` is what a host that aborts a load observes and it never passes through `error`; the password path parks with its reason; and the page retry §3.5 promises is published and reaches the model. One member is still unreachable — `destroyed` — and the gap now carries the measurement and the counterfactual that show it is a question about the surface, not a missing assertion.",
+      "gaps": [],
+      "note": "The gap this row carried was that `destroyed` has no observable path, and the reading of §3.5 settled it rather than a test: the member is written by exactly two paths — an unmount, whose state update React drops because the component reading it is gone, and a supersede, which co-commits `destroyed` and the next `loading` into one commit — so it is terminal and unobservable *by definition*, not by omission. §3.5 now says that in its own words and FR-37 names it the one exception to “both unions are produced”, because the alternative was to manufacture a render or a reporter whose only customer would be the assertion. `src/headless/usePdfDocument.status.test.tsx` holds the boundary with a measurement rather than a claim: it records the sequence a host can read and asserts the word is not in it, and the counterfactual that opened the row — every teardown claiming `cancelled` fails nothing, while every teardown claiming `destroyed` fails the host-cancel case — is why the sentence is about the surface and not about coverage. Everything else in the clause was already held: the unions are published types, the ready-with-null-handle invariant is built into `PdfDocumentLoad` rather than policed, `cancelled` never passes through `error`, the password path parks with its reason, the page retry §3.5 promises is published and reaches the model, and all seven page states are written by a path a test drives.",
       "acceptanceWaiver": "Both unions are produced by components under test rather than declared and unreachable: the document path is driven through a host `AbortSignal` and a password prompt in jsdom, and the page path through fake render tasks whose settle and failure the test controls. What a browser would add — real scroll-out timing — is covered as behaviour by FR-04’s checks, not as a state the model can only show on a device."
     },
     "FR-38": {

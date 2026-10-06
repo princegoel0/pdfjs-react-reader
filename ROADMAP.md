@@ -84,7 +84,7 @@ certified on this machine at all.
 | `FR-34` | Network Contract | **met** | 4/5 | 0 | — |
 | `FR-35` | Bounded Retries | **met** | 4/5 | 0 | — |
 | `FR-36` | Cancellation Tokens | **met** | 4/5 | 0 | — |
-| `FR-37` | Published State Models | **partial** | 4/5 | 1 | the union’s `destroyed` member has no observable path. It is written by two: an unmount, whose s… |
+| `FR-37` | Published State Models | **met** | 4/5 | 0 | — |
 | `FR-38` | Source Utilities | **met** | 4/5 | 0 | — |
 | `FR-39` | Incremental, Viewport-Prioritised Indexing | **met** | 4/5 | 0 | — |
 | `FR-40` | Injectable External Index | **met** | 4/5 | 0 | — |

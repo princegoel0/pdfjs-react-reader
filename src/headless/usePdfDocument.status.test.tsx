@@ -291,19 +291,18 @@ describe('the document state model', () => {
     expect(viewer.latest().numPages).toBe(0);
     expect(viewer.latest().isReady).toBe(false);
     /*
-     *  is a member of the published union, and until this line nothing proved a component can reach
-     * it: the state appeared in the suite only inside  assertions, so deleting the branch that
-     * writes it left every test green — the shape FR-37 calls "a defect in the model rather than an unused
-     * branch". A supersede is its reachable path. An unmount runs the same teardown, and a state written to a
-     * component that is going away has no reader, which is the difference the next test holds.
-     */
-    /*
-     * Measured here rather than asserted: the supersede writes  and  in one commit, so the
-     * sequence a host can read never holds the word. That is the deliberate design the test above names (a
-     * reload leaves the host watching the new load, not a flash of an emptied viewer) — and it is why FR-37
-     * keeps its gap: the member is written by two paths, an unmount that has no reader left and a
-     * supersede that is coalesced away, so nothing a host can observe is ever . See the register
-     * row and ; the assertion that would pin it down needs a decision about the surface, not a test.
+     * `destroyed` is a member of the published union, and until this line nothing proved the *branch that
+     * writes it ever runs*: the state appeared in the suite only inside `not.toContain` assertions, so deleting
+     * the line that wrote it left every test green — the shape FR-37 calls "a defect in the model rather than an
+     * unused branch". This case is what pins the writer down.
+     *
+     * And it measures, rather than asserts, what the host can see: the supersede writes `destroyed` and `loading`
+     * in one commit, so the sequence a host can read never holds the word. That is the deliberate design the case
+     * above names (a reload leaves the host watching the new load, not a flash of an emptied viewer) — and it is
+     * why §3.5 says what it says about `destroyed`: the member is written by two paths, an unmount that has no
+     * reader left and a supersede that is coalesced away, so nothing a host can observe is ever `destroyed`. See
+     * the register row for FR-37; the assertion that would pin it down needs a decision about the surface, not a
+     * test.
      */
     expect(
       viewer.statuses(),

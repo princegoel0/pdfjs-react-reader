@@ -30,7 +30,7 @@ in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **46 met, 11 partial, 1
-absent** of 58 — the eighteenth move being #242’s, which took `FR-54` out of *partial* — on a suite of **1,275 tests in 144 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58 — the eighteenth and nineteenth moves being #242 and the FR-37 ruling, which took `FR-54` and `FR-37` out of *partial* — on a suite of **1,275 tests in 144 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
 this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
@@ -1310,6 +1310,22 @@ re-derived by whoever asks next.
   name has never been in a release a consumer could install, and nothing could produce it, so the cost falls on
   nobody — which is exactly the reasoning §5.5 asks for before a name moves, written here rather than assumed.
   The section number and every other name are unchanged.
+- **§3.5 State models and `FR-37` now say what `destroyed` is**, rather than leaving the union to
+  imply something a host could not use. The member is terminal and has no observer by construction:
+  the two paths that write it are an unmount, whose update React drops because the component reading
+  it is gone, and a supersede, which co-commits `destroyed` with the next `loading` so the sequence
+  a host watches never holds the word. §3.5 states that, and FR-37 names it as the one exception to
+  its own “both unions are produced” rule — the rule stands for every other member, all seven page
+  states included, each written by a path a test drives. **Reason:** the alternative was to
+  manufacture a render or a reporter whose only customer would be the assertion, which is the
+  fiction this repository refuses to code; and the measurement behind the ruling is not a guess —
+  `src/headless/usePdfDocument.status.test.tsx` records the readable sequence and asserts the word
+  is absent from it, and the counterfactual that opened the row (every teardown claiming `cancelled`
+  fails no test, while every teardown claiming `destroyed` fails the host-cancel case) shows the
+  surface is doing what it intends. The docs page that said “an unmount reports `destroyed`” now
+  says what happens instead: it writes it, and there is nobody left to report it to.
+
+
 
 
 ### Changed

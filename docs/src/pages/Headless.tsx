@@ -3,7 +3,7 @@ import { HeadlessExample } from '../examples/HeadlessExample';
 const HOOKS: [string, string][] = [
   [
     'usePdfDocument({ src, workerSrc?, assetUrl?, cMapUrl?, standardFontUrl?, allowedSources?, httpHeaders?, withCredentials?, rangeChunkSize?, disableRange?, disableStream?, retry?, onRetryAttempt?, onProgress?, signal?, enableXfa?, onPasswordRequired? })',
-    'Loads the file. Returns { status, doc, numPages, isReady, error, passwordRequest, capabilities, reload }. `status` is the published document model — idle, loading, password-required, ready, error, cancelled, destroyed — and every other field is read off it, so `ready` never arrives without a handle, and a load stopped by the host’s own signal reports `cancelled` while an unmount reports `destroyed`, neither of them as an error. The network options apply to a URL source only; `retry` defaults to three attempts with full-jitter backoff and never retries a 401, a 403, a 404 or a corrupt file; `onProgress` reports `{ loaded, total, percent }` as bytes arrive, with `percent` null when the response did not state a length; `signal` cancels the load exactly as an unmount would and reports no error.',
+    'Loads the file. Returns { status, doc, numPages, isReady, error, passwordRequest, capabilities, reload }. `status` is the published document model — idle, loading, password-required, ready, error, cancelled, destroyed — and every other field is read off it, so `ready` never arrives without a handle. A load stopped by the host’s own signal reports `cancelled`; a teardown writes `destroyed`, which is the state with no reader — an unmount has nowhere to deliver it and a reload co-commits it with the next `loading` — so neither is ever mistaken for an error. The network options apply to a URL source only; `retry` defaults to three attempts with full-jitter backoff and never retries a 401, a 403, a 404 or a corrupt file; `onProgress` reports `{ loaded, total, percent }` as bytes arrive, with `percent` null when the response did not state a length; `signal` cancels the load exactly as an unmount would and reports no error.',
   ],
   [
     'usePdfVirtualizer({ doc, numPages, scale, gap?, rotation?, pageRotations?, overscan?, layout? })',
@@ -150,7 +150,9 @@ export function Headless() {
         disagreeing: <code>status</code> is never <code>ready</code> with a null <code>doc</code>, and a
         load the host stopped with its own <code>AbortSignal</code> lands on <code>cancelled</code> — a
         mounted viewer with a reader in front of it, which has to show something — while an unmount or a
-        superseded source lands on <code>destroyed</code>. Neither ever passes through <code>error</code>.
+        supersede writes <code>destroyed</code>, the state with nobody left to read it: an unmount has no
+        observer by definition, and a supersede coalesces it into the next <code>loading</code> in the same
+        commit. Neither ever passes through <code>error</code>.
       </p>
       <pre>
         <code>{`// usePdfDocument
