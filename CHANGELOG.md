@@ -1336,6 +1336,23 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **The engine axis read a floor-only crash in one engine, and the run after it did not (#250;
+  FR-48, FR-16).** CI 37534391833 (`dev` at `7866db8`, 2026-10-07) is fourteen jobs green with the
+  pdfjs-dist **6.2.108** cell red on one row: `no-uncaught-errors` in webkit · desktop, `1 uncaught:
+  null is not an object (evaluating 'this._freeHighlight.isEmpty')`. The engine, not the stack,
+  explains it: `_freeHighlight` appears 8 times in 6.2.108's `build/pdf.mjs` and **zero** times in
+  6.3.289 and 6.4.299 — the throwing read is inside pdf.js's own private `#endHighlight`, reached on
+  a pointer-up whose free-highlight state was never initialised, and nothing in this package calls
+  into it. So the floor release carries a defect that 6.3 refactored away, which is a different kind
+  of finding from #249's: there is no capability being promised where it breaks, so a feature
+  declaring an engine minimum does not answer it, and the option that would is raising the peer
+  floor — the owner's call, filed as #250. What keeps this out of *Fixed* is that it was seen once:
+  the next run (`136fc13`, a diff with nothing in the browser path) is green in **both** cells, and
+  two local runs at 6.2.108 — the isolated webkit pass and the full six-cell matrix — produced `0
+  uncaught` each, the latter failing three other webkit-desktop rows and not this one. Recorded as
+  intermittent, with both readings named, because the alternative is deciding what it was from one
+  log line.
+
 - **The lockfile's copy of the manifest is now compared to the manifest, and the first thing it caught was the Node
   floor (#249's side-find, 2026-10-07).** `package-lock.json` carries a mirrored root entry — `engines`,
   `peerDependencies`, `version` — and that copy said `"node": ">=20"` for weeks after `package.json` moved the floor
