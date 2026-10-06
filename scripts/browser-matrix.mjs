@@ -1726,11 +1726,26 @@ const CHECKS = [
       // would leave this row reporting the palette's flatness on an empty page.
       await page.fill('.pjsr-search-input', 'MARKER');
       await page.press('.pjsr-search-input', 'Enter');
-      const haveMarks = await waitFor(
-        () => page.evaluate(() => document.querySelectorAll('mark.pjsr-mark').length || null),
+      // Wait for the *resting* mark, not for the first one any mark at all. The walk is incremental, so a row
+      // that settles as soon as anything is painted finds the middle of it: on the webkit cell of CI run
+      // 37390542384 that was a single match — the active one — and this row then reported that the clause's
+      // colour-only signal had nothing to be read on, one run after the same cell had read all six signals with
+      // no code touching the row in between. Chromium and firefox have two marks by the time anything exists;
+      // the fix is to wait for the state the claim describes rather than for a sign of work.
+      const haveResting = await waitFor(
+        () => page.evaluate(() => document.querySelectorAll('mark.pjsr-mark:not(.pjsr-mark--active)').length || null),
         25_000,
       );
-      if (!haveMarks) fail('the search painted no marks, so the match signals could not be read');
+      if (!haveResting) {
+        const seen = await page.evaluate(() => {
+          const count = document.querySelectorAll('mark.pjsr-mark').length;
+          const active = document.querySelectorAll('mark.pjsr-mark--active').length;
+          return `${count} mark(s), ${active} of them active, readout "${
+            document.querySelector('.pjsr-search-count')?.textContent ?? '(none)'
+          }"`;
+        });
+        fail(`the search never painted a resting mark within 25 s — ${seen}`);
+      }
       const marks = await page.evaluate(() => {
         const pick = (el) => {
           if (!el) return null;

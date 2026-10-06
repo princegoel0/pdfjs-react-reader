@@ -1223,6 +1223,19 @@ re-derived by whoever asks next.
   the message. Two mutations of that branch, both run here: force the selection to fail and the row still prints
   two sheets with the substitution named in its text; make the samples look for a label the bar does not carry and
   it fails saying so, which is the difference between a probe that reports and a probe that waits.
+  The row's other half was fixed in the same pass rather than left as a diagnosis: `forced-colours` now waits for
+  a `mark.pjsr-mark:not(.pjsr-mark--active)` instead of for the first mark of any kind, and when none arrives it
+  prints what is on the page — measured here by pointing the wait at a class nothing carries: *"the search never
+  painted a resting mark within 25 s — 2 mark(s), 1 of them active, readout '1 of 20 · p1'"*, which is the state
+  webkit was arriving at by accident. Settling on the first mark is the same family as #239's reading-too-early pen
+  row: with an incremental walk, "something has been painted" and "the state the clause describes exists" are
+  different moments, and only the second is evidence.
+  And the samples have since answered print's question one level up (CI run 37391924675, dev at `7761399`): all six
+  saw the bar at clientWidth == scrollWidth == 1246 px with no overflow panel open, and the only element in the
+  document carrying the label was the toolbar's hidden measurement copy, a 122×32 box reported unpainted. A bar
+  that measures itself as not overflowing while one of its own controls is rendered nowhere but the sizer is
+  **#243**'s fold planner reached by a second route — webkit's metrics at the *default* scope rather than the
+  From–to width — which makes #243 a defect in the planner rather than a defect in one control.
 
 - **A runner started WebKit, answered two rows, and failed one (#245; FR-44, FR-43, FR-19, FR-48).**
   The cells at `651672c` (CI run 37386366651, 2026-10-05) are the first to carry nineteen checks, and for
