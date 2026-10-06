@@ -560,7 +560,84 @@ const CHECKS = [
         const rows = await page.locator('.pjsr-overflow-row').count();
         const labels = await page.locator('.pjsr-overflow-label').allTextContents();
         if (rows === 0) fail('the overflow menu opened empty');
-        return `${rows} rows: ${labels.slice(0, 6).join(' | ')}`;
+
+        /*
+         * FR-45's "geometry checks for touch targets", and #241's claim in the same pass.
+         *
+         * The clause has always asked for targets to be *measured*, and until now the only assertions were CSS
+         * declarations under jsdom, which lays nothing out. Measuring them here found the defect #236 worked
+         * around: the panel hung below the ⋯ inside `.pjsr-viewer`, which clips with `overflow: clip`, and a clip
+         * is not a scrollbar — content past it is not painted, not hit-testable and not scrollable to. At this
+         * profile the panel wanted 421 px against 196 px of clipped box, and four of the nine rows (Download, Page
+         * layout, Enter fullscreen, Print pages) hit-tested the page behind the viewer or nothing at all. So each
+         * row is scrolled into view, measured, and asked whether a pointer landing on its own centre reaches its
+         * control; the height is asserted at 44 px where the engine reports a coarse pointer, and reported rather
+         * than asserted where it does not — Firefox is asked for touch and ignores it, which is a result and not a
+         * silent difference.
+         */
+        const panel = await page.evaluate(() => {
+          const el = document.querySelector('.pjsr-overflow-menu');
+          let clip = null;
+          for (let a = el.parentElement; a; a = a.parentElement) {
+            const s = getComputedStyle(a);
+            if (/clip|hidden/.test(`${s.overflowX}${s.overflowY}`)) {
+              clip = a;
+              break;
+            }
+          }
+          const box = el.getBoundingClientRect();
+          const clipBox = clip?.getBoundingClientRect();
+          return {
+            size: `${Math.round(box.width)}x${Math.round(box.height)} at y ${Math.round(box.top)}`,
+            clip: clip ? `.${String(clip.className).split(' ')[0]} ending at y ${Math.round(clipBox.bottom)}` : 'nothing',
+            scrolls: `client ${el.clientHeight}px of scroll ${el.scrollHeight}px`,
+            coarse: window.matchMedia('(pointer: coarse)').matches,
+          };
+        });
+        const unreachable = [];
+        const undersized = [];
+        const heights = [];
+        for (let i = 0; i < rows; i += 1) {
+          const row = page.locator('.pjsr-overflow-row').nth(i);
+          const label = (await row.locator('.pjsr-overflow-label').textContent()) ?? `row ${i + 1}`;
+          const control = row.locator('button, select, input').last();
+          await control.scrollIntoViewIfNeeded();
+          const seen = await control.evaluate((el) => {
+            const box = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+            const own = el.closest('.pjsr-overflow-menu').getBoundingClientRect();
+            return {
+              height: Math.round(box.height),
+              past: Math.round(box.bottom - own.bottom),
+              lands: hit !== null && (hit === el || el.contains(hit) || hit.contains(el)),
+              what: hit ? `${hit.tagName}${hit.className ? `.${String(hit.className).split(' ')[0]}` : ''}` : 'nothing',
+            };
+          });
+          heights.push(seen.height);
+          if (!seen.lands) unreachable.push(`${label}: its centre hit-tests ${seen.what}`);
+          else if (seen.past > 1) unreachable.push(`${label}: ${seen.past}px outside its own panel`);
+          if (panel.coarse && seen.height < 44) undersized.push(`${label} at ${seen.height}px`);
+        }
+        if (unreachable.length) {
+          fail(
+            `${unreachable.length} of ${rows} folded rows are past the reach of a pointer at ` +
+              `${profile.viewport.width}×${profile.viewport.height} — ${unreachable.join('; ')} — the panel is ` +
+              `${panel.size}, ${panel.scrolls}, and clipped by ${panel.clip}`,
+          );
+        }
+        if (undersized.length) {
+          fail(
+            `the engine reported a coarse pointer, and FR-45 asks for 44 px touch targets: ${undersized.join(
+              ', ',
+            )} — panel ${panel.size}, ${panel.scrolls}`,
+          );
+        }
+        const shortest = Math.min(...heights);
+        return (
+          `${rows} rows: ${labels.slice(0, 6).join(' | ')} — all ${rows} reachable by pointer, smallest control ` +
+          `measured ${shortest}px${panel.coarse ? ' against FR-45’s 44 px floor' : ' (the engine reported a fine pointer, so 44 px is not the requirement here)'}, ` +
+          `panel ${panel.size} ${panel.scrolls}, clipped by ${panel.clip}`
+        );
       }
       const inline = await page.locator(`${BAR} .pjsr-page-input:visible`).isVisible();
       if (overflow > 0 || !inline) fail(`at ${profile.viewport.width}px the bar folded (overflow ${overflow}, page field inline ${inline})`);

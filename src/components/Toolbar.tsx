@@ -17,6 +17,7 @@ import { formatLabel } from '../lib/labels';
 import { formatPageLabel, labelsDifferFromNumbers, resolvePageInput } from '../lib/page-labels';
 import { useLabels } from './labels-context';
 import { ToolbarMeasuring } from './toolbar-measuring';
+import { clipAncestor, panelMaxHeight } from './toolbar-panel-fit';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -172,7 +173,42 @@ export function Toolbar({
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const sizerRef = useRef<HTMLDivElement | null>(null);
   const overflowRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [menuMaxHeight, setMenuMaxHeight] = useState<number | null>(null);
+
+  /*
+   * The panel hangs below the ⋯ inside a viewer that clips, so on a short viewer its lower rows are not
+   * merely out of sight — they are not painted, not hit-testable, and not reachable by scrolling, because a
+   * clip is not a scroll container. Measured at 375×812: the panel wanted 421 px against 196 px of clipped
+   * box, and eight of eleven rows in Chromium's cell — four of nine in Firefox's — hit-tested the page behind
+   * the viewer (#241). Bounding the panel to the space that remains, and letting it scroll within it, is what
+   * makes the fold planner's output reachable.
+   */
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setMenuMaxHeight(null);
+      return;
+    }
+    const measure = () => {
+      const menu = menuRef.current;
+      const clip = menu ? clipAncestor(menu) : null;
+      if (!menu || !clip) {
+        // Nothing cuts it, so nothing needs bounding — the desktop bar at a normal height.
+        setMenuMaxHeight(null);
+        return;
+      }
+      setMenuMaxHeight(
+        panelMaxHeight({
+          panelTop: menu.getBoundingClientRect().top,
+          clipBottom: clip.getBoundingClientRect().bottom,
+        }),
+      );
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [menuOpen]);
 
   useEffect(() => {
     setPageInput(boxValue());
@@ -713,7 +749,13 @@ export function Toolbar({
             <MoreIcon />
           </button>
           {menuOpen && (
-            <div className="pjsr-overflow-menu">
+            <div
+              className="pjsr-overflow-menu"
+              ref={menuRef}
+              // Bounded to the clipped space beneath the trigger, so the rows past that bound can be scrolled
+              // to instead of being cut off where no pointer reaches them (#241).
+              style={menuMaxHeight === null ? undefined : { maxHeight: `${menuMaxHeight}px` }}
+            >
               {menuRows.map((row) => (
                 <div className="pjsr-overflow-row" key={row[0]!.id}>
                   <span className="pjsr-overflow-label">{row[0]!.label}</span>

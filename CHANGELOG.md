@@ -1952,6 +1952,31 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
 
 ### Fixed
 
+- **The ⋯ panel kept its lower rows out of reach of a pointer (#241; FR-45, FR-28).**
+  `.pjsr-viewer` clips with `overflow: clip`, and a clip is not a scroll container: content past it is not painted,
+  not hit-testable, and cannot be scrolled to. Measured at the matrix's own mobile profile (375×812, Chromium) before
+  this change — the panel wanted 421 px while the clipped box left 196 px under the trigger, and asking the panel to
+  scroll moved it **0 px**, because `scrollHeight` equalled `clientHeight`: an unbounded panel has nothing to scroll.
+  Eight of its eleven folded rows were therefore unreachable by pointer, their centres hit-testing `P.app-load`,
+  `DIV.app-actions` or nothing at all; Firefox's mobile cell lost four of nine. The panel is now bounded to the space
+  its nearest clipping ancestor still has beneath it (`src/components/toolbar-panel-fit.ts`, floored at 96 px so a
+  hopeless measurement yields a scrollable strip rather than a panel of nothing), re-measured on resize, and
+  `overflow: hidden auto` so the rows past the bound can be brought inside a box a pointer can land in. The walk is
+  upward from the panel rather than by class, so a host that wraps the viewer in a clipped box of its own gets that
+  edge instead.
+  What found it was FR-45's own evidence requirement — the clause asks for *geometry checks* for touch targets, and
+  until now the only assertions were CSS declarations under jsdom, which lays nothing out. `toolbar-fold` measures
+  the geometry now: it scrolls to every folded row, asks whether a pointer at that row's own centre reaches its
+  control, asserts the 44 px floor where the engine reports a coarse pointer, and reports the engine's answer where
+  it does not (Firefox is asked for touch and ignores it, so its cell states 32 px rather than pretending). After the
+  fix: Chromium mobile — 11 rows, all reachable, smallest control 44 px, panel 222×176 scrolling 635 px of content;
+  Firefox mobile — 9 rows, all reachable, 32 px at a fine pointer. Counterfactual: keep the bound, remove the scroll,
+  and the row fails `8 of 11 folded rows are past the reach of a pointer … Rotate: 33px outside its own panel; Print
+  document: its centre hit-tests DIV.app-actions` — so the pass is the fix, not the instrument agreeing with itself.
+  The arithmetic is pinned at both ends by `src/components/toolbar-panel-fit.test.tsx`. This is the defect that made
+  #236 ship its XFA thumbnail rotation arm as keyboard-only, and it is the sibling of #243: the fold planner's output
+  has to be somewhere a reader can actually go. The suite is **1,251 tests in 140 files**.
+
 - **Print's range fields folded away because of the click that revealed them (#243; FR-19, FR-28).**
   Measured in Chromium at 1,100 px: `.pjsr-print-scope` is 116 px while it reads "All pages" and 197 px once the
   reader chooses "From–to"; the bar's content width was 1,046 px and the row measured 1,088 px, so the fold

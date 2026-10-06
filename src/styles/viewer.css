@@ -323,6 +323,11 @@
      holds a squeezed viewer. */
   max-width: calc(100vw - 16px);
   max-width: calc(100cqw - 16px);
+  /* Bounded to the clipped space beneath the trigger — the component measures that bound — and scrollable
+     inside it. The viewer's own `overflow: clip` forbids scrolling *to* content it cuts, so a panel taller
+     than the box simply lost its lower rows to a pointer; scrolling has to happen in the panel itself (#241).
+     The x axis stays put because the cap above and `flex-wrap` on the rows already keep content inside. */
+  overflow: hidden auto;
   padding: 8px;
   background: var(--pjsr-bg);
   border: 1px solid var(--pjsr-border);
