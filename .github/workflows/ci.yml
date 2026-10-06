@@ -188,53 +188,11 @@ jobs:
           # So the install names both halves, and the step then reads what is actually on disk and fails if
           # this is not the cell the matrix asked for.
           AXIS="react@$REACT_VERSION react-dom@$REACT_VERSION @types/react@${{ matrix.react }} @types/react-dom@${{ matrix.react }}"
-          DEV_PIN=$(node -p "
-            const lock = require('./package-lock.json').packages;
-            const axis = ['react', 'react-dom', '@types/react', '@types/react-dom'];
-            Object.keys(require('./package.json').devDependencies || {})
-              .filter((name) => !axis.includes(name) && lock['node_modules/' + name])
-              .map((name) => name + '@' + lock['node_modules/' + name].version)
-              .join(' ');
-          ")
-          npm i --no-save --no-package-lock --no-audit --no-fund $AXIS $DEV_PIN > /dev/null
-          REACT_MAJOR='${{ matrix.react }}' node -e '
-            const lock = require("./package-lock.json").packages;
-            const dev = Object.keys(require("./package.json").devDependencies || {});
-            const axis = ["react", "react-dom", "@types/react", "@types/react-dom"];
-            const major = (v) => String(v).split(".")[0];
-            // Straight off the disk, not through `require`: several devDependencies (`@cantoo/pdf-lib`,
-            // `@vitejs/plugin-react`) restrict their `exports` and will not answer `require(name +
-            // "/package.json")`, and a guard that reads those as missing fails a cell that is fine. The
-            // top-level path is also exactly the key the lockfile uses, and npm hoists a direct
-            // dependency there, so the two sides of this comparison are the same file.
-            const version = (name) => {
-              try {
-                return JSON.parse(require("fs").readFileSync("node_modules/" + name + "/package.json", "utf8")).version;
-              } catch (error) {
-                return null;
-              }
-            };
-            const want = process.env.REACT_MAJOR;
-            const problems = [];
-            for (const name of axis) {
-              const have = version(name);
-              if (have === null) problems.push(name + " is not installed at all");
-              else if (major(have) !== want) problems.push(name + " is " + have + ", this cell is the " + want + ".x major");
-            }
-            for (const name of dev) {
-              if (axis.includes(name)) continue;
-              const locked = lock["node_modules/" + name] && lock["node_modules/" + name].version;
-              const have = version(name);
-              if (locked && have !== locked) problems.push(name + " is " + have + ", the lockfile says " + locked);
-            }
-            const read = dev.map((name) => name + " " + version(name)).join(", ");
-            if (problems.length) {
-              console.error(read);
-              console.error("this cell is not the cell the matrix asked for:\n  " + problems.join("\n  "));
-              process.exit(1);
-            }
-            console.log(read);
-          '
+          PINS=$(node scripts/pin-tree.mjs pins --exclude=react --exclude=react-dom --exclude=@types/react --exclude=@types/react-dom)
+          npm i --no-save --no-package-lock --no-audit --no-fund $AXIS $PINS > /dev/null
+          # The same script the `browser` job uses for its axis, for the same reason: two copies of this
+          # derivation is how a peer job ends up certifying a tree nobody else ran (#244).
+          node scripts/pin-tree.mjs check --major=react=${{ matrix.react }} --major=react-dom=${{ matrix.react }} --major=@types/react=${{ matrix.react }} --major=@types/react-dom=${{ matrix.react }}
 
       - name: Type check
         run: npm run typecheck
@@ -375,14 +333,25 @@ jobs:
   # engine's own support assets, so a request that leaves the machine is a finding rather than an accident
   # of the network.
   #
-  # One job, three engines, no runner matrix: the script prints a line per check per engine *including the
-  # capabilities an engine refuses to emulate*, and a Firefox that will not show forced colours is a result
-  # worth reading. Splitting engines across runners would turn that into three green jobs saying nothing.
-  # A real-device pass is a separate row in §8 for a separate kind of evidence, and is not this job.
+  # Three engines inside one job, no engine-agnostic split: the script prints a line per check per engine
+  # *including the capabilities an engine refuses to emulate*, and a Firefox that will not show forced colours
+  # is a result worth reading. Splitting engines across runners would turn that into three green jobs saying
+  # nothing. A real-device pass is a separate row in §8 for a separate kind of evidence, and is not this job.
+  #
+  # The *engine* axis, by contrast, is a runner matrix (#194), because the clause asks for the published floor
+  # and the latest supported 6.x to be **run**, not only built: `consumer` compiles against both ends and opens
+  # neither, so a page painted at 6.2.108 existed only in a Chromium started by hand on the machine that wrote
+  # this file. Same pair of versions as `consumer`, held honest by `scripts/check-docs.mjs`.
   browser:
-    name: Browser matrix (Chromium, Firefox, WebKit)
+    name: Browser matrix (Chromium, Firefox, WebKit, pdfjs-dist ${{ matrix.engine }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: ['6.2.108', '6.4.299']
+    env:
+      PDFJS_ENGINE: ${{ matrix.engine }}
     steps:
       - uses: actions/checkout@v4
 
@@ -399,6 +368,18 @@ jobs:
       - name: Install browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
+      # The swap names the rest of its tree in the *same* install. `npm i` re-resolves every caret range in
+      # `package.json`, and the react job learned that the hard way on 2026-10-06: leaving the dev tree out
+      # moved axe-core and pdfjs-dist under a job that was supposed to be measuring one axis (#244). Then the
+      # step reads the disk and refuses a cell that is not the cell the matrix asked for, so a green cell means
+      # the painted page was built by the engine this row is claimed against.
+      - name: Pin the engine to ${{ matrix.engine }}
+        run: |
+          set -euo pipefail
+          PINS=$(node scripts/pin-tree.mjs pins --exclude=pdfjs-dist)
+          npm i --no-save --no-package-lock --no-audit --no-fund pdfjs-dist@$PDFJS_ENGINE $PINS > /dev/null
+          node scripts/pin-tree.mjs check --exact=pdfjs-dist=$PDFJS_ENGINE
+
       - name: Run the matrix
         run: npm run test:browsers
 
@@ -407,4 +388,8 @@ jobs:
       # from and never failed on) — §6's own rule is that a maximum observed on one device does not become a
       # promise a slower reader's machine breaks.
       - name: Run the benchmarks
+        # One cell, not two: §6's record is a reading of one machine per run, and the floor cell exists to
+        # paint pages, not to re-time them. The version named here is the axis this job runs, and
+        # `scripts/check-docs.mjs` refuses the pair if they ever disagree.
+        if: matrix.engine == '6.4.299'
         run: npm run bench

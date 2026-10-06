@@ -60,6 +60,25 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **The browser matrix gained an engine axis, so a page is painted at both ends of the contract it is claimed
+  against (#194, 2026-10-07).** `PRD.md` FR-48 asks for "the published engine floor `6.2.108` and the latest
+  supported 6.x" to be *tested*, and until today the only job that swapped the engine — `consumer` — builds a
+  bundle and never opens a page, while `browser` ran whatever `node_modules` happened to hold. The job now runs
+  twice per push over the same pair `consumer` uses, and each cell swaps the engine **inside the install that
+  pins the rest of the tree** at its lockfile versions, then reads the disk and refuses a cell that is not the
+  cell the matrix asked for. That shape is not a preference: it is what #244 cost, when the React job's bare
+  `npm i --no-save` re-resolved axe-core and four cells went red over a linter nobody was measuring. Both peer
+  jobs now call one derivation, `scripts/pin-tree.mjs` — whose output was diffed byte-for-byte against the
+  inline block it replaced (12 pins) before the YAML was trusted — and `scripts/check-docs.mjs` refuses the two
+  axes drifting apart, the floor leaving the pair, a job deleting its axis, an axis growing past the pair §8
+  describes, and the benchmark step pointing at an engine no cell runs. `--selftest` is at 41 scenarios, six of
+  them these. **This is a mechanism, not yet evidence**: no runner has painted a page at 6.2.108 in any engine,
+  so the row stays `partial` with that as its gap, and the first run's tally is what moves it. The local reading
+  the clause has been carrying — `with node_modules holding 6.2.108, chromium returns 25 ok / 1 skipped` — stops
+  being the proof and becomes one of the cells. The run this push starts is that first reading, and its id is
+  written into `fr-evidence.json` under `FR-48` rather than into this file, because a number typed here before
+  `gh` reported it is the mistake this repository's evidence rule exists to refuse.
+
 - **axe over the shell with a document on screen, and over the ⋯ panel that only a fake can open (#247,
   2026-10-07).** `src/components/a11y.ready.test.tsx` (4) is FR-45's automated leg applied to the state the
   shell spends its life in — the mount #175 made possible — and it is the first audit of two things that had
@@ -1283,6 +1302,14 @@ re-derived by whoever asks next.
   Whether WebKit's **sheet counts** are right is what the next runner reading decides now that the read is no
   longer the thing that breaks: if they are, #248 closes as an instrument defect; if they are not, the row finally
   holds a product finding, and it will arrive with the state attached rather than as a timeout about a selector.
+  **The next run answered it** — CI 37517337281 (`dev` at `3f5f2ba`, the push that carried this change) is green in
+  every job, and WebKit's print row ran end to end: 2 sheets for the whole document, 1 for `Current page`, 1 for
+  `From–to 2–2`, the 1000-page refusal intact — the same numbers Chromium and Firefox report in the same run. No
+  state-mirror note appeared, so the panel did not dismiss itself under this read-back. #248 closes as an
+  instrument defect, and not on the green alone: the red named its own cause, the fix aims at that cause, and both
+  branches of the new logic were forced to fire here. What the note is for now is the residual — if WebKit's panel
+  does dismiss itself after a selection, the row will say so in its own text *without failing*, and that sentence
+  is a question about the viewer rather than about this harness.
 
 - **Print's WebKit row now says what it saw, instead of waiting thirty seconds on a selector (#248; FR-19,
   FR-48).** Nine runner failures of one row, nine messages about the message: every one has arrived as

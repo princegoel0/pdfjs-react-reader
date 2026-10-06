@@ -1150,7 +1150,11 @@ runnable**, the same tally the local run reports. `verify` is red in all three, 
 budget`, which is the owner's open decision #208. What that still does not buy is stated where it matters:
 **no CI run has ever executed `check:maturity` or `check:fr-evidence`** — they were added to the job after the
 third run, and they sit deliberately *before* the size gate so the next run reaches them whatever #208 decides
-— and the browser matrix ran on the one engine version `node_modules` holds, not at §8's pinned floors, with
+— and the browser matrix ran on the one engine version `node_modules` holds, not at §8's pinned floors — that
+half changed on 2026-10-07 (#194): the job declares `engine: ['6.2.108', '6.4.299']`, the same pair `consumer`
+builds, swaps the engine inside the one install that pins the rest of the tree at their lockfile versions
+(`scripts/pin-tree.mjs`, which both peer jobs now call), and refuses a cell whose disk disagrees — while no
+runner has read the floor cell yet, so the axis is built rather than certified. Still with
 no Edge and no hardware anywhere in the picture. The React evidence is now both: local (re-run on 2026-09-29
 with `react`, `react-dom` and both `@types/*` at 18.3.1 through `npm run verify` end to end, then 19.3.0 put
 back with `--no-save` both ways, which is why `package.json` and `package-lock.json` show no diff) and a
@@ -1323,7 +1327,7 @@ after the wrong answer — the silence was a watchdog that cannot fire inside th
 Nothing here should be taken on trust. Each of these re-derives a number above:
 
 ```bash
-node scripts/check-docs.mjs                     # §2's counts are now a gate, not a courtesy (#213): importable subpaths, the maturity split, source files and lines, test files, stylesheet count and range, fixtures and generators (including "all of them tracked"), CI job count, PRD §8's browser-check count, and the version the docs site prints. Since #240 it also holds the docs site's size tables to `docs/src/size-figures.json` — every published tier must have a figure, no page may index a key the gate never measured, no size cell may be typed by hand — and it refuses a CI run tally or a browser cell's ok/skip reading in `ROADMAP.md` or in any docs page, because those are the two figures no checkout can re-derive. `--selftest` perturbs every figure it reads, one capture at a time, and writes each banned figure back in; it requires every one to be caught
+node scripts/check-docs.mjs                     # §2's counts are now a gate, not a courtesy (#213): importable subpaths, the maturity split, source files and lines, test files, stylesheet count and range, fixtures and generators (including "all of them tracked"), CI job count, PRD §8's browser-check count, and the version the docs site prints. Since #240 it also holds the docs site's size tables to `docs/src/size-figures.json` — every published tier must have a figure, no page may index a key the gate never measured, no size cell may be typed by hand — and it refuses a CI run tally or a browser cell's ok/skip reading in `ROADMAP.md` or in any docs page, because those are the two figures no checkout can re-derive. Since #194 it reads the workflow's engine axes too: the two peer jobs must name the same pair, that pair must contain `package.json`'s advertised floor and nothing else, and the benchmark step must name a version one of the cells actually runs. `--selftest` perturbs every figure it reads, one capture at a time, writes each banned figure back in, and moves the axis six ways; it requires every one to be caught
 npm run check:docs                              # the same, as the step `verify` and CI's Verify job run
 grep -rc "" src/**/*.ts src/**/*.tsx            # file inventory (§2)
 npm run test                                    # 1,264 tests in 142 files (§2, §17)

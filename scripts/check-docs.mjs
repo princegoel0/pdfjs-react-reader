@@ -90,6 +90,69 @@ const ciJobs = (() => {
   return [...ci.slice(at).matchAll(/^ {2}([a-z][\w-]*):\s*$/gm)].map((m) => m[1]);
 })();
 
+/**
+ * The engine axis the peer jobs swap in (#194), read off the workflow rather than repeated in prose.
+ *
+ * `consumer` builds the packed artifact against the advertised floor and the latest supported 6.x, and the
+ * `browser` job now paints against the same pair. Two lists in one file, kept honest by this: the day they
+ * disagree, one job is certifying a range the other never ran, and both greens read like the contract was
+ * measured. The floor is not typed here either — it is `package.json`'s own peer range, so a floor that moves
+ * in the contract and not in CI is a failure rather than a coincidence.
+ */
+const engineAxis = (ciText) => ({
+  axes: [...ciText.matchAll(/^ {8}engine: \[([^\]]*)\]/gm)].map((m) =>
+    m[1]
+      .split(',')
+      .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+      .filter(Boolean),
+  ),
+  bench: [...ciText.matchAll(/if: matrix\.engine == '([^']+)'/g)].map((m) => m[1]),
+});
+
+function checkEngineAxis(ciText) {
+  const { axes, bench } = engineAxis(ciText);
+  const problems = [];
+  if (axes.length < 2) {
+    problems.push(
+      `the engine axis is named by ${axes.length} job(s), not the two the contract is measured across — a job ` +
+        'that stops declaring it silently stops measuring that engine (#194)',
+    );
+    return problems;
+  }
+  const floor = String((pkg.peerDependencies || {})['pdfjs-dist'] || '').replace(/^[\^~]/, '');
+  axes.forEach((axis, i) => {
+    if (!axis.includes(floor)) {
+      problems.push(`engine axis ${i + 1} [${axis.join(', ')}] does not contain the advertised floor ${floor}`);
+    }
+    if (axis.length !== 2) {
+      problems.push(
+        `engine axis ${i + 1} [${axis.join(', ')}] is not a pair: §8 asks for the published floor and the latest ` +
+          'supported 6.x, so a third value is a contract change and one value is a missing cell',
+      );
+    }
+  });
+  axes.slice(1).forEach((axis, i) => {
+    if (axis.join(' ') !== axes[0].join(' ')) {
+      problems.push(
+        `the engine axes disagree: axis 1 is [${axes[0].join(', ')}] and axis ${i + 2} is [${axis.join(', ')}] — ` +
+          'one of those jobs is certifying a range the other never ran (#194)',
+      );
+    }
+  });
+  if (!bench.length) {
+    problems.push(
+      'no step is gated on an engine version, so the benchmark runs in every cell and §6 gets two readings of ' +
+        'one machine per push',
+    );
+  }
+  bench.forEach((want) => {
+    if (!axes[0].includes(want)) {
+      problems.push(`the benchmark step runs only on engine '${want}', which no cell of the matrix names`);
+    }
+  });
+  return problems;
+}
+
 const maturity = JSON.parse(read('api-maturity.json'));
 const tagValues = Object.values(maturity.tags);
 const byState = (state) => tagValues.filter((t) => (typeof t === 'string' ? t : t.state) === state).length;
@@ -306,6 +369,61 @@ const PROHIBITED_SELFTESTS = [
     file: 'docs/src/pages/Compatibility.tsx',
     name: 'a cell reading comes back into a docs page',
     sample: 'Chromium x desktop returned 23 ok and 1 skip.',
+  },
+];
+
+// ---------------------------------------------------------------------------
+// The engine axis (#194) — perturbed the way the two peer jobs drift: one list moved, one list deleted,
+// and the benchmark cell pointed at a version no cell runs.
+// ---------------------------------------------------------------------------
+
+const AXIS_LINE = "        engine: ['6.2.108', '6.4.299']";
+
+/** The n-th exact occurrence of `line`, so a scenario can move one job's axis and leave the other alone. */
+function nthOccurrence(text, line, n) {
+  let at = -1;
+  for (let i = 0; i <= n; i += 1) {
+    at = text.indexOf(line, at + 1);
+    if (at < 0) throw new Error(`self-test anchor "${line}" has no occurrence ${n + 1} in ci.yml`);
+  }
+  return at;
+}
+
+function replaceNth(text, line, n, replacement) {
+  const at = nthOccurrence(text, line, n);
+  return `${text.slice(0, at)}${replacement}${text.slice(at + line.length)}`;
+}
+
+const AXIS_SELFTESTS = [
+  {
+    name: 'the two peer jobs start measuring different pairs',
+    expect: 'disagree',
+    apply: (t) => replaceNth(t, AXIS_LINE, 1, "        engine: ['6.3.0', '6.4.299']"),
+  },
+  {
+    name: 'the advertised floor leaves both axes',
+    expect: 'does not contain the advertised floor',
+    apply: (t) => t.split(AXIS_LINE).join("        engine: ['6.2.999', '6.4.299']"),
+  },
+  {
+    name: 'one job stops declaring an axis at all',
+    expect: 'not the two the contract is measured across',
+    apply: (t) => replaceNth(t, AXIS_LINE, 1, '        # engine axis removed'),
+  },
+  {
+    name: 'an axis grows past the pair §8 describes',
+    expect: 'is not a pair',
+    apply: (t) => replaceNth(t, AXIS_LINE, 1, "        engine: ['6.2.108', '6.3.289', '6.4.299']"),
+  },
+  {
+    name: 'the benchmark cell points at an engine no job runs',
+    expect: "which no cell of the matrix names",
+    apply: (t) => t.replace("if: matrix.engine == '6.4.299'", "if: matrix.engine == '6.9.999'"),
+  },
+  {
+    name: 'the benchmark stops being gated and runs in every cell',
+    expect: 'no step is gated on an engine version',
+    apply: (t) => t.replace("        if: matrix.engine == '6.4.299'\n", ''),
   },
 ];
 
@@ -649,6 +767,7 @@ function audit() {
   return [
     ...RULES.flatMap((rule) => checkRule(rule, textFor(rule.file))),
     ...checkProhibited(textOrNull),
+    ...checkEngineAxis(textFor('.github/workflows/ci.yml')),
     ...checkSizeFigures(sizeState),
     ...checkReadmeFigures({ figures: sizeState.figures, readme: textFor('README.md') }),
   ];
@@ -742,6 +861,19 @@ function selfTest() {
       console.log(`  caught  prose: ${scenario.name} — ${hit.slice(0, 110)}`);
     } else {
       console.log(`  MISSED  prose: ${scenario.name} — ${scenario.id} did not see it in ${scenario.file}`);
+    }
+  }
+  // The engine axis, which has no figure either: its live state is "both jobs say the same pair", so the test
+  // moves one job's list, deletes one, and points the benchmark at a version no cell runs.
+  for (const scenario of AXIS_SELFTESTS) {
+    expected += 1;
+    const found = checkEngineAxis(scenario.apply(read('.github/workflows/ci.yml')));
+    const hit = found.find((p) => p.includes(scenario.expect));
+    if (hit) {
+      caught += 1;
+      console.log(`  caught  axis: ${scenario.name} — ${hit.slice(0, 110)}`);
+    } else {
+      console.log(`  MISSED  axis: ${scenario.name} — the rule saw ${found.length ? `"${found[0].slice(0, 60)}"` : 'nothing'}`);
     }
   }
   // README's tables, perturbed the way they drift: a number left behind, and a row reworded out of reach.

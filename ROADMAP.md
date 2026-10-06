@@ -2444,10 +2444,14 @@ features exist is a table of intentions.
   `npm run check:docs` rather than repeated here, because the two hand-written tallies this bullet carried
   were both wrong inside a week (§1) — which is why `check:docs` now refuses a CI tally typed into this file
   (#240). What that job has to prove is still §8's own rule — a row is not
-  tested until the named job runs and fails when the property regresses. One piece remains rather than the two
-  this bullet listed: the job's own runs stopped being the open half when it began running on every push, and
-  what stays open is the engine axis *in a browser*, since the matrix today measures the engine pinned in
-  `node_modules` while `consumer` only ever builds against it.
+  tested until the named job runs and fails when the property regresses. Both halves this bullet listed are now
+  built: the job runs on every push to `dev`, and it runs across the engine contract (#194) — the matrix declares
+  `engine: ['6.2.108', '6.4.299']`, the same pair `consumer` builds, and paints a page at each. The swap happens
+  in the one install that also pins the rest of the tree at its lockfile versions, which is the rule #244 set
+  after the React job re-resolved axe-core out from under its own suite, and the step then reads the disk and
+  refuses a cell that is not the cell the matrix asked for; `scripts/check-docs.mjs` refuses the two jobs' axes
+  drifting apart. What stays open is a reading rather than a mechanism: no runner has painted a page at the
+  advertised floor yet, so the floor cell is a job that exists, not a compatibility claim that has executed.
 * **`FR-49` benchmark fixture suite. PARTLY BUILT 2026-10-02** — profiles A and B have fixtures, `npm run
   bench` has the bars-and-measures split §6 asks for, and the §1 row carries the numbers and the three ways
   the harness was wrong before it was right. B's fixture is new (`scripts/make-scan-pdf.mjs`: twelve

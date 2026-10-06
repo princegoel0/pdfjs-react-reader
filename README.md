@@ -149,7 +149,7 @@ plan lives: rows move by button or by drag, each carries its own controls, the b
 
 | Package | Required | Tested with |
 | --- | --- | --- |
-| `pdfjs-dist` | `^6.2.108` | 6.3.289, the version installed here and the one CI's `browser` and `verify` jobs run. CI also builds a throwaway consumer against `6.2.108` and `6.4.299` — both green on the 2026-10-04 runs — but those two cells are a typecheck and a Vite build, not a painted page: the engine axis *inside* a browser is still open |
+| `pdfjs-dist` | `^6.2.108` | 6.3.289, the version installed here and the one CI's `verify` job runs. CI builds a throwaway consumer against `6.2.108` and `6.4.299`, and since #194 its `browser` matrix carries that same pair as an axis, so a page is painted at both ends of the range rather than only compiled: the swap happens inside the install that pins the rest of the tree, and the cell refuses to run if the disk is not the version it asked for. What each run read is recorded run by run in `fr-evidence.json` under `FR-48` |
 | `react` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, both verified locally. The 18 pass was re-run on 2026-09-29 with `@types/react@18`: `npm run verify` end to end — typecheck, all 449 tests then in the suite, both bundles, the size gate. The `react` matrix job has since run on CI: all four cells (18 and 19, minimum and latest patch) passed typecheck, the suite and the build on 2026-10-04 |
 | `react-dom` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, swapped in alongside `react` for the same run |
 | `@cantoo/pdf-lib` | `^2.11.1`, **optional** — only `editFeature` asks for it | 2.11.1 |

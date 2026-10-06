@@ -39,7 +39,12 @@ export function Compatibility() {
             <td>
               <code>^6.2.108</code>
             </td>
-            <td>6.3.289, in CI</td>
+            <td>
+              6.3.289 in <code>verify</code>. Since #194 the <code>browser</code> job carries{' '}
+              <code>6.2.108</code> and <code>6.4.299</code> as an axis of its own — a page painted at each end,
+              not only a bundle built at them — and what each run read is recorded run by run in{' '}
+              <code>fr-evidence.json</code> under <code>FR-48</code>
+            </td>
             <td>The engine. Rendering, text, annotations, editing and printing all go straight to it.</td>
           </tr>
           <tr>
