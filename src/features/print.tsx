@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useContext, useMemo, useState } from 'react';
 import { CloseIcon, PrinterIcon } from '../components/icons';
 import {
   usePdfFeatureOptions,
@@ -6,6 +6,7 @@ import {
   usePdfFeatureShell,
   usePdfFeatureState,
 } from '../components/FeatureHost';
+import { ToolbarMeasuring } from '../components/toolbar-measuring';
 import { usePdfPrint } from '../headless/usePdfPrint';
 import { formatLabel } from '../lib/labels';
 import { printRangeFor } from '../lib/print';
@@ -146,6 +147,10 @@ function PrintScopeControl() {
   const state = usePdfFeatureState<PrintFeatureState>();
   const labels = shell.labels;
   const total = shell.numPages || 1;
+  // The range fields widen this control from 116 px to 197 px, and the bar folds on measured widths: measured
+  // narrow, the reader's own choice is what evicts the control they just used (#243). So the copy the bar
+  // measures renders them always.
+  const measuring = useContext(ToolbarMeasuring);
 
   return (
     <div className="pjsr-print-scope" title={labels.printPagesLabel}>
@@ -159,7 +164,7 @@ function PrintScopeControl() {
         <option value="current">{labels.printScopeCurrent}</option>
         <option value="range">{labels.printScopeRange}</option>
       </select>
-      {state.scope === 'range' && (
+      {(state.scope === 'range' || measuring) && (
         <>
           <input
             type="number"

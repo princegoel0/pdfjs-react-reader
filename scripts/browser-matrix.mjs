@@ -1908,9 +1908,10 @@ const CHECKS = [
      * tears the container down the moment that call returns — so the observer is installed *at that boundary*
      * and reads the live DOM from inside it. The override is the app's own edge, not a private channel: if the
      * pipeline never reaches it, `__sheets` stays empty and this row says so. Media emulation is Playwright's
-     * instrument, and where an engine reports `matchMedia('print')` false the row skips rather than accuses.
+     * instrument, and where an engine still reports `matchMedia('print')` false after the row has waited for the
+     * page to confirm the media and run the job again, the row skips rather than accuses.
      *
-     * Four jobs, in the order their cost arrives, and each read in the media its claim belongs to:
+     * Five jobs, in the order their cost arrives, and each read in the media its claim belongs to:
      *
      *  - **job one, on screen — what the pipeline hands the platform.** Two sheets for the two pages that were
      *    selected, painted at the resolution the memory budget allowed (measured against the fixture's own MediaBox
@@ -1921,7 +1922,11 @@ const CHECKS = [
      *  - **job three — a typed value travels.** The same page printed again after the field is filled, with the
      *    dark-pixel count taken inside the widget's own box on the sheet. That comparison is the clause's whole
      *    difference: a stored value that reaches the paper and one that stays in the DOM look identical to a mock.
-     *  - **job four — a selection that cannot fit is refused**, and the platform is never asked: no print call, no
+     *  - **job four — the selection the reader typed.** "From–to 2–2" on a two-page file has to come out as one
+     *    sheet, which is the scope a default cannot express: the earlier jobs print either everything or the page
+     *    the reader happens to be on. Reaching the fields is itself part of #243's claim — a range that folds out
+     *    of the bar when the reader chooses it is a range nobody can type.
+     *  - **job five — a selection that cannot fit is refused**, and the platform is never asked: no print call, no
      *    container, and the error the host is handed names the count that would fit.
      *
      * The order within each job is forced too. The scope is chosen on screen and the media flips afterwards,
@@ -2034,16 +2039,17 @@ const CHECKS = [
       /**
        * Choose a scope, press print, and wait for the *new* job to arrive.
        *
-       * The scope select is driven and the two number fields are not, and that is a product finding rather than
-       * an oversight: choosing "From–to" grows this control from 116 px to 197 px, which is wide enough for the
-       * fold planner to move the whole thing out of the bar into the overflow menu — and nothing opens that menu
-       * as part of the interaction, so the fields a reader has just asked for end up rendered nowhere a pointer
-       * can reach. Measured at 1,100 and 900 px by `.spike/probe-print-fold.mjs`, and filed as **#243**; this
-       * row's first two attempts timed out on exactly that, one on each field.
+       * All three scopes are driven, including "From–to" and its two number fields, and that is the #243 fix
+       * rather than a new ambition: the control grows from 116 px to 197 px when the range appears, which is wide
+       * enough to change what the bar can hold, so when the fold was measured at the *current* width the reader's
+       * own choice evicted the control they had just used — and the fields they had just asked for went with it,
+       * into an overflow panel that nothing had opened. This row's first two attempts timed out on that, one per
+       * field, which is what filed the ticket. The bar measures a growing control at its widest state now, so the
+       * fold is decided at load and the fields stay reachable beside the select that reveals them.
        *
-       * "The *selected* pages" is still asserted, through the two scopes that stay reachable while selected: all
-       * of a two-page document, then the single page in front of the reader. A pipeline that printed the whole
-       * file regardless would fail the second of those.
+       * The three scopes are three different claims, and all three are asserted: all of a two-page document, the
+       * single page in front of the reader, and a range the reader typed. A pipeline that printed the whole file
+       * regardless would fail the last two.
        */
       /** Where the engine made the row drive a control the way a choice would rather than by selection. */
       const scopeNotes = [];
@@ -2323,12 +2329,59 @@ const CHECKS = [
       if (!(await printWith('job two', null, styled, 'print'))) {
         fail('the second job never reached the printer, so the print-media layout could not be read');
       }
-      const run2 = await lastSheet();
+      let run2 = await lastSheet();
+      // Whether this cell needed the retry is engine evidence, not harness trivia: a green row that says nothing
+      // about it cannot be compared with a CI cell that skipped on the same race.
+      let retriedMedia = false;
       if (!run2.mediaPrint) {
-        return skip(
-          `${engine}: matchMedia('print') reports false under Playwright's media emulation, so the sheet's ` +
-            'styles were not readable here — the instrument, not the viewer',
+        /*
+         * One retry, and the reason for it is the row's own ordering: the media has to be flipped *during* the
+         * job, because a control cannot be clicked in print media (Chromium collapses the application's height —
+         * measured, and the reason the click happens on screen). That leaves a race between the emulation
+         * reaching the page and the pipeline reaching `window.print()`, and the sheet then records a media that
+         * had not switched yet. Measured 2026-10-06: chromium desktop reported `mediaPrint: false` on **every**
+         * run, so the clause's central sentence — the print stylesheet shows the sheet and hides everything else —
+         * was being skipped on the one engine that can read it, quietly, in the only harness that runs it.
+         *
+         * The retry waits for the page to say the media has matched, then asks again. That press goes through
+         * the element rather than a pointer, because by then the claim being measured is about the sheet the
+         * pipeline hands over, not about how the click arrived.
+         */
+        const matched = await (async () => {
+          // `printWith` has already put the page back in screen media, which is why the first reading said false
+          // and why the retry has to ask for the print media itself.
+          await page.emulateMedia({ media: 'print' });
+          return waitFor(() => page.evaluate(() => window.matchMedia('print').matches || null), 10_000);
+        })();
+        const before = await sheetCount();
+        await page.evaluate(() => {
+          // The bar renders a hidden measuring copy of every control last, so a plain selector would be one
+          // element ordering accident away from pressing the copy nobody can see (#243 made that copy grow).
+          const control = Array.from(
+            document.querySelectorAll(
+              '.pjsr-toolbar [aria-label="Print document"], .pjsr-toolbar [aria-label="Cancel printing"]',
+            ),
+          ).find((el) => !el.closest('.pjsr-toolbar-sizer'));
+          if (control instanceof HTMLElement) control.click();
+        });
+        const arrived = await waitFor(async () => ((await sheetCount()) > before ? true : null), 60_000);
+        // Let the retried job finish before the media goes back: a container left mounted here would be
+        // measured as the next job's starting state, and the row's own teardown claim would go vague.
+        const torn = await waitFor(
+          async () => ((await page.evaluate(() => !document.querySelector('.pjsr-print'))) ? true : null),
+          15_000,
         );
+        await page.emulateMedia({ media: 'screen' });
+        if (arrived) run2 = await lastSheet();
+        if (!run2.mediaPrint) {
+          return skip(
+            `${engine}: matchMedia('print') still reports false under Playwright's media emulation after ` +
+              `waiting for it (${matched ? 'the page matched, the retried sheet did not' : 'the page never matched'})` +
+              `${arrived ? '' : ', and the retried job never reached the printer'}` +
+              `${torn ? '' : ', and its container never detached'}, so the sheet's styles were not read here`,
+          );
+        }
+        retriedMedia = true;
       }
       if (!run2.printing || run2.container !== 'block') {
         fail(
@@ -2398,10 +2451,34 @@ const CHECKS = [
       }
 
       /*
-       * Job four: a job the budget cannot pay for is refused before the platform is asked. No print arrives,
+       * Job four: the range the reader *typed*, which is "the selected pages" said from the side a default
+       * cannot show. #243 was filed against exactly this pair of fields: choosing "From–to" widened the scope
+       * control from 116 px to 197 px, which is wide enough for the fold planner to move the whole row out of the
+       * bar, so the two fields a reader had just asked for appeared inside an overflow panel that nothing had
+       * opened — and the row timed out on the first of them, reading as a missing input rather than as a control
+       * that had moved. The bar now measures a growing control at its widest state, so the fold is decided before
+       * the reader touches anything and these fields stay where their own select is.
+       */
+      await pickScope('range');
+      await (await reveal('First page to print')).fill('2');
+      await (await reveal('Last page to print')).fill('2');
+      const ranged = await sheetCount();
+      if (!(await printWith('job four', null, ranged, 'screen'))) {
+        fail('the range job never reached the printer, so "the selected pages" was never measured from a range');
+      }
+      const run4 = await lastSheet();
+      if (run4.sheets.length !== 1) {
+        fail(
+          `"From–to" set to 2–2 printed ${run4.sheets.length} sheets of a 2-page file — the clause is about the ` +
+            'pages the reader selected, and one page was selected',
+        );
+      }
+
+      /*
+       * Job five: a job the budget cannot pay for is refused before the platform is asked. No print arrives,
        * which is the outcome — so this one clicks and waits a fixed beat rather than polling for a boundary that
        * must never be reached, and then reads what the host was told. "All pages" of a four-figure document is
-       * the selection a reader makes by not choosing one, which is also the shape #243 leaves reachable.
+       * the selection a reader makes by not choosing one.
        */
       await page.evaluate(() => {
         window.__sheets.length = 0;
@@ -2441,9 +2518,14 @@ const CHECKS = [
         `"${run2.siblings.join(' ')}" went to none, second sheet breaking "${run2.sheets[1].breakBefore}", and ` +
         `the container was gone with the toolbar back afterwards; the widget's own ` +
         `${run3.sheets[0].fieldPixels}px box went ${fieldBefore} → ${fieldAfter} dark px for a typed value, and ` +
-        `"Current page" printed ${run3.sheets.length} of the 2; all ${big.pages} pages of a ` +
+        `"Current page" printed ${run3.sheets.length} of the 2, "From–to 2–2" printed ${run4.sheets.length}; all ` +
+        `${big.pages} pages of a ` +
         `${big.width.toFixed(0)}x${big.height.toFixed(0)}pt document refused with no print call and ` +
         `"${(named ?? '').slice(0, 90)}"` +
+        (retriedMedia
+          ? '; the first print-media job reached the printer before the emulation landed, so the row waited for ' +
+            "matchMedia('print') and ran that job again"
+          : '') +
         // An engine that would not take the selection says so here rather than passing quietly: the scopes are
         // what make the third job's one-page sheet mean "current" instead of "whatever the default was".
         (scopeNotes.length ? `; ${scopeNotes.join('; ')}` : '')

@@ -1952,6 +1952,32 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
 
 ### Fixed
 
+- **Print's range fields folded away because of the click that revealed them (#243; FR-19, FR-28).**
+  Measured in Chromium at 1,100 px: `.pjsr-print-scope` is 116 px while it reads "All pages" and 197 px once the
+  reader chooses "From–to"; the bar's content width was 1,046 px and the row measured 1,088 px, so the fold
+  decision was *made by the interaction* — and the planner, folding by priority, evicted the control the reader
+  had just used along with the two number fields it had just revealed. Nothing reopens that panel as part of the
+  choice, so the fields existed only where no pointer could reach them. #239's row timed out on exactly this,
+  once per field, and recorded the ticket instead of the measurement. `Toolbar` now measures a growing control at
+  its **widest** state: the hidden sizer copy renders the range fields — `ToolbarMeasuring`, a context provider
+  with no DOM node of its own, so the measured children stay one element per item — and the fold is therefore
+  settled at load rather than mid-choice. `src/components/Toolbar.measure.test.tsx` pins both directions (two
+  fields measured, zero rendered until asked for) and each half goes red on its own mutation: make the control
+  ignore the context and the measuring copy loses the fields; make it always render them and the bar grows
+  boxes nobody chose. With the fold stable, the row drives all three scopes, so "the selected pages" is now
+  measured from a typed range as well: `"From–to" set to 2–2 printed 1` of the two the fixture holds.
+  Re-running that row turned up a second defect, and this one was the harness's rather than the product's:
+  `matchMedia('print')` read false on **every** Chromium run, so the row skipped — the clause's central sentence,
+  *a print stylesheet hides everything else*, was quietly going unread in the one engine able to show it, and the
+  identical message had been filed against WebKit an hour earlier as an engine limit. The cause is the row's own
+  ordering: the media can only be flipped while the job is in flight (in print media Chromium collapses the
+  application and the button cannot be clicked at all), so a fast pipeline reaches `window.print()` before the
+  emulation lands. The row now retries once — re-ask for print media, wait for the page to say it has it, press
+  through the element rather than a pointer since the claim is about the sheet and not the click, then wait the
+  job out — and only skips if *that* fails, naming which half failed. Green in Chromium with the retry:
+  container `display: block`, the host's three other body children gone to `display: none`, the second sheet
+  breaking to its own page. The suite is **1,246 tests in 139 files**.
+
 - **The React peer job was running a different suite from `verify` (#244; FR-48, FR-45).**
   `npm i --no-save --no-package-lock react@…` does not swap one package: npm re-resolves the whole tree from
   `package.json`, keeping nothing it was not told to keep. Measured on this host on 2026-10-06, that swap moved

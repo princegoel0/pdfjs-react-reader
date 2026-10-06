@@ -16,6 +16,7 @@ import {
 import { formatLabel } from '../lib/labels';
 import { formatPageLabel, labelsDifferFromNumbers, resolvePageInput } from '../lib/page-labels';
 import { useLabels } from './labels-context';
+import { ToolbarMeasuring } from './toolbar-measuring';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -593,11 +594,16 @@ export function Toolbar({
      second set of names or steal focus. */
   const sizer = (
     <div className="pjsr-toolbar-sizer" ref={sizerRef} aria-hidden="true">
-      {configured.map((item) => (
-        <span key={item.id} data-pjsr-item={item.id}>
-          {item.node}
-        </span>
-      ))}
+      {/* The provider renders no element, so `sizer.children` stays one node per measured item. A control that
+          grows with its own value (print's page scope) reads this and measures its widest state, so the fold is
+          decided by the bar's width rather than by the reader choosing something (#243). */}
+      <ToolbarMeasuring.Provider value>
+        {configured.map((item) => (
+          <span key={item.id} data-pjsr-item={item.id}>
+            {item.node}
+          </span>
+        ))}
+      </ToolbarMeasuring.Provider>
       <span data-pjsr-item="menu">
         <button type="button" className="pjsr-button" tabIndex={-1}>
           <MoreIcon />
