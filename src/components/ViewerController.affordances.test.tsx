@@ -15,8 +15,9 @@
  *  - **wheel zoom**: off, a mod-keyed wheel leaves `resolvedScale` alone and is *not* `defaultPrevented`, so
  *    the host page scrolls; on, it zooms and the host is told the gesture was taken;
  *  - **pinch zoom**: off, a two-finger spread changes nothing;
- *  - **keyboard paging**: off, a `PageDown` is not claimed; on, it is prevented — with no document mounted the
- *    page cannot move, so the claim being tested is the one the clause makes, about who owns the key;
+ *  - **keyboard paging**: off, a `PageDown` is not claimed; on, it is prevented — which is the claim this file
+ *    makes about who owns the key. Whether the reader actually *moved* needs a document on screen, and that leg
+ *    lives in `ViewerLayout.ready.test.tsx`, where the page goes 1 → 2 and the bar follows;
  *  - **fullscreen**: off, `fsAvailable` is false, the bar renders no control for it, and
  *    `toggleFullscreen()` never reaches the element's `requestFullscreen`; on, all three flip together —
  *    which is what "observable" is: a host that turns it off does not get a button that lies;

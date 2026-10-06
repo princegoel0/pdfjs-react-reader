@@ -784,10 +784,12 @@ containers, and one tagged document whose structure tree reads back as headings,
 named figure). Point it at `npm run serve:auth` and a bearer token to see the network options do their
 work: without the token the viewer reports the 401 and offers a retry, with it the same URL paints.
 
-One limit worth knowing before you trust a green suite: **no test has mounted the real viewer controller
-against a document that had finished loading** — under jsdom that combination hangs, so the shell's page
-path is covered by unit tests around its parts and by browser passes against the playground, not by a
-jsdom render of the whole viewer. Fixing the harness is part of the CI work in `ROADMAP.md`. `docs/` is a Vite app that renders the library — against `src` in
+One limit worth knowing before you trust a green suite: **no test loads real PDF bytes through the shell in
+jsdom.** The shell itself is mounted against a document that has finished loading — `src/components/ViewerLayout.ready.test.tsx`
+drives the whole composed viewer over a hand-built page proxy, the same class of stand-in the page-level files use —
+but the engine cannot be opened under Node: pdf.js calls `Uint8Array.prototype.toHex` (in the catalog's fingerprint
+path) and `Map.prototype.getOrInsertComputed`, and Node v24 has neither, so a load of actual bytes fails there rather
+than painting. The painted page is therefore verified in the browser matrix and not by `npm test`. `docs/` is a Vite app that renders the library — against `src` in
 development, against the built `dist` in CI.
 
 ## Status

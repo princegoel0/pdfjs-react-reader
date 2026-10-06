@@ -30,7 +30,7 @@ in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
 ends, Edge, hardware, and the assistive-technology pairings. The register stands at **45 met, 12 partial, 1
-absent** of 58, on a suite of **1,257 tests in 140 files** — eighteen rows moved when a clause-by-clause read of
+absent** of 58, on a suite of **1,260 tests in 141 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
 this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
@@ -59,6 +59,34 @@ direction the count takes from here: down where a guard turns out to be decorati
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **The composed shell mounted under jsdom against a document that had finished loading (#175, 2026-10-06).**
+  `src/components/ViewerLayout.ready.test.tsx` (3) is the first test to drive `useViewerController` and
+  `ViewerLayout` with a ready document, and it closes the two legs of `FR-28` that had only ever been described:
+  PageDown moves the reader **1 → 2** — the scroll position the shell asked for, the page the virtualizer derives
+  from it, the bar's own field following, and `onPageChange` seeing the number — while a refused keyboard leaves
+  the page, the scroll and the event each untouched. No row changed state; FR-28's guard list gained the file.
+  Four answers jsdom does not give were needed: a `ResizeObserver` that hands back an **entry** rather than
+  calling back empty (`ThumbnailList.tsx:30` reads `entries[0].contentRect.width`, and the empty call threw
+  *outside* the test's own frames — three green cases and an unhandled error, which is how it first told the
+  truth), an `IntersectionObserver` for the thumbnail rows, a sized viewport, and the `scrollTo`/`scrollTop` pair
+  the virtualizer's loop runs on. **Two claims this repository carried are withdrawn by the run.** That the
+  combination **hangs** — measured twice to a 60 s and a 120 s kill, stated in `README.md` and `CODE_REFERENCE.md`
+  §20 — does not reproduce: the shell mounts in ~330 ms. What replaces it is an engine ceiling rather than a
+  harness one: opening *real bytes* under Node fails fast, because pdf.js 6.3.289 calls
+  `Uint8Array.prototype.toHex` (the catalog's fingerprint path) and then `Map.prototype.getOrInsertComputed`, and
+  Node v24.21.0 has neither (`typeof Uint8Array.prototype.toHex === undefined`, measured). So the document here is
+  a page proxy of the kind the nine `PdfPage.*` files already build, and the painted page stays the browser
+  matrix's. The second withdrawal is quieter and worth the rule it came from: the counterfactual that made the
+  observer stop reporting intersection **passed**, which proved the thumbnail count measures the list mounting and
+  not anything painting — so the stub was cut back to an idle one and the claim narrowed to what it reads. Six
+  counterfactuals in all: five fail their own case (ignoring the keyboard refusal, unwiring `onPageChange`,
+  removing the bar's page-mirroring effect, moving `scrollToPage` one row early, and turning the harness's own
+  `scrollTo` into a no-op — the last naming which numbers are the fake's and which are the shell's) and one
+  passed, and the one that passed changed the design. Headers corrected in the same pass:
+  `ViewerController.affordances.test.tsx` (its keyboard leg no longer has to stop at `defaultPrevented`) and
+  `a11y.page.test.tsx` (the proxy it invented is now what the whole shell mounts). The suite is **1,260 tests in
+  141 files**.
 
 - **The print path, seen in two engines — and the row's second job failed before it passed (#239, 2026-10-06).**
   `FR-19` keeps one gap, now the narrowest it has been: the sheet has been observed, the marks have not.

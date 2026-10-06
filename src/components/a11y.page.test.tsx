@@ -1,12 +1,11 @@
 /*
  * FR-45 on the page path: the audit run over `PdfPage` itself, with the engine's own text layer in it.
  *
- * The shell audit (`a11y.audit.test.tsx`) can only reach the chrome, because a document that is `ready`
- * puts `PdfPage` on screen and `PdfPage` wants a page proxy the harness has never been able to invent —
- * that is `#175`, still open. But the page component alone takes a proxy directly, and jsdom runs pdf.js's
- * real `TextLayer` well enough to build its spans, so the subtree an assistive technology actually walks
- * can be audited here: the page's own name, the text layer that sits over it, and the marks a search leaves
- * in that layer. What is *not* real in this file is the engine's annotation and
+ * The shell audit (`a11y.audit.test.tsx`) still mounts the chrome only. It used to be blocked: a document that is
+ * `ready` puts `PdfPage` on screen and `PdfPage` wanted a page proxy the harness had never been able to invent —
+ * that was `#175`, and it is closed: the proxy below is now what `ViewerLayout.ready.test.tsx` hands the *whole*
+ * shell under jsdom. What remains un-done is narrower than the old sentence: nobody has pointed axe at that ready
+ * mount yet, so the page subtree is audited here, one page at a time, rather than through the composed viewer. What is *not* real in this file is the engine's annotation and
  * structure markup, both faked by the page proxy they are handed — the first answers no annotations, the
  * second is the element `FakeBuilder` builds — so their accessibility belongs to the browser pass that
  * mounted the true ones and to the `0.12` matrix.
