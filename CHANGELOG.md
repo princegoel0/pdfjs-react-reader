@@ -1324,8 +1324,14 @@ re-derived by whoever asks next.
   fails no test, while every teardown claiming `destroyed` fails the host-cancel case) shows the
   surface is doing what it intends. The docs page that said “an unmount reports `destroyed`” now
   says what happens instead: it writes it, and there is nobody left to report it to.
-
-
+- **§5.5 API maturity** keeps its `aed9fd6` baseline and now says out loud that the baseline **expires with the
+  pre-1.0 window**: at the `1.0.0` close the tags are re-derived from the export map that release actually
+  publishes, a name keeps Stable only if it is reachable in it, and the re-baseline is a reviewed diff naming every
+  name it moves down with its reason. **Reason:** the owner's ruling of 2026-10-05 accepted the commit as the rule
+  for *now*; what the ruling also carried, and what was missing from the document until #207's pass, is the
+  expiry — a tag is a promise to whoever reads the types, and a promise inherited from a commit no consumer ever
+  installed against stops being a promise the moment there is a release to install. Saying the rule without its
+  end date would let 263 "stable" names ride into 1.0 on the strength of a build nobody could download.
 
 
 ### Changed

@@ -832,6 +832,13 @@ already see. Those names have shipped in every internal build since, and the she
 is the table's own test for Stable. The split is printed by `npm run check:maturity` and stated in
 `CODE_REFERENCE.md` §2 as a derived figure, so it cannot go stale silently.
 
+That baseline governs the pre-1.0 window and **expires with it**: at the `1.0.0` close the tags are re-derived from
+the surface `1.0.0` actually publishes, and a name keeps Stable only if it is reachable in that export map — not
+inherited from a commit no consumer ever installed against. A tag is a promise to the person reading the types, and
+a promise carried forward from a build they could not install is not one. The re-baseline is a reviewed diff in the
+release that performs it, every name it moves down is named in the changelog with its reason, and until that diff
+lands the manifest is read against `aed9fd6` because that is the rule chosen above.
+
 Two boundaries this policy protects: the
 find-controller interface is stable *as a shape*, which is what makes an alternative search strategy
 possible without a fork; and where a public prop is typed with an engine class, an upstream change to that
