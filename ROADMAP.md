@@ -91,7 +91,7 @@ certified on this machine at all.
 | `FR-41` | Dual Module Output | **met** | 5/5 | 0 | — |
 | `FR-42` | Document Merge | **met** | 4/5 | 0 | — |
 | `FR-43` | Structure-Tree Integration | **partial** | 5/5 | 2 | the announcement is read from the accessibility tree, not from an assistive technology: the row … |
-| `FR-44` | High Contrast & Forced Colours | **partial** | 5/5 | 1 | WebKit read this row once, then failed it, and the fault was the row rather than the engine: CI … |
+| `FR-44` | High Contrast & Forced Colours | **met** | 5/5 | 0 | — |
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
 | `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108… |
 | `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the one-finger clause is now measured rather than reasoned about, in one engine: `scripts/browse… |

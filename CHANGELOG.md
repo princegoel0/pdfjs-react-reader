@@ -29,12 +29,13 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **43 met, 14 partial, 1
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **44 met, 13 partial, 1
 absent** of 58, on a suite of **1,244 tests in 138 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
-below and is the honest number rather than the comfortable one. One row moved up on a runner's reading of an
-engine this host cannot start, and came back down on the next reading of it: `FR-44` and **#245**/**#246** below
-are that story, and it is why the count is 43 rather than 44. Seventeen of those eighteen are back out:
+below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
+this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
+wrote for itself has been satisfied twice: `FR-44` and **#245**/**#246** below are that whole exchange, and the
+count is 44 because of a repeat rather than a hope. Seventeen of those eighteen are back out:
 `FR-06` was closed in the code by #219 and re-synced in the register the same pass; `FR-30` and `FR-32`
 came back through **#230**, the first Tier-1 work order; `FR-14`, `FR-15` and `FR-39` through **#231**,
 where writing the assertion for the third found the behaviour missing and moved the code as well; `FR-17`
@@ -1243,6 +1244,16 @@ re-derived by whoever asks next.
   mark; the row had simply read the walk before it got one. `FR-44` stays `partial` because its gap now asks for two
   consecutive green readings after a self-contradiction and this is the first, and the browser job's only remaining
   failure is print's scope control — #245/#243, a product fix, not a test one.
+  The second reading arrived, and it changed the row's state without changing the branch's health. CI run
+  37393640240 (dev at `bdd39be`) is green in all fourteen jobs — **87 ok / 9 skipped / 0 not runnable / 0 failed**,
+  six of six engines at or above §8's floors — `forced-colours` read the same way in webkit for the second run
+  running, so the exit condition this row wrote for itself is satisfied and **FR-44 is met: 44 met, 13 partial, 1
+  absent**. Read the ninth skip before celebrating, though: it is print's own row, and webkit got *past* the scope
+  select that run — both of the row's first jobs took the selection — and then skipped because that cell reported
+  the print media unmatched under Playwright's emulation. Three runs of one version of the row, three behaviours:
+  visible-but-unactionable, absent-but-for-the-sizer, worked-then-skipped. So the green closes nothing about #245,
+  which stays open; FR-19's browser evidence on this clause is chromium alone, and the engine that could not read
+  the sheet is the same one that could not read it locally. The register now says a skipped row is a skipped row.
 
 - **A runner started WebKit, answered two rows, and failed one (#245; FR-44, FR-43, FR-19, FR-48).**
   The cells at `651672c` (CI run 37386366651, 2026-10-05) are the first to carry nineteen checks, and for
