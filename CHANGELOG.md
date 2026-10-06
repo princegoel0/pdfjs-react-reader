@@ -1259,6 +1259,31 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **Print's scope read-back now separates the control a reader can use from the state the app holds, because the
+  instrument the last change built answered the question it was made for (#248; FR-19, FR-48).** CI run
+  37515055554 (`dev` at `a068dea`, 2026-10-07 — a push whose diff is the ready-shell audit) went green in thirteen
+  jobs, all three `verify` cells among them, and red in this row in WebKit desktop with the new state line:
+  `the scope select never read "all" — it read "range", "" over 3 s after webkit took the selection through
+  Playwright's selectOption; at the last reading, panel closed, no usable copy, copies sizer 908,168 122x32 group
+  206x32 value "all" unpainted`. Three things are settled by that sentence, and none of them by this file's
+  reading of it. The selection *was* taken: Playwright acts only on a visible copy and the measuring sizer is
+  `visibility: hidden`, so the write went through a copy a reader could reach. The app's state holds the value: the
+  sizer is bound to the same React value and reads `"all"`. What disappeared between the write and the read is the
+  panel. So the row was failing on its **confirmation**, not its premise — and the premise is still asserted twice
+  before this line (`before job one` requires a usable copy with the panel open, and the substitution path requires
+  six agreeing samples). `readScopeControl` returns the state every present copy agrees on beside the value of the
+  usable copy; the poll settles on either; and settling on the state alone puts the transition in the row's own
+  text — `"all" reached the app's state … but no copy a pointer could reach did after the panel closed at reading
+  N, so the sheet counts below carry this scope's claim` — instead of a failure that implies the viewer refused the
+  choice. An empty reading prints as `(no usable copy; state reads …)`, because `""` in a list of values is read as
+  *a control showing nothing* when it meant *no control was there to look at*. Both branches were made to fire in
+  Chromium on 2026-10-07 and the source restored by checksum: a 60 ms veil over the page (so `elementFromPoint`
+  answers the veil while every copy keeps its value) makes the row proceed and print that note, and overwriting
+  each copy's DOM value without dispatching an event makes it fail with the sequence and the box it last read.
+  Whether WebKit's **sheet counts** are right is what the next runner reading decides now that the read is no
+  longer the thing that breaks: if they are, #248 closes as an instrument defect; if they are not, the row finally
+  holds a product finding, and it will arrive with the state attached rather than as a timeout about a selector.
+
 - **Print's WebKit row now says what it saw, instead of waiting thirty seconds on a selector (#248; FR-19,
   FR-48).** Nine runner failures of one row, nine messages about the message: every one has arrived as
   `locator.inputValue: Timeout 30000ms exceeded … waiting for locator('.pjsr-toolbar [aria-label="Print pages"]:visible')`,

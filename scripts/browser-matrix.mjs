@@ -2405,6 +2405,16 @@ const CHECKS = [
                   : 'nothing carrying that label',
                 wrote,
                 value: usable ? usable.value : null,
+                /*
+                 * The state as the app holds it, read off every copy that exists — including the measuring
+                 * sizer, which no pointer can reach but which is bound to the same React value. #248 needs the
+                 * two separated: a copy a reader can use is the *premise* (that is what #243 is about), while
+                 * agreement between the copies is the *state*. Null when they disagree, which would itself be
+                 * a finding about two controlled copies of one select.
+                 */
+                mirror: matches.length && matches.every((m) => m.value === matches[0].value)
+                  ? matches[0].value
+                  : null,
                 more: more
                   ? `present ${Math.round(moreBox.width)}x${Math.round(moreBox.height)}`
                   : 'no button in the bar',
@@ -2543,22 +2553,43 @@ const CHECKS = [
          */
         const seenValues = [];
         let last = null;
+        let panelSeenOpen = false;
+        let closedAfter = null;
+        /** `null` is what "no copy a reader could use" looks like in a list of readings. */
+        const said = (r) => (r.value === null ? `(no usable copy; state reads "${r.mirror}")` : r.value);
         const settled = await waitFor(async () => {
           last = await readScopeControl(null);
-          const now = last.value;
-          if (now === scope) return true;
+          if (last.panel) panelSeenOpen = true;
+          else if (panelSeenOpen && closedAfter === null) closedAfter = seenValues.length;
+          if (last.value === scope || (last.value === null && last.mirror === scope)) return true;
+          const now = said(last);
           if (seenValues[seenValues.length - 1] !== now) seenValues.push(now);
           return null;
         }, 3_000);
         if (!settled) {
           fail(
-            `the scope select never read "${scope}" — it read ${seenValues.length ? `"${seenValues.join('", "')}"` : '(nothing)'} ` +
+            `the scope select never read "${scope}" — it read ${seenValues.length ? seenValues.join(', ') : '(nothing)'} ` +
               `over 3 s after ${how}; at the last reading, ${stateOf(last)}`,
           );
         }
-        if (seenValues.length) {
+        /*
+         * The two ways to settle are two different claims, and the row says which one it got. Reading the value
+         * off a usable copy is the ordinary one. Settling on the state mirror alone — CI run 37515055554's
+         * webkit cell, where every copy read "all" while the panel had closed under the poll — is the app
+         * agreeing while the reader's door vanished, so the *scope* premise still holds and what the row
+         * finally asserts is what came out on paper. Naming the transition is the point: whether the panel
+         * dismissed itself after a selection is a fact about the engine, and a note that says so is worth more
+         * here than a failure that implies the viewer refused the choice.
+         */
+        if (last.value !== scope && last.mirror === scope) {
           scopeNotes.push(
-            `"${scope}" settled on the select after ${seenValues.length} other reading(s): "${seenValues.join('", "')}" — ${how}`,
+            `"${scope}" reached the app's state — every copy present reads it, the sizer among them — but no copy ` +
+              `a pointer could reach did${closedAfter === null ? ' at any reading' : ` after the panel closed at reading ${closedAfter + 1}`}, ` +
+              `so the sheet counts below carry this scope's claim (${how})`,
+          );
+        } else if (seenValues.length) {
+          scopeNotes.push(
+            `"${scope}" settled on the select after ${seenValues.length} other reading(s): ${seenValues.join(', ')} — ${how}`,
           );
         }
         // Put the panel back before reaching for the action. Print's button is a higher-priority control, so it
