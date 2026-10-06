@@ -90,7 +90,7 @@ certified on this machine at all.
 | `FR-40` | Injectable External Index | **met** | 4/5 | 0 | — |
 | `FR-41` | Dual Module Output | **met** | 5/5 | 0 | — |
 | `FR-42` | Document Merge | **met** | 4/5 | 0 | — |
-| `FR-43` | Structure-Tree Integration | **partial** | 5/5 | 2 | the announcement is read from the accessibility tree, not from an assistive technology: the row … |
+| `FR-43` | Structure-Tree Integration | **partial** | 5/5 | 3 | the tier's link-ownership half does not exist in the advertised floor release. CI run 3751989588… |
 | `FR-44` | High Contrast & Forced Colours | **met** | 5/5 | 0 | — |
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
 | `FR-46` | SSR-Safe Module Graph | **partial** | 5/5 | 1 | the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108… |
@@ -100,7 +100,7 @@ certified on this machine at all.
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
 | `FR-52` | Public API & Export Contract | **partial** | 5/5 | 1 | the /edit, /merge, /features/*, per-feature CSS and /locales/* entries this row classifies as pu… |
-| `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 1 | one range is still a promise rather than a measurement: the consumer job runs the packed tarball… |
+| `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 1 | the advertised range and a requirement inside it now contradict each other, and the measurement … |
 | `FR-54` | Stable Error & Cancellation Contract | **partial** | 4/5 | 1 | two published codes have no producer anywhere in the package: `RENDER_CANCELLED` is the name `to… |
 | `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |

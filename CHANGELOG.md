@@ -1278,7 +1278,28 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **The engine axis ran at the advertised floor and found a promise that does not hold there (#194's first reading;
+  FR-43, FR-48, FR-53; decision filed as #249, 2026-10-07).** CI run 37519895887 (`dev` at `1689941`) is the first
+  that carried the axis — the run before it was cancelled by this workflow's own `cancel-in-progress`, which is what
+  a second push mid-matrix does to a reading — and fourteen jobs came back with thirteen green and the browser matrix
+  split by engine. The current end is clean: 6 cells on 6.4.299, 89 ok / 7 skipped / 0 failed. The floor is not: 6
+  cells on **6.2.108**, 86 ok / 7 skipped / **3 failed**, and all three failures are one check —
+  `structure-tree-in-the-accessibility-tree` — in the desktop cell of each of the three engines. The link annotation
+  reaches the structure tree with `aria-owns` empty, which is precisely the unlabelled control FR-43 refuses.
+  **Measured twice, because a runner reading and a source reading are different claims**: `npm pack` of the engine
+  shows `enableLinkOwnership` appears **zero** times in 6.2.108's `build/pdf.mjs` (853,537 bytes) and twice in 6.3.289
+  (860,384) and 6.4.299 (860,818), and `npm view pdfjs-dist versions` says the published 6.x line above the floor is
+  exactly 6.2.108 → 6.3.289 → 6.4.299. So the boundary is not a patch level; there is no release between them to
+  test, and the feature is not "flaky at the floor", it is absent there. **Nothing has been coded in response**,
+  because the three ways out promise different things to different hosts and that is the owner's call (#249): raise
+  the peer floor to 6.3.289, keep `^6.2.108` and give `structureFeature` a declared engine minimum that the code
+  states and the docs show, or implement the ownership in this package. `FR-43` and `FR-53` now carry the finding as
+  a gap each and `FR-48`'s engine-axis gap is rewritten from the reading it was waiting for — which is what a
+  mechanism is for: it was built to look, and the first thing it saw was a contradiction between the range advertised
+  and a requirement inside it.
+
 - **`ROADMAP.md` stopped asking two questions it had already answered (#206, 2026-10-07).** Its
+ Its
   "open questions rather than history" block still listed `FR-16` (whether the register's `met` may rest on the
   engine constructing every widget) and `FR-39` (whether to restate or withdraw the sentence that would make an
   edited page searchable). Both were settled in code and in the lock: **#229** drew the `/Sig` box that the
