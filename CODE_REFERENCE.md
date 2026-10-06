@@ -123,10 +123,13 @@ naming one path pays slightly less; a CJS host naming two pays about a quarter m
 `check-size.mjs` ratchets both shipped CJS paths (`shell (cjs)`, `headless (cjs)`) for that reason: a
 format nobody measures is a format that can grow.
 
-For scale, measured the same way (gzip level 9): `pdf.min.mjs` **131.70 kB**, `pdf.worker.min.mjs`
-**375.25 kB**, and `@cantoo/pdf-lib` **251.41 kB** for what our writer imports (256.05 kB for its whole
-API). The engine is 507 kB before this package contributes anything, which is the context for every
-number above.
+For scale, measured the same way (gzip level 9, decimal kB): `pdf.min.mjs` **131.70 kB**, `pdf.worker.min.mjs`
+**375.25 kB**, and `@cantoo/pdf-lib` **251.53 kB** for what our writer imports (256.05 kB for its whole
+API) — the three figures on the versions this tree installs, `6.3.289` and `2.11.1`, and since #240 `npm run size`
+writes them into `docs/src/size-figures.json` with those versions attached, which is what the docs pages render.
+The engine is 507 kB before this package contributes anything, which is the context for every
+number above. Divide by 1024 instead of 1000 and the same files read 128.61 / 366.46 / 245.63 — which is how one
+re-measurement in this pass first "disproved" them and then found its own probe wrong.
 
 ### The two size rules, and what each one is allowed to do
 
@@ -1226,7 +1229,7 @@ were **fixed toward the code** on 2026-09-28; the entries remain as the correcti
 | README "React 18.3.1 tested" | No job installed 18; the last check was manual, at `0.1` | Re-verified locally **and** a `react` CI matrix added |
 | README "19.3.0, **in CI**" | The `verify` job that ran on 2026-09-24 installed whatever `package-lock.json` pinned, and no job had ever installed 18; nothing since has run at all | Row rewritten to name the machine the measurement came from; the `react` matrix job is future protection, not present evidence |
 | README Status "signing work uncommitted" | Committed as `0fc7273` | Corrected |
-| Docs pages quoting 128.6 / 366.5 / 245.5 kB for engine and peer, on the version that names itself | 131.70 / 375.25 / 251.41 kB measured | Restated, **with the method named** — the trap is documented in `ROADMAP.md` |
+| Docs pages quoting 128.6 / 366.5 / 245.5 kB for engine and peer, on the version that names itself | 131.70 / 375.25 / 251.53 kB measured | Restated, **with the method named** — the trap is documented in `ROADMAP.md`. #240 re-ran the probe and reproduced the *first* triple exactly, because it divided by 1024 where the gate divides by 1000: the two sets are the same bytes in kB and KiB. The figures now ship from `npm run size` inside `docs/src/size-figures.json` with their versions, so neither unit nor version is a hand-copy any more |
 | `ROADMAP.md` "39 tests across four files" for signing | 35 across three | Corrected |
 | Catalog "142 strings" in three places | 144 | Corrected, including a stale number in the test's own comment |
 | A tagged fixture whose tree read back correctly | Its `BDC` operators had one operand instead of two, so pdf.js skipped every marked section with a console warning. The tree is built from `/StructParents`, `/ParentTree` and `/Pg` and never reads the content stream, so all six assertions above it passed on a file that bound nothing | Fixed in `scripts/make-tagged-pdf.mjs`, which now refuses to write a `BDC` without its property list, and pinned twice in `tagged.test.ts`: the content/tree pairing, and the same-length counterfactual that blanks the list. Found by the browser pass, not by the test |
@@ -1308,23 +1311,23 @@ after the wrong answer — the silence was a watchdog that cannot fire inside th
 Nothing here should be taken on trust. Each of these re-derives a number above:
 
 ```bash
-node scripts/check-docs.mjs                     # §2's counts are now a gate, not a courtesy (#213): importable subpaths, the maturity split, source files and lines, test files, stylesheet count and range, fixtures and generators (including "all of them tracked"), CI job count, and PRD §8's browser-check count. `--selftest` perturbs every figure it reads, one capture at a time, and requires each to be caught
+node scripts/check-docs.mjs                     # §2's counts are now a gate, not a courtesy (#213): importable subpaths, the maturity split, source files and lines, test files, stylesheet count and range, fixtures and generators (including "all of them tracked"), CI job count, PRD §8's browser-check count, and the version the docs site prints. Since #240 it also holds the docs site's size tables to `docs/src/size-figures.json` — every published tier must have a figure, no page may index a key the gate never measured, no size cell may be typed by hand — and it refuses a CI run tally or a browser cell's ok/skip reading in `ROADMAP.md` or in any docs page, because those are the two figures no checkout can re-derive. `--selftest` perturbs every figure it reads, one capture at a time, and writes each banned figure back in; it requires every one to be caught
 npm run check:docs                              # the same, as the step `verify` and CI's Verify job run
 grep -rc "" src/**/*.ts src/**/*.tsx            # file inventory (§2)
-npm run test                                    # 759 tests in 74 files (§2, §17)
+npm run test                                    # 1,260 tests in 141 files (§2, §17)
 npm run a11y                                    # the axe audit on its own (FR-45); it also runs inside the line above
 npm run test:browsers                           # FR-48: the §8 browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; it exits non-zero if a check fails *or* if an engine never started, because a row with no job behind it is not a tested row
 npm run probe:canvas                            # FR-57: the §6.1 probe against real Chromium — the ceiling it answers with, the ceiling a mobile UA lowers it to, and the frame every surface landed on
 npm run probe:worker                            # FR-02: what `workerSrc` holds in a browser before anything configures it (empty) and so why the candidate probe runs there
 npx vitest run src/styles/forced-colors.test.ts # §16's stylesheet rules, read from src/styles rather than from a list
 node -e "const u=require('caniuse-lite/dist/unpacker/feature'),f=require('caniuse-lite/dist/unpacker/features').features;const s=u(f['css-media-resolution']).stats;console.log(s.safari['14'],s.safari['16.0'],s.chrome['90'],s.firefox['90'])"   # the §11 `resolution` support flags (caniuse-lite is transitive, via the toolchain, not a declared dependency)
-npm run size                                    # every size figure in §2, plus the two failing rules
+npm run size                                    # every size figure in §2, plus the two failing rules — and the write of `docs/src/size-figures.json`, which the docs site's tables render (#240)
 node -e "console.log(Object.keys(require('./dist/index.js')).length)"   # names on the main entry
 node --input-type=module -e "const m = await import('pdfjs-dist/legacy/build/pdf.mjs'); console.log(m.GlobalWorkerOptions.workerSrc)"   # §10: pdf.js's own Node default, which an unset `workerSrc` leaves in place
 npx vitest run --project node src/lib/worker.fallback.test.ts src/lib/worker.fallback.onpage.test.ts src/lib/worker.fallback.nocode.test.ts src/lib/worker.fallback.deadurl.test.ts   # §10's four worker states, one process each
 npm run build && node scripts/inventory.mjs   # the grouped name lists in §4, straight from dist/*.d.ts
 node scripts/check-maturity.mjs               # §4's union and §2's maturity row: the distinct names it finds in dist, their states, and the reasons behind every non-stable one
-ls playground/fixtures/*.pdf | wc -l && ls scripts/make-*.mjs | wc -l && git ls-files playground/fixtures | wc -l   # §2's fixture row: on disk, generated, and tracked — the third number is the one that catches an uncommitted fixture
+ls playground/fixtures/*.pdf | wc -l && ls scripts/make-*.mjs | wc -l && git ls-files playground/fixtures | wc -l   # §2's fixture row: on disk, generated, and tracked — the third number is the one that catches an uncommitted fixture. 22 on disk and 22 tracked since W8's `vector-sample.pdf` and `oversize-sample.pdf` were committed with the rest of that pass; `check-docs.mjs` fails if the two ever differ.
 npm run bench                                 # §2's benchmark row and README's "Behaviour under load" figures, measured rather than quoted
 grep -n "MAX_RENDER\|PRINT_MEMORY\|CAP_AREA" src/lib/canvas.ts src/lib/print.ts   # §9
 grep -n "structTreeLayer\|annotationCanvasMap" src/components/PdfPage.tsx          # §11

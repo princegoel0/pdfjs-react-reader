@@ -143,7 +143,9 @@ function selfTest() {
   // And the shape of the ruling, not just its arithmetic: if the stop ever sits at or below the noise
   // line, `GREW` is unreachable and the gate has silently become the hard ceiling §6 forbids.
   if (HARD_STOP <= 1 + TOLERANCE) {
-    failures.push(`HARD_STOP ${HARD_STOP} is at or below the reporting line ${1 + TOLERANCE}, so nothing is ever reported`);
+    failures.push(
+      `HARD_STOP ${HARD_STOP} is at or below the reporting line ${1 + TOLERANCE}, so nothing is ever reported`,
+    );
   }
   if (HARD_STOP !== 2) failures.push(`HARD_STOP is ${HARD_STOP}, not the 200 % the #208 ruling set`);
   const lines = cases.length + 2;
@@ -392,19 +394,24 @@ function report(label, bytes, detail) {
   // Three states, because "nothing changed" and "it got bigger and somebody looked" are different facts.
   const flag = verdict.padEnd(4);
   const change =
-    baseline[label] === undefined
-      ? 'new   '
-      : `${delta >= 0 ? '+' : ''}${(delta / KB).toFixed(2)} kB`.padEnd(8);
+    baseline[label] === undefined ? 'new   ' : `${delta >= 0 ? '+' : ''}${(delta / KB).toFixed(2)} kB`.padEnd(8);
   console.log(
     `${flag}  ${label.padEnd(15)} ${(bytes / KB).toFixed(2).padStart(7)} kB gz   ${change}  ${detail}` +
       // The line a doubling is judged against, so `GREW` cannot be read as "fine, keep going" forever.
-      (over ? `\n     ${(bytes / accepted).toFixed(2)}× the accepted ${(accepted / KB).toFixed(2)} kB — the 200 % stop.` : ''),
+      (over
+        ? `\n     ${(bytes / accepted).toFixed(2)}× the accepted ${(accepted / KB).toFixed(2)} kB — the 200 % stop.`
+        : ''),
   );
   measured[label] = bytes;
 }
 
 console.log('shipped files, per entry point');
-for (const path of filePaths) report(path.label, path.files.reduce((sum, file) => sum + gzipSync(readFileSync(join(dist, file)), { level: 9 }).length, 0), path.files.join(' + '));
+for (const path of filePaths)
+  report(
+    path.label,
+    path.files.reduce((sum, file) => sum + gzipSync(readFileSync(join(dist, file)), { level: 9 }).length, 0),
+    path.files.join(' + '),
+  );
 
 console.log('\nbundled per consumer import, worst of esbuild and Rollup');
 for (const path of consumerPaths) {
@@ -481,18 +488,13 @@ const coreRendered = classesIn(
 const featureOnly = [
   ...[
     ...classesIn(
-      listSource(join(root, 'src', 'features'), [
-        join(root, 'src', 'edit.tsx'),
-        join(root, 'src', 'merge.ts'),
-      ]),
+      listSource(join(root, 'src', 'features'), [join(root, 'src', 'edit.tsx'), join(root, 'src', 'merge.ts')]),
     ),
   ]
     .filter((name) => !coreRendered.has(name))
     .sort(),
 ];
-const coreSheet = existsSync(join(dist, 'styles.css'))
-  ? classesIn([join(dist, 'styles.css')])
-  : new Set();
+const coreSheet = existsSync(join(dist, 'styles.css')) ? classesIn([join(dist, 'styles.css')]) : new Set();
 const leaked = featureOnly.filter((name) => coreSheet.has(name));
 
 if (featureOnly.length === 0) {
@@ -510,6 +512,63 @@ if (!leaked.length && featureOnly.length) {
       `(${featureOnly.slice(0, 4).join(', ')}, …)`,
   );
 }
+
+/*
+ * The docs site's footprint tables used to be typed by hand at each release close, which is how
+ * `annotate` came to read 1.86 kB in a page while the gate measured 2.05, and how a whole table quietly
+ * kept a `core` from nine releases ago. PRD's front matter rule 2 says a figure lives in one place and is
+ * kept current, so this writes what the gate just measured to `docs/src/size-figures.json` and the docs
+ * render from it: there is no number left in the docs to re-remember. `npm run check:docs` holds the two
+ * together — every feature the export map publishes must appear here, and every row the docs tables print
+ * must be answerable from it.
+ */
+const figuresPath = join(root, 'docs', 'src', 'size-figures.json');
+const kib = (bytes) => Number((bytes / KB).toFixed(2));
+
+/*
+ * The engine and the writer are quoted beside our own numbers wherever a reader is asking how big this layer is
+ * next to what it needs, and those quotes were typed by hand in five files. The digits reproduced, but a peer
+ * figure without the version it was measured on is an adjective about somebody's `node_modules` - and the writer
+ * had moved from 251.41 to 251.53 kB between the last hand-copy and this one. #240 re-measured every quote and
+ * found its own probe wrong first: it divided by 1024 where the documents divide by 1000. So these are measured
+ * here, on the version actually installed, with that version shipped beside each figure.
+ */
+const peerPaths = [
+  ['pdfjs-dist', 'build/pdf.min.mjs', 'engineMain'],
+  ['pdfjs-dist', 'build/pdf.worker.min.mjs', 'engineWorker'],
+  ['@cantoo/pdf-lib', 'dist/pdf-lib.esm.min.js', 'writer'],
+];
+const peers = Object.fromEntries(
+  peerPaths.map(([packageName, relative, key]) => {
+    const base = join(root, 'node_modules', ...packageName.split('/'));
+    try {
+      const version = JSON.parse(readFileSync(join(base, 'package.json'), 'utf8')).version;
+      return [key, { version, kB: kib(gzipSync(readFileSync(join(base, relative)), { level: 9 }).length) }];
+    } catch {
+      // An optional peer that is not installed is not a size claim; `null` says which, and the docs say so too.
+      return [key, null];
+    }
+  }),
+);
+
+const docsFigures = {
+  '//': 'Generated by `npm run size` (scripts/check-size.mjs) from the worst of esbuild and Rollup over the built artifact. The docs site renders its size tables from this file; edit the gate, not this file. `kB` is what a consumer import costs, `overCore` is each feature or tier apart from core, both in gzipped kilobytes, and `peers` is the engine and the writer as installed, at gzip level 9 with the version each figure came from.',
+  measuredOn: new Date().toISOString().slice(0, 10),
+  kB: Object.fromEntries(Object.entries(measured).map(([label, bytes]) => [label, kib(bytes)])),
+  peers,
+  overCore: Object.fromEntries(
+    consumerPaths
+      // `headless-only` and `merge-only` are their own bundles, not core plus something — the same
+      // distinction the report above makes by printing no increment for them.
+      .filter((path) => path.label.startsWith('core+') || path.label === 'all')
+      .map((path) => [path.label.replace(/^core\+/, ''), kib(measuredConsumer.get(path.label) - coreSize)]),
+  ),
+};
+writeFileSync(figuresPath, `${JSON.stringify(docsFigures, null, 2)}\n`);
+console.log(
+  `\nwrote ${figuresPath} — ${Object.keys(docsFigures.overCore).length} feature and tier figures, ` +
+    `measured ${docsFigures.measuredOn}, for the docs site to render`,
+);
 
 if (update) {
   const body = `${JSON.stringify(

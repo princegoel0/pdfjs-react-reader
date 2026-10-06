@@ -15,6 +15,15 @@ const movable = Object.entries(notes)
 
 const stableCount = Object.values(tags).filter((t) => t === 'stable').length;
 
+import figures from '../size-figures.json';
+
+/** The three shipped catalogs, read from the file `npm run size` writes rather than remembered here. */
+const catalogSizes = Object.entries(figures.kB)
+  .filter(([label]) => label.startsWith('catalog:'))
+  .map(([, kB]) => kB);
+const catalogRange =
+  `${Math.min(...catalogSizes).toFixed(2)}–${Math.max(...catalogSizes).toFixed(2)} kB gzipped`;
+
 export function Api() {
   return (
     <>
@@ -88,7 +97,7 @@ export function Api() {
               <code>pdfjs-react-reader/locales/&lt;lang&gt;</code>
             </td>
             <td>
-              A complete label catalog: <code>de</code>, <code>es</code>, <code>fr</code>. 2.39–2.42 kB gzipped
+              A complete label catalog: <code>de</code>, <code>es</code>, <code>fr</code>. {catalogRange}
               each, frozen, and typed as the whole catalog rather than the partial a host may send.
             </td>
           </tr>

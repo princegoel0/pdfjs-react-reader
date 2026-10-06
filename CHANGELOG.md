@@ -1231,6 +1231,36 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **The docs site's size tables, and every CI tally in the documents, are derived or gone (#240; FR-23, FR-48).**
+  Two kinds of hand-copy were live at once. The numbers: `Introduction.tsx` priced a whole footprint table from a
+  release nine behind — `core` 29.09 kB where the gate measures 32.41, `annotate` +1.86 where it measures +2.02,
+  structure +0.38 against +0.36 — while `Compatibility.tsx` had already been rebuilt to render the same file, so
+  the site carried two tables of the same measurement agreeing with neither. And the readings: `ROADMAP.md` said
+  the `browser` job "has run — thirteen times as of 2026-10-06, green in five of them" where `gh api` on the same
+  evening counted **33 push runs carrying a `Browser matrix` job since 2026-10-04, 22 green, 10 failed,
+  1 cancelled**; `fr-evidence.json`'s own `FR-48` gap led with "ten times … green four times"; the compatibility
+  page's engine rows still quoted "thirteen claims … 23 ok, 1 skip" six rows after the harness grew; and a
+  paragraph of 2026-10-05 history claimed no CI job had ever started a browser. The docs page also printed the
+  package as `0.10.0` while `package.json` says `0.11.0`.
+  What replaced it is one generated file and one gate over it. `npm run size` now writes
+  `docs/src/size-figures.json` — `kB` per measured path, `overCore` per tier, the engine and writer `peers` each
+  with the version they were measured on, and `measuredOn` — and every docs page renders that file rather than
+  remembering numbers at release close. `npm run check:docs` fails on a published tier with no figure, a page
+  indexing a key the gate never measured, a peer measurement that stopped being taken, a size figure typed into a
+  `<td>` or `<strong>` in *any* page (the page list is read off the directory, not typed into the script), a page
+  rendering figures without importing the file, a `measuredOn` that is not a date, and the printed version
+  against `package.json`. A CI run count and a matrix cell's `ok`/`skipped` reading are **refused** in `ROADMAP.md`
+  and the docs pages rather than derived: they are not properties of the tree, so nothing in a checkout can
+  re-check them, and the honest fix is the one the row now states — each reading with its run id in
+  `fr-evidence.json` under `FR-48`, and no tally above it. `--selftest` writes every one of those back in and
+  catches **32 of 32**, so the prohibitions are rules and not comments.
+  One discovery on the way was about the probe rather than the documents: re-measuring the peer figures first
+  "disproved" `pdf.min.mjs` at 131.70 kB with a 128.61 reading, along with both floor and top-end engine versions,
+  before the arithmetic was checked — the probe divided by 1024 where the gate divides by 1000, and the same bytes
+  are 131.70 kB and 128.61 KiB. The numbers were right; what was missing was the version and the unit, which is
+  why `peers` now ships with both attached. `FR-23` gains the figures file, the three pages and `check-docs` as
+  its automated guard, and `FR-48` gains `check-docs` as a guard over the prose that describes it.
+
 - **Two greens did not settle print's row, and this file said it did (#245 reopened as #248; FR-19, FR-48).**
   CI run 37472575777 — a push whose diff is the register and the changelog, the same shape as the two runs
   counted as the repeat — came back **87 ok / 7 skipped / 0 not runnable / 2 failed**. One failure was

@@ -650,7 +650,7 @@ reader's machine, not what it weighs — and that is written down rather than sm
 
 
 For scale, `pdfjs-dist` 6.3.289 gzips to 131.7 kB for the main-thread module (`pdf.min.mjs`) and 375.3 kB
-for its worker, and `@cantoo/pdf-lib` 2.11.1 bundles minified to 251.4 kB for what the `edit` tier
+for its worker, and `@cantoo/pdf-lib` 2.11.1 bundles minified to 251.5 kB for what the `edit` tier
 actually imports — 256.1 kB if a host takes the whole API — each measured the way `scripts/check-size.mjs`
 measures, at gzip level 9. So the engine dominates any viewer bundle regardless of this package, and the
 `edit` tier doubles that weight when a host mounts it and installs the writer.
