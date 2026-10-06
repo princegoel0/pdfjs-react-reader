@@ -1976,7 +1976,22 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   through the element rather than a pointer since the claim is about the sheet and not the click, then wait the
   job out — and only skips if *that* fails, naming which half failed. Green in Chromium with the retry:
   container `display: block`, the host's three other body children gone to `display: none`, the second sheet
-  breaking to its own page. The suite is **1,246 tests in 139 files**.
+  breaking to its own page.
+  The seventh run (CI 37421704560) then failed WebKit on the same line as before, and reported it with a sentence
+  this package wrote: *"0/6 samples saw a usable control … the only element carrying the label was the toolbar's
+  hidden measurement copy."* That was the instrument, not the viewer. The samples counted only a copy inside the bar
+  as usable — while the row had just clicked the ⋯ button to reach the control, and an abandoned WebKit selection
+  closes the panel it opened, so six readings taken afterwards described a *closed* panel as an absent control. The
+  row now puts the panel back before it measures anything, counts a copy in an open panel as usable (a folded
+  control a reader reaches by pressing ⋯ is reachable), and prints the ⋯ button's own box, the panel's row labels,
+  the width of the whole scope group — the measuring copy at 197 px against the live one at 116 px, which is this
+  fix visible in the numbers instead of argued from the code — and, for any copy an ancestor's `overflow: clip`
+  cuts, how many pixels it takes (#241's claim, stated as a measurement). Probed in Chromium at 1,100 px, where
+  print's scope really does fold, the row runs green end to end through the panel; with the selection forced to
+  fail, the substitution reads *"6/6 samples saw a usable control in the menu at 608,275 116x32; overflow button
+  present 32x32; panel open; rows Enter fullscreen | Print pages"*. Whether WebKit is clipped by the viewer's own
+  box, folded at its own metrics at 1,246 px, or simply green is now a question the next run answers in one of
+  those three sentences. The suite is **1,246 tests in 139 files**.
 
 - **The React peer job was running a different suite from `verify` (#244; FR-48, FR-45).**
   `npm i --no-save --no-package-lock react@…` does not swap one package: npm re-resolves the whole tree from

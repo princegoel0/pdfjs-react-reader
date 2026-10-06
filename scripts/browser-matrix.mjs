@@ -2065,6 +2065,15 @@ const CHECKS = [
        * whether a pointer landing at its centre hits it, and whether it is disabled; plus the bar's own
        * clientWidth against its scrollWidth and whether an overflow panel exists, because the question being
        * answered is whether the fold planner is under pressure at this viewport.
+       *
+       * What it now answers is a three-way question, because CI run 37421704560 showed the two-way version
+       * mis-reporting the middle case. A control can be (a) inline in the bar, (b) folded into the overflow list,
+       * which is reachable because the ⋯ button is in the bar and a reader opens it, or (c) rendered nowhere a
+       * pointer can get to. Reading (b) as (c) — which the old `where === 'bar'` filter did, and did in the same
+       * row that had *just* clicked the button to reach it — called webkit's control unreachable while the row was
+       * standing in its panel. So a `menu` copy counts as usable when the panel is open, the ⋯ button's own
+       * presence is printed, and the panel's rows are named: that is the difference between the planner folding
+       * on webkit's metrics at 1,246 px and the control genuinely vanishing.
        */
       const scopeSamples = async (count = 6) => {
         const runs = [];
@@ -2076,6 +2085,26 @@ const CHECKS = [
                 const box = el.getBoundingClientRect();
                 const style = getComputedStyle(el);
                 const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+                const scope = el.closest('.pjsr-print-scope');
+                const scopeBox = scope?.getBoundingClientRect();
+                /*
+                 * The clip walk, which is #241 stated in pixels rather than as a timeout: the viewer clips with
+                 * `overflow: clip`, so a panel that hangs below its box is not merely off-screen — nothing a
+                 * pointer does can land on the part that is cut, and a `<select>` there has no room to open.
+                 */
+                let clippedBy = null;
+                for (let a = el.parentElement; a; a = a.parentElement) {
+                  const s = getComputedStyle(a);
+                  if (!/clip|hidden/.test(`${s.overflowX}${s.overflowY}`)) continue;
+                  const r = a.getBoundingClientRect();
+                  const dx = Math.max(0, r.left - box.left) + Math.max(0, box.right - r.right);
+                  const dy = Math.max(0, r.top - box.top) + Math.max(0, box.bottom - r.bottom);
+                  if (dx > 0 || dy > 0) {
+                    clippedBy = `${a.className || a.tagName} cut ${Math.round(dx)}x${Math.round(dy)}px of it ` +
+                      `(box ${Math.round(r.width)}x${Math.round(r.height)} at ${Math.round(r.x)},${Math.round(r.y)})`;
+                    break;
+                  }
+                }
                 return {
                   where: el.closest('.pjsr-overflow-menu')
                     ? 'menu'
@@ -2083,20 +2112,29 @@ const CHECKS = [
                       ? 'sizer'
                       : 'bar',
                   box: `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}`,
+                  // The whole control, not just its select: #243 is about this box doubling when the range appears.
+                  group: scopeBox ? `${Math.round(scopeBox.width)}x${Math.round(scopeBox.height)}` : 'none',
+                  clippedBy,
                   painted:
                     box.width > 0 && box.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
                   covered: !(hit !== null && (hit === el || el.contains(hit) || hit.contains(el))),
                   disabled: Boolean(el.disabled),
                 };
               };
+              const more = document.querySelector('.pjsr-toolbar [aria-label="More controls"]');
+              const moreBox = more?.getBoundingClientRect();
               return {
                 matches: Array.from(
                   document.querySelectorAll(
                     '.pjsr-toolbar [aria-label="Print pages"], .pjsr-overflow-menu [aria-label="Print pages"]',
                   ),
                 ).map(shape),
-                bar: bar ? `${bar.clientWidth}/${bar.scrollWidth}` : 'none',
+                more: more
+                  ? `present ${Math.round(moreBox.width)}x${Math.round(moreBox.height)}`
+                  : 'no button in the bar',
                 panel: Boolean(document.querySelector('.pjsr-overflow-menu')),
+                rows: Array.from(document.querySelectorAll('.pjsr-overflow-label')).map((node) => node.textContent),
+                bar: bar ? `${bar.clientWidth}/${bar.scrollWidth}` : 'none',
               };
             }),
           );
@@ -2107,22 +2145,39 @@ const CHECKS = [
 
       /** The samples as one line, plus whether a reader could have used the control in each of them. */
       const describeSamples = (runs) => {
+        const reachable = (m) => m.painted && !m.covered && !m.disabled && !m.clippedBy;
         const usable = runs.map(
-          (run) => run.matches.find((m) => m.where === 'bar' && m.painted && !m.covered && !m.disabled) ?? null,
+          (run) =>
+            run.matches.find(
+              (m) => reachable(m) && (m.where === 'bar' || (m.where === 'menu' && run.panel)),
+            ) ?? null,
         );
         const found = usable.filter(Boolean);
         const boxes = [...new Set(found.map((m) => m.box))];
+        const places = [...new Set(found.map((m) => m.where))];
+        // A copy that exists but is cut by an ancestor is a different failure from one that is missing, and it
+        // is #241's: say which it is instead of letting "no usable control" cover both.
+        const cut = [...new Set(runs.flatMap((r) => r.matches.map((m) => m.clippedBy).filter(Boolean)))];
         return {
           usable: found.length,
           agreed: boxes.length === 1,
           total: runs.length,
           text:
-            `${found.length}/${runs.length} samples saw a usable control, at ${boxes.join(' then ') || 'no box'}; ` +
-            `bar clientWidth/scrollWidth ${[...new Set(runs.map((r) => r.bar))].join(' ')}; panel present ` +
-            `${[...new Set(runs.map((r) => r.panel))].join(' or ')}; first sample held ${
+            `${found.length}/${runs.length} samples saw a usable control` +
+            (found.length ? ` in the ${places.join(' or the ')} at ${boxes.join(' then ')}` : ' at no box') +
+            (cut.length ? `, while ${cut.join(' and ')} shows one that a pointer cannot fully reach` : '') +
+            `; overflow button ${[...new Set(runs.map((r) => r.more))].join(' or ')}; panel ` +
+            `${[...new Set(runs.map((r) => (r.panel ? 'open' : 'closed')))].join(' or ')}; ` +
+            `rows ${[...new Set(runs.map((r) => r.rows.join(' | ')))].join(' // ') || '(no panel rows)'}; ` +
+            `bar clientWidth/scrollWidth ${[...new Set(runs.map((r) => r.bar))].join(' ')}; first sample held ${
               runs[0].matches.length
                 ? runs[0].matches
-                    .map((m) => `${m.where} ${m.box}${m.painted ? '' : ' unpainted'}${m.covered ? ' covered' : ''}`)
+                    .map(
+                      (m) =>
+                        `${m.where} ${m.box} group ${m.group}${m.painted ? '' : ' unpainted'}${
+                          m.covered ? ' covered' : ''
+                        }${m.clippedBy ? ' clipped' : ''}`,
+                    )
                     .join(' | ')
                 : 'nothing carrying that label'
             }`,
@@ -2130,27 +2185,42 @@ const CHECKS = [
       };
 
       const pickScope = async (scope) => {
-        const pages = await reveal('Print pages');
+        let pages = await reveal('Print pages');
         try {
           await pages.selectOption(scope);
         } catch (error) {
           /*
-           * WebKit has now failed this line twice and told two different stories: on CI run 37386366651 (dev at
-           * 651672c) Playwright resolved the `<select>` as visible and then could not act on it, and on CI run
-           * 37390542384 (dev at 3f12174) the same locator never resolved at all. A control that is intermittently
-           * on screen in a bar its own fold row reports as not overflowed is a layout question rather than an
-           * automation one, and this host cannot start webkit to look closer — three attempts, all
-           * `Target page, context or browser has been closed` — so the runner carries the instrument. The
-           * samples decide which story is true. Six agreeing on one painted, uncovered, enabled box is a control
-           * a reader can use, so the value goes on it the way a choice puts it — `input` then `change`, the
-           * events the app listens for — and the substitution is printed in the row's own text. Anything else,
-           * including a box that appears in some samples and not in others, is this package's failure, and the
-           * row fails with every sample in the message.
+           * WebKit has now failed this line four times and told three different stories: on CI run 37386366651
+           * (dev at 651672c) Playwright resolved the `<select>` as visible and then could not act on it; on CI run
+           * 37390542384 (dev at 3f12174) the same locator never resolved at all; on CI runs 37391924675/37392699425
+           * the label existed only on the hidden measuring copy; and on CI run 37421704560 (dev at 1e502ba, after
+           * #243) the row reached the control through the ⋯ panel, the selection timed out, and the samples —
+           * which counted only a bar copy as usable — then described the panel they had just opened as an absent
+           * control. A layout question that keeps changing shape is answered by measuring more of it, not by
+           * retrying the same probe: this host cannot start webkit (three attempts, all `Target page, context or
+           * browser has been closed`), so the runner carries the instrument.
+           *
+           * So the panel is put back before anything is described (an abandoned selection dismisses it, and a
+           * closed panel renders no folded control at all), and six DOM readings then decide which of the three
+           * states this is. Six agreeing on one painted, uncovered, enabled copy — in the bar or in that open
+           * panel — is a control a reader can use, so the value goes on it the way a choice puts it: `input` then
+           * `change`, the events the app listens for, and the substitution is printed in the row's own text.
+           * Anything else, including a copy that appears in some samples and not in others, is this package's
+           * failure, and the row fails with every sample in the message.
            */
+          if ((await page.locator('.pjsr-overflow-menu').count()) === 0) {
+            const more = page.locator('.pjsr-toolbar [aria-label="More controls"]:visible');
+            if ((await more.count()) > 0) {
+              await more.click();
+              await page.waitForSelector('.pjsr-overflow-menu', { timeout: 5_000 }).catch(() => undefined);
+            }
+          }
           const seen = describeSamples(await scopeSamples());
           if (seen.usable !== seen.total || !seen.agreed) {
             fail(`the "${scope}" scope control could not be used: ${firstLine(error)} — ${seen.text}`);
           }
+          // The copy acted on is resolved after the panel came back, not the locator that timed out before it.
+          pages = page.locator('.pjsr-toolbar [aria-label="Print pages"]:visible').first();
           await pages.evaluate((el, value) => {
             el.value = value;
             el.dispatchEvent(new Event('input', { bubbles: true }));
