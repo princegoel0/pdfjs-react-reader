@@ -62,7 +62,8 @@ for (const arg of args) {
 const ONLY_ENGINES = value('--engines', 'chromium,firefox,webkit').split(',');
 const ONLY_PROFILES = value('--profiles', 'desktop,mobile').split(',');
 /**
- * A name-filtered subset of the checks, for developing one row without re-running eighteen of them.
+ * A name-filtered subset of the checks, for developing one row without re-running the rest of them. The count
+ * is deliberately not quoted here: it lives in `PRD.md` §8, and `npm run check:docs` derives it from this array.
  *
  * The cell's own two verdicts are never filtered out, because a row that leaves an uncaught error behind it
  * has to keep telling the story: `--checks=print` narrows what runs, not what is reported.
@@ -1760,6 +1761,7 @@ const CHECKS = [
     name: 'structure-tree-in-the-accessibility-tree',
     desktopOnly: true,
     run: async ({ page, load, pageErrors }) => {
+      const engine = page.context().browser()?.browserType().name();
       const viewerRequests = [];
       const onRequest = (request) => {
         if (/pdf_viewer/.test(request.url())) viewerRequests.push(request.url().split('/').pop());
@@ -1797,34 +1799,74 @@ const CHECKS = [
       );
       const taggedFetch = viewerRequests.length;
 
-      const dom = await page.evaluate(() => {
-        const roots = [...document.querySelectorAll('.structTree')];
-        const roles = new Set();
-        for (const root of roots) {
-          for (const el of root.querySelectorAll('[role]')) roles.add(el.getAttribute('role'));
-        }
-        const link = document.querySelector('.pjsr-annotation-layer a');
-        const owned = (link?.getAttribute('aria-owns') ?? '')
-          .split(' ')
-          .filter(Boolean)
-          .map((id) => {
-            const el = document.getElementById(id);
-            return el
-              ? { id, inTree: !!el.closest('.structTree'), role: el.getAttribute('role') ?? el.tagName.toLowerCase() }
-              : { id, inTree: false, role: '(no such element)' };
-          });
-        return {
-          roots: roots.length,
-          roles: [...roles].sort(),
-          link: link
-            ? {
-                owns: owned,
-                ownsCount: owned.filter((entry) => entry.inTree).length,
-                name: link.getAttribute('aria-label') ?? '',
-              }
-            : null,
-        };
-      });
+      /*
+       * The engine axis (#194) reads this row at the advertised floor as well as at the current release, and the
+       * floor has no link-ownership code at all: `enableLinkOwnership` appears twice in 6.3.289's `build/pdf.mjs`
+       * and not once in 6.2.108's, which is what the first axis run showed in all three engines. The tier says so
+       * itself — `structureFeature.engineRequirements`, minimum 6.3.289 — and this is the same number, kept from
+       * drifting by `src/features/structure.engine-floor.test.tsx`. Below the minimum the row asserts the
+       * *declared* shape rather than the wanted one, because a row that only ever checks the happy case cannot
+       * notice an engine gaining or losing the behaviour, which is the whole point of declaring a boundary.
+       */
+      const LINK_OWNERSHIP_MINIMUM = '6.3.289';
+      const ownsLinks = releaseAtLeast(engineVersion, LINK_OWNERSHIP_MINIMUM);
+
+      const readDom = () =>
+        page.evaluate(() => {
+          const roots = [...document.querySelectorAll('.structTree')];
+          const roles = new Set();
+          for (const root of roots) {
+            for (const el of root.querySelectorAll('[role]')) roles.add(el.getAttribute('role'));
+          }
+          const link = document.querySelector('.pjsr-annotation-layer a');
+          const owned = (link?.getAttribute('aria-owns') ?? '')
+            .split(' ')
+            .filter(Boolean)
+            .map((id) => {
+              const el = document.getElementById(id);
+              return el
+                ? {
+                    id,
+                    inTree: !!el.closest('.structTree'),
+                    role: el.getAttribute('role') ?? el.tagName.toLowerCase(),
+                  }
+                : { id, inTree: false, role: '(no such element)' };
+            });
+          return {
+            roots: roots.length,
+            roles: [...roles].sort(),
+            link: link
+              ? {
+                  owns: owned,
+                  ownsCount: owned.filter((entry) => entry.inTree).length,
+                  name: link.getAttribute('aria-label') ?? '',
+                }
+              : null,
+          };
+        });
+
+      /*
+       * Waited for, not read once. The annotation layer is built and the engine writes `aria-owns` onto it
+       * afterwards, so a single read can land between the two and report a link that owns nothing — which is what
+       * webkit · desktop did twice on 2026-10-07, once green and once red, on the *same* build and with the
+       * annotate feature never even mounted in that cell. Same family as #246's mark premise and #248's
+       * read-back: the row has to wait for the state its claim is about, and the below-minimum branch still
+       * asserts the absence, so an engine that gained the ownership is caught rather than waited away.
+       */
+      let dom = null;
+      const settledDom = await waitFor(async () => {
+        dom = await readDom();
+        if (!dom || dom.roots === 0 || !dom.link) return null;
+        return ownsLinks ? (dom.link.ownsCount > 0 ? dom : null) : dom;
+      }, 20_000);
+      if (!settledDom) {
+        fail(
+          `no structure tree with a mounted link annotation settled within 20 s on ${engine} ` +
+            `(${engineVersion}): ${JSON.stringify(dom)} — the tree is built by the tier's lazy import and the ` +
+            'link by the annotation layer, and the ownership is written after both',
+        );
+      }
+      dom = settledDom;
 
       if (dom.roots === 0) {
         fail('no structure tree was mounted on a document that declares one — the feature fetched nothing or the gate refused');
@@ -1842,17 +1884,6 @@ const CHECKS = [
       if (!dom.link) {
         fail('the tagged fixture carries a link annotation and the annotation layer mounted none, so the ownership half of the clause could not be asked');
       }
-      /*
-       * The engine axis (#194) reads this row at the advertised floor as well as at the current release, and the
-       * floor has no link-ownership code at all: `enableLinkOwnership` appears twice in 6.3.289's `build/pdf.mjs`
-       * and not once in 6.2.108's, which is what the first axis run showed in all three engines. The tier says so
-       * itself — `structureFeature.engineRequirements`, minimum 6.3.289 — and this is the same number, kept from
-       * drifting by `src/features/structure.engine-floor.test.tsx`. Below the minimum the row asserts the
-       * *declared* shape rather than the wanted one, because a row that only ever checks the happy case cannot
-       * notice an engine gaining or losing the behaviour, which is the whole point of declaring a boundary.
-       */
-      const LINK_OWNERSHIP_MINIMUM = '6.3.289';
-      const ownsLinks = releaseAtLeast(engineVersion, LINK_OWNERSHIP_MINIMUM);
       if (ownsLinks && dom.link.ownsCount === 0) {
         fail(
           `the link annotation owns nothing in the structure tree on ${engineVersion} (aria-owns ${JSON.stringify(dom.link.owns)}): ` +
@@ -3061,6 +3092,645 @@ const CHECKS = [
     },
   },
   {
+    /*
+     * FR-24's pixels, which is the half of the clause jsdom cannot reach.
+     *
+     * Its other sentence — that every page draws from *the same* `OptionalContentConfig` instance, and that a
+     * `SetOCGState` action moves that instance rather than a copy — is asserted by object identity in
+     * `src/headless/usePdfOptionalContent.shared.test.tsx` and `src/components/ViewerController.layers.test.tsx`,
+     * which is the right instrument for identity and no instrument at all for "the page changed". A panel that
+     * flips a checkbox on an instance no render reads, or a page that fetches its own config (pdf.js builds a
+     * **new** object on every `getOptionalContentConfig()` call, from cached worker data), passes both files.
+     * So this row asks the question that cannot be faked: does the ink move?
+     *
+     * Four claims, in the order a reader meets them:
+     *  - the tab **lists** the fixture's three groups with the states `/OCProperties` declares them in, read
+     *    back off the checkboxes rather than from the generator;
+     *  - the band the Stamp layer paints is blank while that group is off, and the two lines of content either
+     *    side of it are inked — the premise that the page painted at all, and that the blankness belongs to the
+     *    layer rather than to a canvas that never arrived;
+     *  - one switch on inks that band and one switch off blanks it again, which is the same config object the
+     *    render holds, moved twice by the panel;
+     *  - a **second** page follows while it is the one on screen, which is the clause's "every page": page 2's
+     *    grouped line goes blank when a panel last read against page 1 switches that group off, and returns
+     *    when it is switched back on. A config fetched per render would leave page 2 on the document's defaults.
+     */
+    name: 'layers-switch-paints-a-page',
+    desktopOnly: true,
+    run: async ({ page, load, reveal, jumpTo }) => {
+      const engine = page.context().browser()?.browserType().name();
+      const size = await basePageDims('attachments-ocg-sample.pdf', 1);
+      await page.locator('.app-features label', { hasText: 'layers' }).locator('input').check();
+      await load('attachments-ocg-sample.pdf', 3);
+      await page.evaluate(() => {
+        const el = document.querySelector('.pjsr-viewport');
+        el.scrollTop = 0;
+        el.scrollLeft = 0;
+      });
+
+      /**
+       * Ink inside horizontal bands of one page's canvas, in bands the document's own units define.
+       *
+       * Each range is a distance from the top of the page, converted against `basePageDims()` rather than
+       * against a constant, at the full width of the canvas: the fixture puts exactly one line of text in each
+       * optional-content group and nothing else at that height, so a band is that layer's whole contribution
+       * and a change in it cannot have come from anywhere else on the page.
+       */
+      const BANDS = ([selector, ranges, height]) => {
+        const canvas = document.querySelector(selector);
+        if (!canvas || !canvas.width || !canvas.height) return null;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return null;
+        const out = {};
+        for (const [name, from, to] of ranges) {
+          const y0 = Math.max(0, Math.floor((from / height) * canvas.height));
+          const y1 = Math.min(canvas.height, Math.ceil((to / height) * canvas.height));
+          if (y1 <= y0) {
+            out[name] = { marks: 0, pixels: 0 };
+            continue;
+          }
+          const { data } = ctx.getImageData(0, y0, canvas.width, y1 - y0);
+          let marks = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] < 8) continue;
+            if (Math.abs(255 - data[i]) + Math.abs(255 - data[i + 1]) + Math.abs(255 - data[i + 2]) > 60) {
+              marks += 1;
+            }
+          }
+          out[name] = { marks, pixels: canvas.width * (y1 - y0) };
+        }
+        return out;
+      };
+
+      // The fixture's lines, in pt from the top of a 612x792 page: page 1 has Heading 16pt at 700, Body 12pt at
+      // 660, the Stamp layer's 16pt line at 600 with its 4pt rule at 576, and ungrouped 10pt text at 520.
+      const PAGE1 = [
+        ['heading', 68, 102],
+        ['body', 112, 146],
+        ['stamp', 176, 218],
+        ['plain', 254, 282],
+      ];
+      const PAGE2 = [
+        ['body', 76, 98],
+        ['plain', 116, 138],
+      ];
+      const ONE = '.pjsr-page-canvas[aria-label="Page 1"]';
+      const TWO = '.pjsr-page-canvas[aria-label="Page 2"]';
+      const read = (selector, ranges) => page.evaluate(BANDS, [selector, ranges, size.height]);
+      const inked = (band) => Boolean(band) && band.marks > 30;
+      const blank = (band) => Boolean(band) && band.marks < 10;
+      const shown = (bands) =>
+        bands === null
+          ? '(no canvas)'
+          : Object.entries(bands)
+              .map(([name, band]) => `${name} ${band.marks}/${band.pixels}`)
+              .join(', ');
+      /** Poll one band until the predicate accepts it, and keep the last reading for the failure message. */
+      const until = async (selector, ranges, name, accept, timeout = 20_000) => {
+        let last = null;
+        const hit = await waitFor(async () => {
+          last = await read(selector, ranges);
+          return last && accept(last[name]) ? last : null;
+        }, timeout);
+        return { bands: hit ?? last, settled: hit !== null };
+      };
+
+      /**
+       * Every tab in the sidebar, with what a pointer landing on its centre would hit.
+       *
+       * The tablist is `flex: 1 1 auto` inside a 248 px sidebar and does not wrap, so a third tab runs past the
+       * panel's own box and the page area — which comes later in DOM order — paints over the part that does. The
+       * row therefore asks the same question a reader's finger asks (`elementFromPoint` at the centre, the way
+       * #241 and #243 learned to ask it) and takes the keyboard path when the answer is not the tab itself,
+       * rather than letting a pointer click time out and report a viewer defect that is really a reachability
+       * one. Both paths are the application's own: the arrow keys are `Sidebar`'s roving tabindex, not a
+       * synthetic event.
+       */
+      const tabs = () =>
+        page.evaluate(() =>
+          Array.from(document.querySelectorAll('.pjsr-sidebar [role="tab"]')).map((el) => {
+            const box = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+            return {
+              label: (el.textContent ?? '').trim(),
+              selected: el.getAttribute('aria-selected'),
+              box: `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}`,
+              reached: hit === el || el.contains(hit) || (hit !== null && hit.contains(el)),
+              covers: hit ? `${hit.tagName.toLowerCase()}.${hit.className?.baseVal ?? hit.className ?? ''}` : '(nothing)',
+            };
+          }),
+        );
+
+      /** Open one sidebar tab the way a reader can, pointer when the tab takes the press, keyboard when it does not. */
+      const openTab = async (label) => {
+        const first = await tabs();
+        const target = first.find((entry) => entry.label === label);
+        if (!target) fail(`the sidebar tablist holds ${first.map((entry) => `"${entry.label}"`).join(', ')} and no "${label}"`);
+        if (target.selected === 'true') return { how: 'already open', target };
+        if (target.reached) {
+          await page.click(`.pjsr-sidebar [role="tab"]:has-text("${label}")`);
+          return { how: 'clicked', target };
+        }
+        const active = first.find((entry) => entry.selected === 'true') ?? first[0];
+        await page.evaluate((name) => {
+          const el = Array.from(document.querySelectorAll('.pjsr-sidebar [role="tab"]')).find(
+            (tab) => (tab.textContent ?? '').trim() === name,
+          );
+          el?.focus();
+        }, active.label);
+        for (let step = 0; step < first.length; step += 1) {
+          await page.keyboard.press('ArrowRight');
+          const now = (await tabs()).find((entry) => entry.label === label);
+          if (now?.selected === 'true') return { how: `arrow keys from "${active.label}" (a pointer at ${target.box} hits ${target.covers})`, target };
+        }
+        fail(
+          `"${label}" never became the selected tab after ${first.length} ArrowRight presses from "${active.label}" — ` +
+            `the tablist now reads ${JSON.stringify(await tabs())}`,
+        );
+        return { how: 'unreachable', target };
+      };
+
+      /** What one layer's checkbox reports right now. */
+      const checkedOf = (label) =>
+        page.evaluate((name) => {
+          const li = Array.from(document.querySelectorAll('.pjsr-layers-item')).find(
+            (item) => (item.querySelector('.pjsr-layers-name')?.textContent ?? '').trim() === name,
+          );
+          return li ? Boolean(li.querySelector('input[type=checkbox]')?.checked) : null;
+        }, label);
+
+      /*
+       * Switch one layer and wait for the panel to agree, rather than using Playwright's `check()`.
+       *
+       * `check()` reads the box on the tick after the click and throws "Clicking the checkbox did not change
+       * its state" when it has not moved yet — and it has not, because the click runs `setVisibility` on the
+       * shared config and then `shell.repaint`, so the row's own `checked` prop only lands on the next React
+       * commit. The stamp switch got lucky; the body one did not. The state is what the clause claims, so it is
+       * waited for, and a panel that never shows it is reported as the stale list it is.
+       */
+      const toggle = async (label, want) => {
+        const now = await checkedOf(label);
+        if (now !== !want) {
+          fail(
+            `"${label}" reads checked=${now} before a switch ${want ? 'on' : 'off'} — the row expected ` +
+              `${!want}, and clicking it now would move the wrong way`,
+          );
+        }
+        await page.click(`.pjsr-layers-item:has-text("${label}") input[type="checkbox"]`);
+        const settled = await waitFor(async () => ((await checkedOf(label)) === want ? true : null), 5_000);
+        if (!settled) {
+          fail(
+            `clicking "${label}"'s checkbox left the panel reading checked=${await checkedOf(label)} after 5 s — ` +
+              'a list that cannot see the state it just wrote is a copy, not the instance the render reads',
+          );
+        }
+      };
+
+      await (await reveal('Toggle sidebar')).click();
+      await page.waitForSelector('.pjsr-sidebar');
+      const opened = await openTab('Layers');
+      const pointerReached = opened.target.reached;
+      /*
+       * #254, asserted rather than noted. The row was written to fall back to the tablist's own arrow keys
+       * because a pointer could not reach this tab, and the fallback proved the keyboard reader's path while
+       * hiding the mouse user's — so reaching a tab *is* now part of what this row requires, and the wrapping
+       * tablist is what makes it true. The keyboard route stays in `openTab` as the shape a reader can take, not
+       * as a way for the row to pass.
+       */
+      if (!pointerReached) {
+        fail(
+          `the "Layers" tab at ${opened.target.box} is not where a pointer lands: elementFromPoint at its centre ` +
+            `answers "${opened.target.covers}", so a mouse user cannot open the layer list at all (#254) — ` +
+            `the row got in by ${opened.how}, which is a reader's fallback and not a fix`,
+        );
+      }
+      await page.waitForSelector('.pjsr-layers-item', { timeout: 20_000 });
+      const rows = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('.pjsr-layers-item')).map((li) => ({
+          name: (li.querySelector('.pjsr-layers-name')?.textContent ?? '').trim(),
+          checked: li.querySelector('input[type=checkbox]')?.checked ?? null,
+        })),
+      );
+      for (const [name, expectChecked] of [
+        ['Heading layer', true],
+        ['Body layer', true],
+        ['Stamp layer', false],
+      ]) {
+        const row = rows.find((entry) => entry.name === name);
+        if (!row) fail(`the layers tab listed ${rows.map((entry) => `"${entry.name}"`).join(', ')} without "${name}"`);
+        if (row.checked !== expectChecked) {
+          fail(
+            `"${name}" reads checked=${row.checked} in the panel while /OCProperties declares it ` +
+              `${expectChecked ? 'ON' : 'OFF'} — the list is not the document's state (${JSON.stringify(rows)})`,
+          );
+        }
+      }
+
+      /*
+       * The premise, waited for. WebKit's cell failed the first version of this line by reading the canvas once
+       * and finding every band blank — which is the instrument reading its own race, not a viewer that paints
+       * nothing: the row had only just mounted the page. So the three bands that the document declares visible
+       * are waited for, and a page that never paints them is reported as the missing premise it is.
+       */
+      let start = null;
+      const painted = await waitFor(async () => {
+        start = await read(ONE, PAGE1);
+        return start && inked(start.plain) && inked(start.heading) && inked(start.body) ? start : null;
+      }, 30_000);
+      if (!painted) {
+        fail(
+          `page 1 never painted the two default-on layers and the ungrouped line beside them: ${shown(start)} after ` +
+            `30 s in ${engine} — with nothing on the page there is no change for a switch to be measured against`,
+        );
+      }
+      if (!blank(start.stamp)) {
+        fail(
+          `the Stamp layer is OFF in the document and still painted ${start.stamp.marks}/${start.stamp.pixels} ` +
+            `dark px in its band (${shown(start)}) — this render is not reading /OCProperties, so nothing below can ` +
+            'attribute a change to it',
+        );
+      }
+
+      // The first switch also proves the panel writes the instance the page paints with: `checked` is read from
+      // the rows, and the rows are rebuilt from the config on the repaint's revision bump.
+      await toggle('Stamp layer', true);
+      const on = await until(ONE, PAGE1, 'stamp', inked);
+      if (!on.settled) {
+        fail(
+          `switching the Stamp layer on left its band at ${shown(on.bands && { stamp: on.bands.stamp })} after ` +
+            `20 s (${engine}) — the checkbox moved and the page did not, which is what a config the render never ` +
+            'reads looks like',
+        );
+      }
+      const widened = await read(ONE, PAGE1);
+      if (!inked(widened.plain) || !inked(widened.heading) || !inked(widened.body)) {
+        fail(`switching one layer on took other content away: ${shown(widened)}`);
+      }
+
+      await toggle('Stamp layer', false);
+      const off = await until(ONE, PAGE1, 'stamp', blank);
+      if (!off.settled) {
+        fail(
+          `switching the Stamp layer back off left ${shown(off.bands && { stamp: off.bands.stamp })} in its band ` +
+            `(${shown(off.bands)}) — the ink that arrived with the switch did not leave with it, so the reading ` +
+            'above may have been a late paint rather than the layer',
+        );
+      }
+
+      await toggle('Body layer', false);
+      const p1body = await until(ONE, PAGE1, 'body', blank);
+      if (!p1body.settled) {
+        fail(`switching the Body layer off left page 1's grouped line painted: ${shown(p1body.bands)}`);
+      }
+      const p1left = await read(ONE, PAGE1);
+      if (!inked(p1left.heading) || !inked(p1left.plain)) {
+        fail(`switching one group off took more than that group with it: ${shown(p1left)}`);
+      }
+
+      // The second page, reached the way a reader reaches it, with the panel still showing what it read for page 1.
+      await jumpTo(2);
+      await page.waitForSelector(TWO, { timeout: 20_000 }).catch(() => undefined);
+      const p2wait = await until(TWO, PAGE2, 'plain', inked, 30_000);
+      const p2 = p2wait.bands;
+      if (!p2) fail(`page 2 never mounted a canvas after the jump (${engine})`);
+      if (!p2wait.settled) {
+        fail(
+          `page 2's ungrouped line never painted (${shown(p2)} after 30 s in ${engine}) — the page did not paint at ` +
+            'all, so its grouped band being blank would say nothing about the layer either way',
+        );
+      }
+      if (!blank(p2.body)) {
+        fail(
+          `page 2 still paints its Body-layer line (${p2.body.marks}/${p2.body.pixels} dark px) after the panel ` +
+            `switched that group off for page 1 (${shown(p1left)}) — the clause says *every* page redraws from the ` +
+            'same instance, and a config fetched per render leaves this page on the document defaults',
+        );
+      }
+
+      await toggle('Body layer', true);
+      const p2back = await until(TWO, PAGE2, 'body', inked);
+      if (!p2back.settled) {
+        fail(
+          `switching the Body layer back on, while page 2 was the page on screen, left its band at ` +
+            `${shown(p2back.bands && { body: p2back.bands.body })} (${shown(p2back.bands)})`,
+        );
+      }
+
+      await page.click('.pjsr-sidebar .pjsr-sidebar-close');
+      await page.waitForSelector('.pjsr-sidebar', { state: 'detached' });
+
+      return (
+        `${engine}: ${rows.length} groups listed as the document declares them (${rows.map((entry) => `${entry.name}=${entry.checked ? 'on' : 'off'}`).join(', ')}), ` +
+        `the Layers tab ${pointerReached ? 'took a pointer click' : `was reached by ${opened.how}`}, ` +
+        `page 1's Stamp band went ${start.stamp.marks} → ${on.bands.stamp.marks} → ${off.bands.stamp.marks} dark px ` +
+        `of ${on.bands.stamp.pixels} for one switch on and back off, with the other three bands still painted ` +
+        `(${shown(widened)}); page 2's grouped band followed the same panel to ${p2.body.marks} px blank and back ` +
+        `to ${p2back.bands.body.marks} px while its ungrouped line stayed at ${p2back.bands.plain.marks}`
+      );
+    },
+  },
+  {
+    /*
+     * FR-19's marks half: what the reader drew has to arrive on paper.
+     *
+     * The clause sends three things with a page — form values, persisted annotation marks, and the reader's own
+     * authoring marks *only when the authoring feature is loaded and they are persisted*. The first is measured
+     * by `print-sheets-hide-the-application`, where a typed value moves the widget's own box on the sheet from
+     * 27 dark px to over a thousand. The second was asserted only in jsdom, where the pipeline's `page.render`
+     * is a mock and "it reached the sheet" describes nothing — so this row draws a stroke with the shipped ink
+     * tool, prints the same page twice, and counts the same box on the same sheet before and after.
+     *
+     * Why the *print-intent* render is the only place this can be shown: the pipeline composites nothing. It
+     * asks pdf.js for each page at `intent: 'print'` with `AnnotationMode.ENABLE_STORAGE` and hands those
+     * canvases to the platform, so a mark gets to paper only if the engine draws it out of the document's
+     * annotation storage. The DOM editor layer a reader sees on screen is not in the print container and cannot
+     * be, which is also why the transient core pen needed a compositing step and this one does not. Asserting
+     * that an `.inkEditor` element exists proves a mark was *made*; the delta below proves it was *kept where
+     * the printer looks*.
+     */
+    name: 'print-carries-an-authored-mark',
+    desktopOnly: true,
+    run: async ({ page, load, reveal }) => {
+      const engine = page.context().browser()?.browserType().name();
+      const base = await basePageDims('annotated-sample.pdf', 1);
+      await page.locator('.app-features label', { hasText: 'annotate' }).locator('input').check();
+      await load('annotated-sample.pdf', 2);
+      await page.evaluate(() => {
+        const el = document.querySelector('.pjsr-viewport');
+        el.scrollTop = 0;
+        el.scrollLeft = 0;
+      });
+      // A predictable box: rows before this one leave the zoom wherever they parked it, and the region below is
+      // expressed as fractions of the page.
+      await page.selectOption(`${BAR} [aria-label="Zoom level"]`, 'automatic');
+      await page.waitForSelector('.pjsr-page-canvas');
+
+      /*
+       * The stroke's box, in fractions of the page rather than in pixels: the screen canvas and the sheet are
+       * two different rasterisations of the same page, and the ratio is the only thing they share. Page 1 of
+       * this fixture puts its last line of text at 596 pt, so everything below 400 pt is blank paper — and the
+       * blankness is asserted, not assumed, because the comparison is a delta.
+       */
+      const REGION = { x0: 0.1, x1: 0.6, y0: 0.32, y1: 0.46 };
+
+      await page.evaluate((rect) => {
+        const w = window;
+        w.__jobs = [];
+        w.__rect = rect;
+        w.print = function print() {
+          const container = document.querySelector('.pjsr-print');
+          const canvases = container ? Array.from(container.querySelectorAll('canvas')) : [];
+          const count = (data) => {
+            let marks = 0;
+            for (let i = 0; i < data.length; i += 4) {
+              if (Math.abs(255 - data[i]) + Math.abs(255 - data[i + 1]) + Math.abs(255 - data[i + 2]) > 60) {
+                marks += 1;
+              }
+            }
+            return marks;
+          };
+          w.__jobs.push(
+            canvases.map((canvas) => {
+              const x0 = Math.max(0, Math.floor(rect.x0 * canvas.width));
+              const x1 = Math.min(canvas.width, Math.ceil(rect.x1 * canvas.width));
+              const y0 = Math.max(0, Math.floor(rect.y0 * canvas.height));
+              const y1 = Math.min(canvas.height, Math.ceil(rect.y1 * canvas.height));
+              if (x1 <= x0 || y1 <= y0) {
+                return { width: canvas.width, height: canvas.height, marks: 0, pixels: 0 };
+              }
+              const ctx = canvas.getContext('2d', { willReadFrequently: true });
+              const marks = ctx ? count(ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data) : 0;
+              return { width: canvas.width, height: canvas.height, marks, pixels: (x1 - x0) * (y1 - y0) };
+            }),
+          );
+        };
+      }, REGION);
+
+      const jobCount = () => page.evaluate(() => window.__jobs.length);
+      const lastJob = () => page.evaluate(() => window.__jobs[window.__jobs.length - 1] ?? null);
+
+      /** Every copy of the scope select, with what each one reads and whether a pointer could reach it. */
+      const scopeCopies = () =>
+        page.evaluate(() =>
+          Array.from(
+            document.querySelectorAll(
+              '.pjsr-toolbar [aria-label="Print pages"], .pjsr-overflow-menu [aria-label="Print pages"]',
+            ),
+          ).map((el) => ({
+            where: el.closest('.pjsr-overflow-menu')
+              ? 'menu'
+              : el.closest('.pjsr-toolbar-sizer')
+                ? 'sizer'
+                : 'bar',
+            value: el.value,
+            painted: el.getBoundingClientRect().width > 0 && getComputedStyle(el).visibility !== 'hidden',
+          })),
+        );
+
+      /*
+       * Choose "All pages", and prove the application took it.
+       *
+       * The scope is not assumed because rows share one page and `print-sheets-hide-the-application` leaves it
+       * on "From–to" — a job of one sheet for page 2, which would make the sheet this row reads a different
+       * page from the one it drew on. WebKit refuses `selectOption` on a native `<select>` (that engine's note
+       * is in the print row), so the fallback puts the value on through the event the application listens for,
+       * on the copy a pointer could reach rather than the hidden measuring one (#243).
+       */
+      const pickAll = async () => {
+        const control = await reveal('Print pages');
+        try {
+          await control.selectOption('all');
+        } catch (error) {
+          const wrote = await page.evaluate(() => {
+            const copies = Array.from(
+              document.querySelectorAll(
+                '.pjsr-toolbar [aria-label="Print pages"], .pjsr-overflow-menu [aria-label="Print pages"]',
+              ),
+            ).filter((el) => !el.closest('.pjsr-toolbar-sizer') && el.getBoundingClientRect().width > 0);
+            const el = copies[0];
+            if (!el) return 'none';
+            el.value = 'all';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return `${copies.length} copy(ies)`;
+          });
+          if (wrote === 'none') {
+            fail(
+              `"All pages" could not be written and no copy of the scope control a pointer could reach was ` +
+                `present after ${firstLine(error)}: ${JSON.stringify(await scopeCopies())}`,
+            );
+          }
+        }
+        const settled = await waitFor(async () => {
+          const copies = await scopeCopies();
+          return copies.length > 0 && copies.every((copy) => copy.value === 'all') ? copies : null;
+        }, 5_000);
+        if (!settled) {
+          fail(
+            `the print scope never settled on "all" — it read ${JSON.stringify(await scopeCopies())} after 5 s, ` +
+              'so the sheet counts below would be some other selection\'s',
+          );
+        }
+        return settled;
+      };
+      const scopePath = await pickAll();
+
+      /** Press the viewer's own print control, then wait for the job to reach the boundary and for the app to come back. */
+      const printNow = async (step) => {
+        const before = await jobCount();
+        const button = await reveal('Print document');
+        await button.click();
+        const arrived = await waitFor(async () => ((await jobCount()) > before ? true : null), 60_000);
+        if (!arrived) {
+          fail(`${step}: the pipeline never reached window.print() within 60 s, so there was no sheet to read`);
+        }
+        const torn = await waitFor(
+          async () => (await page.evaluate(() => !document.querySelector('.pjsr-print')) ? true : null),
+          15_000,
+        );
+        if (!torn) fail(`${step}: the print container was still in the document 15 s after the job reached the printer`);
+        return lastJob();
+      };
+
+      const first = await printNow('before the mark');
+      if (!first || first.length !== 2) {
+        fail(
+          `"All pages" (every copy of the control reads "${scopePath[0]?.value}") printed ${first ? first.length : 0} ` +
+            `sheet(s) for a two-page fixture, so page 1 had no sheet to compare against: ${JSON.stringify(first)}`,
+        );
+      }
+      if (first[0].pixels < 4_000) {
+        fail(
+          `the box the stroke is planned into covers ${first[0].pixels} px of a ${first[0].width}x${first[0].height} ` +
+            `sheet — a region too small to measure a mark in`,
+        );
+      }
+      if (first[0].marks > 30) {
+        fail(
+          `the region already holds ${first[0].marks} dark px of ${first[0].pixels} on page 1's sheet before ` +
+            'anything is drawn, so the fixture is not blank where this row planned to mark it and a delta would mean nothing',
+        );
+      }
+
+      const pen = await reveal('Ink');
+      await pen.click();
+      await page.waitForFunction(
+        () => document.querySelector('.pjsr-editor-layer')?.className.includes('inkEditing') === true,
+        undefined,
+        { timeout: 15_000 },
+      );
+      /*
+       * Aim at the band, and scroll it into view first.
+       *
+       * The region is a fixed fraction of the page — the sheet is read by fraction, so it cannot move — and a
+       * page at fit-width on a 1,280px window is ~1,571 CSS px tall in a 900px viewport, so a band at 32-46 %
+       * of the page is off the bottom of the window unless the row scrolls. That is #228's lesson applied to
+       * the harness's own aim: the claim is about a place on the page, and the instrument has to go there.
+       */
+      const at = await page.evaluate((rect) => {
+        const scroller = document.querySelector('.pjsr-viewport');
+        const canvas = document.querySelector('.pjsr-page-canvas');
+        if (!canvas || !scroller) return { error: 'there is no page-1 canvas to aim at' };
+        // The frame the point has to live inside is the scroll element's own box: the playground's header and
+        // event log sit above and below the viewer, so "60 px from the top of the window" is a feature checkbox.
+        const view = scroller.getBoundingClientRect();
+        let box = canvas.getBoundingClientRect();
+        scroller.scrollTop += box.top + box.height * rect.y0 - (view.top + 60);
+        box = canvas.getBoundingClientRect();
+        const x = box.left + box.width * rect.x0;
+        const y = box.top + box.height * rect.y0;
+        const bottom = box.top + box.height * rect.y1;
+        if (y < view.top + 8 || bottom > view.bottom - 8 || box.width < 200) {
+          return {
+            error:
+              `the region runs y=${Math.round(y)}..${Math.round(bottom)} inside a viewport of ` +
+              `${Math.round(view.width)}x${Math.round(view.height)} at y=${Math.round(view.top)} (canvas ` +
+              `${Math.round(box.width)}x${Math.round(box.height)} at y=${Math.round(box.top)}, scroll ` +
+              `${Math.round(scroller.scrollTop)}) — nothing to draw on`,
+          };
+        }
+        const hit = document.elementFromPoint(x, y);
+        return {
+          x,
+          y,
+          width: box.width,
+          height: box.height,
+          scrolled: Math.round(scroller.scrollTop),
+          layer: hit?.closest('.pjsr-editor-layer') instanceof Element,
+          name: hit ? `${hit.tagName.toLowerCase()}.${hit.className?.baseVal ?? hit.className ?? ''}` : '(nothing)',
+        };
+      }, REGION);
+      if (at.error) fail(`cannot aim the stroke on page 1: ${at.error}`);
+      if (!at.layer) {
+        fail(
+          `the armed point (${Math.round(at.x)},${Math.round(at.y)}) is over "${at.name}" rather than the editor ` +
+            'layer, so the drag would not be a mark on the page',
+        );
+      }
+      await page.mouse.move(at.x, at.y);
+      await page.mouse.down();
+      for (let step = 1; step <= 10; step += 1) {
+        const fx = (REGION.x1 - REGION.x0) * (step / 10);
+        const fy = step % 2 === 0 ? 0.13 : 0.05;
+        await page.mouse.move(at.x + fx * at.width, at.y + fy * at.height, { steps: 3 });
+      }
+      await page.mouse.up();
+      // Take the tool off before counting: the engine builds the editor when the mode changes rather than at
+      // every pointerup, and an editor element is the mark that lives in annotation storage — the draw layer
+      // this gesture paints into is gone by the time the printer is asked.
+      await pen.click();
+      const editors = await waitFor(
+        () => page.evaluate(() => document.querySelectorAll('.pjsr-editor-layer .inkEditor').length || null),
+        15_000,
+      );
+      if (!editors) {
+        fail(
+          `a mouse drag across page 1 with the pen armed, and the tool then taken off, produced no ink editor in ` +
+            `the layer (${engine}) — nothing was authored, so the sheet comparison below has no mark in it`,
+        );
+      }
+
+      const second = await printNow('after the mark');
+      if (!second || second.length !== first.length) {
+        fail(
+          `the second job printed ${second ? second.length : 0} sheet(s) against ${first.length} for the same ` +
+            'selection, so the two readings are not of the same pages',
+        );
+      }
+      if (second[0].width !== first[0].width || second[0].height !== first[0].height) {
+        fail(
+          `page 1 reached the sheet at ${first[0].width}x${first[0].height} device px before the mark and ` +
+            `${second[0].width}x${second[0].height} after it, so the two counts are not the same measurement`,
+        );
+      }
+      const gained = second[0].marks - first[0].marks;
+      if (gained < 100) {
+        fail(
+          `the drawn mark never reached paper: page 1's sheet holds ${second[0].marks} dark px in the ` +
+            `${second[0].pixels} px box after ${editors} ink editor was committed to annotation storage, against ` +
+            `${first[0].marks} before it (engine ${engine}, pdfjs-dist ${engineVersion}) — the clause says a ` +
+            'persisted mark travels with the pages',
+        );
+      }
+      // Page 2 is the control: same job, same box, a page nobody drew on.
+      const control = second[1].marks - first[1].marks;
+      if (control > 20) {
+        fail(
+          `page 2's sheet gained ${control} dark px in the same box where only page 1 was marked ` +
+            `(${first[1].marks} → ${second[1].marks}), so the reading is not about the page that was drawn on`,
+        );
+      }
+
+      return (
+        `${engine}: ${scopePath.length} copies of the scope control read "all", ${first.length} sheets at ` +
+        `${first[0].width}x${first[0].height} device px, and page 1's own ${first[0].pixels} px box went ` +
+        `${first[0].marks} → ${second[0].marks} dark px for one authored mark held in annotation storage ` +
+        `(${editors} ink editor committed, the draw layer gone), while page 2's sheet in the same box moved ` +
+        `${first[1].marks} → ${second[1].marks}`
+      );
+    },
+  },
+  {
     name: 'nothing-came-from-a-cdn',
     cell: true,
     run: ({ external, local }) => {
@@ -3153,7 +3823,15 @@ async function runCell(engineName, profileName, baseUrl) {
   const consoleErrors = [];
   const external = [];
   const local = [];
-  page.on('pageerror', (error) => pageErrors.push(firstLine(error)));
+  /*
+   * Which row was running when the engine threw. `no-uncaught-errors` is a cell-level check, so before this it
+   * could only say "1 uncaught" about nineteen rows and a whole matrix run — the first webkit desktop reading of
+   * 2026-10-07 said exactly that, and nothing in the log could say whether the cause was the print row, the ink
+   * row or a document swap two checks earlier. The name is stamped where the error is *recorded*, not where it is
+   * reported, because a throw from a `setTimeout` lands here long after the row that scheduled it.
+   */
+  let runningCheck = '(before the first check)';
+  page.on('pageerror', (error) => pageErrors.push(`[${runningCheck}] ${firstLine(error)}`));
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text().split('\n')[0].slice(0, 120));
   });
@@ -3258,6 +3936,7 @@ async function runCell(engineName, profileName, baseUrl) {
     if (check.desktopOnly && profile.touch) continue;
     if (ONLY_CHECKS.length && !check.cell && !ONLY_CHECKS.some((name) => check.name.startsWith(name))) continue;
     const started = Date.now();
+    runningCheck = check.name;
     try {
       const detail = await check.run(harness);
       if (detail && typeof detail === 'object' && detail[SKIP]) {
@@ -3283,7 +3962,7 @@ async function runCell(engineName, profileName, baseUrl) {
     version,
     profile: profileName,
     started: true,
-    // A cell-level verdict rather than a fourteenth check: §8's own row counts are quoted in that table and
+    // A cell-level verdict rather than another check: §8's own row counts are quoted in that table and
     // in this file's header, and the floor is a statement about the engine the cell ran on, not about a
     // property of the viewer.
     floor: floorVerdict(engineName, version),

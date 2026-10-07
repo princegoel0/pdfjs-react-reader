@@ -826,6 +826,17 @@
   gap: var(--pjsr-cluster-gap);
   flex: 1 1 auto;
   min-width: 0;
+  /*
+   * Wrap rather than overflow, because on one row the third tab is unreachable rather than merely tight. The
+   * tablist lives in a 248 px panel and shrinks to whatever the close control leaves, so Thumbnails + Outline +
+   * Layers runs the last tab past its own box — and the close control, a later sibling in DOM order, paints over
+   * the part that does. Measured by `layers-switch-paints-a-page` (FR-24): `elementFromPoint` at the Layers tab's
+   * centre answered `button.pjsr-sidebar-close` in chromium 153 (box 198,206) and in webkit 26 (198,181), and only
+   * firefox 155's metrics let a pointer land (#254). The keyboard path was never broken — the roving ArrowRight
+   * reaches every tab — which is precisely why a test that activates a tab by hand could not see this. Removing
+   * the rule makes that row fail naming #254, which is what keeps it from quietly coming back.
+   */
+  flex-wrap: wrap;
 }
 
 .pjsr-sidebar-tab {
