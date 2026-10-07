@@ -72,6 +72,14 @@ const jsEntries = exportKeys.filter((k) => !isCss(k) && !isLocale(k) && k !== '.
 
 const sourceFiles = walk('src', (n) => /\.(ts|tsx)$/.test(n) && !/\.test\.(ts|tsx)$/.test(n));
 const testFiles = walk('src', (n) => /\.test\.(ts|tsx)$/.test(n));
+
+/*
+ * The groups the suite runs in are a fact about `vitest.config.ts`, so they are read from it. §17's heading
+ * used to spell "three projects" and the rule matched that word literally, which meant the only thing the
+ * document could do when a project was added was break the gate — and the gate reported it as a figure that
+ * had left the document rather than as a count the document had correctly caught up with.
+ */
+const projectNames = [...read('vitest.config.ts').matchAll(/name:\s*'([\w-]+)'/g)].map((match) => match[1]);
 const stylesheets = walk('src/styles', (n) => n.endsWith('.css'));
 const sheetLines = stylesheets.map((p) => lineCount(read(p))).sort((a, b) => a - b);
 const fixtures = walk('playground/fixtures', (n) => n.endsWith('.pdf'));
@@ -272,8 +280,11 @@ const RULES = [
     id: 'tests-heading',
     what: 'CODE_REFERENCE §17 heading',
     file: 'CODE_REFERENCE.md',
-    pattern: /^## 17\. Tests: (\d+) files, [\d,]+ tests, three projects$/m,
-    expect: () => [testFiles.length],
+    pattern: /^## 17\. Tests: (\d+) files, [\d,]+ tests, (\w+) projects$/m,
+    expect: () => [
+      testFiles.length,
+      (WORD[projectNames.length] ?? `#${projectNames.length}`).toLowerCase(),
+    ],
   },
   {
     id: 'stylesheets',

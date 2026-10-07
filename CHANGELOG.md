@@ -2537,6 +2537,25 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
 
 ### Fixed
 
+- **Two waits in the suite had no budget, and one heavyweight file was scheduled against a wave that
+  starved it (#261; FR-30, FR-32, FR-46).** `npm run verify` went red on this host with 4–17 failing tests
+  across `edit.test.tsx`, `edit.undo.test.tsx`, `edit.extract.test.tsx`, `annotate.lifecycle.test.tsx` and
+  `annotate.pointer-duty.test.tsx`, every one of them green when run alone and 1,299/1,299 green in another
+  run of the same command minutes later. Reading the failure up rather than dismissing it: `--testTimeout=20000`
+  collapsed the twelve-odd timeouts into **one assertion that was actually wrong** —
+  `expected 'Page 1 moved to position 2' to match /Saved 20 pages/` — and following that thread found three
+  `waitFor` calls in `src/edit.extract.test.tsx` with no `timeout` at all, so they were running on vitest's
+  **one-second default** while the sibling wait four lines above them declares four seconds for the same
+  writer pass. A wait whose patience was never sized to the work it waits for is not a flake; it is an
+  assertion that reads whatever happened to be on screen. All three now carry the budget their neighbour
+  states, and the falsification is one digit: `timeout: 1` fails that test in 159 ms reading the empty
+  status, and `timeout: 4000` passes it. The remaining timeouts were contention, and the fix is #224's, not a
+  bigger ceiling: the six `src/edit*.test.tsx` files — a real engine save plus a real writer pass over the
+  twenty-page fixture, whose bytes the assertions then parse back — and `src/lib/ssr.test.ts`, which imports
+  the whole public surface with no DOM (417 ms for the first entry alone), now run in their own serialised
+  projects after the parallel groups. Measured on a quiet machine they own: 26 tests in 4.2 s, so the 5 s
+  ceiling was never the problem and is untouched. Two green full-suite runs in a row after; `CODE_REFERENCE`
+  §2 and §17 now say five projects, because that is what the config defines.
 - **The accessibility record demanded that every cell install the React that produced it, and both React 18
   cells obliged (#262; FR-58, FR-48).** CI run 37631611428 — the push that carried #251–#260 — is twelve jobs green
   and two red, and both failures are one assertion in one test: `src/lib/a11y-record.test.ts > names the

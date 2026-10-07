@@ -133,9 +133,13 @@ describe('extract and split', () => {
     // The moved page leads the extracted file, and nothing was dropped from it.
     expect(kidsOf(bytes)).toHaveLength(20);
     expect(kidsOf(bytes)[0]).toBe(214);
-    await waitFor(() =>
-      expect(document.querySelector('.pjsr-pages-status')?.textContent).toMatch(/Saved 20 pages/),
-    );
+    // Four seconds, not `waitFor`'s default one. The announcement is written by the same pass that produced
+    // those bytes, and on a loaded machine a one-second poll gives up while the writer is still running — the
+    // failure then reads the *previous* action's text back at you, which is the shape #261 was filed for.
+    await waitFor(() => expect(document.querySelector('.pjsr-pages-status')?.textContent).toMatch(/Saved 20 pages/), {
+      timeout: 4000,
+      interval: 25,
+    });
   });
 
   it('keeps the plan after an extract, because nothing was written to the document', async () => {
@@ -145,10 +149,12 @@ describe('extract and split', () => {
     // The status line, not `settle()`: an extract is a writer pass over twenty pages, and under the load of
     // a full suite run 30 ms is not enough for it to finish — the assertion then reads a button that is
     // still disabled because the plan has not landed yet, which is the flake the test above already
-    // documents and solved the same way.
-    await waitFor(() =>
-      expect(document.querySelector('.pjsr-pages-status')?.textContent).toMatch(/Saved 20 pages/),
-    );
+    // documents and solved the same way. The budget is stated for the same reason: `waitFor` would otherwise
+    // give up after one second, which is not a writer pass.
+    await waitFor(() => expect(document.querySelector('.pjsr-pages-status')?.textContent).toMatch(/Saved 20 pages/), {
+      timeout: 4000,
+      interval: 25,
+    });
     expect(byLabel(/^Apply page changes$/)?.hasAttribute('disabled')).toBe(false);
     expect(document.querySelector('.pjsr-pages-summary')?.textContent).toMatch(/not applied/);
   });
@@ -167,10 +173,9 @@ describe('extract and split', () => {
     // The plan is untouched, so part one is the file's first four pages and part two the rest.
     expect(kidsOf(first)).toEqual(before.slice(0, 4));
     expect(kidsOf(second)).toEqual(before.slice(4));
-    await waitFor(() =>
-      expect(document.querySelector('.pjsr-pages-status')?.textContent).toMatch(
-        /Saved 2 files: 4 pages, then 16/,
-      ),
+    await waitFor(
+      () => expect(document.querySelector('.pjsr-pages-status')?.textContent).toMatch(/Saved 2 files: 4 pages, then 16/),
+      { timeout: 4000, interval: 25 },
     );
   });
 
