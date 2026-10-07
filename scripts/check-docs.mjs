@@ -220,6 +220,7 @@ const WORD = [
   'Eighteen',
   'Nineteen',
   'Twenty',
+  'Twenty-One',
 ];
 
 // ---------------------------------------------------------------------------
@@ -299,7 +300,7 @@ const RULES = [
     id: 'checks',
     what: 'PRD §8 Chrome row',
     file: 'PRD.md',
-    pattern: /(\w+) automated browser checks run in Chromium today/,
+    pattern: /([\w-]+) automated browser checks run in Chromium today/,
     expect: () => [WORD[checkCount] ?? `#${checkCount}`],
   },
   {

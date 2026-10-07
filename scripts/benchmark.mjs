@@ -248,6 +248,14 @@ async function arm(page) {
   await page.evaluate(() => {
     window.__longest = 0;
     window.__frames = [];
+    // §6 profile C's attribution: the viewer marks its own paint spans (`pjsr:` names) and discards the
+    // entries as soon as they are made, so a reader has to be watching — this is that watcher.
+    window.__spans = [];
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.name.startsWith('pjsr:')) window.__spans.push({ name: entry.name, ms: entry.duration });
+      }
+    }).observe({ type: 'measure', buffered: true });
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) window.__longest = Math.max(window.__longest, entry.duration);
       // `longtask` is buffered, so a task during the first paint is still seen — which is the one worth knowing about.
@@ -437,6 +445,28 @@ const COLD_BOX = (pageNumber) => {
  * ask the engine for the same pixels; what is *not* shared is the page load, and the note that prints this
  * number says so instead of implying a split nobody instrumented.
  */
+/**
+ * The viewer's own spans, summed per name. §6 profile C asks for main-thread work *attributable to our layer*,
+ * and `PdfPage` marks each pass it starts (`pjsr:p<n>:<pass>`) plus the canvas pass's two halves — this
+ * package's synchronous setup, and the engine's awaited paint. Attribution therefore comes from the load being
+ * measured rather than from a difference between two loads.
+ */
+const spanTotals = (page, coldPage) =>
+  page.evaluate(async (wanted) => {
+    const read = () => {
+      const totals = {};
+      for (const s of window.__spans ?? []) totals[s.name] = (totals[s.name] ?? 0) + s.ms;
+      return totals;
+    };
+    // Ink appears *during* a paint — pdf.js draws in chunks — so the first reading after a page is visibly
+    // painted can legitimately be missing the span that closes when the render promise settles. Wait for the
+    // two spans the profile C numbers are built from, bounded, and let a load that never answers fail the bar
+    // below rather than quietly contribute a 0 to a median.
+    const has = (totals) => wanted.every((name) => totals[name] !== undefined);
+    for (let attempt = 0; attempt < 60 && !has(read()); attempt++) await new Promise((r) => setTimeout(r, 50));
+    return { totals: read(), seen: (window.__spans ?? []).length };
+  }, [`pjsr:p${coldPage}:canvas`, `pjsr:p${coldPage}:text`]);
+
 async function engineOnly(browser, baseUrl, profile, box) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
@@ -585,6 +615,7 @@ async function runProfile(browser, profile, baseUrl) {
   const openTimes = [];
   const coldTimes = [];
   const coldBlocks = [];
+  const coldSpans = [];
   let coldInk = 0;
   let coldBox = null;
   for (let sample = 0; sample < COLD_SAMPLES; sample++) {
@@ -601,6 +632,7 @@ async function runProfile(browser, profile, baseUrl) {
     // Read from the same context the timing came from: what §6's profile C wants to know is how long the
     // main thread was busy *on the page that was just measured*, and the sweep below reuses a warm document.
     coldBlocks.push(await coldPage.evaluate(() => window.__longest ?? 0));
+    coldSpans.push(await spanTotals(coldPage, profile.coldPage));
     coldBox = await coldPage.evaluate(COLD_BOX, profile.coldPage);
     await coldContext.close();
   }
@@ -635,6 +667,22 @@ async function runProfile(browser, profile, baseUrl) {
       );
     } else {
       const failed = runs.filter((r) => r.error);
+      // §6 profile C's attribution, read out of the load that was just measured. `pjsr:p<n>:canvas` is the
+      // awaited paint — the engine's own render call, from the line that starts it to the promise settling —
+      // and the three overlay passes are the engine's layer classes run from this package's effects. The
+      // overlay figure is a max, not a sum: text at 80 ms and annotations at 80 ms inside one settle is 80
+      // ms of main thread, not 160 ms of it. A pass the seam did not report reads as NaN, which fails the
+      // bars below rather than becoming a 0 ms contribution to a median.
+      const spanOf = (pass) => coldSpans.map((c) => c.totals[`pjsr:p${profile.coldPage}:${pass}`] ?? NaN);
+      const engineTimes = spanOf('canvas');
+      const overlayTimes = coldSpans.map((c) =>
+        Math.max(
+          0,
+          ...['text', 'annotations', 'xfa'].map((pass) => c.totals[`pjsr:p${profile.coldPage}:${pass}`] ?? 0),
+        ),
+      );
+      const unmarkedTimes = coldTimes.map((ms, i) => Math.max(0, ms - engineTimes[i] - overlayTimes[i]));
+      const spansSeen = coldSpans.reduce((n, c) => n + c.seen, 0);
       const renderTimes = runs.map((r) => r.renderMs);
       const openMs = runs.map((r) => r.openMs);
       const blocks = runs.map((r) => r.longTaskMs);
@@ -651,9 +699,26 @@ async function runProfile(browser, profile, baseUrl) {
           `median ${ms(median(renderTimes))} of ${renderTimes.length} samples (${ms(Math.min(...renderTimes))}–${ms(Math.max(...renderTimes))}) in page.render(); document open ${ms(median(openMs))}; longest long task ${ms(median(blocks))} (pdf.js draws in chunks, so the engine's own work rarely crosses the 50 ms bar on its own)`,
           renderTimes,
         ),
+        bar(
+          'the seam in the paint path answered, for the page that was measured',
+          coldSpans.length > 0 &&
+            engineTimes.every((v) => Number.isFinite(v)) &&
+            overlayTimes.every((v) => Number.isFinite(v)),
+          `${spansSeen} UserTiming entries across ${coldSpans.length} cold loads, read from the load they describe. The page this profile measures cold is page ${profile.coldPage}, and every pass it owes — the awaited paint and the overlay layers — has to be in the record: the product discards each entry as soon as it is made, so a viewer whose marks went missing would otherwise contribute a quiet 0 ms to the median below rather than failing it`,
+        ),
+        bar(
+          `§6 profile C: main-thread work attributable to our layer on page ${profile.coldPage} stays under 200 ms`,
+          overlayTimes.every((v) => Number.isFinite(v)) && median(overlayTimes) < 200,
+          `median ${ms(median(overlayTimes))} of ${coldSpans.length} cold loads, the union of the passes this package drives on that page — the text layer, the annotation layer and, on a form, the XFA layer — taken as a max because they run inside one settle, not added. The awaited paint in the same load took ${ms(median(engineTimes))}, and ${ms(median(unmarkedTimes))} is named by neither: React committing the row, the virtualizer measuring it, the worker round trip, image decode and the compositor. None of that is charged to this layer, because a bar over the whole wait measures the machine and calls the result the package`,
+        ),
+        measure(
+          'engine render, marked inside the viewer’s own load',
+          `median ${ms(median(engineTimes))} of ${engineTimes.length} samples (${ms(Math.min(...engineTimes))}–${ms(Math.max(...engineTimes))}) between the \`page.render()\` call and its promise settling, in the same load as the cold-page number — engine ${engine}`,
+          engineTimes,
+        ),
         note(
-          'profile C’s split, and how it was got',
-          `the viewer puts this page on screen in a median ${ms(median(coldTimes))} and held the main thread for ${ms(median(coldBlocks))} at the longest; the engine alone at that box takes ${ms(median(renderTimes))}. About ${ms(Math.max(0, median(coldTimes) - median(renderTimes)))} of the wait is therefore not the engine's render call — under §6's 200 ms for this profile. Two separate page loads subtracted, not one instrumented measurement: pdf.js draws on the main thread inside the same tasks as our layout, so anything finer needs a mark in the render path and none exists.`
+          '§6 profile C’s attribution, and the part no mark claims',
+          `This line used to confess a method: the split came from subtracting two page loads — the viewer's cold page in one context, an engine-only harness at the same box in another — because "anything finer needs a mark in the render path and none exists". The marks exist now, in src/components/PdfPage.tsx, on the four passes the page already keeps for its own rendered join, so the numbers above come from the load they describe. The two engine figures do NOT agree, and the record says so instead of choosing one: ${ms(median(engineTimes))} marked inside the viewer against ${ms(median(renderTimes))} in the harness with the viewer removed. They are different questions — the marked span is the paint as the reader waits for it, from the call to the settling of its promise, so it carries the worker round trip and the chunk boundaries the engine chooses; the harness span is the same box and the same page with nothing of ours around it. Neither is the right answer to §6's sentence on its own, which is why both are printed and only the marked one is attributed.`,
         ),
       );
     }

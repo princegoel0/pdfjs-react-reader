@@ -173,6 +173,65 @@ export interface PdfPageProps {
 /** A pass whose completion the `rendered` state waits for. */
 type PagePass = 'canvas' | 'text' | 'annotations' | 'xfa';
 
+/*
+ * §6 profile C asks for "viewer main-thread work attributable to our layer" with "engine render time reported
+ * separately", and FR-49 asks for each profile's target to be measured against its fixture rather than felt.
+ * The benchmark got that by subtracting two page loads — the viewer's cold page from one browser context, an
+ * engine-only harness at the same box from another — which is a difference between two runs, not a measurement
+ * of one. These spans are the seam that makes the stronger claim possible: one paint, its passes named, and the
+ * canvas pass is the engine's awaited paint and the other three are its layer classes run from here.
+ *
+ * Two rules the callers depend on:
+ *
+ *  - **a name is cleared before it is marked.** The same page repaints on every zoom step and rotation, so a
+ *    start mark left behind by a paint that was torn down mid-flight would lengthen the next one. A paint that
+ *    errors leaves its engine mark unmeasured for exactly that reason: the next paint discards the name;
+ *  - **the measure is discarded as soon as it is made.** A viewer that kept a UserTiming record per pass per
+ *    repaint would hand a long scroll a timeline buffer that only grows. A reader has to be watching:
+ *    `scripts/benchmark.mjs` installs a `PerformanceObserver` before the document loads, and an observer is
+ *    given the entry when it is created, not when it is read.
+ *
+ * A realm without UserTiming — jsdom, a server import — gets nothing and no error. `performance` is reached
+ * through `globalThis` inside these functions and never at module scope, which is what keeps FR-46's SSR
+ * property true of a file that measures paint timing.
+ */
+const timing = () => (globalThis as { performance?: Performance }).performance;
+
+/** Open a span. The name is discarded first: see the rule above. */
+function openSpan(name: string): void {
+  const perf = timing();
+  if (!perf?.mark) return;
+  try {
+    perf.clearMarks?.(name);
+    perf.mark(name);
+  } catch {
+    // A timing seam must never reach the reader. `measure()` throws when a named mark does not exist, and the
+    // one place that was true — the boundary between our setup and the engine's paint — is now two marks at
+    // one instant rather than one mark shared, because a shared name is cleared by whichever span closes first.
+  }
+}
+
+/** Close it, hand the entry to any observer, and leave no accumulation behind. */
+function closeSpan(name: string, start: string, end: string): void {
+  const perf = timing();
+  if (!perf?.measure) return;
+  try {
+    perf.mark(end);
+    perf.measure(name, start, end);
+  } catch {
+    return;
+  }
+  perf.clearMarks?.(start);
+  perf.clearMarks?.(end);
+  perf.clearMeasures?.(name);
+}
+
+/** The names a paint owns: one span per pass, and the canvas pass split into ours and the engine's. */
+const passSpan = (pageNumber: number, pass: PagePass) => `pjsr:p${pageNumber}:${pass}`;
+const passStart = (pageNumber: number, pass: PagePass) => `${passSpan(pageNumber, pass)}:start`;
+const passEnd = (pageNumber: number, pass: PagePass) => `${passSpan(pageNumber, pass)}:end`;
+
+
 /**
  * The §3.5 page states, as observed from inside one mounted page.
  *
@@ -210,6 +269,7 @@ function usePageProgress(
 
   const begin = useCallback((pass: PagePass) => {
     passesRef.current.add(pass);
+    openSpan(passStart(pageNumberRef.current, pass));
     if (pass === 'canvas') {
       paintedRef.current = false;
       failedRef.current = false;
@@ -219,6 +279,7 @@ function usePageProgress(
   const end = useCallback(
     (pass: PagePass) => {
       passesRef.current.delete(pass);
+      closeSpan(passSpan(pageNumberRef.current, pass), passStart(pageNumberRef.current, pass), passEnd(pageNumberRef.current, pass));
       if (pass === 'canvas') paintedRef.current = true;
       if (paintedRef.current && !failedRef.current && passesRef.current.size === 0) {
         report('rendered');
@@ -437,6 +498,7 @@ export const PdfPage = memo(function PdfPage({
     const canvas = canvasRef.current;
     if (!page || !canvas || !viewport) return;
 
+
     // An over-large canvas does not throw: the browser allocates nothing and
     // pdf.js paints into a blank surface, so the ceiling has to be applied here.
     const { scale: dpr, refused } = resolveRenderScale({
@@ -480,6 +542,7 @@ export const PdfPage = memo(function PdfPage({
     canvas.style.height = `${Math.floor(viewport.height)}px`;
 
     const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined;
+
     const task = page.render({
       canvas,
       viewport,
