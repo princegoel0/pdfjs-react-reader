@@ -149,7 +149,11 @@ export function Report() {
         With Next.js, render the viewer in a client component (<code>&#39;use client&#39;</code>).
         Importing the package is safe on the server — every entry point is imported without a DOM in the
         test suite and none of them throws — but the worker resolution and the canvas are browser-only by
-        nature, so it is the <em>render</em> that needs the boundary, not the import.
+        nature, so it is the <em>render</em> that needs the boundary, not the import. One boundary is the
+        peer&apos;s rather than ours: <code>pdfjs-dist</code> 6.2.108, the floor of the advertised range,
+        throws <code>DOMMatrix is not defined</code> from its own module scope when Node imports its modern
+        entry, and its <code>legacy</code> build imports cleanly. A server that must run on exactly that
+        version aliases <code>pdfjs-dist/legacy/build/pdf.mjs</code>; from 6.3.289 up nothing needs aliasing.
       </div>
       <pre>
         <code>{`// app/report/[id]/page.tsx — a server component. No viewer here, but deciding what

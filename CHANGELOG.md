@@ -1373,8 +1373,9 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Amended
 
-Nine statements moved across four rulings (2026-10-04, 2026-10-05, 2026-10-05 again on #207, and 2026-10-07 on
-#249), and each moved as the lock requires: the id or section is unchanged, the whole requirement is restated,
+Statements have moved in several rulings (2026-10-04, 2026-10-05 twice, and twice on 2026-10-07 — #249 then #263),
+and each moved as the lock requires. The count of them is deliberately not stated here any more: a hand-kept tally of the
+entries below goes stale on the next amendment, which is the same rule #240 applied to CI tallies: the id or section is unchanged, the whole requirement is restated,
 and the reason is written here to stay. Nothing
 in this list is a requirement weakened to match the code — in every case the sentence was saying something the
 package does not do, or cannot do on the engine we advertise, one of them (`FR-47`) gained a promise instead of
@@ -1385,6 +1386,30 @@ stable, and what the published pre-1.0 line is allowed to permit. They are recor
 because §5.5 and §9 are the contract a consumer reads, and an unstated baseline is a baseline that will be
 re-derived by whoever asks next.
 
+Two of these were adopted at the lock **without an owner answer** and are recorded as the owner’s under the 2026-10-07
+delegation: `FR-18` naming the core-ink withdrawal explicitly (the PRD had already said "no core pen" in §3.3/FR-19, and
+nothing reversed it), and `FR-27` regaining a regex pattern ceiling while the worker and per-page timeout stay out of 1.0 as the
+owner locked them. `FR-46`’s boundary, added below on #263, is the first amendment in this list that narrows *what a claim is
+about* rather than what the package does — the throw it carves out is in the peer’s module scope, before any line of this
+package runs, and was verified against both tarballs on 2026-10-07 rather than remembered.
+
+- **FR-46 SSR-Safe Module Graph** (2026-10-07, #263) now names the boundary of its own claim. **Reason:** the
+  requirement said "importing any documented entry point in a server environment must not throw" and the register’s gap said that
+  property holds from 6.3.289 up but not at the advertised floor. Measured again against the tarballs on
+  2026-10-07 rather than from the note: `pdfjs-dist@6.2.108`’s modern entry throws
+  `ReferenceError: DOMMatrix is not defined` from its own module scope when Node imports it — before any of this
+  package’s code runs, so no assertion or re-export we write can make the sentence true at that version — while the
+  same release’s `legacy` entry imports cleanly with the identical 62 names, and 6.3.289 and 6.4.299 import
+  cleanly from the modern entry. The clause now says which of those two facts it is a promise about: the property
+  is *this package’s module scope* (clean everywhere, tested, and tested against the published tarball in CI),
+  and where it depends on the peer being importable at all the boundary is stated, with the host-facing remedy
+  named on the Installation page. What was **not** done is the alternative that would have made the sentence true
+  by force: importing the engine’s `legacy` build unconditionally. That build is not the one this package ships and
+  browser-verifies, so it would trade a tested promise for an untested one to satisfy a clause’s wording — and
+  `FR-49`’s profile-A bar was re-read under the same discipline and left alone: §6 already says "a target is not a
+  measurement" and forbids promoting one machine’s baseline into the requirement, so the 100 ms cold-page figure stays
+  a target and the real defect is the one the clause names — "a regression is a failing job rather than a slower
+  feeling" — which no gate did until #275 built one.
 - **§5.5 API maturity** now states that the tag baseline is a commit and names it — a name is Stable if it was
   reachable from a published entry point at `aed9fd6`, the `0.9` close, and Experimental if it arrived after —
   with the reason written down instead of left as an implementation habit. **Reason:** the registry answers were

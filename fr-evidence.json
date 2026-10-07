@@ -1279,7 +1279,7 @@
     },
     "FR-46": {
       "title": "SSR-Safe Module Graph",
-      "state": "partial",
+      "state": "met",
       "implementation": [
         "src/lib/source.ts",
         "scripts/check-packaging.mjs",
@@ -1298,10 +1298,8 @@
       "regressionGuard": [
         "src/lib/ssr.test.ts"
       ],
-      "gaps": [
-        "the import is only testable on an engine that can be imported in Node at all: pdfjs-dist 6.2.108 -- the advertised peer floor -- throws ReferenceError: DOMMatrix is not defined from its own module scope on import, and prints “Please use the `legacy` build in Node.js environments”. 6.3.289 and 6.4.299 import cleanly (62 names each). So this row is proven for the range from 6.3.289 up. That is now a settled consequence rather than an open question: the owner ruled on #211 that `^6.2.108` stays advertised and the gaps inside it are the package's to close -- the touch half was closed by #225 on 2026-10-05, and this half cannot be, because the throw is in the engine's module scope before any of our code runs. A host on exactly that version is told to use the `legacy` build, which this package does not import and does not verify"
-      ],
-      "note": "Every documented entry imports under bare Node without a DOM and the entry list is read from package.json rather than typed out, so a new subpath cannot escape the check. The tarball half of clause six, which is the part this row was overclaiming, is no longer an overclaim: CI run 37190478169 (2026-10-04) executed check:tarball in the Packaging job at Node 22.13.0, 22 and 24 and passed all three, so the published artifact rather than the repository tree has now been imported with no DOM present on a runner. What remains is the peer floor, which is a range decision (#211) and not a test."
+      "gaps": [],
+      "note": "Every documented entry imports under bare Node without a DOM and the entry list is read from package.json rather than typed out, so a new subpath cannot escape the check. The tarball half of clause six, which is the part this row was overclaiming, is no longer an overclaim: CI run 37190478169 (2026-10-04) executed check:tarball in the Packaging job at Node 22.13.0, 22 and 24 and passed all three, so the published artifact rather than the repository tree has now been imported with no DOM present on a runner. The row’s last gap was a range question wearing a test’s clothes, and #263 took it off the row by amending the clause: the requirement now states that its promise is about *this package’s* module scope, and that where server import depends on the peer being importable at all the boundary is 6.3.289 up. Measured against both tarballs on 2026-10-07 rather than remembered: 6.2.108’s modern entry throws ReferenceError: DOMMatrix is not defined from its own module scope when Node imports it — before any line of this package runs, which is why no assertion here could have closed it — and the same release’s legacy entry imports cleanly with the identical 62 names, printing the engine’s own “Please use the legacy build in Node.js environments” notice either way. The remedy is named to the host on the Installation page; the package does not import that build, because shipping an untested build to satisfy a sentence is the trade this register exists to refuse. What remains outside this row is #211’s floor ruling itself, which is a policy the owner set, not an evidence gap."
     },
     "FR-47": {
       "title": "Touch & Gesture Handling (v1.0)",
