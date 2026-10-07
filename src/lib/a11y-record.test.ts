@@ -8,9 +8,11 @@
  *
  * The rules are the kind that fail:
  *
- *  - the **toolchain the record names is the one installed now**. axe 4.13 and axe 4.14 disagree about real
- *    rules — #244's CI cell failed on exactly that difference — so a record whose `axeCore` does not match
- *    `node_modules` describes a different audit than the one this repository runs;
+ *  - the **toolchain the record names is the one installed now**, for the packages every cell pins: axe 4.13 and
+ *    axe 4.14 disagree about real rules — #244's CI cell failed on exactly that difference — so a record whose
+ *    `axeCore` does not match `node_modules` describes a different audit than the one this repository runs.
+ *    React is the exception and is checked against the advertised peer range instead, because React is the axis
+ *    the `react` job varies; the case that demanded equality turned both React 18 cells red (#262);
  *  - the ruleset claim is **read out of the harness**, not restated here, so a record cannot quietly start
  *    claiming a WCAG level the audits do not ask axe for;
  *  - an entry with zero passing rules is not "clean", it is an audit that saw nothing (lesson 22 — the same
@@ -28,6 +30,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+
+import packageJson from '../../package.json';
 
 interface AuditEntry {
   test: string;
@@ -70,6 +74,23 @@ function installed(name: string): string {
   return JSON.parse(readFileSync(join(process.cwd(), 'node_modules', name, 'package.json'), 'utf8')).version as string;
 }
 
+/** The react peer range the manifest advertises, read rather than restated here. */
+function peerRange(): string {
+  const range = String(packageJson.peerDependencies.react ?? '');
+  if (!range) throw new Error('package.json advertises no react peer range for this check to read');
+  return range;
+}
+
+/** The majors that range names. Only the `^N.n.n` union form is understood; anything else throws. */
+function reactMajorRange(): string[] {
+  const range = peerRange();
+  const majors = [...range.matchAll(/\^(\d+)\.\d+\.\d+/g)].map((match) => match[1]!);
+  if (!majors.length) {
+    throw new Error(`the react peer range "${range}" names no caret major, and this check understands only that form`);
+  }
+  return majors;
+}
+
 /** The tag list the harness actually hands axe, read from the source rather than copied. */
 function harnessTags(): string[] {
   const source = readFileSync(join(process.cwd(), 'src', 'components', 'axe-audit-harness.ts'), 'utf8');
@@ -103,13 +124,31 @@ describe('the committed accessibility record (FR-58)', () => {
       expect(String(env[key] ?? ''), `${label} is missing or empty in the record`).toMatch(pattern);
     }
     // The teeth: a record about axe 4.13 says nothing about a suite that now runs axe 4.14.
-    for (const name of ['axe-core', 'jsdom', 'vitest', 'react']) {
+    for (const name of ['axe-core', 'jsdom', 'vitest']) {
       const key = name === 'axe-core' ? 'axeCore' : name;
       expect(env[key], `${name} is not named in the record at all`).toBeTruthy();
       expect(String(env[key]), `the record was made against ${name} ${env[key]}, and this tree installs ${name} ${installed(name)}`).toBe(
         installed(name),
       );
     }
+    /*
+     * React is deliberately not compared with this tree, and the reason is a red CI run rather than a preference.
+     * React is the axis the `react` job varies, so equality would have the React 18 cells refuse a record the
+     * verify job legitimately produced — which is what the first version of this case did: CI run 37631611428,
+     * both React 18 cells red on `the record was made against react 19.3.0, and this tree installs react 18.3.1`,
+     * one failing test in each, 1,298 passing. The axe/jsdom/vitest comparisons above stay exact because #244
+     * pins those in every cell; this one is the tree the matrix is allowed to change. What the record still has
+     * to satisfy is the range the package advertises, so a record made against a React this package does not
+     * support is refused, and a React move in `package.json` moves this check with it rather than leaving a
+     * second list to rot.
+     */
+    const react = String(env.react ?? '');
+    expect(react, 'react is not named in the record at all').toMatch(/^\d+\.\d+\.\d+/);
+    const majors = reactMajorRange();
+    expect(
+      majors.includes(react.split('.')[0]!),
+      `the record was made against react ${react}, which is outside the advertised peer range ${peerRange()}`,
+    ).toBe(true);
   });
 
   it('claims exactly the ruleset the harness asks axe for', () => {
