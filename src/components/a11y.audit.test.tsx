@@ -15,7 +15,7 @@
  */
 import { act, cleanup, render } from '@testing-library/react';
 import { useEffect } from 'react';
-import { runAudit, violationList } from './axe-audit-harness';
+import { recordAudit, runAudit, violationList } from './axe-audit-harness';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OutlineView } from './OutlineView';
 import { PasswordPrompt } from './PasswordPrompt';
@@ -124,7 +124,9 @@ function OutlineTree({ entries }: { entries: OutlineEntry[] }) {
  * first place.
  */
 const run = async (node: Element) => {
-  const { violations, incomplete, passes } = await runAudit(node);
+  const result = await runAudit(node);
+  recordAudit(result);
+  const { violations, incomplete, passes } = result;
   return {
     violations: violationList({ violations }),
     incomplete: incomplete.map((rule) => rule.id),
@@ -289,6 +291,7 @@ describe('what the audit cannot see', () => {
   it('reports only rules it cannot evaluate, never a finding about the shell', async () => {
     const { container } = render(<Shell />);
     const results = await runAudit(container);
+    recordAudit(results);
     const seen = results.incomplete.map(
       (rule) =>
         `${rule.id} ${rule.nodes

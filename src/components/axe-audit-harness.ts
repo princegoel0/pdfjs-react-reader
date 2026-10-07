@@ -17,6 +17,8 @@
  * 5-second audit that needs longer than that under load is a measurement worth keeping honest.
  */
 import axe from 'axe-core';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { expect } from 'vitest';
 
 /** The tags `PRD.md` §Access claims: WCAG 2.0, 2.1 and 2.2, levels A and AA. */
 const AUDIT_OPTIONS = {
@@ -58,4 +60,48 @@ export function violationList(result: Pick<AuditResult, 'violations'>): string[]
   return result.violations.map(
     (v: axe.Result) => `${v.id} — ${v.nodes.map((n: axe.NodeResult) => n.target.join(' ')).join(', ')}`,
   );
+}
+
+/**
+ * FR-58's record, written only when `npm run a11y:record` names a path in `PJSR_A11Y_RECORD`.
+ *
+ * §9 wants accessibility evidence a reader can re-read, not a console log that ends with the job, and the
+ * benchmark half of that was produced in W8 by a tracked `benchmarks/latest.json`. This is the same discipline
+ * applied to the audits: each audit contributes one entry, and
+ * [`scripts/a11y-record.mjs`](../../scripts/a11y-record.mjs) adds the environment around them.
+ *
+ * Nothing is written during `npm run a11y` or `npm test`, deliberately — a test that rewrote a tracked file on
+ * every run would leave the working tree permanently dirty, and the clean-checkout condition is part of every
+ * gate here. The record changes when someone asks for it.
+ *
+ * An entry names the test it came from (`expect.getState()`, so a shared helper records the case that called
+ * it rather than the helper) and carries `expectViolation`, because a record that says "no violations" about
+ * a run that included no failing tree proves nothing about the audit's reach. The one case that introduces a
+ * defect on purpose sets it, and `src/lib/a11y-record.test.ts` fails if no entry has it.
+ */
+export function recordAudit(result: AuditResult, options: { expectViolation?: boolean } = {}): void {
+  const path = process.env.PJSR_A11Y_RECORD;
+  if (!path) return;
+  const state = expect.getState() as { currentTestName?: string; testFilePath?: string; testPath?: string };
+  const entry = {
+    test: state.currentTestName ?? '(outside a test)',
+    file: (state.testFilePath ?? state.testPath ?? '').split(/[\\/]/).slice(-2).join('/'),
+    violations: result.violations.map((v: axe.Result) => v.id),
+    // axe's own sentence, not a paraphrase: "incomplete" means it could not answer, and the record has to
+    // say which of the two a reader is looking at.
+    incomplete: result.incomplete.map((r: axe.Result) => ({
+      id: r.id,
+      reason: String(r.nodes?.[0]?.failureSummary ?? r.description ?? 'no reason given').replace(/\s+/g, ' ').slice(0, 160),
+    })),
+    passes: result.passes.length,
+    expectViolation: options.expectViolation === true,
+  };
+  let entries: unknown[] = [];
+  try {
+    entries = JSON.parse(readFileSync(path, 'utf8')) as unknown[];
+  } catch {
+    entries = [];
+  }
+  entries.push(entry);
+  writeFileSync(path, JSON.stringify(entries, null, 2));
 }

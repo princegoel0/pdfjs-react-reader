@@ -31,7 +31,7 @@
  */
 import { act, cleanup } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { runAudit, violationList } from './axe-audit-harness';
+import { recordAudit, runAudit, violationList } from './axe-audit-harness';
 import {
   NUM_PAGES,
   installReadyShellJsdom,
@@ -124,6 +124,7 @@ describe('FR-45: axe over the shell with a document on screen (#247)', () => {
     expect(reached(view).toolbarControls).toBeGreaterThan(0);
 
     const result = await runAudit(view.container);
+    recordAudit(result);
     expect(violationList(result), violationList(result).join('\n')).toEqual([]);
     // The reach of the run, asserted rather than assumed: nothing here may be an incomplete *finding*.
     expect(reportIncompletes(result.incomplete), 'incomplete rules must be jsdom blind spots').toEqual([]);
@@ -148,6 +149,7 @@ describe('FR-45: axe over the shell with a document on screen (#247)', () => {
     expect(shellChrome(view).pageInput, 'and the bar followed').toBe('2');
 
     const result = await runAudit(view.container);
+    recordAudit(result);
     expect(violationList(result), `after a page change: ${violationList(result).join('\n')}`).toEqual([]);
     // Two ids in the whole mount, both the sidebar's (measured), so this is a floor that a future part can trip
     // rather than a claim about what crosses parts today — see the header.
@@ -184,6 +186,7 @@ describe('FR-45: axe over the shell with a document on screen (#247)', () => {
     ).toBeGreaterThan(0);
 
     const result = await runAudit(view.container);
+    recordAudit(result);
     expect(violationList(result), `with the ⋯ panel open: ${violationList(result).join('\n')}`).toEqual([]);
   });
 
@@ -201,6 +204,7 @@ describe('FR-45: axe over the shell with a document on screen (#247)', () => {
     tablist.appendChild(stray);
 
     const result = await runAudit(view.container);
+    recordAudit(result, { expectViolation: true });
     expect(
       violationList(result).some((line) => line.startsWith('aria-required-children')),
       violationList(result).join('\n') || 'axe saw nothing at all',

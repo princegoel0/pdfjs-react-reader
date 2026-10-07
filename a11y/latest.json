@@ -1,0 +1,329 @@
+{
+  "schema": 1,
+  "producedBy": "npm run a11y:record (scripts/a11y-record.mjs)",
+  "environment": {
+    "machine": "princegoel",
+    "platform": "win32",
+    "osRelease": "10.0.26300",
+    "node": "v24.21.0",
+    "axeCore": "4.13.0",
+    "jsdom": "30.1.1",
+    "vitest": "3.2.7",
+    "react": "19.3.0",
+    "ranAt": "2026-10-07T02:30:04.462Z",
+    "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557"
+  },
+  "standard": {
+    "source": "PRD.md §Access / FR-45",
+    "tags": [
+      "wcag2a",
+      "wcag2aa",
+      "wcag21a",
+      "wcag21aa",
+      "wcag22aa"
+    ],
+    "harness": "src/components/axe-audit-harness.ts",
+    "note": "axe under jsdom answers structure and naming only. The rules that report `incomplete` here are the ones needing layout, geometry or a real hit-test — measured touch-target evidence is the browser matrix’s `toolbar-fold` row, and colour contrast and the assistive-technology pairings are still open gaps in fr-evidence.json under FR-45."
+  },
+  "totals": {
+    "audits": 17,
+    "expectedToBeClean": 16,
+    "expectedToFail": 1,
+    "violationsRecorded": 2,
+    "rulesIncomplete": [
+      "aria-hidden-focus",
+      "aria-valid-attr-value",
+      "color-contrast"
+    ]
+  },
+  "audits": [
+    {
+      "test": "the shell, audited > is clean while it waits for a document",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 13,
+      "expectViolation": false
+    },
+    {
+      "test": "the shell, audited > is clean when the load failed",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 13,
+      "expectViolation": false
+    },
+    {
+      "test": "the shell, audited > is clean while it asks for a password",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 16,
+      "expectViolation": false
+    },
+    {
+      "test": "the shell, audited > is clean with the sidebar open on the thumbnails tab",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 17,
+      "expectViolation": false
+    },
+    {
+      "test": "the shell, audited > is clean with the sidebar open on the outline tab",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "aria-valid-attr-value",
+          "reason": "Fix all of the following: ARIA attribute element ID does not exist on the page: aria-labelledby=\"_r_5_-tab-outline\""
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 17,
+      "expectViolation": false
+    },
+    {
+      "test": "the shell, audited > is clean with the sidebar open on the layers tab",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "aria-valid-attr-value",
+          "reason": "Fix all of the following: ARIA attribute element ID does not exist on the page: aria-labelledby=\"_r_6_-tab-layers\""
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 17,
+      "expectViolation": false
+    },
+    {
+      "test": "the shell, audited > is clean with the sidebar open on the attachments tab",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "aria-valid-attr-value",
+          "reason": "Fix all of the following: ARIA attribute element ID does not exist on the page: aria-labelledby=\"_r_7_-tab-attachments\""
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 17,
+      "expectViolation": false
+    },
+    {
+      "test": "the shell, audited > is clean with the search bar open",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 14,
+      "expectViolation": false
+    },
+    {
+      "test": "the primitives, audited on their own > carries an outline tree with nested entries",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 12,
+      "expectViolation": false
+    },
+    {
+      "test": "the primitives, audited on their own > asks for a credential it cannot see",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 10,
+      "expectViolation": false
+    },
+    {
+      "test": "the primitives, audited on their own > wraps a page in structure that belongs to it",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 13,
+      "expectViolation": false
+    },
+    {
+      "test": "what the audit cannot see > reports only rules it cannot evaluate, never a finding about the shell",
+      "file": "components/a11y.audit.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 13,
+      "expectViolation": false
+    },
+    {
+      "test": "FR-45: axe over the shell with a document on screen (#247) > is clean over the mounted pages, the bar and the sidebar",
+      "file": "components/a11y.ready.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 19,
+      "expectViolation": false
+    },
+    {
+      "test": "FR-45: axe over the shell with a document on screen (#247) > is still clean after the reader moves a page with the keyboard",
+      "file": "components/a11y.ready.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 19,
+      "expectViolation": false
+    },
+    {
+      "test": "FR-45: axe over the shell with a document on screen (#247) > is clean with the bar folded and its ⋯ panel open",
+      "file": "components/a11y.ready.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 19,
+      "expectViolation": false
+    },
+    {
+      "test": "FR-45: axe over the shell with a document on screen (#247) > can fail, because it is looking at the tree it claims to walk",
+      "file": "components/a11y.ready.test.tsx",
+      "violations": [
+        "aria-required-children",
+        "aria-required-parent"
+      ],
+      "incomplete": [
+        {
+          "id": "aria-hidden-focus",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        },
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 18,
+      "expectViolation": true
+    },
+    {
+      "test": "the page, audited > paints a text layer before it is judged",
+      "file": "components/a11y.page.test.tsx",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "reason": "Fix all of the following: Axe encountered an error; test the page for this type of problem manually"
+        }
+      ],
+      "passes": 11,
+      "expectViolation": false
+    }
+  ]
+}
