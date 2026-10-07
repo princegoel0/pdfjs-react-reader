@@ -178,8 +178,15 @@ function AnnotateRunner() {
     const alert = createAlertRegion(labels);
     root.append(alert.element);
     alert.start();
+    // pdf.js binds Enter and Space on `window` and gates them with `container.contains(target)`, then reads
+    // `currentLayer.canCreateNewEmptyEditor()` without a guard — so the container decides which keys the engine
+    // claims. The root made it every key in the application, including an Enter in the page field and a Space on
+    // a sidebar checkbox, each of which can land while no page layer is current (a document swap, or every page
+    // scrolled out) and throw uncaught inside the engine. The pages' own scroller is what pdf.js's viewer hands
+    // it; the root stays as the fallback for a host that writes its own layout without one (FR-28).
+    const editorContainer = root.querySelector<HTMLElement>('.pjsr-viewport') ?? root;
     const manager = new AnnotationEditorUIManager(
-      root,
+      editorContainer,
       // The manager reads `classList` off the viewer and nothing else, so the
       // root stands in for pdf.js's PDFViewer.
       { classList: root.classList } as never,
