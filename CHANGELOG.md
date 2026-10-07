@@ -68,6 +68,47 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **FR-43's clause now has its noun measured: a form widget inside marked content, and the two ways a widget gets
+  a name (FR-43, #268, 2026-10-07).** The requirement says "a widget is announced with its owning node rather than
+  as an unlabelled control", and every measurement in this repository was made on the annotation that is *not* a
+  widget: `tagged-sample.pdf` carries a `/Link` — which is what the engine's `enableLinkOwnership` is written for —
+  and `form-sample.pdf` carries fields with no structure tree at all. So the gap was the artifact, not the code,
+  and `scripts/make-tagged-form-pdf.mjs` writes `tagged-form-sample.pdf` to close it: a tagged page with two
+  AcroForm text fields *inside* the tree, deliberately one of each kind.
+
+  **The named field** sits under a `/Form` element carrying `/Alt (Reviewer name)`. Read from the engine, that is
+  the clause as written: `StructTreeLayerBuilder.#setAttributes` walks an element with `/Alt`, and for every kid of
+  type `annotation` it puts the `/Alt`, verbatim, into the table `AnnotationLayer` asks for by annotation id — in
+  chromium the widget arrives as `aria-label="Reviewer name"`, which is what the new matrix row
+  `widget-named-by-its-owning-node` asserts. **The unlabelled field** has no `/Alt` and no `/TU`, so the engine has
+  nothing to say about it and the name it arrives with is the shell's: `src/lib/annotation-names.ts` (#267) lends it
+  the field name, and the row asserts that too. Two cases in one file is the point — a fixture with only the named
+  field would pass while a producer who labelled nothing got nothing, and one with only the unnamed field would
+  credit the shell with the engine's work. And because `enableLinkOwnership` is computed as
+  `contentElement.localName === "a"`, the `aria-owns` route stays a link's and the `/Alt` route is the widget's: the
+  row names both mechanisms and does not describe either as the other. Both widgets are also asserted to still hold
+  their values and stay tabbable, and to appear in the structure DOM's `aria-owns` lists.
+
+  `src/lib/tagged.test.ts` gained five cases on the same file, asserting the tree's own `alt` field rather than a
+  DOM attribute (what the engine answers is this file's business; what a browser paints is the matrix's), and the
+  fixture-directory claim is now derived instead of remembered: it used to say "seventeen of the eighteen other
+  fixtures answer `null`", so the test now opens all of them — **two** answer a structure tree, **nineteen** answer
+  `null` for the tree and `getMarkInfo()` alike, and the **two** that cannot be opened at all (the truncated file,
+  the encrypted one) are named rather than counted as nulls, because "could not look" is not "looked and saw
+  nothing".
+
+  Four falsifications, each restored by checksum, all four red for their own reason: `/Alt` renamed → the roles and
+  marks all stay and the name goes; `/OBJR` renamed in both places → the tree claims no widget; the same rename in
+  only the *second* field's element → the named case stays green and the ownership assertion reddens alone, which is
+  what proves it is an assertion and not a companion to the first; and `nameUnnamedWidgets` held out of
+  `PdfPage.tsx` → the unlabelled field arrives as `aria-label=""`. **What the pairing test caught was this work
+  order's own generator:** its first output omitted `/Contents` from the page dictionary, so the tree bound all five
+  marks, the widgets painted, every role read back correctly — and the page had no text at all. That is the same
+  silent shape as the `BDC` and `/Pg` failures the tagged generator was written to refuse, so the new script now
+  refuses to write a page that names no content stream. `scripts/check-docs.mjs` gained one `WORD` entry
+  (`Twenty-Two`) because §8's Chrome row spells the harness's check count and the gate refuses to guess a spelling it
+  does not have — its 46 `--selftest` perturbations still all bite.
+
 - **FR-45's automated leg now runs where a layout exists, and it found ten unnamed nodes on its first pass (FR-45,
   FR-58, #267, 2026-10-07).** The clause splits its evidence four ways, and the axe half had only ever run in the
   one environment where two of its rules are blind: jsdom hands every element a 0×0 box and paints nothing, so

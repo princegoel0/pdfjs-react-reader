@@ -21,7 +21,7 @@
  * A fixture that quietly lost either key would prove nothing while passing every assertion above it, so the
  * generator refuses to write one.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getDocument, type PDFDocumentProxy, type PDFPageProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
@@ -189,17 +189,43 @@ describe('a document that declares its structure', () => {
   });
 
   /*
-   * The ordinary case, stated next to the unusual one: seventeen of the eighteen other fixtures answer
-   * `null` — for the tree and for `getMarkInfo()` alike, so a structure layer is a feature for the
-   * documents that opt into tagging and a no-op for the rest. Which is the fact behind the decision
-   * recorded in `ROADMAP.md`, and the reason `null` is asserted rather than treated as falsy-by-luck: an
-   * implementation that asked `info.Marked` would answer the same way for the two very different cases.
+   * The ordinary case, stated next to the unusual one — and now measured instead of remembered. This comment
+   * used to carry a count of the fixtures directory ("seventeen of the eighteen other fixtures answer `null`"),
+   * which is the kind of sentence a new fixture silently falsifies, so the assertion walks the directory
+   * instead: two files answer a structure tree, one of them #268's widget file, and everything else answers
+   * `null` for the tree and for `getMarkInfo()` alike. That is the fact behind the decision recorded in
+   * `ROADMAP.md` — a structure layer is a feature for the documents that opt into tagging and a no-op for the
+   * rest — and the reason `null` is asserted rather than treated as falsy-by-luck: an implementation that asked
+   * `info.Marked` answers the same way for the two very different cases.
    */
   it('is the exception among our fixtures, which answer null', async () => {
-    const doc = await open(fixture('outline-sample.pdf'));
-    const page = await doc.getPage(1);
-    expect(await page.getStructTree()).toBeNull();
-    expect(await doc.getMarkInfo()).toBeNull();
+    const dir = join(process.cwd(), 'playground', 'fixtures');
+    const names = readdirSync(dir).filter((name) => name.endsWith('.pdf')).sort();
+    const withTree: string[] = [];
+    const unreadable: string[] = [];
+    let answeredNull = 0;
+    for (const name of names) {
+      try {
+        const doc = await open(fixture(name));
+        const tree = await (await doc.getPage(1)).getStructTree();
+        if (tree) withTree.push(name);
+        else {
+          answeredNull++;
+          expect(await doc.getMarkInfo(), `${name} answers a tree for a document that declares no /MarkInfo`).toBeNull();
+        }
+        await doc.cleanup();
+      } catch {
+        // The damaged and encrypted fixtures are the two files that cannot be opened without a repair pass or a
+        // password. Named rather than counted as nulls, because "could not look" is not "looked and saw nothing".
+        unreadable.push(name);
+      }
+    }
+    expect(withTree, 'the files with a structure tree').toEqual(['tagged-form-sample.pdf', 'tagged-sample.pdf']);
+    expect(unreadable.sort(), `the files this sweep could not open: ${unreadable.join(', ')}`).toEqual([
+      'damaged-truncated.pdf',
+      'encrypted-sample.pdf',
+    ]);
+    expect(answeredNull, 'and every other file answers null').toBe(names.length - withTree.length - unreadable.length);
   });
 });
 
@@ -251,5 +277,108 @@ describe('what silently breaks the tree', () => {
       'mc5',
     ]);
     expect(await contentMarks(page)).toEqual([]);
+  });
+});
+
+/*
+ * FR-43's noun, at last: a widget inside marked content (#268).
+ *
+ * The clause says "a widget is announced with its owning node rather than as an unlabelled control", and every
+ * measurement in this repository up to now was made on the annotation that is *not* a widget: `tagged-sample.pdf`
+ * carries a `/Link` (which is what the engine's `enableLinkOwnership` is written for) and `form-sample.pdf`
+ * carries fields with no structure tree at all. `tagged-form-sample.pdf` is authored for the missing case, and it
+ * carries two fields on purpose, because there are two honest answers to the sentence:
+ *
+ *  - `reviewerName` sits in a `/Form` element with `/Alt (Reviewer name)`. pdf.js's
+ *    `StructTreeLayerBuilder.#setAttributes` (`web/pdf_viewer.mjs`) reads such an element, and for every kid of
+ *    type `annotation` it puts the `/Alt`, verbatim, into the table `AnnotationLayer` asks for by annotation id.
+ *    That is the owner naming the control, and it is the engine's doing — which is why the assertion below is
+ *    about the tree's own `alt` field and not about an `aria-label`: what a DOM audit sees is one row of the
+ *    browser matrix's business (`widget-named-by-its-owning-node`), and what the engine *answers* is this file's.
+ *  - `reviewerComments` has no `/Alt`, and no `/TU` on its widget either. The tree claims it, and says nothing
+ *    about it. That is the case `src/lib/annotation-names.ts` (#267) exists for, and the reason both are in one
+ *    file: a fixture with only the first case would pass while the producer who forgot to label anything got no
+ *    name, and one with only the second would let the shell take credit for the engine's work.
+ */
+describe('FR-43: a widget inside marked content', () => {
+  const WIDGETS = 'tagged-form-sample.pdf';
+
+  it('binds each field to the element that owns it, and keeps the /Alt where the producer put it', async () => {
+    const doc = await open(fixture(WIDGETS));
+    const tree = (await (await doc.getPage(1)).getStructTree()) as never;
+    expect(walk(tree)).toEqual([
+      'Root/Document/H1 → mc0',
+      'Root/Document/Div/P → mc1',
+      'Root/Document/Div/Form → mc2 (alt: Reviewer name)',
+      'Root/Document/Div/P → mc3',
+      'Root/Document/Div/Form → mc4',
+    ]);
+  });
+
+  it('claims both widgets under the id the annotation layer will ask with', async () => {
+    const doc = await open(fixture(WIDGETS));
+    const page = await doc.getPage(1);
+    const annotations = (await page.getAnnotations({ intent: 'display' })) as Array<Record<string, unknown>>;
+    expect(
+      annotations.map((a) => [a.subtype, a.fieldName]).sort(),
+      'the file declares two text fields and the worker reports both as widgets',
+    ).toEqual([
+      ['Widget', 'reviewerComments'],
+      ['Widget', 'reviewerName'],
+    ]);
+
+    const claimed = treeAnnotations((await page.getStructTree()) as never).sort();
+    expect(claimed, 'the tree claims the same ids the layer will build its elements under').toEqual(
+      annotations.map((a) => `pdfjs_internal_id_${a.id}`).sort(),
+    );
+  });
+
+  it('opens the same marks in its content as its tree binds', async () => {
+    const doc = await open(fixture(WIDGETS));
+    const page = await doc.getPage(1);
+    const bound = treeMarks((await page.getStructTree()) as never);
+    expect(bound).toEqual(['mc0', 'mc1', 'mc2', 'mc3', 'mc4']);
+    expect(await contentMarks(page)).toEqual(bound);
+  });
+
+  /*
+   * The counterfactual on the naming half, at the same byte length so no xref moves: rename `/Alt` and every role
+   * still reads back, the marks stay bound — the only thing that disappears is the word the engine would have
+   * handed the widget. This is what makes the case above a test of the `/Alt` rather than of the tree parsing.
+   */
+  it('keeps its tree but loses the owner’s name when /Alt is renamed', async () => {
+    const bytes = fixture(WIDGETS);
+    const text = Buffer.from(bytes).toString('latin1');
+    expect(text).toMatch(/\/Alt \(Reviewer name\)/);
+    const stripped = Buffer.from(text.replace('/Alt (Reviewer name)', '/Alx (Reviewer name)'), 'latin1');
+    expect(stripped.length).toBe(bytes.length);
+
+    const doc = await open(new Uint8Array(stripped));
+    expect(walk((await (await doc.getPage(1)).getStructTree()) as never)).toEqual([
+      'Root/Document/H1 → mc0',
+      'Root/Document/Div/P → mc1',
+      'Root/Document/Div/Form → mc2',
+      'Root/Document/Div/P → mc3',
+      'Root/Document/Div/Form → mc4',
+    ]);
+  });
+
+  /*
+   * And on the ownership half: an `/OBJR` renamed is a kid no reader recognises, so the tree keeps its shape and
+   * its marks while the widgets fall out of it. Asserted as the pair — marks still bound, no annotation claimed —
+   * because the marks alone would also be true of a file that never had a widget in the tree.
+   */
+  it('keeps its marks but claims no widget when /OBJR is renamed', async () => {
+    const bytes = fixture(WIDGETS);
+    const text = Buffer.from(bytes).toString('latin1');
+    expect((text.match(/\/Type \/OBJR/g) ?? []).length).toBe(2);
+    const stripped = Buffer.from(text.replaceAll('/Type /OBJR', '/Type /OBXR'), 'latin1');
+    expect(stripped.length).toBe(bytes.length);
+
+    const doc = await open(new Uint8Array(stripped));
+    const page = await doc.getPage(1);
+    const tree = (await page.getStructTree()) as never;
+    expect(treeAnnotations(tree)).toEqual([]);
+    expect(treeMarks(tree).sort()).toEqual(['mc0', 'mc1', 'mc2', 'mc3', 'mc4']);
   });
 });

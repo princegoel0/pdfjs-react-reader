@@ -1,0 +1,114 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /MarkInfo << /Marked true >> /Lang (en-US) /StructTreeRoot 22 0 R /AcroForm 5 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [14 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /StructElem /S /Document /K [19 0 R 20 0 R] >>
+endobj
+5 0 obj
+<< /Fields [6 0 R 7 0 R] /DR << /Font << /F1 3 0 R >> >> >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Widget /F 4 /FT /Tx /T (reviewerName) /V (Ada Lovelace) /DA (/F1 10 Tf 0 g) /Rect [200 656 360 674] /P 14 0 R /StructParent 1 >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Widget /F 4 /FT /Tx /T (reviewerComments) /V (looks fine) /DA (/F1 10 Tf 0 g) /Rect [200 606 360 624] /P 14 0 R /StructParent 2 >>
+endobj
+8 0 obj
+<< /Length 373 >>
+stream
+BX /MC0 << /MCID 0 >> BDC
+BT /F2 20 Tf 72 720 Td (Tagged form fixture) Tj ET
+EMC
+BX /MC1 << /MCID 1 >> BDC
+BT /F1 12 Tf 72 660 Td (Reviewer name:) Tj ET
+EMC
+BX /MC2 << /MCID 2 >> BDC
+BT /F1 10 Tf 72 659 Td (Ada Lovelace) Tj ET
+EMC
+BX /MC3 << /MCID 3 >> BDC
+BT /F1 12 Tf 72 610 Td (Comments:) Tj ET
+EMC
+BX /MC4 << /MCID 4 >> BDC
+BT /F1 10 Tf 72 609 Td (looks fine) Tj ET
+EMC
+endstream
+endobj
+9 0 obj
+<< /MCID 0 >>
+endobj
+10 0 obj
+<< /MCID 1 >>
+endobj
+11 0 obj
+<< /MCID 2 >>
+endobj
+12 0 obj
+<< /MCID 3 >>
+endobj
+13 0 obj
+<< /MCID 4 >>
+endobj
+14 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 3 0 R >> >> /Properties << /MC0 9 0 R /MC1 10 0 R /MC2 11 0 R /MC3 12 0 R /MC4 13 0 R >> /Contents 8 0 R /Annots [6 0 R 7 0 R] /StructParents 0 >>
+endobj
+15 0 obj
+<< /Type /StructElem /S /Form /P 20 0 R /Pg 14 0 R /Alt (Reviewer name) /K [<< /Type /OBJR /Obj 6 0 R /Pg 14 0 R >> << /Type /MCR /MCID 2 /Pg 14 0 R >>] >>
+endobj
+16 0 obj
+<< /Type /StructElem /S /Form /P 20 0 R /Pg 14 0 R /K [<< /Type /OBJR /Obj 7 0 R /Pg 14 0 R >> << /Type /MCR /MCID 4 /Pg 14 0 R >>] >>
+endobj
+17 0 obj
+<< /Type /StructElem /S /P /P 20 0 R /Pg 14 0 R /K [1] >>
+endobj
+18 0 obj
+<< /Type /StructElem /S /P /P 20 0 R /Pg 14 0 R /K [3] >>
+endobj
+19 0 obj
+<< /Type /StructElem /S /H1 /P 4 0 R /Pg 14 0 R /K [0] >>
+endobj
+20 0 obj
+<< /Type /StructElem /S /Div /P 4 0 R /K [17 0 R 15 0 R 18 0 R 16 0 R] >>
+endobj
+21 0 obj
+<< /Nums [0 [19 0 R 17 0 R 18 0 R] 1 15 0 R 2 16 0 R] >>
+endobj
+22 0 obj
+<< /Type /StructTreeRoot /K 4 0 R /ParentTree 21 0 R /ParentTreeNextKey 3 >>
+endobj
+xref
+0 23
+0000000000 65535 f 
+0000000009 00000 n 
+0000000140 00000 n 
+0000000198 00000 n 
+0000000295 00000 n 
+0000000366 00000 n 
+0000000441 00000 n 
+0000000611 00000 n 
+0000000783 00000 n 
+0000001207 00000 n 
+0000001236 00000 n 
+0000001266 00000 n 
+0000001296 00000 n 
+0000001326 00000 n 
+0000001356 00000 n 
+0000001609 00000 n 
+0000001781 00000 n 
+0000001932 00000 n 
+0000002006 00000 n 
+0000002080 00000 n 
+0000002154 00000 n 
+0000002244 00000 n 
+0000002317 00000 n 
+trailer
+<< /Size 23 /Root 1 0 R >>
+startxref
+2410
+%%EOF

@@ -229,6 +229,9 @@ const WORD = [
   'Nineteen',
   'Twenty',
   'Twenty-One',
+  // §8's Chrome row spells the harness's own check count, so the table has to keep up with the matrix: an
+  // unspelled number is printed as `#22`, which the document would then have to carry as a digits figure.
+  'Twenty-Two',
 ];
 
 // ---------------------------------------------------------------------------

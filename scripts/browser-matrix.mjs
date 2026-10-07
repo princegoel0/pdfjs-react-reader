@@ -2046,6 +2046,117 @@ const CHECKS = [
     },
   },
   {
+    /*
+     * FR-43's noun is a widget, and until this row the repository had never put one inside a structure tree:
+     * `tagged-sample.pdf` carries a link (which is what `enableLinkOwnership` is written for) and
+     * `form-sample.pdf` carries fields with no tree at all, so the sentence "a widget is announced with its
+     * owning node rather than as an unlabelled control" was measured on the annotation that is not a widget
+     * (#268's gap). `tagged-form-sample.pdf` is authored for exactly this question, and it now has two
+     * widgets because there are two honest answers:
+     *
+     *  - `reviewerName` sits in a `/Form` element carrying `/Alt (Reviewer name)`. pdf.js's
+     *    `StructTreeLayerBuilder.#setAttributes` walks such an element, and for every kid of type
+     *    `annotation` it puts the `/Alt`, verbatim, into the table `AnnotationLayer` asks for by annotation
+     *    id — so the owner names the control. That is the clause's own mechanism, and it is the engine's.
+     *  - `reviewerComments` has no `/Alt` and no `/TU` either, so the engine has nothing to say. The name it
+     *    arrives with is the shell's: `src/lib/annotation-names.ts` (#267) lends it the field name the engine
+     *    wrote onto `name`. Asserting both in one row is the point — a file with only the first case would
+     *    pass while the producer that forgot to label anything got nothing, and a file with only the second
+     *    would credit the shell with the engine's work.
+     *
+     * Both halves also assert what a name must not cost: the field still holds its value and is still tabbable,
+     * which is the trap #267 measured and refused (`aria-hidden` silences axe and takes the control away).
+     */
+    name: 'widget-named-by-its-owning-node',
+    desktopOnly: true,
+    run: async ({ page, load, pageErrors }) => {
+      // The tier has to be on for the structure layer to reach the annotation layer at all. Checking the box
+      // is idempotent, and it is checked here rather than inherited from the row above because a row that
+      // depends on another row's state is a row that changes when the order does (#254, #248).
+      await page.locator('.app-features label', { hasText: 'structure' }).locator('input').check();
+      const errorsBefore = pageErrors.length;
+      await load('tagged-form-sample.pdf', 1);
+      await page
+        .waitForSelector('.pjsr-annotation-layer input[name="reviewerName"]', { timeout: 30_000 })
+        .catch(() => undefined);
+      await page.waitForTimeout(1_500);
+
+      const read = await page.evaluate(() => {
+        const fields = [...document.querySelectorAll('.pjsr-annotation-layer input, .pjsr-annotation-layer textarea')].map(
+          (el) => ({
+            name: el.getAttribute('name') ?? '',
+            id: el.id,
+            label: el.getAttribute('aria-label') ?? '',
+            owns: el.getAttribute('aria-owns') ?? '',
+            value: el.value ?? '',
+            tabbable: el.tabIndex >= 0,
+          }),
+        );
+        const owned = [...document.querySelectorAll('.structTree [aria-owns]')].flatMap((el) =>
+          (el.getAttribute('aria-owns') ?? '').split(/\s+/).filter(Boolean),
+        );
+        return { fields, trees: document.querySelectorAll('.structTree').length, owned };
+      });
+
+      const byName = (name) => read.fields.find((f) => f.name === name);
+      for (const name of ['reviewerName', 'reviewerComments']) {
+        if (!byName(name)) {
+          fail(
+            `the tagged form fixture mounted ${read.fields.length} control(s) ` +
+              `[${read.fields.map((f) => f.name || '(no name)').join(', ')}] and none of them is ` +
+              `"${name}", so there is no widget to ask about — ${read.trees} structure tree(s) on the page`,
+          );
+        }
+      }
+
+      const named = byName('reviewerName');
+      if (named.label !== 'Reviewer name') {
+        fail(
+          `the widget whose owning /Form element carries /Alt "Reviewer name" arrived as ` +
+            `aria-label ${JSON.stringify(named.label)} instead${named.label === 'reviewerName' ? ' — that is the shell’s own fallback, so the structure layer named nothing: ' : ': '}` +
+            `${read.trees} structure tree(s) mounted, ${read.owned.length} owned ids`,
+        );
+      }
+
+      const bare = byName('reviewerComments');
+      if (bare.label !== 'reviewerComments') {
+        fail(
+          `the widget the file says nothing about arrived as aria-label ${JSON.stringify(bare.label)}; the shell's ` +
+            'naming pass (#267) is expected to lend it the field name the engine put on `name`, and a different ' +
+            'value means either the pass did not run or the file grew a label the row does not know about',
+        );
+      }
+
+      for (const field of [named, bare]) {
+        if (!field.tabbable) {
+          fail(`the widget "${field.name}" is not tabbable — a name that costs keyboard access is not a fix (#267 measured this)`);
+        }
+        if (!field.value) {
+          fail(`the widget "${field.name}" lost its value on the way to being named`);
+        }
+      }
+
+      const unowned = [named, bare].filter((f) => !read.owned.includes(f.id)).map((f) => `${f.name} (${f.id})`);
+      if (unowned.length) {
+        fail(
+          `${unowned.join(' and ')} is not in any owning element's aria-owns list, so the structure tree does not ` +
+            `claim the widget at all — owned ids seen: ${read.owned.slice(0, 8).join(', ') || '(none)'}`,
+        );
+      }
+
+      if (pageErrors.length > errorsBefore) {
+        fail(`this row raised ${pageErrors.length - errorsBefore} new page error(s): ${pageErrors[errorsBefore]}`);
+      }
+
+      return (
+        `2 widgets, ${read.trees} tree(s): reviewerName arrives "${named.label}" from its owning /Form element's /Alt, ` +
+        `reviewerComments arrives "${bare.label}" from the shell's naming pass (the file says nothing about it); ` +
+        `both tabbable with their values (${[named, bare].map((f) => f.value).join(', ')}), both claimed by the ` +
+        `structure DOM's aria-owns`
+      );
+    },
+  },
+  {
     name: 'forced-colours',
     desktopOnly: true,
     run: async ({ page, load, reveal }) => {
