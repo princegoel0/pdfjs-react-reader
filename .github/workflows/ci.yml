@@ -413,10 +413,14 @@ jobs:
       - name: Accessibility audit in a real browser
         run: npm run a11y:browser-record
 
-      # FR-49's evidence, in the same job because it needs the same browser install. The script separates
-      # bars (structural, and they fail the job) from measures (timings, printed with the machine they came
-      # from and never failed on) — §6's own rule is that a maximum observed on one device does not become a
-      # promise a slower reader's machine breaks.
+      # FR-49's evidence, in the same job because it needs the same browser install. The script separates bars
+      # (structural, and they fail the job) from measures (timings, printed with the machine they came from). A
+      # timing is never compared against *another* machine's number — §6: "a maximum observed on one device does
+      # not become a promise that a slower reader's machine will break" — but each one is compared against this
+      # environment's own accepted baseline, and that comparison fails the job, which is FR-49's "a regression is
+      # a failing job rather than a slower feeling". On this runner the legs read `n/a` until
+      # `.github/workflows/bench-baseline.yml` has been dispatched and its artifact committed; see
+      # `scripts/benchmark-baseline.mjs` for the tolerance and for why an unaccepted leg is not a passing one.
       - name: Run the benchmarks
         # One cell, not two: §6's record is a reading of one machine per run, and the floor cell exists to
         # paint pages, not to re-time them. The version named here is the axis this job runs, and

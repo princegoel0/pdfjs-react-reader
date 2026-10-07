@@ -225,6 +225,7 @@
     "probe:canvas": "node scripts/canvas-probe.mjs",
     "probe:worker": "node scripts/worker-default-browser.mjs",
     "bench": "node scripts/benchmark.mjs",
+    "bench:update-baseline": "node scripts/bench-update-baseline.mjs",
     "typecheck": "tsc --noEmit",
     "size": "node scripts/check-size.mjs",
     "size:update": "node scripts/check-size.mjs --update",

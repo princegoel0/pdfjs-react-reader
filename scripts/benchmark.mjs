@@ -8,9 +8,13 @@
  *  - **bar** — a structural property that holds on any machine, so it fails the run when it does not: the
  *    canvas count stays bounded, live pixel budget does not grow with scroll depth, the render caps bind
  *    where they are supposed to and degrade resolution rather than painting a blank page.
- *  - **measure** — a timing, printed with the machine it came from and never failed on: document open, cold
- *    page, frame gaps, longest main-thread task. Headless Chromium has no vsync to hit, so "60 FPS" is not
- *    a thing this can honestly assert; the longest long task is, and it is the half a reader feels.
+ *  - **measure** — a timing, printed with the machine it came from: document open, cold page, frame gaps,
+ *    longest main-thread task. Headless Chromium has no vsync to hit, so "60 FPS" is not a thing this can
+ *    honestly assert. No timing here is ever compared against *another* machine's number — §6: "a maximum
+ *    observed on one device does not become a promise that a slower reader's machine will break" — but each
+ *    one is compared against **this environment's own accepted baseline**, and that comparison can fail the
+ *    job. That is FR-49's "a regression is a failing job rather than a slower feeling", and the leg-by-leg
+ *    rules, the tolerance and the reason a leg cannot compare live in `scripts/benchmark-baseline.mjs`.
  *
  * A bar that cannot fail is not a bar, and cannot be wrong is not much either. Three of these went through
  * a version that did not measure what it said: the zoom test at 400 % on a dpr-1 desktop left the canvas at
@@ -33,7 +37,9 @@
  * as tasks #141 and #156, and the run prints that instead of implying a phone was involved.
  *
  * It needs a browser, so it is its own command — `npm run bench`, a step in CI's `browser` job — and not
- * part of `npm run verify`. Its record goes to `benchmarks/latest.json`, which is tracked.
+ * part of `npm run verify`. Its record goes to `benchmarks/latest.json`, which is tracked, and the numbers a
+ * run has been accepted as a baseline for go to `benchmarks/baseline.json`, also tracked and rewritten only
+ * by `npm run bench:update-baseline`.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -43,6 +49,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
+import { compareRun, summarise } from './benchmark-baseline.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -841,4 +848,47 @@ console.log(
   `wrote benchmarks/latest.json — tracked, and the fixture hashes in it are of the bytes measured. ` +
     `Committing that change is a decision, not a side effect.`,
 );
-process.exit(broke.length ? 1 : 0);
+
+/*
+ * FR-49's other half: "a regression is a failing job rather than a slower feeling". The timings above have
+ * been reported forever; this is the part that can fail, and it fails only against the accepted baseline for
+ * *this* environment, never against another machine's number (§6: "a maximum observed on one device does not
+ * become a promise that a slower reader's machine will break"). A leg with no entry here prints `n/a` and is
+ * counted in the summary, because an unmeasured row is not a passing row (PRD §8's own words).
+ */
+console.log('\nFR-49 regression gate — this run against the accepted baseline for its own environment');
+let regressed = [];
+let baselineFile;
+try {
+  baselineFile = JSON.parse(readFileSync(join(directory, 'baseline.json'), 'utf8'));
+} catch {
+  console.log(
+    '  REGRESSION  benchmarks/baseline.json is missing or unreadable — a gate with nothing to compare against ' +
+      'compares nothing, which is the failure §8 calls an unverified row rather than a pass. ' +
+      'Run `npm run bench` and `npm run bench:update-baseline`, or restore the tracked file.',
+  );
+  process.exit(1);
+}
+const { key: environmentKey, lines: gateLines } = compareRun({
+  baseline: baselineFile,
+  environment: environmentBlock,
+  profiles: record.profiles,
+});
+console.log(`  environment: ${environmentKey}`);
+for (const line of gateLines) {
+  const mark =
+    line.status === 'pass' ? '  regr ok  ' : line.status === 'fail' ? '  REGR FAIL' : line.status === 'blind' ? '  regr BLND' : '  regr n/a ';
+  console.log(`  ${mark}${line.label.padEnd(50)}${line.detail}`);
+}
+const gate = summarise(gateLines);
+console.log(`  ${gate.text}`);
+regressed = gateLines.filter((l) => l.status === 'fail');
+if (regressed.length) {
+  console.log(
+    `\n${regressed.length} leg(s) ran past their own environment's tolerance. The fix is to find what changed, ` +
+      `not to re-accept the baseline: \`npm run bench:update-baseline -- --force\` is how a person accepts a ` +
+      `new number on purpose, and its name has to be in the commit message.`,
+  );
+}
+
+process.exit(broke.length || regressed.length ? 1 : 0);

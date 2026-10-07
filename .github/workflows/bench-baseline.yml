@@ -1,0 +1,82 @@
+name: Bench baseline
+
+# FR-49's gate needs a baseline that was *accepted on the environment it gates*. `scripts/benchmark-baseline.mjs`
+# refuses to compare a run against another machine's numbers, so the runner's `npm run bench` step reads `n/a`
+# on every leg until someone accepts a runner's own readings — which is this job, and nothing else.
+#
+# It is `workflow_dispatch`-only on purpose. A baseline that rewrote itself on every push would absorb every
+# regression into its own median, which is the "slower feeling" the clause is about. The output is an artifact,
+# not a commit: a person downloads it, reads what the tolerances became, and commits it. That act is the
+# evidence — `src/lib/benchmark-baseline.test.ts` then re-derives each stored tolerance from the readings in
+# the file and refuses one that does not match, so a hand-edited ceiling shows up as a red test rather than as
+# a quiet gate that can no longer fail.
+#
+# The bench runs twice and both readings are folded in, because `GATE.minimumReadings` is 2: a single accepted
+# number has no spread in it, and a leg built from one reading is `provisional` — reported, not gated.
+#
+# The engine is pinned to the same version as the `browser` job's bench cell (`.github/workflows/ci.yml`'s
+# `if: matrix.engine == '6.4.299'`), because the engine version is part of the environment fingerprint: an
+# entry accepted at another engine would describe a different cell than the one CI runs.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: bench-baseline-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: Measure the runner twice and fold both into the baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PDFJS_ENGINE: 6.4.299
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install the browser the benchmark drives
+        run: npx playwright install --with-deps chromium
+
+      # The same swap the `browser` job performs, including the part that names the rest of the tree in one
+      # install and then reads the disk to refuse a cell that is not the cell it asked for (#244).
+      - name: Pin the engine to ${{ env.PDFJS_ENGINE }}
+        run: |
+          set -euo pipefail
+          PINS=$(node scripts/pin-tree.mjs pins --exclude=pdfjs-dist)
+          npm i --no-save --no-package-lock --no-audit --no-fund pdfjs-dist@$PDFJS_ENGINE $PINS
+          node scripts/pin-tree.mjs check --exact=pdfjs-dist=$PDFJS_ENGINE
+
+      # `npm run bench` exits non-zero when a bar breaks or a leg regresses against this file's own entries, so
+      # a run that would not be allowed to be accepted here fails the job before the artifact is uploaded.
+      - name: Measure, pass 1
+        run: npm run bench
+
+      - name: Accept pass 1
+        run: node scripts/bench-update-baseline.mjs
+
+      - name: Measure, pass 2
+        run: npm run bench
+
+      - name: Accept pass 2 and report the tolerances
+        run: node scripts/bench-update-baseline.mjs
+
+      - name: Show what the runner's environment looks like to the gate
+        run: node -e "const b=require('./benchmarks/baseline.json');for(const[k,v]of Object.entries(b.environments))console.log(k+' -> '+Object.values(v.entries).filter(e=>e.status==='live').length+'/'+Object.keys(v.entries).length+' legs live')"
+
+      - name: Upload the baseline the runner measured
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks-baseline
+          path: benchmarks/baseline.json
+          if-no-files-found: error

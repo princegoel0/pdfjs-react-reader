@@ -1,0 +1,492 @@
+{
+  "schema": 1,
+  "about": "FR-49's regression gate: the timings `npm run bench` has been accepted as a baseline for, per environment. A run compares its own medians against the entry for its own fingerprint and fails the job past the tolerance; an environment with no entry is reported as n/a and never as a pass. Written by `npm run bench:update-baseline`.",
+  "rule": "PRD §6: \"A target is not a measurement… A maximum observed on one device does not become a promise that a slower reader's machine will break.\" This file is the measurement side of FR-49's \"a regression is a failing job\"; the bar stays where §6 put it, and no number here is promoted into it.",
+  "gate": {
+    "safetyMargin": 1.25,
+    "toleranceFloor": 1.5,
+    "toleranceCeiling": 2,
+    "minimumReadings": 2,
+    "minimumSamples": 3,
+    "maximumReadings": 8
+  },
+  "spreadEvidence": "The floor of 1.5× comes from three CI runs of the same tree: profile A cold page 195/236/264 ms (1.12×), profile C cold page 213/288/380 ms (1.32×), profile C engine-only render 106.5/146.1/148.0 ms (1.01×), profile D harness 1527/1774/2028 ms (1.14×) — runs 37655557527, 37537133179, 37681492748. The ceiling of 2× is where a timing comparison stops meaning anything, and a leg past it is marked blind.",
+  "environments": {
+    "Intel(R) Core(TM) i5-14450HX · win32 x86_64 · 23.6 GB · node 24 · pdfjs-dist 6.3.289": {
+      "describe": "Intel(R) Core(TM) i5-14450HX · win32 x86_64 · 23.6 GB · node 24 · pdfjs-dist 6.3.289",
+      "readings": [],
+      "entries": {
+        "A|document open to first ink": {
+          "fixture": {
+            "name": "long-sample.pdf",
+            "bytes": 375178,
+            "sha256": "f887d87dee2f3fb45ecdc237a341dd1ca0fe669f4265ee85b46bfdd7d68c7fc2"
+          },
+          "readings": [
+            {
+              "p50": 439,
+              "p95": 542,
+              "max": 542,
+              "samples": 5,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 377,
+              "p95": 828,
+              "max": 828,
+              "samples": 5,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 377,
+              "p95": 389,
+              "max": 389,
+              "samples": 5,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 377,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "A|cold page": {
+          "fixture": {
+            "name": "long-sample.pdf",
+            "bytes": 375178,
+            "sha256": "f887d87dee2f3fb45ecdc237a341dd1ca0fe669f4265ee85b46bfdd7d68c7fc2"
+          },
+          "readings": [
+            {
+              "p50": 190,
+              "p95": 332,
+              "max": 332,
+              "samples": 5,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 105,
+              "p95": 176,
+              "max": 176,
+              "samples": 5,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 102,
+              "p95": 112,
+              "max": 112,
+              "samples": 5,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": null,
+          "tolerance": null,
+          "status": "blind"
+        },
+        "A|frame gaps / main thread": {
+          "fixture": {
+            "name": "long-sample.pdf",
+            "bytes": 375178,
+            "sha256": "f887d87dee2f3fb45ecdc237a341dd1ca0fe669f4265ee85b46bfdd7d68c7fc2"
+          },
+          "readings": [
+            {
+              "p50": 16.7,
+              "p95": 16.7,
+              "max": 16.8,
+              "samples": 359,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 16.7,
+              "p95": 16.7,
+              "max": 16.8,
+              "samples": 356,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 16.7,
+              "p95": 16.7,
+              "max": 16.8,
+              "samples": 352,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 16.7,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "B|document open to first ink": {
+          "fixture": {
+            "name": "scan-sample.pdf",
+            "bytes": 816275,
+            "sha256": "e92ea6fbe9a8142a64dfdb04441cb0706bb16f312a5cce97a93baff6a1a311a0"
+          },
+          "readings": [
+            {
+              "p50": 516,
+              "p95": 527,
+              "max": 527,
+              "samples": 5,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 440,
+              "p95": 462,
+              "max": 462,
+              "samples": 5,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 451,
+              "p95": 467,
+              "max": 467,
+              "samples": 5,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 451,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "B|cold page": {
+          "fixture": {
+            "name": "scan-sample.pdf",
+            "bytes": 816275,
+            "sha256": "e92ea6fbe9a8142a64dfdb04441cb0706bb16f312a5cce97a93baff6a1a311a0"
+          },
+          "readings": [
+            {
+              "p50": 308,
+              "p95": 325,
+              "max": 325,
+              "samples": 5,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 268,
+              "p95": 287,
+              "max": 287,
+              "samples": 5,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 183,
+              "p95": 295,
+              "max": 295,
+              "samples": 5,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 268,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "B|frame gaps / main thread": {
+          "fixture": {
+            "name": "scan-sample.pdf",
+            "bytes": 816275,
+            "sha256": "e92ea6fbe9a8142a64dfdb04441cb0706bb16f312a5cce97a93baff6a1a311a0"
+          },
+          "readings": [
+            {
+              "p50": 16.7,
+              "p95": 16.8,
+              "max": 16.8,
+              "samples": 258,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 16.7,
+              "p95": 16.8,
+              "max": 16.8,
+              "samples": 254,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 16.7,
+              "p95": 16.8,
+              "max": 16.8,
+              "samples": 253,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 16.7,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|document open to first ink": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 510,
+              "p95": 552,
+              "max": 552,
+              "samples": 5,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 423,
+              "p95": 446,
+              "max": 446,
+              "samples": 5,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 433,
+              "p95": 445,
+              "max": 445,
+              "samples": 5,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 433,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|cold page": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 212,
+              "p95": 261,
+              "max": 261,
+              "samples": 5,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 180,
+              "p95": 194,
+              "max": 194,
+              "samples": 5,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 171,
+              "p95": 186,
+              "max": 186,
+              "samples": 5,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 180,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|engine render, viewer absent": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 77.8,
+              "p95": 109.6,
+              "max": 109.6,
+              "samples": 5,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 66.9,
+              "p95": 72.9,
+              "max": 72.9,
+              "samples": 5,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 66.1,
+              "p95": 72.8,
+              "max": 72.8,
+              "samples": 5,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 66.9,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|engine render, marked inside the viewer’s own load": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 136.7,
+              "p95": 150.6,
+              "max": 150.6,
+              "samples": 5,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 105.1,
+              "p95": 107,
+              "max": 107,
+              "samples": 5,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 110.9,
+              "p95": 115,
+              "max": 115,
+              "samples": 5,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 110.9,
+          "tolerance": 1.541,
+          "status": "live"
+        },
+        "C|frame gaps / main thread": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 16.7,
+              "p95": 16.8,
+              "max": 50.1,
+              "samples": 134,
+              "at": "2026-10-07T03:55:11.120Z",
+              "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 16.7,
+              "p95": 16.8,
+              "max": 33.4,
+              "samples": 129,
+              "at": "2026-10-07T21:11:15.521Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            },
+            {
+              "p50": 16.7,
+              "p95": 16.8,
+              "max": 33.3,
+              "samples": 131,
+              "at": "2026-10-07T21:12:10.338Z",
+              "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "10.0.26300"
+            }
+          ],
+          "reference": 16.7,
+          "tolerance": 1.5,
+          "status": "live"
+        }
+      },
+      "environment": {
+        "machine": "Intel(R) Core(TM) i5-14450HX",
+        "platform": "win32",
+        "arch": "x86_64",
+        "memoryGb": 23.6,
+        "node": "v24.21.0",
+        "engine": "6.3.289"
+      }
+    }
+  }
+}

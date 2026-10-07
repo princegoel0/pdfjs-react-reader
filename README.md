@@ -673,31 +673,39 @@ working, on documents big enough to make a mistake visible. `npm run bench` is t
 it serves the playground, drives the fixtures, separates the two kinds of
 number §6 insists on keeping apart — a **bar** is structural and fails the run (canvas count bounded,
 off-screen canvases gone, the render caps binding where they should), a **measure** is a timing printed
-with the machine it came from and never failed on, because a maximum observed on one machine is not a
-promise a slower reader's device will keep — and writes the result to **`benchmarks/latest.json`, which is
+with the machine it came from, and never compared against *another* machine's number, because a maximum
+observed on one machine is not a promise a slower reader's device will keep. It **is** compared against the
+accepted baseline for the machine that produced it, in `benchmarks/baseline.json`, and past that tolerance the
+job fails — FR-49's "a regression is a failing job rather than a slower feeling", with the tolerance derived
+from the spread the environment has already shown rather than from a number somebody liked. A leg with no
+accepted entry here, too few samples, or a fixture that changed under it is reported as `n/a` and counted in
+the summary: an unmeasured leg is not a passing one. The run also writes **`benchmarks/latest.json`, which is
 tracked**: the machine model, OS, browser and engine versions, the git revision, each fixture's sha256, and
 p50/p95/max for every sampled number. A test reads that file back and fails if a field goes missing or a
 fixture hash no longer matches the bytes on disk, so the record cannot drift from the documents it describes.
-Measured here (Chromium, Windows, `pdfjs-dist` 6.3.289, 2026-10-04):
+Measured here (Chromium, Windows, `pdfjs-dist` 6.3.289, 2026-10-07):
 
 - **Profile A — text-heavy, `long-sample.pdf`, a thousand pages, three page sizes cycling so no single
-  estimate flatters it.** A page that had never been painted took a median **147 ms** of five samples
-  (124–199 ms) to its first ink, which is *above* §6's 100 ms bar on this machine, and the record says so
-  rather than promoting a number into a requirement. Quoted beside it, because that is the reason §6 keeps
-  baselines out of the contract: an earlier run of the same build on the same machine measured **224 ms** for
-  the same page. Four page canvases and four slots were the most mounted anywhere in a forty-step pass, no
-  sample along the way was blank, the widest canvas reached 4.6 MP against a 33.6 MP absolute ceiling, and the
-  longest main-thread task in the run was 67 ms.
+  estimate flatters it.** A page that had never been painted took a median **102 ms** of five samples
+  (101–112 ms) to its first ink, which is still *above* §6's 100 ms bar on this machine — by 2 ms today,
+  by 47 ms in the 2026-10-04 record and by 90 ms in the one from earlier today at `a37af3f` — and the
+  record says so rather than promoting a number into a requirement. That spread is also why the bar stays
+  where the document put it: §6 keeps baselines out of the
+  contract precisely so a machine cannot vote. Four page canvases and four slots were the most mounted anywhere
+  in a forty-step pass, no sample along the way was blank, the widest canvas reached 4.6 MP against a 33.6 MP
+  absolute ceiling, and the longest main-thread block in a cold load was 57 ms.
 - **Profile B — image-heavy, `scan-sample.pdf`, twelve pages each carrying one 2550×3300 RGB scan.** Pages
-  paint at **29.5 % ink** where a text page manages 0.5 %, and a cold page took a median 416 ms (319–448 ms
+  paint at **29.53 % ink** where a text page manages 0.52 %, and a cold page took a median 183 ms (181–295 ms
   across the five, the work being the 25 MP decode each page carries). Two canvases and two slots at the peak
   of the scroll; 3.8 MP largest, 1571 px widest.
 - **Profile C — vector-heavy, `vector-sample.pdf`, four A1 drawing sheets of 336 clipped cells each.** The
-  engine reports 12,922 operators per sheet, and this is the profile where the two costs are told apart: the
-  viewer took a median 241 ms to put sheet 4 on screen, and the same page at the same box with none of the
-  viewer in the way (`playground/raw.html`) rendered in a median 82.7 ms — so about 158 ms of the wait is
-  ours, which is under §6's 200 ms and reported as the difference of two loads rather than as a mark
-  inside one.
+  engine reports 12,922 operators per sheet, and this is the profile where the two costs are told apart — by
+  marks the viewer puts in its own paint path, read from the load being measured, not by subtracting one page
+  load from another. Sheet 4 came in at a median 171 ms cold; inside that same load the awaited `page.render()`
+  took 110.9 ms and the passes this package drives — text, annotations, XFA — took a median **69.8 ms**, against
+  §6's 200 ms for this profile. The same page at the same box with none of the viewer in the way
+  (`playground/raw.html`) rendered in a median 66.1 ms, and the record prints both engine numbers rather than
+  choosing: they answer different questions, and the marked one is the one attributed.
 - **Profile D — the low-memory harness.** The scans again, on a 412×915 phone context at dpr 3 with an
   Android user agent and 6× CPU throttling, zoomed to 300 % through the toolbar's overflow menu because that
   is where the control is on a bar that narrow. The canvas came back at 5.2 MP — the mobile package default,

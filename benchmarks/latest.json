@@ -9,8 +9,8 @@
     "node": "v24.21.0",
     "browser": "chromium 153.0.8010.12",
     "engine": "6.3.289",
-    "revision": "a37af3fd0bfd1993c32cefc9065876ac354a9557",
-    "ranAt": "2026-10-07T03:55:11.120Z"
+    "revision": "048c608f140e27389acd08bd2e39daff362d5638",
+    "ranAt": "2026-10-07T21:12:10.338Z"
   },
   "caps": {
     "maxPixels": 33554432,
@@ -37,7 +37,7 @@
         {
           "label": "off-screen canvases are not kept",
           "ok": true,
-          "detail": "4 canvases held at the peak of the first third and 4 at the peak of the last, whose canvases covered 4.6 MP in total"
+          "detail": "4 canvases held at the peak of the first third and 3 at the peak of the last, whose canvases covered 4.6 MP in total"
         },
         {
           "label": "no blank page during the scroll",
@@ -63,31 +63,31 @@
       "measures": [
         {
           "label": "document open to first ink",
-          "detail": "median 439 ms of 5 samples (415–542 ms); dev-server transforms included, so this is not §6's cold-page number",
+          "detail": "median 377 ms of 5 samples (361–389 ms); dev-server transforms included, so this is not §6's cold-page number",
           "distribution": {
             "samples": 5,
-            "p50": 439,
-            "p95": 542,
+            "p50": 377,
+            "p95": 389,
             "p99": null,
-            "max": 542
+            "max": 389
           }
         },
         {
           "label": "cold page",
-          "detail": "median 190 ms of 5 samples (169–332 ms) to ink on page 500, 0.52 % ink, longest main-thread block 63 ms in that load, against §6’s bar of under 100 ms",
+          "detail": "median 102 ms of 5 samples (101–112 ms) to ink on page 500, 0.52 % ink, longest main-thread block 57 ms in that load, against §6’s bar of under 100 ms",
           "distribution": {
             "samples": 5,
-            "p50": 190,
-            "p95": 332,
+            "p50": 102,
+            "p95": 112,
             "p99": null,
-            "max": 332
+            "max": 112
           }
         },
         {
           "label": "frame gaps / main thread",
-          "detail": "p50 16.7 ms, p95 16.7 ms, max 16.8 ms over 359 frames; longest long task 63 ms. Headless has no vsync, so no frame rate is claimed.",
+          "detail": "p50 16.7 ms, p95 16.7 ms, max 16.8 ms over 352 frames; longest long task 58 ms. Headless has no vsync, so no frame rate is claimed.",
           "distribution": {
-            "samples": 359,
+            "samples": 352,
             "p50": 16.7,
             "p95": 16.7,
             "p99": 16.8,
@@ -141,31 +141,31 @@
       "measures": [
         {
           "label": "document open to first ink",
-          "detail": "median 516 ms of 5 samples (470–527 ms); dev-server transforms included, so this is not §6's cold-page number",
+          "detail": "median 451 ms of 5 samples (437–467 ms); dev-server transforms included, so this is not §6's cold-page number",
           "distribution": {
             "samples": 5,
-            "p50": 516,
-            "p95": 527,
+            "p50": 451,
+            "p95": 467,
             "p99": null,
-            "max": 527
+            "max": 467
           }
         },
         {
           "label": "cold page",
-          "detail": "median 308 ms of 5 samples (298–325 ms) to ink on page 12, 29.53 % ink, longest main-thread block 63 ms in that load; §6 sets no cold-page bar for this profile",
+          "detail": "median 183 ms of 5 samples (181–295 ms) to ink on page 12, 29.53 % ink, longest main-thread block 58 ms in that load; §6 sets no cold-page bar for this profile",
           "distribution": {
             "samples": 5,
-            "p50": 308,
-            "p95": 325,
+            "p50": 183,
+            "p95": 295,
             "p99": null,
-            "max": 325
+            "max": 295
           }
         },
         {
           "label": "frame gaps / main thread",
-          "detail": "p50 16.7 ms, p95 16.8 ms, max 16.8 ms over 258 frames; longest long task 63 ms. Headless has no vsync, so no frame rate is claimed.",
+          "detail": "p50 16.7 ms, p95 16.8 ms, max 16.8 ms over 253 frames; longest long task 57 ms. Headless has no vsync, so no frame rate is claimed.",
           "distribution": {
-            "samples": 258,
+            "samples": 253,
             "p50": 16.7,
             "p95": 16.8,
             "p99": 16.8,
@@ -198,7 +198,7 @@
         {
           "label": "§6 profile C: main-thread work attributable to our layer on page 4 stays under 200 ms",
           "ok": true,
-          "detail": "median 69.8 ms of 5 cold loads, the union of the passes this package drives on that page — the text layer, the annotation layer and, on a form, the XFA layer — taken as a max because they run inside one settle, not added. The awaited paint in the same load took 136.7 ms, and 6.9 ms is named by neither: React committing the row, the virtualizer measuring it, the worker round trip, image decode and the compositor. None of that is charged to this layer, because a bar over the whole wait measures the machine and calls the result the package"
+          "detail": "median 69.8 ms of 5 cold loads, the union of the passes this package drives on that page — the text layer, the annotation layer and, on a form, the XFA layer — taken as a max because they run inside one settle, not added. The awaited paint in the same load took 110.9 ms, and 0.0 ms is named by neither: React committing the row, the virtualizer measuring it, the worker round trip, image decode and the compositor. None of that is charged to this layer, because a bar over the whole wait measures the machine and calls the result the package"
         },
         {
           "label": "canvas count stays bounded",
@@ -234,64 +234,64 @@
       "measures": [
         {
           "label": "document open to first ink",
-          "detail": "median 510 ms of 5 samples (472–552 ms); dev-server transforms included, so this is not §6's cold-page number",
+          "detail": "median 433 ms of 5 samples (417–445 ms); dev-server transforms included, so this is not §6's cold-page number",
           "distribution": {
             "samples": 5,
-            "p50": 510,
-            "p95": 552,
+            "p50": 433,
+            "p95": 445,
             "p99": null,
-            "max": 552
+            "max": 445
           }
         },
         {
           "label": "cold page",
-          "detail": "median 212 ms of 5 samples (124–261 ms) to ink on page 4, 82.86 % ink, longest main-thread block 65 ms in that load; §6 sets no cold-page bar for this profile",
+          "detail": "median 171 ms of 5 samples (148–186 ms) to ink on page 4, 82.86 % ink, longest main-thread block 57 ms in that load; §6 sets no cold-page bar for this profile",
           "distribution": {
             "samples": 5,
-            "p50": 212,
-            "p95": 261,
+            "p50": 171,
+            "p95": 186,
             "p99": null,
-            "max": 261
+            "max": 186
           }
         },
         {
           "label": "engine render, viewer absent",
-          "detail": "median 77.8 ms of 5 samples (77.3 ms–109.6 ms) in page.render(); document open 251.1 ms; longest long task 0.0 ms (pdf.js draws in chunks, so the engine's own work rarely crosses the 50 ms bar on its own)",
+          "detail": "median 66.1 ms of 5 samples (62.8 ms–72.8 ms) in page.render(); document open 203.5 ms; longest long task 0.0 ms (pdf.js draws in chunks, so the engine's own work rarely crosses the 50 ms bar on its own)",
           "distribution": {
             "samples": 5,
-            "p50": 77.8,
-            "p95": 109.6,
+            "p50": 66.1,
+            "p95": 72.8,
             "p99": null,
-            "max": 109.6
+            "max": 72.8
           }
         },
         {
           "label": "engine render, marked inside the viewer’s own load",
-          "detail": "median 136.7 ms of 5 samples (126.7 ms–150.6 ms) between the `page.render()` call and its promise settling, in the same load as the cold-page number — engine 6.3.289",
+          "detail": "median 110.9 ms of 5 samples (104.3 ms–115.0 ms) between the `page.render()` call and its promise settling, in the same load as the cold-page number — engine 6.3.289",
           "distribution": {
             "samples": 5,
-            "p50": 136.7,
-            "p95": 150.6,
+            "p50": 110.9,
+            "p95": 115,
             "p99": null,
-            "max": 150.6
+            "max": 115
           }
         },
         {
           "label": "frame gaps / main thread",
-          "detail": "p50 16.7 ms, p95 16.8 ms, max 50.1 ms over 134 frames; longest long task 65 ms. Headless has no vsync, so no frame rate is claimed.",
+          "detail": "p50 16.7 ms, p95 16.8 ms, max 33.3 ms over 131 frames; longest long task 56 ms. Headless has no vsync, so no frame rate is claimed.",
           "distribution": {
-            "samples": 134,
+            "samples": 131,
             "p50": 16.7,
             "p95": 16.8,
-            "p99": 33.4,
-            "max": 50.1
+            "p99": 16.8,
+            "max": 33.3
           }
         }
       ],
       "notes": [
         {
           "label": "§6 profile C’s attribution, and the part no mark claims",
-          "detail": "This line used to confess a method: the split came from subtracting two page loads — the viewer's cold page in one context, an engine-only harness at the same box in another — because \"anything finer needs a mark in the render path and none exists\". The marks exist now, in src/components/PdfPage.tsx, on the four passes the page already keeps for its own rendered join, so the numbers above come from the load they describe. The two engine figures do NOT agree, and the record says so instead of choosing one: 136.7 ms marked inside the viewer against 77.8 ms in the harness with the viewer removed. They are different questions — the marked span is the paint as the reader waits for it, from the call to the settling of its promise, so it carries the worker round trip and the chunk boundaries the engine chooses; the harness span is the same box and the same page with nothing of ours around it. Neither is the right answer to §6's sentence on its own, which is why both are printed and only the marked one is attributed."
+          "detail": "This line used to confess a method: the split came from subtracting two page loads — the viewer's cold page in one context, an engine-only harness at the same box in another — because \"anything finer needs a mark in the render path and none exists\". The marks exist now, in src/components/PdfPage.tsx, on the four passes the page already keeps for its own rendered join, so the numbers above come from the load they describe. The two engine figures do NOT agree, and the record says so instead of choosing one: 110.9 ms marked inside the viewer against 66.1 ms in the harness with the viewer removed. They are different questions — the marked span is the paint as the reader waits for it, from the call to the settling of its promise, so it carries the worker round trip and the chunk boundaries the engine chooses; the harness span is the same box and the same page with nothing of ours around it. Neither is the right answer to §6's sentence on its own, which is why both are printed and only the marked one is attributed."
         }
       ]
     },
@@ -324,13 +324,13 @@
       "measures": [
         {
           "label": "cold page on the harness",
-          "detail": "1527 ms to ink on page 6 at 6x via CDP; longest long task 777 ms since the document opened. A throttled desktop core is not a handset, and §6 also asks for the real-device pass.",
+          "detail": "1387 ms to ink on page 6 at 6x via CDP; longest long task 489 ms since the document opened. A throttled desktop core is not a handset, and §6 also asks for the real-device pass.",
           "distribution": {
             "samples": 1,
-            "p50": 1527,
-            "p95": 1527,
+            "p50": 1387,
+            "p95": 1387,
             "p99": null,
-            "max": 1527
+            "max": 1387
           }
         }
       ],
