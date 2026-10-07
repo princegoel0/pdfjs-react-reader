@@ -1548,17 +1548,34 @@ re-derived by whoever asks next.
   pdfjs-dist **6.2.108** cell red on one row: `no-uncaught-errors` in webkit · desktop, `1 uncaught:
   null is not an object (evaluating 'this._freeHighlight.isEmpty')`. The engine, not the stack,
   explains it: `_freeHighlight` appears 8 times in 6.2.108's `build/pdf.mjs` and **zero** times in
-  6.3.289 and 6.4.299 — the throwing read is inside pdf.js's own private `#endHighlight`, reached on
-  a pointer-up whose free-highlight state was never initialised, and nothing in this package calls
-  into it. So the floor release carries a defect that 6.3 refactored away, which is a different kind
+  6.3.289 and 6.4.299 — the throwing read is inside pdf.js's own private `#endHighlight`, and the floor
+  source says what state it reads: `HighlightEditor.startHighlighting` is a *static* method holding
+  *static* state (`_freeHighlight`, `_freeHighlightId`, `_freeHighlightClipId`), every call registers its
+  own `window` `pointerup`/`blur` end handler under its own `AbortController`, and `#endHighlight` clears
+  the shared slot with no null guard. So the throw needs one state slot and **two live end handlers** —
+  not, as this entry first said, a state that was never initialised. So the floor release carries a defect that 6.3 refactored away, which is a different kind
   of finding from #249's: there is no capability being promised where it breaks, so a feature
-  declaring an engine minimum does not answer it, and the option that would is raising the peer
-  floor — the owner's call, filed as #250. What keeps this out of *Fixed* is that it was seen once:
+  declaring an engine minimum does not answer it. The option that would is raising the peer floor, and it
+  was weighed and refused: `PRD.md` names `6.2.108` in FR-53's own clause, so a floor move is an amendment
+  rather than a patch, #211/#225 kept this floor deliberately to own the two-finger pan, and nothing here
+  has been reproduced on the path that breaks. Filed as #250. What keeps this out of *Fixed* is that it was seen once:
   the next run (`136fc13`, a diff with nothing in the browser path) is green in **both** cells, and
   two local runs at 6.2.108 — the isolated webkit pass and the full six-cell matrix — produced `0
   uncaught` each, the latter failing three other webkit-desktop rows and not this one. Recorded as
   intermittent, with both readings named, because the alternative is deciding what it was from one
   log line.
+
+  It has now been looked for on purpose, and the decision is taken: **the floor stays**. A probe on 2026-10-07
+  ran the sequences the mechanism requires — two `pointerdown`s before any `pointerup`; `pointerdown`,
+  `pointercancel`, a second `pointerdown`, `pointerup`; the same through a real mouse; and a second, distinct
+  pointer arriving mid-stroke — in chromium *and* webkit at 6.2.108, then again on 6.3.289. Every cell read zero
+  uncaught errors. The reason is in the same source: the begin registers a capture-phase `pointerdown` blocker on
+  `window`, which is what stops a second begin from starting, and the second begin is the precondition the crash
+  needs. The runner's sighting therefore sits on a path this host has not constructed (a `blur`/`pointercancel`
+  interleaving is the plausible one), not on one a reader provably walks. What *is* reproducible and differs by
+  engine: at 6.2.108 a `pointercancel` leaves `.textLayer.free` set, and at 6.3.289 it clears it — and the engine's
+  own CSS makes that a cursor (`--editorFreeHighlight-editing-cursor` where `--editorHighlight-editing-cursor`
+  should be), with nothing taken off pointer events.
 
 - **The lockfile's copy of the manifest is now compared to the manifest, and the first thing it caught was the Node
   floor (#249's side-find, 2026-10-07).** `package-lock.json` carries a mirrored root entry — `engines`,
@@ -2495,6 +2512,23 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
 
 ### Fixed
 
+- **The accessibility record demanded that every cell install the React that produced it, and both React 18
+  cells obliged (#262; FR-58, FR-48).** CI run 37631611428 — the push that carried #251–#260 — is twelve jobs green
+  and two red, and both failures are one assertion in one test: `src/lib/a11y-record.test.ts > names the
+  toolchain that is installed in this tree right now` reading `the record was made against react 19.3.0, and this
+  tree installs react 18.3.1`, 1 failed / 1,298 passed in each cell. #252's guard was right to insist a record
+  name its own toolchain — that is the rule #244 was born from — but it applied the equality to *every* package,
+  including the one the `react` job exists to vary. A record produced in the verify job can therefore never
+  satisfy a React 18 cell, which is #244's mistake mirrored: an evidence instrument that certifies one tree and
+  then accuses the trees the matrix is allowed to change. The fix splits the claim by what is actually pinned:
+  `axe-core`, `jsdom` and `vitest` keep exact equality, because #244's `pin-tree.mjs` holds those at the lockfile
+  versions in every cell, and `react` is now checked against `package.json`'s own `peerDependencies.react` — read
+  from the manifest, so moving the advertised range moves the check instead of leaving a second list behind. Four
+  readings, one per condition, each restored byte-for-byte: a record naming axe 9.9.9 is refused (`and this tree
+  installs axe-core 4.13.0`); a record naming react 17.0.0 is refused as outside `^18.0.0 || ^19.0.0`; a record
+  naming react **18.3.1** now passes, which is the exact condition that reddened both cells; and the committed
+  record on 19.3.0 passes. `src/lib/benchmark-record.test.ts` was read for the same over-reach and does not
+  compare React at all, so the defect was one file's, not a pattern.
 - **The structure-tree row read the annotation layer once, and once was sometimes before the engine had written
   the ownership (#258, 2026-10-07).** `structure-tree-in-the-accessibility-tree` came back red in
   webkit · desktop with `the link annotation owns nothing in the structure tree on 6.3.289 (aria-owns [])`. It was
