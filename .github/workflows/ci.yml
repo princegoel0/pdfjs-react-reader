@@ -418,12 +418,34 @@ jobs:
       # timing is never compared against *another* machine's number — §6: "a maximum observed on one device does
       # not become a promise that a slower reader's machine will break" — but each one is compared against this
       # environment's own accepted baseline, and that comparison fails the job, which is FR-49's "a regression is
-      # a failing job rather than a slower feeling". On this runner the legs read `n/a` until
-      # `.github/workflows/bench-baseline.yml` has been dispatched and its artifact committed; see
-      # `scripts/benchmark-baseline.mjs` for the tolerance and for why an unaccepted leg is not a passing one.
-      - name: Run the benchmarks
+      # a failing job rather than a slower feeling". See `scripts/benchmark-baseline.mjs` for the tolerance and
+      # for why an unaccepted leg is not a passing one.
+      #
+      # Twice, and both records uploaded: the baseline needs `minimumReadings` = 2 to know what this environment's
+      # noise is, and two passes of the same tree minutes apart measure exactly that — machine noise, not a code
+      # change. A `workflow_dispatch` seeding job was written first and does not work here: GitHub resolves the
+      # trigger against the default branch, and `main` is nineteen commits behind `dev` with no
+      # `workflow_dispatch` in its copy, so `gh workflow run` answers HTTP 404 (measured 2026-10-08). Uploading
+      # the artifact from the job that already runs needs no new trigger, no write token, and no commit from CI —
+      # `npm run bench:update-baseline -- --record <file>` is still the deliberate act, done by a person.
+      - name: Run the benchmarks twice and keep both records
         # One cell, not two: §6's record is a reading of one machine per run, and the floor cell exists to
         # paint pages, not to re-time them. The version named here is the axis this job runs, and
         # `scripts/check-docs.mjs` refuses the pair if they ever disagree.
         if: matrix.engine == '6.4.299'
-        run: npm run bench
+        run: |
+          set -euo pipefail
+          npm run bench
+          cp benchmarks/latest.json benchmarks/ci-run-1.json
+          npm run bench
+      - name: Upload the records this machine measured
+        # Not `always()`: a run whose bars broke is not a baseline candidate, and an upload step that fails
+        # because its input is missing would only add a second red to a job that is already red.
+        if: matrix.engine == '6.4.299'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-records-pdfjs-dist-6.4.299
+          path: |
+            benchmarks/latest.json
+            benchmarks/ci-run-1.json
+          if-no-files-found: error

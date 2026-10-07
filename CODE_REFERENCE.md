@@ -1211,13 +1211,15 @@ and `check:tarball` · and `browser`, the only job that starts one: `playwright 
 firefox webkit`, then `npm run test:browsers`, `npm run a11y:browser-record` and `npm run bench` (the bench in
 the `6.4.299` cell only, since §6's record is a reading of one machine per run).
 
-**A second workflow, dispatched by hand** (`.github/workflows/bench-baseline.yml`): FR-49's gate compares a run
-against the accepted baseline *for its own environment*, so the runner's legs read `n/a` until a runner's own
-readings are accepted. This job pins the same engine as CI's bench cell, measures twice (`GATE.minimumReadings`
-is 2 — one number has no spread in it), folds both into `benchmarks/baseline.json` and uploads the file as an
-artifact. It never commits: a person reads what the tolerances became and commits the artifact, which is the
-point of the exercise — `.github/workflows/ci.yml`'s own `verify` run then refuses a baseline whose stored
-tolerance is not the one its own readings derive (`src/lib/benchmark-baseline.test.ts`).
+**How CI gets a baseline it is allowed to use**: FR-49's gate compares a run against the accepted baseline *for
+its own environment*, so the runner's legs read `n/a` until a runner's own readings are accepted. A
+`workflow_dispatch` seeding job cannot work while `main` is behind `dev` — GitHub resolves the trigger against
+the default branch, and the API answers HTTP 404 (measured 2026-10-08) — so the `browser` job's bench step runs
+the benchmark twice, keeps both records and uploads them as `benchmark-records-pdfjs-dist-6.4.299`. A person
+downloads it and folds each record with `npm run bench:update-baseline -- --record <file>`, which keys the entry
+on the record's own environment block rather than on the machine running the command. CI never writes
+`benchmarks/baseline.json` itself, and `src/lib/benchmark-baseline.test.ts` re-derives every stored tolerance
+from the readings beside it, so the accepted file cannot be quietly widened by hand.
 
 **What has actually run.** As of 2026-10-04, everything except the two gates added an hour ago. The workflow
 had been dormant since `5059bc7` on 2026-09-24 — a run of a `verify` matrix that no longer exists, on YAML

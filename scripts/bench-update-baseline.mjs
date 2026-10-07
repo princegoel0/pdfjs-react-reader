@@ -17,15 +17,24 @@
  *    both and prints what it moved, because sometimes the change is the point (a fixture got bigger, an engine
  *    got faster) and a human should be able to say so out loud.
  *
- * Usage: `npm run bench` then `npm run bench:update-baseline [--force]`.
+ * Usage: `npm run bench` then `npm run bench:update-baseline [--force] [--record <path>]`.
+ *
+ * `--record` folds a record other than the file on disk — the one thing that makes a *runner's* baseline
+ * acceptable from here, since `mergeRecord` keys the entry on the record's own environment block, not on the
+ * machine running the command. The runner uploads `benchmarks/latest.json` as an artifact (`.github/workflows/
+ * ci.yml`), and downloading it and folding it is the deliberate act; CI never writes the file itself.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BASELINE_HEADER, GATE, entryState, fingerprint, mergeRecord } from './benchmark-baseline.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
-const recordPath = join(repo, 'benchmarks', 'latest.json');
+const flag = (name) => {
+  const at = process.argv.indexOf(name);
+  return at < 0 ? null : process.argv[at + 1];
+};
+const recordPath = flag('--record') ? resolve(flag('--record')) : join(repo, 'benchmarks', 'latest.json');
 const baselinePath = join(repo, 'benchmarks', 'baseline.json');
 
 const record = JSON.parse(readFileSync(recordPath, 'utf8'));

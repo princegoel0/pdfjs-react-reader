@@ -128,11 +128,18 @@ to bite — and never up on a claim nobody can make fail.
   changing the engine in the environment turns all twelve to `n/a` without a single one of them reading as a pass.
 
   **The CI half of the clause needs a runner's own numbers**, and a runner cannot be seeded from this laptop by
-  definition. `.github/workflows/bench-baseline.yml` is a `workflow_dispatch` job that pins the same engine as
-  CI's bench cell, measures twice (`minimumReadings` is 2 — one number has no spread in it), folds both into the
-  committed file and uploads it as an artifact. It does not commit: the deliberate act stays a person, and it is
-  the only way the runner's legs stop reading `n/a`. Until someone lands that artifact, CI's bench step prints
-  twelve unverified legs and passes on the bars alone, and FR-49's row says so.
+  definition — the record has to *come from* the environment it describes. A `workflow_dispatch` seeding job was
+  written first and it does not work in this repository: GitHub resolves that trigger against the default branch,
+  and `main` sits nineteen commits behind `dev` with no `workflow_dispatch` in its copy of any workflow, so
+  `gh workflow run bench-baseline.yml --ref dev` answers **HTTP 404** (measured 2026-10-08, and the job was
+  deleted rather than left in the tree as a thing that cannot run). What does work needs no new trigger and no
+  write token: CI's bench step now runs the benchmark **twice** and uploads both records as the artifact
+  `benchmark-records-pdfjs-dist-6.4.299`, and `npm run bench:update-baseline -- --record <file>` folds a
+  downloaded record into the entry for *its* environment, because `mergeRecord` keys on the record's own
+  environment block and not on the machine running the command. Two passes of one tree is the better measurement
+  anyway — the spread between them is the runner's noise with no code change in it. Nothing in CI writes the
+  tracked file; a person reads the tolerances the artifact produced and commits them. Until that lands, CI's
+  bench step prints twelve unverified legs and passes on the bars alone, and FR-49's row says so.
 
 - **FR-43's clause now has its noun measured: a form widget inside marked content, and the two ways a widget gets
   a name (FR-43, #268, 2026-10-07).** The requirement says "a widget is announced with its owning node rather than
