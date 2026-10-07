@@ -117,6 +117,26 @@ const HORIZONTAL_PADDING = 32;
 const NARROW_HORIZONTAL_PADDING = 8;
 const NARROW_VIEWPORT_MAX = 640;
 
+/**
+ * How many layout changes a jump is allowed to live through.
+ *
+ * See the `pendingJump` below: a request made against a table that is still being corrected has to be made
+ * again against each correction. Six means five re-issues and a sixth pass that declines to write and drops
+ * the request instead, because a pin that never expires would drag a reader back to a page they asked for
+ * before they went somewhere else.
+ */
+const JUMP_REISSUE_LIMIT = 6;
+
+/**
+ * How long a jump stays worth fighting for, measured from the request.
+ *
+ * Both this and {@link JUMP_REISSUE_LIMIT} exist for the same reason: a pin that never expires would drag a
+ * reader back to a page they asked for before they went somewhere else. 4 s covers the dimension sweep of a
+ * 1,000-page document on this host — the fit-scale correction that motivates the pin lands 21 ms after the
+ * request in webkit, and the sweep's chunks arrive every ~30 ms through it.
+ */
+const JUMP_REISSUE_WINDOW_MS = 4000;
+
 export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirtualizerResult {
   const {
     doc,
@@ -144,6 +164,32 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
+  /*
+   * A jump that has not yet been given the page it asked for.
+   *
+   * The offset a page sits at is a row in the layout table, and on a document that is still measuring itself
+   * the table is wrong at the moment the request arrives: a fit mode resolves against page 1's box, and until
+   * that box lands it resolves against the 612×792 default — ~27 % too tall on a landscape first page. So the
+   * write goes to the stale number, the corrected table lands, and the reader is left on a different page than
+   * the one they typed. Measured in webkit 2026-10-07 (#259): `long-sample.pdf`, a jump to page 1000, and page
+   * 733 permanently — the row's own log had called it a slow walk because it could only read the newest page
+   * change, and the counter added with #265 says two page changes in ninety seconds.
+   *
+   * `since` is the layout generation the request was issued against, so an answer of "you are on that page"
+   * from *that* table does not close it: the next table is the one that has to agree. `until` and the
+   * generation ceiling bound how long the request outranks the reader's own position, because a pin that never
+   * expires would drag a reader back to a page they asked for minutes ago. A hand scroll closes it early — the
+   * wheel, touch and pointer listeners below — because a reader who has taken the wheel is no longer asking to
+   * be put somewhere.
+   */
+  const pendingJump = useRef<{
+    page: number;
+    offsetInPagePx: number;
+    since: number;
+    until: number;
+  } | null>(null);
+  const layoutGeneration = useRef(0);
+
   const reportPageDims = useCallback((index: number, pageDims: PageDims) => {
     setDims((prev) => {
       if (prev.has(index)) return prev;
@@ -158,6 +204,7 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
     setDims(new Map());
     setEstimate(DEFAULT_PAGE_ESTIMATE);
     setAverage(null);
+    pendingJump.current = null;
   }, [doc]);
 
   // Seed the layout: page 1's box for the fit modes to work against, the mean of a
@@ -224,6 +271,20 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
     };
     el.addEventListener('scroll', onScroll, { passive: true });
 
+    /*
+     * Direct manipulation abandons an unsatisfied jump. The three events are the ones a reader produces and a
+     * programmatic scroll does not: a wheel, a touch, a pointer press inside the pages. The page field, the
+     * outline and the thumbnails are outside this element, so the click that *asks* for a page never cancels
+     * its own request, and the keyboard is deliberately not in this list because the shell pages with arrow
+     * keys through `scrollToPage`, which re-arms it.
+     */
+    const abandonJump = () => {
+      pendingJump.current = null;
+    };
+    el.addEventListener('wheel', abandonJump, { passive: true });
+    el.addEventListener('touchstart', abandonJump, { passive: true });
+    el.addEventListener('pointerdown', abandonJump);
+
     const observer = new ResizeObserver(() => {
       setViewport({ width: el.clientWidth, height: el.clientHeight });
     });
@@ -233,6 +294,9 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
 
     return () => {
       el.removeEventListener('scroll', onScroll);
+      el.removeEventListener('wheel', abandonJump);
+      el.removeEventListener('touchstart', abandonJump);
+      el.removeEventListener('pointerdown', abandonJump);
       observer.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
@@ -293,14 +357,77 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
     return computeLayout(sizes, gap);
   }, [slots, dims, layoutEstimate, resolvedScale, rotationFor, gap]);
 
+  /** The row a page is grouped into, or -1 when the slot table has no row for it. */
+  const rowForPage = useCallback(
+    (pageIndex: number) => {
+      for (let s = 0; s < slots.length; s++) {
+        if (slots[s]!.includes(pageIndex)) return s;
+      }
+      return -1;
+    },
+    [slots],
+  );
+
+  /*
+   * Write the current table's offset for a page, and answer whether that page is now at the top of the
+   * viewport. The answer is about the row under the top edge and not about the number handed to `scrollTo`,
+   * because a table that is still being corrected can be too tall or too short for its own request: the engine
+   * clamps such a write silently, and the reader is not.
+   */
+  const applyJump = useCallback(
+    (page: number, offsetInPagePx: number, behavior: ScrollBehavior) => {
+      const el = containerRef.current;
+      if (!el || slots.length === 0) return true;
+      const rowIndex = rowForPage(page - 1);
+      const top = layout.offsets[rowIndex];
+      if (top === undefined) return true;
+      // A destination inside the page is measured from that page's own top edge, in content pixels — which is
+      // why it arrives already scaled rather than as PDF points: only the caller holding the page viewport can
+      // turn a `/XYZ` top into one, and the rotation is part of that answer.
+      el.scrollTo({ top: Math.max(0, top + offsetInPagePx), behavior });
+      const at = Math.min(findStartIndex(layout, el.scrollTop), slots.length - 1);
+      return at === rowIndex;
+    },
+    [layout, rowForPage, slots],
+  );
+
   // Keep the topmost visible row anchored when layout shifts underneath it
   // (dimension corrections, zoom changes) so the viewport doesn't jump.
   const prevLayout = useRef<LayoutResult | null>(null);
   useEffect(() => {
+    const generation = ++layoutGeneration.current;
     const prev = prevLayout.current;
     prevLayout.current = layout;
     const el = containerRef.current;
     if (!prev || !el || prev.offsets.length === 0 || layout.offsets.length === 0) return;
+
+    /*
+     * An unsatisfied jump outranks the anchor, and takes the anchor's place for this pass: the offset it
+     * writes *is* the anchored position, recomputed for the page that was asked for rather than for whatever
+     * row the previous table put under the top edge. Re-issued with `auto` even if the request named another
+     * behavior — a corrected table lands every few frames, and animating toward each new figure would restart
+     * the animation instead of finishing it. Nothing in this package passes a behavior; a host that asks for a
+     * smooth jump gets one smooth write and, if the table moves under it, a hard landing.
+     */
+    const jump = pendingJump.current;
+    if (jump) {
+      /*
+       * Both bounds are checked *before* the write. A request that has run out of time or chances that then
+       * lunges at the page one more time is the yank this exists to prevent — and the yank would land, because
+       * the reader has usually moved by then.
+       */
+      if (generation - jump.since >= JUMP_REISSUE_LIMIT || Date.now() > jump.until) {
+        pendingJump.current = null;
+        return;
+      }
+      // Re-issued with `auto` even if the request named another behavior: a corrected table lands every few
+      // frames, and animating toward each new figure would restart the animation instead of finishing it.
+      // Nothing in this package passes a behavior; a host that asks for a smooth jump gets one smooth write
+      // and, if the table moves under it, a hard landing.
+      const landedOnANewTable = generation > jump.since && applyJump(jump.page, jump.offsetInPagePx, 'auto');
+      if (landedOnANewTable) pendingJump.current = null;
+      return;
+    }
 
     const first = Math.min(findStartIndex(prev, el.scrollTop), prev.offsets.length - 1);
     const delta = layout.offsets[first]! - prev.offsets[first]!;
@@ -308,7 +435,7 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
       el.scrollTop += delta;
       setScrollTop(el.scrollTop);
     }
-  }, [layout]);
+  }, [layout, applyJump]);
 
   const visible = useMemo(() => {
     if (slots.length === 0) return { start: 0, end: -1 };
@@ -369,22 +496,15 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
       const el = containerRef.current;
       if (!el || slots.length === 0) return;
       const clamped = Math.min(Math.max(1, Math.round(pageNumber)), numPages);
-      const pageIndex = clamped - 1;
-      let slotIndex = -1;
-      for (let s = 0; s < slots.length; s++) {
-        if (slots[s]!.includes(pageIndex)) {
-          slotIndex = s;
-          break;
-        }
-      }
-      const top = layout.offsets[slotIndex];
-      if (top === undefined) return;
-      // A destination inside the page is measured from that page's own top edge, in content pixels — which is
-      // why it arrives already scaled rather than as PDF points: only the caller holding the page viewport can
-      // turn a `/XYZ` top into one, and the rotation is part of that answer.
-      el.scrollTo({ top: Math.max(0, top + offsetInPagePx), behavior });
+      pendingJump.current = {
+        page: clamped,
+        offsetInPagePx,
+        since: layoutGeneration.current,
+        until: Date.now() + JUMP_REISSUE_WINDOW_MS,
+      };
+      applyJump(clamped, offsetInPagePx, behavior);
     },
-    [slots, layout, numPages],
+    [applyJump, numPages, slots.length],
   );
 
   return {

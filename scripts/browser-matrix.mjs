@@ -264,6 +264,56 @@ const LAST_LOG = (prefix) => {
 };
 
 /**
+ * Count the page-change callbacks as they arrive, because the newest one cannot say how the reader got there.
+ *
+ * FR-05 / #259: `virtualizes-1000-pages` polled `last onPageChange "N"`. A reader that walked 733 pages one at
+ * a time and a reader that moved once and then stopped both report the same line, and those are different
+ * defects with different fixes — one is a slow layout sweep, the other is a scroll write that was never
+ * applied. The playground's log is a bounded stack of eight strings, so the events that left the top of it are
+ * gone by the time a check looks; the count has to be collected while the walk is happening.
+ *
+ * It records page numbers it has not seen, deduplicated by text on purpose: React keys the log rows by
+ * position, so prepending one line re-keys all eight and an observer that counted added nodes would report
+ * eight events for one callback. A number that repeats is therefore counted once — true of any walk that
+ * never revisits a page, which is what a jump and a scroll-out are — and `largest step` between consecutive
+ * recorded pages is what separates a teleport from a one-row-at-a-time walk.
+ */
+const START_PAGE_CHANGE_WATCH = () => {
+  const list = document.querySelector('.app-log');
+  if (!list) return false;
+  const pages = [];
+  const seen = new Set();
+  const harvest = () => {
+    for (const li of list.querySelectorAll('li')) {
+      const match = /^onPageChange (\d+)/.exec((li.textContent ?? '').trim());
+      if (match && !seen.has(match[1])) {
+        seen.add(match[1]);
+        pages.push(Number(match[1]));
+      }
+    }
+  };
+  harvest();
+  new MutationObserver(harvest).observe(list, { childList: true, subtree: true, characterData: true });
+  window.__pjsrPageChanges = pages;
+  return true;
+};
+
+/**
+ * The sentence the counter buys: how many page changes, over what span, and whether it crossed that span in
+ * jumps or in steps.
+ */
+function pageChangeSummary(pages) {
+  if (!pages || pages.length === 0) return 'no onPageChange event was recorded';
+  if (pages.length === 1) return `1 onPageChange event (${pages[0]})`;
+  let largestStep = 0;
+  for (let i = 1; i < pages.length; i++) largestStep = Math.max(largestStep, Math.abs(pages[i] - pages[i - 1]));
+  // The interpretation only when the figure earns it: two events one page apart is a jump and its correction,
+  // two hundred of them is a reader being walked down the document.
+  const shape = pages.length > 20 ? `, largest step ${largestStep} (walked, not jumped)` : `, largest step ${largestStep}`;
+  return `${pages.length} onPageChange events, ${pages[0]} → ${pages[pages.length - 1]}${shape}`;
+}
+
+/**
  * The bytes a check asked the browser to save.
  *
  * `download.path()` is the file Playwright kept for it; the stream is the fallback for an engine that reports
@@ -520,39 +570,61 @@ const CHECKS = [
   },
   {
     name: 'virtualizes-1000-pages',
-    run: async ({ page, log, load, jumpTo }) => {
+    run: async ({ page, log, load, jumpTo, watchPageChanges, pageChanges }) => {
       await load('long-sample.pdf', 1000);
       const count = (await page.textContent(`${COUNT}`))?.trim() ?? '';
       const total = Number(count.replace(/\D+/g, ''));
       if (!Number.isFinite(total) || total < 900) fail(`page count reads "${count}"`);
       const mounted = await page.locator('.pjsr-page-slot').count();
       const height = await page.evaluate(() => document.querySelector('.pjsr-viewport')?.scrollHeight ?? 0);
+      if (!(await watchPageChanges()))
+        fail('no .app-log to count page changes in, so a walk cannot be told from a stall');
       const how = await jumpTo(total);
-      // 90s rather than 30, the elapsed time printed, and the scroll position reported on failure, because this
-      // row came up red on WebKit desktop (stuck at page 733, no further movement for the whole window) in one
-      // run and green in the next. The red one was a harness artifact: two matrix processes sharing one dev-server
-      // port. Re-run alone, WebKit desktop reaches page 999 in 0.1s and WebKit mobile page 1000 in 0.1s, so there
-      // is no engine defect here to file — and what the long ceiling plus the extra detail buy is the ability to
-      // say which of those two things happened, from the log line, without re-running anything.
+      /*
+       * 90s rather than 30, the elapsed time printed, and the scroll position reported on failure, because this
+       * row came up red on WebKit desktop (stuck at page 733, no further movement for the whole window) in one
+       * run and green in the next.
+       *
+       * What that red was, measured 2026-10-07 (#259 reopened #210, #265 closed it). The note here used to say
+       * it was a harness artifact — two matrix processes sharing one dev-server port — and that a solo run
+       * reached page 999 in 0.1s; a solo run does not do that, and five of them said so. The counter installed
+       * below then killed the second theory too: webkit's failure read `2 onPageChange events, 733 → 732`, so
+       * the reader was not walked down the document one page at a time, they were put on the wrong page once
+       * and left there. A probe that wrapped `Element.prototype.scrollTo` and the `scrollTop` setter (the ones
+       * in `.spike/`, this harness does not carry them) found the third and correct theory: the jump was
+       * written against the layout the fit mode had resolved from the 612-wide *default* page box, scale 1.98,
+       * because page 1's real landscape box had not landed yet; when it landed the whole document shrank 27 %,
+       * the engine clamped the reader to the new end of the range, and the virtualizer's anchor looked that
+       * clamped position up in the *old* table, named the row it found there, and moved the reader to it.
+       * Chromium wins the same race by measuring page 1 first. Fixed in `usePdfVirtualizer`, where a jump is
+       * now a request that outlives its write.
+       *
+       * What the row can still not tell you: the two engines agree on layout to within a few hundred px of
+       * scroll height, so nothing here was ever an engine difference — it is a timing one, and a browser that
+       * resolves `getPage(1)` a frame later is enough to hit it. The long ceiling, the event count and the
+       * scroll position are what make the next such failure diagnosable from its own line.
+       */
       const walked = Date.now();
       const line = await waitFor(async () => {
         const latest = await log('onPageChange');
         return Number(latest.replace(/\D+/g, '')) >= total - 3 ? latest : null;
       }, 90_000);
       const seconds = ((Date.now() - walked) / 1000).toFixed(1);
+      const seen = pageChangeSummary(await pageChanges());
       if (line === null) {
         // The bare "never reached the end" message said nothing about *how* it failed, and a row that is red in
         // one run and green in the next has to be diagnosable from its own line. Where the reader stopped, how
-        // far the scroll got and how many slots are mounted are what tell a contended port from a stalled walk.
+        // far the scroll got, how many slots are mounted and how many page changes it took to get there are
+        // what tell a slow sweep from a write that was never applied, without re-running anything.
         const stuck = await log('onPageChange');
         const { top, height } = await page.evaluate(() => {
           const el = document.querySelector('.pjsr-viewport');
           return { top: el?.scrollTop ?? -1, height: el?.scrollHeight ?? -1 };
         });
         fail(
-          `${how}, but the reader never reached the end of ${total} pages in ${seconds}s — last onPageChange ` +
-            `"${stuck}", scrollTop ${top} of ${height}px, ${await page.locator('.pjsr-page-slot').count()} ` +
-            'slots mounted',
+          `${how}, but the reader never reached the end of ${total} pages in ${seconds}s — ${seen}, last ` +
+            `onPageChange "${stuck}", scrollTop ${top} of ${height}px, ` +
+            `${await page.locator('.pjsr-page-slot').count()} slots mounted`,
         );
       }
       const landed = Number(line.replace(/\D+/g, ''));
@@ -560,7 +632,10 @@ const CHECKS = [
       const after = await page.locator('.pjsr-page-slot').count();
       if (!ink || ink.ratio < 0.0005) fail(`page ${landed} never painted`);
       if (Math.max(mounted, after) > 40) fail(`${mounted} then ${after} page slots mounted — not virtualizing`);
-      return `${total} pages, ${how}, ${mounted}→${after} slots mounted, scroll height ${height}px, page ${landed} at ${(ink.ratio * 100).toFixed(2)} % ink, reached in ${seconds}s`;
+      return (
+        `${total} pages, ${how}, ${mounted}→${after} slots mounted, scroll height ${height}px, page ${landed} at ` +
+        `${(ink.ratio * 100).toFixed(2)} % ink, reached in ${seconds}s, ${seen}`
+      );
     },
   },
   {
@@ -3861,6 +3936,8 @@ async function runCell(engineName, profileName, baseUrl) {
     external,
     local,
     log: (prefix) => page.evaluate(LAST_LOG, prefix),
+    watchPageChanges: () => page.evaluate(START_PAGE_CHANGE_WATCH),
+    pageChanges: () => page.evaluate(() => window.__pjsrPageChanges?.slice() ?? []),
     viewportBox: async () =>
       (await page.locator('.pjsr-viewport').boundingBox()) ?? { x: 0, y: 0, width: 300, height: 300 },
     load: async (file, pages) => {

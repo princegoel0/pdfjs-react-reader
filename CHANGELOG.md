@@ -1553,7 +1553,13 @@ package runs, and was verified against both tarballs on 2026-10-07 rather than r
   the row should count the `onPageChange` events it saw, because "walked 733 times" and "never moved" are
   different defects. Neither the tablist wrap nor the editor-container change is in this row's path (it runs
   before both, opens no sidebar and mounts no `annotate`), and it failed identically in a run containing only
-  itself. Filed as **#259**, which reopens the conclusion of **#210** rather than its symptom.
+  itself. Filed as **#259**, which reopens the conclusion of **#210** rather than its symptom. **The "webkit walks
+  one page at a time" half of this entry is wrong**, and #265's counter killed it in one run: the failure line
+  reads `2 onPageChange events, 733 → 732`. The request was written against a layout that had not finished correcting
+  itself, the corrected table shrank the document 27 %, the engine clamped the reader, and the anchor moved them
+  to whatever row the clamped number names in the *stale* table. Reproducible solo, five times: that half of
+  this entry stands. The walk, the "witness to the walk" reading and the 90 s budget's innocence do not — the
+  jump never walked at all, and the defect is in #265's entry.
 
 - **§6.2's ledger took its first resolution, and the gate then deleted the entry (#255, 2026-10-07).**
   `source-map-js` 1.2.1 → 1.2.2: `npm update source-map-js` moves exactly one package, inside the `^1.2.1` that
@@ -2555,7 +2561,49 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   the whole public surface with no DOM (417 ms for the first entry alone), now run in their own serialised
   projects after the parallel groups. Measured on a quiet machine they own: 26 tests in 4.2 s, so the 5 s
   ceiling was never the problem and is untouched. Two green full-suite runs in a row after; `CODE_REFERENCE`
-  §2 and §17 now say five projects, because that is what the config defines.
+  §2 and §17 now say five projects, because that is what the config defines. The gate that reads that sentence
+  had to change too, and **it is the gate that was wrong rather than the number**: `check-docs.mjs`'s
+  `tests-heading` rule matched the literal word `three`, so adding a project made the check report "the figure
+  left the document" for a document that had correctly been updated. The word is now derived from the `name:`
+  entries in `vitest.config.ts` — the same trick #240 used for the size figures, and the same rule it was
+  written to enforce: a documented count should come from something that runs. Perturbing the config to four
+  projects fails with `the document says "four", the tree gives five`.
+- **A 1,000-page jump landed on page 733 in webkit because the offset it wrote belonged to a table that was
+  about to change (#265, closing #259; FR-05, FR-10, FR-12).** Two earlier readings of this row were both wrong.
+  **#210** called the red a harness artifact — "two matrix processes sharing one dev-server port" — and said a
+  solo run reached the end in 0.1 s; five solo runs reproduced the red. **#259** then called it a walk, and the
+  counter added to `virtualizes-1000-pages` falsified *that* in one run: webkit's failure line reads
+  `2 onPageChange events, 733 → 732`, not seven hundred. The counter counts page numbers it has not seen,
+  deduplicated by text, because React keys the playground's log rows by position and prepending one line
+  re-keys all eight — an observer counting added nodes would report eight events for one callback. A probe that
+  wrapped `Element.prototype.scrollTo` and the `scrollTop` setter (`.spike/probe-jump*.mjs`, not shipped) then
+  named the mechanism: the jump was written against the layout a fit mode had resolved from the **612-wide
+  default page box** — scale 1.98 — because page 1's real landscape box had not landed yet, so `scrollTo` asked
+  for 1,585,472; when that box arrived the whole document shrank 27 %, the engine clamped the reader to the new
+  end of the range at 1,162,224, and the virtualizer's anchor derived the reader's row by looking that *new*
+  number up in the *old* table, found row 733 there, and moved the reader to it. Chromium wins the same race by
+  measuring page 1 first, which is why one engine was green and the other red on identical code. So a jump is
+  now a request that outlives its write: `usePdfVirtualizer` keeps the page, re-issues it into each corrected
+  table, and stops when the page is confirmed by a table *after* the one the request was made in — bounded by
+  six layout changes, four seconds, or a wheel/touch/pointer of the reader's own. Both bounds are checked
+  *before* the write, because a request that has run out of chances lunging at the page one last time is
+  exactly the yank the bounds exist to prevent. Six cases in `usePdfVirtualizer.jump.test.tsx` hold the
+  contract — grow under the reader, shrink past them, keep an in-page destination (FR-10), yield to a hand
+  scroll, and expire two different ways — and jsdom is made to be an engine for it: `scrollTo` is not
+  implemented there, `scrollTop` discards writes and `scrollHeight` is 0, so the stubs clamp on write *and* on
+  read, which is what makes case 2 measure the clamp rather than nothing. The falsification is one constant:
+  `JUMP_REISSUE_LIMIT` at 1 turns five of the six red, each naming the page the reader lost ("expected 3 to be
+  5"), and the ceiling case fails as `expected 1 to be 6`. All four browser cells then went from a 90 s red to
+  0.1–0.2 s green, webkit desktop still printing the stale table in its own line (`scroll height 1587043px`,
+  the height before the shrink) and arriving at page 1000 anyway. Two things this does not claim: the row's 90 s
+  ceiling was never the problem and is untouched, and a jump to the last page can settle one row short when the
+  final row cannot reach the top of the viewport — that is geometry, and the row accepts the last three pages.
+  What the row *was* hiding is in the register: **FR-12 had been `met` with no assertion behind its first
+  verb** — `page-labels.test.ts` proves a label resolves and `Toolbar.test.tsx` proves the field clamps, and
+  nothing proved the reader arrives anywhere. The bytes: core **32.78 kB gz**, from 32.51 measured on the same
+  tree with this work order's change reverted — **0.27 kB** for the pin, accepted in this diff per #208 rather
+  than argued with; the README tables and `docs/src/size-figures.json` are refreshed from the same run, and
+  `CODE_REFERENCE` §2/§17 now read 88 files / 18,672 lines / 149 test files.
 - **The accessibility record demanded that every cell install the React that produced it, and both React 18
   cells obliged (#262; FR-58, FR-48).** CI run 37631611428 — the push that carried #251–#260 — is twelve jobs green
   and two red, and both failures are one assertion in one test: `src/lib/a11y-record.test.ts > names the
