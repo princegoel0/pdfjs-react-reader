@@ -29,8 +29,10 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **46 met, 11 partial, 1
-absent** of 58 — the eighteenth and nineteenth moves being #242 and the FR-37 ruling, which took `FR-54` and `FR-37` out of *partial* — on a suite of **1,275 tests in 144 files** — eighteen rows moved when a clause-by-clause read of
+ends, Edge, hardware, and the assistive-technology pairings. The register stands at **49 met, 8 partial, 1
+absent** of 58 — the eighteenth and nineteenth moves being #242 and the FR-37 ruling, which took `FR-54` and `FR-37`
+out of *partial*, and the twentieth and twenty-first being #253's two browser rows, which took `FR-24` and `FR-19` out
+of it — on a suite of **1,299 tests in 148 files** — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
 this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
@@ -49,16 +51,193 @@ a fix, a comment and no assertion; `FR-05`, `FR-08`, `FR-10`, `FR-26` and `FR-28
 one of the five refused to be a missing test either; `FR-36` through **#238**, whose two gaps were three
 operations with no abort assertion and turned out to be three half-gaps in the code as well; and `FR-19`'s
 sheet through **#239**, which was never a missing assertion but a missing measurement — the clause's nouns are a
-printed page and a hidden application, and neither exists in a DOM that resolves no media query. `FR-19` keeps one
-gap, and it is the marks half rather than the sheet half. `FR-24` came back
-to one gap from two, and stayed short: what it cannot yet show is a pixel. `FR-53` and `FR-54` each went from
-three gaps to one, and the sentence each now lacks is a different kind of thing — a measurement nobody has run
-(the writer peer at both ends of its range) and a speaker nobody has (two codes no consumer can receive). §8's
-Chromium row counts **nineteen** checks: #239 added one, and it ran green in Chromium and Firefox alike. That is the
+printed page and a hidden application, and neither exists in a DOM that resolves no media query. Both of the two rows
+that were one sentence short of *met* are met now, and each closed on a pixel rather than on a call record:
+`FR-19`'s marks half through **#253**'s `print-carries-an-authored-mark`, and `FR-24`'s painted consequence through
+its `layers-switch-paints-a-page` — the two are *Added* below, with the numbers each engine reported and the
+counterfactuals that made each row bite. `FR-53` and `FR-54` each went from
+three gaps to one, and the sentence each now lacks is a different kind of thing — a promise with no content in it until **#260** listed
+the 27 members the writer is relied on for and resolved them against the installed package — and the registry read
+taken the same afternoon found that `^2.11.1` holds exactly one published version today, so an upper end was never
+there to measure; what the row still lacks is the step that notices when one appears and a speaker nobody has (two codes no consumer can receive). §8's
+Chromium row counts **twenty-one** checks: #239 added one and #253 added two, and all three of #253's rows ran green
+in Chromium, Firefox *and* WebKit on this host. That is the
 direction the count takes from here: down where a guard turns out to be decoration, up where a test is shown
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **The writer peer is now relied on by name, not by range (FR-53, #260, 2026-10-07).** `PRD.md`'s Dependency &
+  Engine Contract ends with "npm semver acceptance alone is not a support claim", and until now that sentence was
+  carried for `@cantoo/pdf-lib` by nothing: the peer is installed exactly once, from the lockfile, and the row's
+  gap said its `^2.11.1` was "asserted as far as semver resolves it and no further". Reading the registry on
+  2026-10-07 made the gap sharper rather than wider — 48 published 2.x versions, and **exactly one** of them is a
+  member of `^2.11.1` (`2.11.1`, which is also `dist-tags.latest`), so there was never an upper end sitting
+  unmeasured. What was missing is what a range's support claim is made of, and `src/lib/pdf-write.peer-contract
+.test.ts` now states it: the 27 members `src/lib/pdf-write.ts` and `src/lib/pdf-merge.ts` call, grouped by the
+  object the call site holds (`document`, `document.context`, `document.getForm()`, `document.addPage()`,
+  `dictionary`, `array`, `signature field`, plus the `PDFDocument` and `PDFName` statics), each resolved on the
+  installed package — and reached on *live* objects where the production path reaches them, which was a correction
+  rather than a refinement: `page.node` and `field.acroField` are constructor assignments that appear on no
+  prototype, so the first draft of this oracle reported three members this package genuinely calls as missing.
+  Three of the ten cases compose rather than reflect (`degrees(90)` into `setRotation`, the `instanceof
+  PDFSignature` walk to `acroField.dict`, and the `/Kids` permutation `permutePageTree` writes), and three keep the
+  contract itself honest: the import list is scanned out of the two holders with comments stripped first, every
+  declared member has to still be called, and the range advertised is compared with the version measured in both
+  places `package.json` writes it. Five falsifications, each red for the reason its message names — a call site
+  renamed (`document → removePage` read as stale); a peer name imported that the contract gives no role for
+  (`PDFHexString`, while the existence case stayed green because that name really does exist, which is what makes
+  those two cases different instruments); a member the peer lacks (`PDFDocument.signDocument`, seen from opposite
+  sides by the surface and stale cases); both ranges moved to `^3.0.0` (only the install case red, so the
+  dev-equals-peer case is a check and not a restatement); and comment-stripping switched off over a source whose
+  prose mentions a `PDFRect` import, which reddened two cases on prose alone and went green again when it was
+  restored. What the row still lacks is discovery, not content — a step in the `consumer` job, which is already
+  online, comparing the range's current top member against the lockfile pin — and that is the gap `fr-evidence.json`
+  now carries. No verdict moved: `FR-53` stays `partial`, the register stands at 49 met / 8 partial / 1 absent, and
+  the suite is **1,299 tests in 148 files**.
+
+- **§6 profile C is measured now instead of subtracted, and the seam that does it is in the paint path
+  (FR-49, 2026-10-07).** The clause asks for "viewer main-thread work attributable to our layer" with "engine
+  render time reported separately". The benchmark had been getting that by subtracting two page loads — the
+  viewer's cold page in one browser context, an engine-only harness at the same box in another — and its own
+  report line admitted it: "anything finer needs a mark in the render path and none exists". The four passes
+  `usePageProgress` already keeps to decide when a page may report `rendered` are now marked
+  (`openSpan`/`closeSpan` in `src/components/PdfPage.tsx`), which was the argument for putting them there rather
+  than inventing a structure: the boundaries already exist, and `canvas` *is* the awaited `page.render()`. Each
+  entry is discarded the moment it is made, so a 1,000-page scroll accumulates no timeline — which means a
+  reader has to be watching, and `scripts/benchmark.mjs` installs a `PerformanceObserver` before the paint and
+  filters to `pjsr:` names, because React’s dev build measures its own components too and a premise bar that
+  counts those would pass on a viewer whose marks had all disappeared. **Measured** on chromium 153 /
+  pdfjs-dist 6.3.289 at page 4 of `vector-sample.pdf`, five cold loads: a median **69.8 ms** attributed to the
+  passes this package drives against §6’s 200 ms, **131.5 ms** of awaited paint in the same load, and ~86 ms
+  named by neither mark — React committing the row, the virtualizer measuring it, the worker round trip, image
+  decode and the compositor — which the record states instead of folding into the bar. The two engine figures do
+  not agree, 131.5 ms inside the viewer against 81.0 ms with it removed, because they answer different
+  questions; both are printed and only the marked one is attributed. Two bars now fail the run rather than
+  reporting a quiet zero: the seam has to answer for the page being measured, and a span the viewer did not
+  report reads as NaN, not as 0 ms. What it costs is stated too: `core` moved 32.35 → **32.51 kB gz** (+0.16 kB —
+  two helpers and four names, on the page that already kept these boundaries), and `shell` 68.23 → **68.44 kB**,
+  with the README and docs tables refreshed from that measurement rather than from the last close, because
+  `check:docs` compares the prose to `docs/src/size-figures.json`.
+
+  **What the measurement cost, and why the guard is written the way it is.** The first version shared one mark
+  between two spans — the setup span’s end was the engine span’s start — so closing the first cleared the name
+  the second measured from, and Chromium threw inside the render promise, which is the page’s *error* path: a
+  timing failure on its way to a reader as a broken page. `src/components/PdfPage.timing.test.tsx` was green
+  throughout, because its fake `performance` accepted any `measure` call and jsdom has no UserTiming at all to
+  disagree. Three things followed: the fake now refuses a measure whose marks are not open, the way the browser
+  does; the split was cut rather than patched, since the pass spans answer the clause without it; and every
+  helper swallows a timing failure, with a case asserting exactly that — force a refusal and the page still
+  paints, still reports `rendered`, and reports no error. Four mutations, each restored byte-for-byte: never
+  close a pass, never clear the measure, never clear a name before reopening it, never open the paint span —
+  each red on the case that names it. The kept lesson: **a fake that cannot say no cannot catch anything**, and
+  a green jsdom suite is not evidence about a browser-only API.
+
+- **A layer switch is now measured as pixels, and the row that measures it found a control no pointer can reach
+  (`layers-switch-paints-a-page`, FR-24, 2026-10-07).** The clause's sentence about *listing* the groups and
+  redrawing *every page* from one `OptionalContentConfig` instance was guarded by identity tests —
+  `usePdfOptionalContent.shared.test.tsx`, `ViewerPages.paint.test.tsx`, `ViewerController.layers.test.tsx` — and
+  identity is exactly what a jsdom test can prove and what a page that ignores the config cannot be caught by.
+  The new row reads horizontal bands of the live canvas on `attachments-ocg-sample.pdf`, each band a distance from
+  the top of the page converted against the fixture's own `basePageDims()` rather than a constant, where the
+  generator puts one line of text in each group and nothing else at that height. In chromium 153 / firefox 155 /
+  webkit 26 at desktop 1280×900: the panel lists Heading-on, Body-on, Stamp-off as `/OCProperties` declares, the
+  Stamp band is 0 dark px while its group is off with the three neighbouring bands painted (2,558 / 1,485 / 1,974),
+  **5,245 px after one switch on and 0 again after one switch off**, and page 2's grouped line follows the same
+  panel to 0 px and back to 1,277 while its ungrouped neighbour never moves (5,265/1,299 in firefox, 5,084/1,176 in
+  webkit). Three counterfactuals, each red for the reason its own message names and restored byte-for-byte:
+  `optionalContentConfig={null}` — every render fetching its own instance, which is the bug the shell's injection
+  exists to avoid — fails at *the checkbox moved and the page did not*; dropping the hook's `onChanged?.()` fails a
+  leg earlier at *a list that cannot see the state it just wrote*; and a panel that reports every group visible
+  fails the listing premise before a pixel is read. Two instrument defects surfaced on the way and are fixed in
+  the row: Playwright's `check()` reads a controlled checkbox on the tick after the click, before React's commit has
+  put the new state on the element — webkit's cell failed on that, not on the viewer — so a switch is now clicked
+  and then *waited for*; and the premise was one unpolled canvas read, which is the same class of mistake as #246's.
+  Reaching the tab is itself a finding, filed as **#254**: `.pjsr-sidebar-tabs` is a no-wrap flex row inside a 248 px
+  panel, so with three tabs the third runs past the tablist and the close control — a later sibling in DOM order —
+  paints over it, and `elementFromPoint` at its centre answers `button.pjsr-sidebar-close` in chromium (198,206) and
+  webkit (198,181) while firefox's metrics let the pointer land. The row uses the tablist's own ArrowRight roving
+  keys where a pointer cannot reach and prints which path it took; `FR-24` moves to **met**, its `acceptanceWaiver`
+  goes with the gap it explained, and the row is cited as acceptance and as guard.
+
+- **A mark the reader authored reaches paper, which is FR-19's last sentence and is now a measurement
+  (`print-carries-an-authored-mark`, 2026-10-07).** The clause sends three things with a page — form values,
+  persisted annotation marks, and the reader's own marks once the authoring feature is loaded and they are
+  persisted. `print-sheets-hide-the-application` proved the first by watching a widget's own box on a sheet go
+  27 → 1,019 dark pixels; the second lived only in jsdom, where `page.render` is a mock and *reached the sheet*
+  describes nothing. The new row prints one document twice and counts a fixed region of page 1's sheet — 136,699
+  device px of a 1,224×1,584 page, expressed as a fraction of the page because the screen canvas and the sheet are
+  two rasterisations with only the ratio in common. Measured at desktop: that region holds **0 dark px before the
+  stroke and 3,338 after** it is drawn with the shipped ink tool and its editor committed (3,365 firefox, 3,179
+  webkit), while page 2's sheet in the same region moves 7,057 → 7,057 / 7,146 → 7,146 / 5,278 → 5,278, which is
+  what makes the delta about the page that was drawn on. The pipeline composites nothing — each page is asked for
+  at `intent: 'print'` with `AnnotationMode.ENABLE_STORAGE` — so a mark arriving on paper can only mean the engine
+  drew it out of annotation storage, and the row is falsified on both halves of that: `ENABLE_FORMS` in place of
+  `ENABLE_STORAGE` drops the after-reading to 0 px and is named as *the drawn mark never reached paper*, and moving
+  the region onto the page's own text fires the premise bar at 35,320 px (*the fixture is not blank where this row
+  planned to mark it*). Two things the harness had to learn about its own aim: the region is a fraction of the
+  page, so the row scrolls the band into view before drawing, and the frame it must fit inside is the scroll
+  element's box rather than the window's — a first version aimed 60 px from the top of the window and drew its
+  stroke across a playground feature checkbox. The scope is chosen rather than assumed, because rows share a page
+  and the print row leaves it on *From–to*: every copy of the control is read back, and webkit's refusal of
+  `selectOption` goes through the `change` event the application listens for, as #248 established. `FR-19` moves
+  to **met**.
+
+- **The axe audits now leave a committed record behind, which takes FR-58’s accessibility half out of the open
+  gaps (2026-10-07).** §9 asks for “reproducible benchmark and accessibility evidence” recorded “with its
+  environment, operator and date”; the benchmark half became `benchmarks/latest.json` in W8 and the accessibility
+  half was still stdout. `npm run a11y:record` runs the same serialised `a11y` project with the recorder switched
+  on (`recordAudit` in `src/components/axe-audit-harness.ts`, which is a no-op unless the environment names a
+  path — so `npm test` and `npm run a11y` still write nothing and the working tree stays clean between deliberate
+  runs) and produces `a11y/latest.json`: 17 audits, one entry each, with the machine, the OS, the
+  Node/axe-core/jsdom/vitest/react versions, the commit and the date, plus every rule axe reported `incomplete`
+  and its own reason. `src/lib/a11y-record.test.ts` (6) is the guard: it refuses the record when its toolchain no
+  longer matches `node_modules`, when an entry reports zero passing rules, when the ruleset claim and the
+  harness’s `values: [...]` list disagree, when `totals` is not derived from `audits`, when two entries carry one
+  name, and when no entry in the record is a tree that was made dirty on purpose — that last one is the house
+  counterfactual rule written into the evidence, and `a11y.ready.test.tsx`’s planted `role="listitem"` is the
+  entry that satisfies it. **Measured:** the record names axe-core 4.13.0, jsdom 30.1.1, vitest 3.2.7, react
+  19.3.0 at `a37af3f`, and three rules incomplete: `aria-hidden-focus`, `aria-valid-attr-value`,
+  `color-contrast` — which is why this is evidence about structure and naming, not about contrast (FR-45’s open
+  gap) or geometry (the matrix’s `toolbar-fold` row). The record’s own first attempt came out with an empty `file`
+  field, because this vitest answers `testPath` and not `testFilePath`; the validator reads `src/<file>` from
+  disk, so a name that points nowhere fails rather than passing quietly. **Seven counterfactuals, each restored
+  by checksum:** deleting the record, forbidding every entry from failing, an undeclared total, an audit that
+  checked nothing, a one-tag ruleset claim, an axe version that has moved, and two entries sharing a name — all
+  seven red on the case that names them. CI’s accessibility step became `npm run a11y:record`, so the evidence is
+  produced on a runner, and FR-58 keeps three gaps: the tagged release candidate, the device pass and the
+  screen-reader pairings.
+
+- **§6.2's dependency scan now exists, and so does the triage path it asks for (2026-10-07).** Until this pass
+  the clause had *nothing*: no `npm audit` step, no `dependabot.yml`, no triage document — the only PRD-mandated
+  obligation in the whole specification with no code behind it, and because it carries no FR row,
+  `npm run check:fr-evidence` cannot see it and never will. `npm run check:deps` audits both surfaces
+  (`--omit=dev`, which is what a consumer resolves, and the whole tree, which is what a laptop and a runner
+  execute), and every advisory the registry reports has to be decided in
+  `security/dependency-triage.json` with a reason, a review date and the four facts the decision was made
+  about — severity, vulnerable range, the packages reached and the surface it appeared on. Those four are
+  re-read on every run, so an advisory that escalates or widens reopens the entry instead of travelling under
+  an old signature; a passed review date is red; a finding that has gone away takes its entry with it; and an
+  audit that cannot execute exits 2 rather than skipping, because "no network today" is how a scanning
+  obligation quietly stops being one. `SECURITY.md` carries the path as prose, ending in the case §6.2 names
+  hardest — a finding inside a peer's own bundle, which no range change here can close, answered by the
+  published `^6.2.108` floor and by deprecating the line that permitted 5.x. **Measured:** production clean
+  (this package declares no runtime dependencies at all), development carrying five advisories — two critical
+  and one moderate in vitest's worker pool and mocker, one high in `source-map-js`, one low in esbuild — each
+  recorded with the holder whose range blocks it (`tsup` declares `^0.27.0`; `vitest` declares `^1.1.1` for
+  tinypool) or the refresh that clears it (`source-map-js` 1.2.2 satisfies the `^1.2.1` postcss and css-tree
+  already ask for; installing it is the owner's call, so it is recorded as `upgrade-now` with a two-week date
+  rather than done here). **Counterfactuals:** seven on the live registry — deleting a decision, mis-stating a
+  range, calling a high a moderate, recording a dev finding as shipping, dropping one of the two packages an
+  advisory reaches, and leaving a decision undated all go red with the sentence that names them, and the ledger
+  was restored byte-for-byte by checksum; the eighth — a *production*-surface finding excused as dev-only —
+  cannot be reached on this tree while the production audit is clean, which is exactly why `--selftest` carries
+  it as a synthetic input, and 12/12 scenarios fire. The step runs in `verify` and as its own CI step, placed
+  ahead of the steps that read the tree. **Superseded one day later, by the gate rather than by memory:** #255
+  took that `upgrade-now` (`source-map-js` 1.2.1 → 1.2.2, one package, no range touched), and `check:deps` then
+  refused the ledger row — `the ledger still carries a decision for a finding the registry no longer reports` —
+  so the entry was deleted and the scan now reads four live advisories. That refusal is the design being
+  exercised: a triage record that outlives its finding reads like a live risk.
 
 - **A feature can now declare that one of its own behaviours needs an engine newer than the package floor, and
   `structureFeature` is the first to (#249; FR-43, FR-53, FR-48, 2026-10-07).** The owner's ruling on #194's finding was
@@ -1336,6 +1515,34 @@ re-derived by whoever asks next.
 
 ### Changed
 
+- **#210's closure was wrong, and a quiet machine proved it (#259, 2026-10-07).** That task recorded webkit's
+  1,000-page stall as port contention — "not reproducible solo". It is now reproducible solo, five times, with
+  nothing else running, and chromium is unaffected in the same breath: `--engines=chromium,webkit
+  --profiles=desktop --checks=virtualizes` returned `page 1000 … reached in 0.1s` with 2 slots mounted for
+  chromium and `the reader never reached the end of 1000 pages in 90.0s — last onPageChange "onPageChange 733",
+  scrollTop 852226 of 1163352px, 3 slots mounted` for webkit; webkit · mobile stalled the same way at page 740.
+  The two engines agree on layout to within ~500 px of scroll height, so what differs is the *jump*: chromium
+  teleports, webkit walks one page at a time, and the row's own 90 s budget is a witness to the walk rather than a
+  verdict on the viewer. It is bimodal, not simply slow — the same row read `reached in 0.2s` in two full-matrix
+  runs earlier the same day — so the next thing to fix is the instrument's inability to say which path it took:
+  the row should count the `onPageChange` events it saw, because "walked 733 times" and "never moved" are
+  different defects. Neither the tablist wrap nor the editor-container change is in this row's path (it runs
+  before both, opens no sidebar and mounts no `annotate`), and it failed identically in a run containing only
+  itself. Filed as **#259**, which reopens the conclusion of **#210** rather than its symptom.
+
+- **§6.2's ledger took its first resolution, and the gate then deleted the entry (#255, 2026-10-07).**
+  `source-map-js` 1.2.1 → 1.2.2: `npm update source-map-js` moves exactly one package, inside the `^1.2.1` that
+  both postcss 8.5.28 and css-tree 3.2.1 already declare, so no range was touched and no major anywhere — which is
+  what made it the one finding recorded as `upgrade-now` rather than `upgrade-blocked`. The point of the pass is
+  what happened after: `npm run check:deps` went red on the **ledger**, not on the registry —
+  `GHSA-68fv-2mgg-jv7q: the ledger still carries a decision for a finding the registry no longer reports. Delete
+  the entry — a stale triage record reads like a live risk` — so the entry was deleted and the scan reads four
+  live advisories against one precedent, production still clean. That is the design exercised for real: a triage
+  path that only ever *grows* is a list of excuses, and this one has to shrink when a risk leaves. The remaining
+  four are all `upgrade-blocked` and each names the holder that blocks it — esbuild's fix is the 0.28 major
+  against tsup's `^0.27.0`, and the two tinypool advisories plus `@vitest/mocker`'s all need vitest 5.0.3, which
+  is a toolchain decision rather than a refresh.
+
 - **The engine axis read a floor-only crash in one engine, and the run after it did not (#250;
   FR-48, FR-16).** CI 37534391833 (`dev` at `7866db8`, 2026-10-07) is fourteen jobs green with the
   pdfjs-dist **6.2.108** cell red on one row: `no-uncaught-errors` in webkit · desktop, `1 uncaught:
@@ -2287,6 +2494,61 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   inside the re-accepted baseline it names.)
 
 ### Fixed
+
+- **The structure-tree row read the annotation layer once, and once was sometimes before the engine had written
+  the ownership (#258, 2026-10-07).** `structure-tree-in-the-accessibility-tree` came back red in
+  webkit · desktop with `the link annotation owns nothing in the structure tree on 6.3.289 (aria-owns [])`. It was
+  isolated before it was explained: two runs of that row alone in that cell, one green and one red, with the
+  annotate feature never mounted — which also rules out the two changes that had just landed, because the row does
+  not mount them. The cause was the instrument: `AnnotationLayer` builds the `<a>` and pdf.js writes `aria-owns`
+  onto it *afterwards*, so a single read can land between the two — the same class as #246's mark premise and
+  #248's read-back. The read is now polled for 20 s until the tree is mounted and the link exists, and above the
+  engine's declared minimum until it owns something; below the minimum it accepts the first readable state and
+  still asserts the **absence**, so an engine that gains the ownership fails rather than being waited away. Made
+  to bite by setting the predicate to something the fixture cannot satisfy (`ownsCount > 5`): it failed with
+  `no structure tree with a mounted link annotation settled within 20 s on webkit (6.3.289)` and printed the whole
+  state it had — 2 roots, nine roles, the link's real `aria-owns` id — then restored, and three isolated webkit
+  runs read green.
+
+- **A key typed in the toolbar could reach pdf.js's editor keyboard handler and throw uncaught, because the
+  editor manager's container was the whole viewer (#257; FR-29, 2026-10-07).** The symptom arrived from the
+  browser matrix: webkit · desktop reported
+  `undefined is not an object (evaluating 'this.currentLayer.canCreateNewEmptyEditor')` twice, and the
+  cell-level `no-uncaught-errors` check could only say *nineteen rows ran and one of them threw* — so the
+  instrument was fixed first, and a page error now carries the row that was running when it arrived. Then the
+  engine, not the stack, named the mechanism: `AnnotationEditorUIManager` installs a **`window`** keydown
+  listener whose map runs Enter and Space through a containment test —
+  `!(target instanceof HTMLButtonElement) && container.contains(target)` — and only then reads
+  `this.currentLayer.canCreateNewEmptyEditor()`, with no null guard, so the handler throws whenever no page's
+  editor layer is current: a document swap, or every page scrolled out of the virtualized window. That is
+  pdf.js's own bug to fix, but the reach was ours: `annotate.tsx` handed the manager `rootRef.current`, which
+  contains the toolbar, the sidebar and the page area, so an Enter in the page-number field and a Space on a
+  layer checkbox both satisfied a test written for a key pressed *on a page*. pdf.js's viewer passes the pages
+  container, and so does this package now — `root.querySelector('.pjsr-viewport') ?? root`, the root kept as the
+  fallback a host writing its own layout (FR-28) needs, because a feature that quietly lost keyboard authoring on
+  such a host would be a worse defect than the one being fixed. `src/features/annotate.container.test.tsx` (3)
+  asserts the containment shape — the viewport is the container, the page input and the sidebar checkbox are
+  outside it, the pages are inside, and a layout with no viewport still gets a working manager — and it was red
+  before the change with `expected <div class="pjsr-viewer"> to be <div class="pjsr-viewport">`. It asserts
+  wiring rather than the crash on purpose: the crash is timing- and engine-sensitive, the wiring is not. This is
+  a different crash from **#250**'s, which is at the 6.2.108 floor in code 6.3 deleted; this one is at 6.3.289 in
+  code that still exists.
+
+- **A sidebar with three tabs put its third tab under the close button, so a pointer could not open it (#254,
+  2026-10-07).** Found while `layers-switch-paints-a-page` was being written, not by anyone clicking:
+  `.pjsr-sidebar-tabs` is a no-wrap flex row inside a 248 px panel and shrinks to whatever the close control
+  leaves, so Thumbnails + Outline + Layers runs the last tab past its own box and the close button — a later
+  sibling in DOM order — paints over the part that does. `elementFromPoint` at the Layers tab's centre answered
+  `button.pjsr-sidebar-close` in chromium 153 (box 198,206) and webkit 26 (198,181); only firefox 155's metrics
+  let a pointer land. The row's first version reached the tab through the tablist's own roving ArrowRight keys
+  and printed which path it took, and that is exactly the shape of this bug: the keyboard reader was never
+  blocked, so nothing that drives a tab by hand — which is every test in this repository — could see that a mouse
+  user was. `.pjsr-sidebar-tabs` now wraps, and the row *requires* a pointer click instead of tolerating a
+  fallback: with `flex-wrap` removed it fails naming #254 and the covering element, and with it in place all
+  three engines report "took a pointer click" while a four-tab mount (Thumbnails, Outline, Layers, Attachments)
+  reads a 90 px header in two rows with every tab reachable. The cost is one declaration in the core sheet. There
+  is no jsdom guard, because there cannot be one: the clip is decided by real layout, and jsdom hands every
+  element a 0×0 box — the same reason #241 and #243 are browser rows.
 
 - **The error wrapper's engine-name table was keyed on five names that no shipped engine stamps, and missed the
   one the engine uses as its catch-all (#242; FR-54).** `src/lib/errors.ts` classifies a failure by the `name`

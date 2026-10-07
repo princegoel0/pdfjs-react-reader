@@ -66,12 +66,12 @@ certified on this machine at all.
 | `FR-16` | AcroForm Support | **met** | 5/5 | 0 | — |
 | `FR-17` | Form Data Sync | **met** | 4/5 | 0 | — |
 | `FR-18` | Annotations: View | **met** | 5/5 | 0 | — |
-| `FR-19` | High-Fidelity Printing | **partial** | 5/5 | 1 | the marks half of the clause has never been seen on paper: what the browser row reads is a typed… |
+| `FR-19` | High-Fidelity Printing | **met** | 5/5 | 0 | — |
 | `FR-20` | Document Download | **met** | 4/5 | 0 | — |
 | `FR-21` | Opt-In Feature Registration | **met** | 5/5 | 0 | — |
 | `FR-22` | Per-Feature Stylesheets | **met** | 5/5 | 0 | — |
 | `FR-23` | Enforced Size Boundary | **met** | 5/5 | 0 | — |
-| `FR-24` | Optional-Content Layers | **partial** | 4/5 | 1 | what no jsdom can show: that switching a layer changes the pixels. The instance property is now … |
+| `FR-24` | Optional-Content Layers | **met** | 5/5 | 0 | — |
 | `FR-25` | Embedded Files | **met** | 4/5 | 0 | — |
 | `FR-26` | Replaceable Find Strategy | **met** | 5/5 | 0 | — |
 | `FR-27` | Search Depth | **met** | 5/5 | 0 | — |
@@ -100,20 +100,22 @@ certified on this machine at all.
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
 | `FR-52` | Public API & Export Contract | **partial** | 5/5 | 1 | the /edit, /merge, /features/*, per-feature CSS and /locales/* entries this row classifies as pu… |
-| `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 1 | the engine contract is proven unevenly across its two halves. `pdfjs-dist` is now verified *insi… |
+| `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 1 | the writer peer has a contract now and no way to notice when it needs one. `src/lib/pdf-write.pe… |
 | `FR-54` | Stable Error & Cancellation Contract | **met** | 4/5 | 0 | — |
 | `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |
 | `FR-57` | Runtime Resource Budget Contract | **met** | 5/5 | 0 | — |
-| `FR-58` | Release Evidence & Consumer Verification | **absent** | 0/5 | 4 | no release candidate has ever been built and tested on a clean runner from a packed artifact. Th… |
+| `FR-58` | Release Evidence & Consumer Verification | **absent** | 2/5 | 3 | no release candidate has ever been built and tested on a clean runner from a packed artifact. Th… |
 
 <!-- FR-EVIDENCE:STATUS:END -->
 
 ### Why the narrative table below says `done` and this one says `partial`
 
-Twenty-one of its 51 rows disagree with the register. None of them is a lie, and none of them will be edited
-by hand. They were true when written, and then the lock **added clauses underneath them**: `FR-02` says done
-because worker configuration was measured end to end in a real browser across four states — it was — and the
+Rows of the narrative table below disagree with the register, and the count is deliberately not written down
+here: it moves every time a row closes, and nothing derives it. None of the disagreements is a lie, and none of
+they will be edited by hand. They were true when written, and then the lock **added clauses underneath
+them**: `FR-02` says done because worker configuration was measured end to end in a real browser across four
+states — it was — and the
 rewrite asked, on top of that, for conflicting worker URLs to surface as `CONFIGURATION_ERROR`. `FR-37` says
 built because both unions are exported and produced — they are — and the lock asked for `cancelled` to be
 observable and for the page path to publish the retry it names. `FR-41` says built, and it is; the floor then
@@ -124,7 +126,7 @@ So the narrative table keeps its job, which the generated block cannot do: it re
 measurement that retired a requirement, the engine behaviour that turned out to be impossible, the premise a
 test was built on and then corrected. Read it for the reasoning. Read the block above for the state.
 
-Two rows once sat in that gap as live questions rather than history, and both have been answered since:
+Three rows have sat in that gap as live questions rather than history, and each has been answered since:
 
 * **`FR-16`** — the register's `met` rested on "every declared widget kind reaches a real HTML control, and the
   engine constructs them", which left the `/Sig` box drawn by nobody wherever the engine gave no element.
@@ -137,6 +139,32 @@ Two rows once sat in that gap as live questions rather than history, and both ha
   the host" names the host-facing per-page `invalidatePages`. Both halves are guarded — the swap and its race in
   `src/headless/usePdfSearch.incremental.test.tsx`, the handle member in `ViewerController`'s published handle —
   which is why the register reads `met` with no gap rather than `partial` with an argument.
+* **`FR-19`'s marks half and `FR-24`'s pixels** — both rows said `done` here and `partial` in the register, and
+  the thing each lacked was the same kind of thing: a measurement a DOM that rasterises nothing cannot supply.
+  **#253** added two browser rows rather than two assertions. `print-carries-an-authored-mark` prints one document
+  twice and counts a fixed fraction of page 1's sheet, which goes from 0 dark px to 3,338 when a stroke drawn with
+  the shipped ink tool is committed to annotation storage — and page 2's sheet, same box, same job, does not move.
+  `layers-switch-paints-a-page` reads bands of the live canvas on the optional-content fixture: the Stamp layer's
+  band is 0 px while its group is off, 5,245 px after one switch on and 0 after one switch off, and page 2's
+  grouped line follows the same panel to 0 px and back — which is the clause's *every page*, and the leg a
+  per-render config fetch fails. Both rows were then made to fail on purpose (a mode without storage, a page
+  fetching its own config, a mutation that never asks for a repaint, a panel that lists everything visible), and
+  each red run named its own cause. The switch row also opened **#254**, and the same pass closed it:
+  `.pjsr-sidebar-tabs` was a no-wrap flex row in a 248 px panel, so with three tabs the third ran out from under the
+  tablist and the close control — a later sibling in DOM order — painted over it, which is what `elementFromPoint`
+  at its centre reported in chromium and webkit while firefox's metrics let the pointer land. The tablist wraps
+  now, the row *requires* a pointer click and names #254 when it cannot get one, and all three engines read
+  "took a pointer click". Two more defects came out of the same hour, and both were the harness rather than the
+  viewer: an uncaught TypeError in webkit · desktop that a cell-level check could not attribute to any of nineteen
+  rows — page errors now carry the row that was running, and the mechanism turned out to be ours, `annotate.tsx`
+  handing the editor manager the viewer root as its container, which made every toolbar and sidebar key an editor
+  key (#257) — and the structure row reading the annotation layer once, before pdf.js had written `aria-owns` onto
+  it (#258). `FR-53`'s clause-by-clause read then found the row's last sentence resting on a range rather than on
+  a claim anyone could test: `@cantoo/pdf-lib` is installed exactly once, and the registry read of 2026-10-07 shows
+  `^2.11.1` has exactly one published member today, so there was no upper end unmeasured — what was unmeasured was
+  what the promise means. `src/lib/pdf-write.peer-contract.test.ts` states it now (27 members, resolved on the
+  installed package and on live objects where the call sites hold them), and the row keeps one gap for the half
+  still missing: nothing notices the day the range gains a member.
 
 ### The order of work
 
@@ -154,7 +182,7 @@ package is something later packages need, and each has an exit test that is not 
 | **W6** | **Ink retirement.** Remove the core freehand surface from root and `/headless`, make `annotateFeature` the only pen, move its rules out of the core sheet, re-baseline sizes, and name every removed export in the changelog — they are in the published 0.1.2, so this is a public-API removal. | FR-18, the FR-19 clause, FR-22 | W3 | the exports are gone from `dist`, `check:maturity` agrees, and the size gate is re-accepted in the same diff | #200, #124, #155 |
 | **W7** | **Support floors and the jobs that prove them.** `engines.node >=22.13.0`; CI off Node 20; latest-supported-6.x engine job; React minimum-patch rows; pinned browser floors instead of Playwright defaults; an Edge row or its withdrawal; **a CI job that calls `npm run verify`**, which today none does. | FR-41, FR-46, FR-48, FR-50, FR-53, every §8 row | — | the first real run of `browser`, `packaging` and `consumer` on a clean runner | #202, #194 |
 | **W8** | **Evidence, fixtures and the missing tests.** Profiles C and D; the oversize-page fixture; a committed benchmark record with machine, OS, browser, engine, fixture hash, date and p50/p95; a thumbnail test; the in-place text-layer assertion; the rotation-registration assertion; the annotation-carried attachment listing test. | FR-49, FR-51, FR-11, FR-06, FR-09, FR-13, FR-25 | W4, W7 | `npm run bench` fails on a profile C or D regression; FR-11 gains its first automated guard | #192, #195 |
-| **W9** | **Certification.** Real-device passes; NVDA+Firefox, JAWS+Chromium, VoiceOver+Safari with a named environment, date and operator; the `0.1.2` → `1.0.0` upgrade path exercised against the artifact; §9 signed. | FR-43's announcement half, FR-44, FR-45, FR-58 | all of the above. **The two decisions W9 used to wait on are taken (2026-10-05):** FR-50's baseline stays the `aed9fd6` commit and §5.5 says so with its reason — and says the rule expires with the pre-1.0 window, because at the `1.0.0` close the tags are re-derived from the export map that release actually publishes, as a reviewed diff naming every name it moves down; and `0.1.0`/`0.1.1` are to be deprecated while `0.1.2` stays live — recorded in §9. **One of §9's items is a registry write, so it is the owner's action, not a job's.** Read the published facts first (`npm view pdfjs-react-reader versions` → 0.1.0, 0.1.1, 0.1.2 only, none deprecated; each declares `pdfjs-dist ^5.0.0` and `engines.node >=20`), then run the two lines below and confirm them with `npm view pdfjs-react-reader@0.1.0 deprecated` — an empty answer means the write did not land:<br>`npm deprecate "pdfjs-react-reader@>=0.1.0 <0.1.2" "pdfjs-react-reader 0.1.0 and 0.1.1 accept pdfjs-dist 5.x, which is unsupported: CVE-2026-16633 has no 5.x fix. Install 0.1.2 with pdfjs-dist >=6.2.108 on Node >=22.13.0, or wait for 1.0.0."`<br>The range excludes `0.1.2` deliberately — deprecating it would leave no installable package at all, and its `^5.0.0 || ^6.2.108` peer range is a limit of the published surface that `1.0.0` corrects by declaring `^6.2.108` alone. | §8 has no `unverified` row left, and every claim cites the run that proved it | #141, #156, #207 |
+| **W9** | **Certification.** Real-device passes; NVDA+Firefox, JAWS+Chromium, VoiceOver+Safari with a named environment, date and operator; the `0.1.2` → `1.0.0` upgrade path exercised against the artifact; §9 signed. | FR-43's announcement half, FR-44, FR-45, FR-58 | all of the above. **The two decisions W9 used to wait on are taken (2026-10-05):** FR-50's baseline stays the `aed9fd6` commit and §5.5 says so with its reason — and says the rule expires with the pre-1.0 window, because at the `1.0.0` close the tags are re-derived from the export map that release actually publishes, as a reviewed diff naming every name it moves down; and `0.1.0`/`0.1.1` are to be deprecated while `0.1.2` stays live — recorded in §9. **One of §9's items is a registry write, so it is the owner's action, not a job's.** It is the owner's for a measured reason too: the line below was run from the dev machine on 2026-10-07 with the owner's authorization, and the registry answered `404` to the `PUT` while `npm view pdfjs-react-reader@0.1.0 deprecated` went on reading empty — the write needs an npm session that owns the package, and this machine either has none or has one that does not (the credential inspection that would tell the two apart is blocked here, so the record stops at what the registry said). Read the published facts first (`npm view pdfjs-react-reader versions` → 0.1.0, 0.1.1, 0.1.2 only, none deprecated; each declares `pdfjs-dist ^5.0.0` and `engines.node >=20`), then run the two lines below and confirm them with `npm view pdfjs-react-reader@0.1.0 deprecated` — an empty answer means the write did not land:<br>`npm deprecate "pdfjs-react-reader@>=0.1.0 <0.1.2" "pdfjs-react-reader 0.1.0 and 0.1.1 accept pdfjs-dist 5.x, which is unsupported: CVE-2026-16633 has no 5.x fix. Install 0.1.2 with pdfjs-dist >=6.2.108 on Node >=22.13.0, or wait for 1.0.0."`<br>The range excludes `0.1.2` deliberately — deprecating it would leave no installable package at all, and its `^5.0.0 || ^6.2.108` peer range is a limit of the published surface that `1.0.0` corrects by declaring `^6.2.108` alone. | §8 has no `unverified` row left, and every claim cites the run that proved it | #141, #156, #207 |
 
 Three rules make the order mean something. **A package is not closed when its code merges** — it is closed when
 its register rows read `met` and the gate passes, because the gate is the only reader that checks. **No package

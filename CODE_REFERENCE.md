@@ -60,11 +60,11 @@ React DOM, `pdfjs-dist`, and one optional writer.
 | Names on `/headless` | **197** | the same, over `dist/headless.d.ts` |
 | Names on `/edit` | **36**, on `/merge` **13** | `dist/edit.d.ts`, `dist/merge.d.ts` |
 | Distinct public names, by maturity | **323** — 263 stable, 60 experimental, 0 deprecated, plus **15** in the `removed` ledger (FR-18). The split is measured, not asserted: `npm run check:maturity` prints it, and whether 60 experimental names is the right number to carry into `1.0.0` is the owner's open decision **#207** | `api-maturity.json`, audited by `npm run check:maturity` |
-| Source files (non-test) | **88**, 18,436 lines | `src/**`, counted by `node scripts/check-docs.mjs` (`wc -l` semantics, test files excluded). 80 / 17,169 was the figure when §2 was last re-run by hand; the touch-fallback module, its engine stand-ins, this script, the handle member and walk guard of #231, the form hook’s refusal to claim a change it did not make, #238’s three cancellation guards (an already-aborted token performs no work on the print, attachment and thumbnail paths), #243’s measuring context, #241’s panel bound, #229’s signature box rule, #175’s ready-document shell mount and #247’s shared ready-shell harness (the jsdom answers, the page proxy, and the fold fake that lets the ⋯ panel mount) and #249’s engine-version helper — the comparison a feature uses to declare that one of its own behaviours needs an engine newer than the package floor, and #242’s measurement of which exception names the installed engine actually stamps — have moved it since |
-| Test files / tests | **144 files / 1,275 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
-| Stylesheets | 9, from 24 to 1,337 lines | `src/styles/`, same command (`structure.css` is the small one, `viewer.css` the large) |
+| Source files (non-test) | **88**, 18,552 lines | `src/**`, counted by `node scripts/check-docs.mjs` (`wc -l` semantics, test files excluded). 80 / 17,169 was the figure when §2 was last re-run by hand; the touch-fallback module, its engine stand-ins, this script, the handle member and walk guard of #231, the form hook’s refusal to claim a change it did not make, #238’s three cancellation guards (an already-aborted token performs no work on the print, attachment and thumbnail paths), #243’s measuring context, #241’s panel bound, #229’s signature box rule, #175’s ready-document shell mount, #247’s shared ready-shell harness (the jsdom answers, the page proxy, and the fold fake that lets the ⋯ panel mount) and #249’s engine-version helper — the comparison a feature uses to declare that one of its own behaviours needs an engine newer than the package floor, and #242’s measurement of which exception names the installed engine actually stamps have moved it since; the seven lines since the last sync are #257’s editor container, which decides what the annotation manager is allowed to hear |
+| Test files / tests | **148 files / 1,299 tests**, in three projects (`node`, `dom`, `a11y`) | `npm run test` |
+| Stylesheets | 9, from 24 to 1,348 lines | `src/styles/`, same command (`structure.css` is the small one, `viewer.css` the large) |
 | Fixtures | 22 PDFs, produced by 18 generator scripts, **all of them tracked** — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded; `vector-sample.pdf` is the only one whose cost is operators — four A1 sheets, 336 clipped cells each, 12,922 engine-reported operators a page and 0.51 MB on disk; `oversize-sample.pdf` is the only one with a page no renderer may paint — 612×792, 12,000×9,000 and 200,000×600 pt, which is the edge-case suite's sixth shape and the 0.25-minimum refusal in 1,023 bytes | `playground/fixtures/`, `scripts/make-*.mjs` |
-| Benchmark | `npm run bench` measures §6's four profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). All four have committed fixtures: C is `vector-sample.pdf` with the engine's own time taken separately through `playground/raw.html`, and D is `scan-sample.pdf` on the committed low-memory harness — 412×915 at dpr 3 with an Android user agent and 6× CDP CPU throttling, zoomed through the toolbar's overflow menu. The report is **`benchmarks/latest.json`, tracked**: §6's environment fields, each fixture's sha256, and p50/p95/max per sampled number with p99 only where there are 100+ samples. `src/lib/benchmark-record.test.ts` is what keeps that file an evidence rather than an artifact of the last run | `scripts/benchmark.mjs`, `benchmarks/latest.json`, `ROADMAP.md` §1 `FR-49` |
+| Benchmark | `npm run bench` measures §6's four profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine and never failed on). All four have committed fixtures: C is `vector-sample.pdf`, whose split between this package and the engine is read from the `pjsr:` paint marks the viewer puts in its own render path (the engine-only harness through `playground/raw.html` runs beside it as a cross-check, and the two disagree by design — see §17's `PdfPage.timing` row), and D is `scan-sample.pdf` on the committed low-memory harness — 412×915 at dpr 3 with an Android user agent and 6× CDP CPU throttling, zoomed through the toolbar's overflow menu. The report is **`benchmarks/latest.json`, tracked**: §6's environment fields, each fixture's sha256, and p50/p95/max per sampled number with p99 only where there are 100+ samples. `src/lib/benchmark-record.test.ts` is what keeps that file an evidence rather than an artifact of the last run | `scripts/benchmark.mjs`, `benchmarks/latest.json`, `ROADMAP.md` §1 `FR-49` |
 | CI | 6 jobs in `ci.yml` (`verify`, `docs`, `react`, `consumer`, `packaging` for FR-41 on a Node matrix, and `browser` for FR-48 across three engines; the axe audit is a step inside `verify`), 1 deploy workflow in `docs.yml` | `.github/workflows/` |
 | Browser evidence | **Three engines, six cells, 2026-10-04: 67 ok, 5 skipped, 0 failed, 0 not runnable.** Chromium 153 desktop 12 ok / mobile 11 ok + 1 skip; Firefox 155 and WebKit 26 desktop 12 ok / mobile 10 ok + 2 skips. Every skip is the emulation's — no wheel events on the 375 px profile, and no `Touch` constructor to synthesise a pinch from on Firefox and WebKit. Each cell also prints its engine against §8's floor (153 vs 125, 155 vs 124, 26 vs 18), and §8's own policy keeps those rows `unverified`: a current build passing does not certify an older floor. Two rows in this file used to claim Firefox and WebKit would not start on this host at all; both were measured out of it, the second by a run whose failures came from two matrix processes sharing one dev-server port | `scripts/browser-matrix.mjs`, `ROADMAP.md` §1 `FR-48` |
 
@@ -914,7 +914,7 @@ focus **twice** — palette on, then off — so the ring seen is the sheet's re-
 
 ---
 
-## 17. Tests: 144 files, 1,275 tests, three projects
+## 17. Tests: 148 files, 1,299 tests, three projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read
 from disk), **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library) except the audits, which are
@@ -963,6 +963,15 @@ cannot appear here.
   reaches the canvas buffer while a `resize` at the same density does not, plus **`ViewerLabels` (6)** — the
   bar mounted against a stub controller, which is the only place the `controller → ViewerParts → Toolbar`
   link of the label table is asserted
+* The paint seam, which is what lets §6 profile C be measured rather than inferred (FR-49):
+  **`PdfPage.timing` (5)** — the four passes `usePageProgress` already keeps for its own `rendered` join are named
+  on the page that ran them (`canvas` is the awaited `page.render()`, the other three are the engine's layer classes
+  run from this package's effects), every span is discarded the moment it is measured because a viewer that kept one
+  record per pass per repaint would hand a long scroll a timeline that only grows, a reused name is cleared before it
+  is opened again, and a UserTiming that refuses cannot reach the reader as a page failure. The fake `performance`
+  here refuses a measure whose marks are not open, the way Chromium does — the first version accepted anything, and
+  while it was green the seam shared one mark between two spans so the second measured from a name the first had
+  cleared, which threw inside the render promise. jsdom has no UserTiming at all, so it could not see any of that
 * Engine behaviour, through pdf.js itself: **`damaged`** (6), **`encrypted`** (3),
   **`encrypted.reprompt`** (1) — one load per file, because a load left parked in the Node fake worker
   stops every case after it — **`edge-cases`** (7), which is `FR-51`'s matrix in one named place: the six
@@ -998,6 +1007,13 @@ cannot appear here.
   It names its own reach: 2 ids in the whole mount, both the sidebar's, so this is a states audit rather than
   the cross-part id audit it was first written to be, and its fourth case plants a `role="listitem"` in the
   `tablist` to prove the run can speak
+* The accessibility record (`FR-58`): **`a11y-record` (6)** reads `a11y/latest.json`, the file
+  `npm run a11y:record` writes out of the audits above — one entry per audit, with the machine, the OS, the
+  Node/axe/jsdom/vitest/react versions, the commit and the date. It refuses the record when its toolchain no
+  longer matches what `node_modules` holds, when an entry reports zero passing rules (an audit that reached
+  nothing is not a clean run), when the ruleset it claims and the harness’s own tag list disagree, when
+  `totals` are not derived from `audits`, and when nothing in it is a tree that was made dirty on purpose.
+  §9 asks for accessibility evidence a reader can re-read rather than a console log that ends with the job
 * Tiers: `features/download` `edit` (11) `edit.extract` (5) `edit.signatures` (8), and
   **`features/structure` (10)** — the gate counted by reads of the peer class (zero for an untagged file,
   one for a tagged one), both `MarkInfo` shapes, the document changing under it, and the merged page props
@@ -1125,18 +1141,25 @@ that was wrong.
 | `npm run check:packaging` | FR-41 against `dist/`: both formats and both declaration files per path, then `require()` and `import()` of every entry must expose the same names. Also FR-52's map shape: every key classified, no wildcard, no `./types`, no target outside `dist/` |
 | `npm run check:examples` | FR-52 / §5.6: packs, extracts the tarball into a throwaway project and type-checks every fenced example in `PRD.md` and `README.md` plus the docs site's live examples against **the artifact**, with no `paths` mapping — the only check here that resolves the package the way a host does. Prints each skip with the requirement it waits on; runs in `verify` and in CI |
 | `npm run check:maturity` | FR-50 against `dist/`: reads the published names through `scripts/api-names.mjs` and fails if one has no maturity state in `api-maturity.json`, if a state has no name behind it, if a non-stable name has no reason, or if the file invents a fifth state. Runs itself against nine synthetic violations first. Last step of `npm run verify`, and since 2026-10-04 a named step in the CI `verify` job |
+| `npm run check:deps` | §6.2's automated scan of transitive dependencies, over **both** surfaces: `npm audit --omit=dev` (what a consumer resolves) and `npm audit` (what a laptop and a runner execute). Every advisory the registry reports must be decided in `security/dependency-triage.json`, and the four facts a decision was made about — `severity`, `affectedRange`, the `packages` it reaches, the `surface` it was seen on — must still match the registry today, so an escalation or a widened range reopens the entry instead of riding along under an old signature. An entry whose review date has passed is red, a finding that has gone away takes its entry with it, `accepted-dev-only` on something that ships is red, and an audit that cannot execute exits 2 rather than skipping. `--selftest` grades 12 synthetic trees first. The triage path itself is [`SECURITY.md`](./SECURITY.md); **the obligation carries no FR row**, so `check:fr-evidence` cannot see it and this is the only place it is tracked |
 | `npm run check:fr-evidence` | FR-52/FR-58: the register gate. Reads the requirement ids and titles out of `PRD.md`, so a row cannot invent or drop a requirement; fails a citation that points at a file that does not exist and a `#anchor` the browser harness does not define; demands that a `met` row show implementation, tests, a guard naming its own `FR-` id, docs, and acceptance or a waiver of at least 40 characters; refuses a `partial` with no gap; and compares `ROADMAP.md`'s generated status block against the register, ignoring line endings (#215) so the check does not depend on whose checkout it is. `--emit` rewrites that block; `--selftest` grades itself against 22 cases first — 19 injected violations and
 three that must stay quiet |
 | `npm run check:tarball` | FR-41 against the **artifact**: `npm pack`, install the tarball beside its real peers into a CommonJS project, resolve every path both ways, and typecheck one identical source file as `.mts` and as `.cts` under `NodeNext`. Needs the network, so it is not in `verify` |
 | `npm run test:browsers` | FR-48: §8's browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; exits non-zero if a check fails **or** if an engine never started, because a row with no job behind it is not a tested row |
-| `npm run bench` | FR-49: §6's profiles against their fixtures. Prints **bars** (structural — bounded canvas count, canvases actually released, the caps binding where they should) and **measures** (timings with the machine named, never failed on). C and D report that they have no fixture |
+| `npm run a11y:record` | FR-58: runs the `a11y` project with the recorder switched on and writes `a11y/latest.json` — axe’s findings as a committed record with its environment, not a console log. Writes nothing when the audit run is red, and `npm test` / `npm run a11y` write nothing at all, so the tree stays clean between deliberate runs. `src/lib/a11y-record.test.ts` is what keeps it honest |
+| `npm run bench` | FR-49: §6's four profiles against their committed fixtures. Prints **bars** (structural — bounded
+| | canvas count, canvases released, the caps binding, the two §6 profile C bars) and
+  **measures** (timings with the machine named, never failed on). Profile C's attribution of the cold page between
+  this package and the engine comes from `pjsr:` UserTiming marks the viewer puts in its own paint path, read in
+  the load under test; the engine-only harness through `playground/raw.html` is printed beside it as a cross-check,
+  not as the subtraction the number used to be |
 | `npm run probe:canvas` | FR-57's "detection, not labels" in Chromium: imports `src/lib/canvas.ts` through the dev server and fails unless the platform probe answers with the ceiling in force, the shell probes without being asked, one surface lands per frame, no rung allocates above the limit, and the first surface comes after the page painted. Prints the numbers, not just the verdict |
 | `npm run probe:worker` | FR-02's browser premise: reads `GlobalWorkerOptions.workerSrc` in Chromium with the playground's own worker wiring blocked, and fails if a browser entry stops starting on the empty string — the state that is why the candidate probe runs in a browser and not in Node |
-| `npm run verify` | typecheck → test → build → size → packaging → examples → maturity → fr-evidence. Also `prepublishOnly` |
+| `npm run verify` | typecheck → test → build → size → packaging → examples → maturity → **deps** → docs → fr-evidence. Also `prepublishOnly` |
 
 **CI** (`.github/workflows/ci.yml`, read-only token, `concurrency` cancelling superseded runs), six jobs:
 `verify` on Node **22.13.0, 22 and 24** (the contract floor, the LTS, the next major) running typecheck,
-tests, the axe audit, build, **the maturity gate and the register gate**, size, `npm pack --dry-run` and
+tests, the axe audit, build, **the maturity, dependency-triage and register gates**, size, `npm pack --dry-run` and
 `check:examples` · `docs` (skipped on `main`,
 where `docs.yml` publishes instead) · `react`, which swaps in majors **18 and 19** at both their
 **minimum-advertised and latest patches** — four runs, with the two `react`/`react-dom` majors asserted to
@@ -1342,6 +1365,7 @@ npm run check:docs                              # the same, as the step `verify`
 grep -rc "" src/**/*.ts src/**/*.tsx            # file inventory (§2)
 npm run test                                    # 1,275 tests in 144 files (§2, §17)
 npm run a11y                                    # the axe audit on its own (FR-45); it also runs inside the line above
+npm run a11y:record                           # the same audits, and writes a11y/latest.json (FR-58)
 npm run test:browsers                           # FR-48: the §8 browser rows in Chromium, Firefox and WebKit at 1280×900 and 375×812/dpr-2. Needs the Playwright engines installed; it exits non-zero if a check fails *or* if an engine never started, because a row with no job behind it is not a tested row
 npm run probe:canvas                            # FR-57: the §6.1 probe against real Chromium — the ceiling it answers with, the ceiling a mobile UA lowers it to, and the frame every surface landed on
 npm run probe:worker                            # FR-02: what `workerSrc` holds in a browser before anything configures it (empty) and so why the candidate probe runs there
