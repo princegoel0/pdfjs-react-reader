@@ -50,10 +50,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      # FR-45. The same file runs inside `npm test` above, so a violation fails every job; this step is
-      # here so the failure has a name on the checks list rather than being line 4,000 of a suite.
-      - name: Accessibility audit (axe-core, WCAG 2.0/2.1/2.2 A+AA)
-        run: npm run a11y
+      # FR-45, and FR-58's accessibility half. The same audits run inside `npm test` above, so a violation fails
+      # every job; this step is here so the failure has a name on the checks list rather than being line 4,000 of
+      # a suite — and because `a11y:record` is what *produces* `a11y/latest.json`, the committed evidence §9 asks
+      # for, from a runner rather than from one developer's console.
+      - name: Accessibility audit and record (axe-core, WCAG 2.0/2.1/2.2 A+AA)
+        run: npm run a11y:record
 
       - name: Build
         run: npm run build
@@ -63,6 +65,13 @@ jobs:
       # untagged export could merge green.
       - name: Published API maturity tags
         run: npm run check:maturity
+
+      # §6.2: automated scanning of transitive dependencies, with a documented triage path. Placed here, ahead
+      # of the steps that read the tree, because the obligation is that a scan *runs*: a finding the registry
+      # reports and nobody has decided is red, and a scan that could not reach the registry is red too rather
+      # than skipped. The decisions live in security/dependency-triage.json and the path is SECURITY.md.
+      - name: Dependency scan and triage
+        run: npm run check:deps
 
       # §22 of CODE_REFERENCE: the counts that document states about this tree — entry points, source files,
       # fixtures, CI jobs, browser checks — are derived here rather than copied by hand, because every one of

@@ -1,0 +1,74 @@
+{
+  "//": "§6.2's documented triage path, machine-readable half. `npm run check:deps` scans both surfaces and refuses a finding that is reported by the registry and recorded here as nothing, a decision kept after the finding is gone, and any of the four facts a decision was made about (severity, affectedRange, packages, surface) moving without the entry moving with it. The prose path — who decides, in what order, and what a peer's own finding is allowed to look like — is SECURITY.md. Entries with `status: \"precedent\"` are not live findings: they are the recorded answer to the clause's hardest case, a finding that originates inside a peer's bundle.",
+  "schema": 1,
+  "policy": "SECURITY.md",
+  "entries": [
+    {
+      "advisory": "GHSA-g7r4-m6w7-qqqr",
+      "url": "https://github.com/advisories/GHSA-g7r4-m6w7-qqqr",
+      "title": "esbuild allows arbitrary file read when running the development server on Windows",
+      "severity": "low",
+      "affectedRange": ">=0.27.3 <0.28.1",
+      "packages": ["esbuild"],
+      "surface": "development",
+      "decision": "upgrade-blocked",
+      "reason": "The fix is 0.28.1 and tsup — the tool every published artifact is built with — declares `^0.27.0`, so the release this tree resolves to is still vulnerable however the lockfile is refreshed; vite 7 would accept 0.28 but npm installs one version, and forcing it means an `overrides` entry fighting a declared range. The advisory's own reach is the loopback dev server on Windows reading files outside the served root, which no CI job runs; the browser matrix starts vite on Linux.",
+      "reviewedOn": "2026-10-07",
+      "reviewBy": "2027-01-05"
+    },
+    {
+      "advisory": "GHSA-5gmw-xhrv-c9v3",
+      "url": "https://github.com/advisories/GHSA-5gmw-xhrv-c9v3",
+      "title": "Tinypool: Prototype Pollution gadget in worker options leads to Remote Code Execution",
+      "severity": "critical",
+      "affectedRange": "<=2.1.0",
+      "packages": ["tinypool"],
+      "surface": "development",
+      "decision": "upgrade-blocked",
+      "reason": "tinypool arrives only through vitest 3.2.7's `^1.1.1`, and the fixed 2.1.2 is outside that range, so clearing it means moving vitest a major, which touches every file in a 144-file suite, the a11y project's singleFork pool configuration (#216) and the lockfile-pinned dev tree CI asserts on (#244). Nothing a consumer installs contains it: `npm audit --omit=dev` reports zero for this package, whose runtime dependencies are none, and no published file imports tinypool.",
+      "reviewedOn": "2026-10-07",
+      "reviewBy": "2026-11-01"
+    },
+    {
+      "advisory": "GHSA-85c8-ppgw-ccpr",
+      "url": "https://github.com/advisories/GHSA-85c8-ppgw-ccpr",
+      "title": "Tinypool: Prototype Pollution Gadget to RCE in run() options",
+      "severity": "critical",
+      "affectedRange": "<2.1.2",
+      "packages": ["tinypool"],
+      "surface": "development",
+      "decision": "upgrade-blocked",
+      "reason": "The second prototype-pollution gadget in the same worker pool, fixed in the same release, blocked by the same range: it is a separate advisory and is recorded separately, because one of the two could be withdrawn or re-scoped without the other, and a shared entry would hide that.",
+      "reviewedOn": "2026-10-07",
+      "reviewBy": "2026-11-01"
+    },
+    {
+      "advisory": "GHSA-82fw-gwwq-j7x9",
+      "url": "https://github.com/advisories/GHSA-82fw-gwwq-j7x9",
+      "title": "Vitest: Path Traversal / Arbitrary File Read via @vitest/mocker Redirect Mock",
+      "severity": "moderate",
+      "affectedRange": ">=2.1.0 <4.1.11",
+      "packages": ["@vitest/mocker", "vitest"],
+      "surface": "development",
+      "decision": "upgrade-blocked",
+      "reason": "Fixed in the 4.1.11 line; this tree is on 3.2.7, which pins @vitest/mocker to its own exact version, so the two names npm reports are one install and one upgrade. The reach is the mock registry reading a path outside the project while a test run is being driven locally — the runner, not the viewer, and not anything a consumer resolves.",
+      "reviewedOn": "2026-10-07",
+      "reviewBy": "2026-11-01"
+    },
+    {
+      "status": "precedent",
+      "advisory": "GHSA-hq66-cqwq-w95j",
+      "cve": "CVE-2026-16633",
+      "url": "https://github.com/advisories/GHSA-hq66-cqwq-w95j",
+      "title": "PDF.js: Arbitrary JavaScript execution upon opening a malicious PDF",
+      "severity": "critical",
+      "affectedRange": ">=5.6.83 <6.2.108",
+      "packages": ["pdfjs-dist"],
+      "surface": "production",
+      "decision": "peer-floor",
+      "reason": "§6.2's hardest case, written down so a future reader recognises it: the finding originates inside a peer's own bundle, so no change to this package's code and no version of this package fixes it. What this package controls is the range it publishes: `pdfjs-dist: ^6.2.108`, whose floor is the first release the advisory does not cover, and CI installs the floor and the latest supported 6.x on every push so the pairing is executed rather than asserted. What it could not control was the line already published — 0.1.0 and 0.1.1 declare `^5.0.0` as their only engine peer, so installing them resolves an engine with no fix for this CVE, which is why those two versions are deprecated on the registry (PRD §9, ROADMAP W9, decision #207) and why a peer finding never gets to end at a comment.",
+      "reviewedOn": "2026-10-07",
+      "reviewBy": "2027-01-05"
+    }
+  ]
+}
