@@ -130,6 +130,16 @@ to bite — and never up on a claim nobody can make fail.
   reads the call site out of `PdfPage.tsx` failed — its message first read `expected -1 to be greater than -1`,
   which indicts the reader rather than the page, so it now prints which markers it looked for and where.
 
+  The floor was read too, before letting CI be the first to ask. `pdfjs-dist@6.2.108` installed with
+  `scripts/pin-tree.mjs pins` in the same command (#244's shape), `pin-tree.mjs check --exact` proving the cell,
+  then the recorder: six audits over chromium 153.0.8010.12, firefox 155.0 and webkit 26.6, 0 violations, 351
+  contrast nodes and 231 target-size nodes, and the same widget and link names as at 6.3.289 — so the naming fix is
+  not engine-version-shaped and the new CI step will not redden the floor cell for a reason this machine could have
+  found first. The instrument earned its keep on its own author: the restore command carried a `> /dev/null` copied
+  from the Linux-shaped CI step, cmd answered `The system cannot find the path specified`, and
+  `pin-tree.mjs check --exact=pdfjs-dist=6.3.289` refused a node_modules still holding 6.2.108 instead of letting a
+  floor tree stand in for the lockfile one. Restored, and both `pin-tree.mjs check` and `git status` come back clean.
+
   Cost: `core` 32.78 → **33.26 kB gz** (+0.48 kB, the naming module and one label key), the structure path 34.00,
   all nine 49.58. The ratchet reports the growth against the baseline last re-accepted at #225 and is not silently
   re-accepted here. In the register `FR-45` stays **partial**: two of its three gaps closed by measurement and one
