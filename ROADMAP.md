@@ -100,7 +100,7 @@ certified on this machine at all.
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |
 | `FR-51` | Edge-Case Suite | **met** | 5/5 | 0 | — |
 | `FR-52` | Public API & Export Contract | **partial** | 5/5 | 1 | the /edit, /merge, /features/*, per-feature CSS and /locales/* entries this row classifies as pu… |
-| `FR-53` | Dependency & Engine Contract | **partial** | 5/5 | 1 | the writer peer has a contract now and no way to notice when it needs one. `src/lib/pdf-write.pe… |
+| `FR-53` | Dependency & Engine Contract | **met** | 5/5 | 0 | — |
 | `FR-54` | Stable Error & Cancellation Contract | **met** | 4/5 | 0 | — |
 | `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |

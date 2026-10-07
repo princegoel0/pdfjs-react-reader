@@ -257,4 +257,24 @@ describe('FR-53: the optional peer enters through the edit door and no other', (
     expect(used.has(PEER), 'the writer is in the set, so the case above is not vacuous').toBe(true);
     expect(manifest.dependencies ?? {}, 'nothing is bundled in as a hard dependency').toEqual({});
   });
+
+  it('advertises the React pair as one range, which is the only enforcement this package has', () => {
+    /*
+     * FR-53's `React and react-dom must match major versions` clause, read for what it can mean here: this
+     * package cannot reach into a host's `node_modules`, and npm will install `react@18` beside `react-dom@19`
+     * without complaint. What keeps the pair in step is the manifest's own words, so saying the same thing
+     * twice, in two strings that have to agree, is the whole of it — and the two strings agreeing is the
+     * assertion rather than a formality. Split them — a `^18.0.0 || ^19.0.0` for one and a `^19.0.0` for the
+     * other, which is the kind of edit that happens when someone raises a floor in one place — and a host can
+     * be told by this manifest that a mismatched pair is supported.
+     *
+     * What this does not prove is that a matched pair *works*, which is the `react` CI job's claim (18 and 19,
+     * minimum and latest patch, one variable feeding both installs) and is cited under FR-48.
+     */
+    const peers = packageJson.peerDependencies ?? {};
+    expect(peers['react-dom'], 'react-dom is advertised with the range react is').toBe(peers.react);
+    expect(peers.react, 'the React range is declared, so the case above is not comparing two undefined').toEqual(
+      expect.any(String),
+    );
+  });
 });

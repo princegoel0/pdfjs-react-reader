@@ -914,7 +914,7 @@ focus **twice** — palette on, then off — so the ring seen is the sheet's re-
 
 ---
 
-## 17. Tests: 149 files, 1,305 tests, five projects
+## 17. Tests: 149 files, 1,306 tests, five projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read from
 disk) except `ssr.test.ts`, **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library) except the audits and

@@ -29,10 +29,10 @@ added beside the size step (#215's follow-on) run green ahead of it, and #218 mo
 in front of it too, so a byte budget cannot hide a contract check — that
 reorder has not run on a runner yet, which is why FR-52's examples clause keeps its gap. What is left open is
 not reachable from this machine: §8's pinned browser floors, the engine axis inside a browser at both range
-ends, Edge, hardware, and the assistive-technology pairings. The register stands at **49 met, 8 partial, 1
-absent** of 58 — the eighteenth and nineteenth moves being #242 and the FR-37 ruling, which took `FR-54` and `FR-37`
+ends, Edge, hardware, and the assistive-technology pairings. The register's state of record is the command, not a
+number in this file — `npm run check:fr-evidence`, whose emitted block lives in ROADMAP.md §Status — the eighteenth and nineteenth moves being #242 and the FR-37 ruling, which took `FR-54` and `FR-37`
 out of *partial*, and the twentieth and twenty-first being #253's two browser rows, which took `FR-24` and `FR-19` out
-of it — on a suite of **1,299 tests in 148 files** — eighteen rows moved when a clause-by-clause read of
+of it — on a suite whose size is what `npm test` prints rather than what this file remembers — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
 this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
@@ -66,6 +66,31 @@ direction the count takes from here: down where a guard turns out to be decorati
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **FR-53's writer peer gained the half #260 left open: something now notices when its range grows (FR-53, #266,
+  2026-10-07).** That work order gave `@cantoo/pdf-lib` a surface contract — the 27 members `pdf-write.ts` and
+  `pdf-merge.ts` call, resolved against the peer in the tree — and named what it could not do: a contract can only
+  ever speak about the version it is run against, and `^2.11.1` is a caret, so it grows by itself the day npm
+  serves a second member. Nothing in the suite could see that happening, because the suite reads `node_modules`,
+  not the registry. `scripts/check-writer-peer.mjs` asks npm what the advertised range resolves to *now* and
+  compares the newest member to the proven pin, failing with the one command that re-runs the contract — and it
+  asks npm rather than reimplementing semver, because a second answer to "what is in this range" is exactly the
+  kind of thing that drifts. It runs as a step in the `consumer` job, which is already online and already
+  networked, and deliberately not in `verify`, which is not — the same reason `check:tarball` sits outside it.
+  Readings, four of them, because an instrument that has only been seen to pass is not known to be able to fail:
+  the real read today answers `range ^2.11.1 → 1 member npm serves, newest 2.11.1, which is the pin`;
+  `--at=2.12.0` (a what-if that skips the registry call) fails naming the command, and says *in a scratch tree*
+  because `npm i --no-save` in this one re-resolves unrelated devDependencies, which is #244's lesson; and a
+  throwaway manifest in `.spike/wt/` — the same script, a scratch tree that `.gitignore` keeps out of the repo, so
+  re-create it to repeat this, and the repository's own `package.json` untouched — fails on `^9.9.9` with `resolves to nothing on the registry` carrying npm's `E404` line, fails on
+  `^1.0.0` with `146 members npm serves, newest 1.21.1`, and passes on `^2.0.0` with `94 members, newest 2.11.1`.
+  The last two are the multi-member output shape being parsed against the live registry, which is the part a
+  single-member range could never have exercised. The clause's React half got the same treatment: **nothing in
+  the repo asserted that `react` and `react-dom` are advertised as the same range**, and that equality is the only
+  enforcement a manifest has over a pair it cannot install for a host — `dependency-boundary.test.ts` now asserts
+  it, with the CI matrix's matched-major installs cited as the separate claim. `FR-53` moves to **met**. What this
+  does not have: the step has not run on a runner yet, so the reading it will print there is tomorrow's, and the
+  range arithmetic is proven against the registry from one machine.
 
 - **The writer peer is now relied on by name, not by range (FR-53, #260, 2026-10-07).** `PRD.md`'s Dependency &
   Engine Contract ends with "npm semver acceptance alone is not a support claim", and until now that sentence was

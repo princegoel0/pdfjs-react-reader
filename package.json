@@ -231,6 +231,7 @@
     "check:examples": "node scripts/check-examples.mjs",
     "check:maturity": "node scripts/check-maturity.mjs",
     "check:deps": "node scripts/check-deps.mjs",
+    "check:writer-peer": "node scripts/check-writer-peer.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "check:fr-evidence": "node scripts/check-fr-evidence.mjs",
     "check:tarball": "node scripts/tarball-check.mjs",

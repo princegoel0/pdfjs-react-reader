@@ -239,6 +239,16 @@ jobs:
       - name: Install
         run: npm ci
 
+      # FR-53's discovery half, and the reason it lives here rather than in `verify`: a caret range grows by
+      # itself, so the day npm serves a second member of `@cantoo/pdf-lib: ^2.11.1`, the contract in
+      # `src/lib/pdf-write.peer-contract.test.ts` stops covering the promise this package publishes — and
+      # nothing in the suite can see it, because the suite only ever reads the peer in the tree. This asks npm
+      # what the advertised range resolves to now and fails if that is not the proven pin, with the command that
+      # re-runs the contract in the message. It needs the network, which is also why `check:tarball` is out of
+      # `verify`.
+      - name: Writer peer range still resolves to the proven version
+        run: npm run check:writer-peer
+
       - name: Build library
         run: npm run build
 
