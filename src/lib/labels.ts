@@ -32,6 +32,12 @@ export interface PdfViewerLabels {
    * carries its own rather than showing the engine's.
    */
   deleteAnnotation: string;
+  /**
+   * The name lent to a link annotation whose PDF carries nothing to name it with — `/TU`, contents, URL and
+   * destination all empty. A focusable link with no name is an FR-45 violation a reader cannot act on, and
+   * hiding it to silence the audit was measured taking a working `/Dest` out of the tab order (#267).
+   */
+  linkAnnotation: string;
   /** The highlight-colour control, whose value is one of the engine's palette names. */
   highlightColour: string;
   /**
@@ -221,6 +227,7 @@ export const DEFAULT_LABELS: PdfViewerLabels = {
   inkTool: 'Ink',
   inkNeedsPointer: 'Drawing needs a mouse, a pen or a finger — there is no keyboard equivalent',
   deleteAnnotation: 'Delete selected annotation',
+  linkAnnotation: 'Link',
   highlightColour: 'Highlight colour',
   highlightAdded: 'Highlight added',
   freeTextAdded: 'Text added',

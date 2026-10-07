@@ -18,6 +18,7 @@ export const FR_LABELS: PdfViewerLabels = Object.freeze({
   inkTool: 'Stylo',
   inkNeedsPointer: 'Dessiner demande une souris, un stylet ou un doigt — pas d’équivalent au clavier',
   deleteAnnotation: 'Supprimer l’annotation sélectionnée',
+  linkAnnotation: 'Lien',
   highlightColour: 'Couleur de surlignage',
   highlightAdded: 'Surlignage ajouté',
   freeTextAdded: 'Texte ajouté',

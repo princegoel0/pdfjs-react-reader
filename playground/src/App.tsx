@@ -240,7 +240,7 @@ export default function App() {
             <option value="/pdfjs-dist/">self-hosted</option>
           </select>
         </label>
-        <span className="app-features" aria-label="Mounted features">
+        <span className="app-features" role="group" aria-label="Mounted features">
           <label>
             <input
               type="checkbox"

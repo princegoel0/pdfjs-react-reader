@@ -26,9 +26,10 @@ import { tmpdir, hostname, platform, release } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { auditTags } from './axe-tags.mjs';
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(root, 'a11y', 'latest.json');
-const HARNESS = join(root, 'src', 'components', 'axe-audit-harness.ts');
 
 /** A version read out of an installed package's own manifest — not `require(name + '/package.json')`, which
  * throws for packages that restrict `exports` (the lesson #244 left behind). */
@@ -38,16 +39,6 @@ function installedVersion(name) {
   } catch {
     return `${name} is not installed`;
   }
-}
-
-function auditTags() {
-  const source = readFileSync(HARNESS, 'utf8');
-  const match = /values:\s*\[([^\]]*)\]/.exec(source);
-  if (!match) throw new Error(`${HARNESS} no longer spells its rule tags in a \`values: [...]\` list, so the record cannot say what was checked.`);
-  return match[1]
-    .split(',')
-    .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
-    .filter(Boolean);
 }
 
 function revision() {
@@ -118,8 +109,12 @@ try {
       harness: 'src/components/axe-audit-harness.ts',
       note:
         'axe under jsdom answers structure and naming only. The rules that report `incomplete` here are the ones needing ' +
-        'layout, geometry or a real hit-test — measured touch-target evidence is the browser matrix’s `toolbar-fold` row, ' +
-        'and colour contrast and the assistive-technology pairings are still open gaps in fr-evidence.json under FR-45.',
+        'layout, geometry or a real hit-test. Colour contrast and touch-target size are measured where a layout exists: ' +
+        'a11y/browser.json, written by `npm run a11y:browser-record` and read back by ' +
+        'src/lib/a11y-browser-record.test.ts, runs the same tag list inside Chromium, Firefox and WebKit, and the browser ' +
+        'matrix’s `toolbar-fold` row measures the toolbar’s boxes at the widths it folds at. What is still an open gap in ' +
+        'fr-evidence.json under FR-45 is the assistive-technology pairings — NVDA with Firefox, JAWS with Chrome and ' +
+        'VoiceOver with Safari need a human operator reading what each one speaks.',
     },
     totals: {
       audits: entries.length,

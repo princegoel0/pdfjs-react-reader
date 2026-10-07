@@ -19,6 +19,7 @@ import { useLabels } from './labels-context';
 import { useDevicePixelRatio } from './useDevicePixelRatio';
 import { applyHighlights, unwrapMarks } from '../lib/highlight';
 import { attachmentMimeType } from '../lib/attachments';
+import { nameUnnamedWidgets } from '../lib/annotation-names';
 import { downloadBytes } from '../lib/download';
 import type { AnnotationValueStore } from '../lib/form';
 import { signatureBoxes } from '../lib/form';
@@ -839,6 +840,16 @@ export const PdfPage = memo(function PdfPage({
         renderForms,
         enableScripting: false,
       } as unknown as Parameters<AnnotationLayer['render']>[0]);
+      /*
+       * FR-45, measured in a real browser rather than asserted about one (#267): axe in chromium, firefox and
+       * webkit each found nine form controls and one link with no accessible name, because the engine names a
+       * widget only when the PDF carries a `/TU` field label — and hands it the fully qualified field name on
+       * the `name` attribute instead. That name is what the document actually has, so the control gets it.
+       * `src/lib/annotation-names.ts` spells out what the pass will not do: no label already given by the
+       * author or by the structure layer is touched, and nothing is invented for a widget the document never
+       * named at all.
+       */
+      nameUnnamedWidgets(container, annotations, labels.linkAnnotation);
       if (!cancelled) end('annotations');
     })().catch((err: unknown) => {
       if (cancelled) return;

@@ -35,7 +35,8 @@ out of *partial*, and the twentieth and twenty-first being #253's two browser ro
 of it — on a suite whose size is what `npm test` prints rather than what this file remembers — eighteen rows moved when a clause-by-clause read of
 `PRD.md` against the tests found guards asserting less than the sentences they were cited for, which is *Changed*
 below and is the honest number rather than the comfortable one. One row moved on a runner's reading of an engine
-this host cannot start, moved back when the next reading disagreed, and is met again now that the condition it
+this host could not start that day (#267 read all three engines from this machine the same week), moved back when
+the next reading disagreed, and is met again now that the condition it
 wrote for itself has been satisfied twice: `FR-44` and **#245**/**#246** below are that whole exchange, and that
 count moved on a repeat rather than a hope. Seventeen of those eighteen are back out, and the eighteenth is back
 out too: `FR-16` was short of a behaviour rather than an assertion, and **#229** built it — the `/Sig` box drawn by
@@ -66,6 +67,75 @@ direction the count takes from here: down where a guard turns out to be decorati
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **FR-45's automated leg now runs where a layout exists, and it found ten unnamed nodes on its first pass (FR-45,
+  FR-58, #267, 2026-10-07).** The clause splits its evidence four ways, and the axe half had only ever run in the
+  one environment where two of its rules are blind: jsdom hands every element a 0×0 box and paints nothing, so
+  `color-contrast` reports `incomplete` and `target-size` "passes" six nodes it could not have measured.
+  `scripts/a11y-browser-record.mjs` drives the playground in Playwright's engines, injects the axe build already in
+  `node_modules`, runs **the same tag list the jsdom harness declares** — one derivation for both, in
+  `scripts/axe-tags.mjs`, so a browser record cannot claim a WCAG level the audits stopped asking for — over
+  `form-sample.pdf` in two mount states (sidebar closed, then sidebar open on the tab whose label was read back
+  rather than assumed), and writes `a11y/browser.json`: six audits over three engines, 351 contrast nodes and 231
+  target-size nodes measured in a real layout, each entry naming its engine version, document, mount state, node
+  count, widget names and link names. `src/lib/a11y-browser-record.test.ts` reads that file back in the `node`
+  project — eight cases, no browsers — and the CI `browser` job runs the recorder in both engine cells.
+
+  The first run earned its minutes: **ten unnamed nodes in all three engines at once** — `label` ×7, `select-name`
+  ×2, `link-name` ×1 — on a tree eleven jsdom audit files had walked and pronounced clean. The cause was in the
+  engine, not the shell: pdf.js names a widget only from the annotation's `/TU`, and the fixture declares none.
+  `src/lib/annotation-names.ts` now names what the document left silent, after the layer renders and before the
+  page marks it done, from the sources a reader would trust in order (`fieldName → label → name → contents →
+  title`, and for a link `title → contents → url → destination → the shell's own word`), leaves alone anything the
+  document, the author or the structure layer already named, and **reports the control it cannot name instead of
+  inventing a label for it**. Hiding was tried and rejected on a measurement: `aria-hidden` on the unnamed link
+  took a working `/Dest` navigation out of the tab order, so a generic name and a focusable element is the fix,
+  which costs a new label key (`linkAnnotation`) in all four catalogs.
+
+  Three of this work order's findings were instruments, not the viewer. (a) The record's own reader printed
+  `linkNames: ["(unnamed)","Link"]` on an audit with zero `link-name` violations; the probe showed the link it
+  called unnamed is `title="Back to page one (link annotation)"` — pdf.js's own naming — and the reader looked only
+  at `aria-label` and the text. The field now records *where the name came from*, and the guard asserts on that,
+  because a reader that cannot say how it knows manufactures findings. (b) `a11y/latest.json`'s
+  `standard.note` still said colour contrast was an open gap; a run had just falsified that sentence, so it was
+  rewritten in the same pass as the record it describes. (c) Two comments — this script's own header and the
+  browser matrix's launch-report note — asserted that this host cannot start Firefox or WebKit. Today's readings
+  started all three (chromium 153.0.8010.12, firefox 155.0, webkit 26.6) with `notRunnable` empty, so both now say
+  what was measured when instead of what the machine is presumed never to do.
+
+  The same evening ran the browser matrix six cells wide, three times, and that belongs here because it is how two
+  of this entry's claims nearly got written wrong. Run one read **92 ok / 7 skipped / 0 not runnable / 3 failed** —
+  `form-widgets-are-html-controls` in webkit desktop and mobile, plus `authored-ink-survives-scroll-and-save` in
+  webkit desktop. Holding the naming call out of `PdfPage.tsx` for run two read **94 ok / 1 failed**, and putting it
+  back for run three read **94 ok / 1 failed** again, so the two signature-box failures were not the naming pass's:
+  the same code read `5 boxes drawn and 1 left to the engine` twice. What is deliberately absent from that sentence
+  is an explanation, because the comfortable one was measured and refused — the first run was the first matrix run
+  after a source edit, but the optimised-dependency hash the structure row prints (`45f3c999`) was identical in all
+  three runs, so the warm-up story does not hold and the row stays recorded as having read 3 of 5 boxes once in
+  three runs with no mechanism found. `authored-ink-survives-scroll-and-save` is the opposite case: it failed in
+  webkit desktop in all three runs with `no "Ink" control in the 1280px bar, and no overflow menu to look in`, in the
+  same cell at the same width where `toolbar-fold` in that very run reports `no overflow at 1280px, jump-to-page
+  inline` — a bar the planner says is unfolded, holding a control `reveal()` cannot find with no panel to open.
+  Chromium and Firefox read it green every time, so it is engine-shaped, it is not #267's, and it is filed as
+  **#276** rather than absorbed. Those runs also produced the sighting #248 wrote its note to catch: webkit's print
+  row settled on the application's state while no copy a pointer could reach held it, and the row proceeded with
+  that sentence in its own text — twice in three runs, not the third, which is the alternation this engine and this
+  row have produced since run 37386366651.
+
+  Falsification, twelve ways, each restored by checksum: eight against the record guard (a stale axe version, an
+  injected violation, contrast at zero nodes, a widget stripped of its name, a link stripped of its name, totals
+  typed rather than derived, an engine dropped without a reason, a shorter tag list) — every one red naming its own
+  reason; then the product call removed for a real browser run, where the three engines found the same ten nodes,
+  `npm run a11y:browser-record` exited 1 and left `a11y/browser.json` **byte-identical**, and the jsdom case that
+  reads the call site out of `PdfPage.tsx` failed — its message first read `expected -1 to be greater than -1`,
+  which indicts the reader rather than the page, so it now prints which markers it looked for and where.
+
+  Cost: `core` 32.78 → **33.26 kB gz** (+0.48 kB, the naming module and one label key), the structure path 34.00,
+  all nine 49.58. The ratchet reports the growth against the baseline last re-accepted at #225 and is not silently
+  re-accepted here. In the register `FR-45` stays **partial**: two of its three gaps closed by measurement and one
+  replaced by a narrower measured fact — 19 `.pjsr-text-layer` nodes stay `incomplete` in every engine because axe
+  will not resolve a background through the canvas they sit over — and the NVDA/JAWS/VoiceOver pairings are still
+  the operator and the schedule they have always been.
 
 - **FR-53's writer peer gained the half #260 left open: something now notices when its range grows (FR-53, #266,
   2026-10-07).** That work order gave `@cantoo/pdf-lib` a surface contract — the 27 members `pdf-write.ts` and

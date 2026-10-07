@@ -2650,8 +2650,11 @@ const CHECKS = [
            * #243) the row reached the control through the ⋯ panel, the selection timed out, and the samples —
            * which counted only a bar copy as usable — then described the panel they had just opened as an absent
            * control. A layout question that keeps changing shape is answered by measuring more of it, not by
-           * retrying the same probe: this host cannot start webkit (three attempts, all `Target page, context or
-           * browser has been closed`), so the runner carries the instrument.
+           * retrying the same probe: webkit would not start on this host at that moment (three attempts, all
+           * `Target page, context or browser has been closed`), so the runner carried the instrument. It has since
+           * started here — the run of 2026-10-07 launched chromium 153.0.8010.12, firefox 155.0 and webkit 26.6 on
+           * this machine — which makes that refusal a transient of the host rather than a property of it, and the
+           * reason a `not runnable` line in a log is worth re-running before it is believed.
            *
            * So the panel is put back before anything is described (an abandoned selection dismisses it, and a
            * closed panel renders no folded control at all), and six DOM readings then decide which of the three
@@ -3864,9 +3867,12 @@ const errText = (error) => String(error?.message ?? error).replace(/\s+/g, ' ').
 
 /**
  * A browser that will not start is a different finding from a check that failed, and the log has to tell
- * them apart: this host's Windows loader refuses the engine's own DLLs before a page exists, so nothing this
- * package does has been measured — which is a gap in the evidence rather than a defect in the viewer. The
- * status code is translated because a decimal NTSTATUS is not something a reader can look up in a log.
+ * them apart: an engine whose process dies before a page exists means nothing in this package has been
+ * measured there, which is a gap in the evidence rather than a defect in the viewer. It has happened on this
+ * host — the recorded readings include firefox and webkit exiting with an NTSTATUS before any report line —
+ * and it is not a permanent property of it: the run of 2026-10-07 started all three engines here (chromium
+ * 153.0.8010.12, firefox 155.0, webkit 26.6). The status code is translated because a decimal NTSTATUS is not
+ * something a reader can look up in a log.
  */
 const NTSTATUS = { 3236495362: '0xC0000142, DLL initialisation failed' };
 const launchText = (error) => {

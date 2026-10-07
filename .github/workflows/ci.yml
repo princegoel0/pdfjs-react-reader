@@ -402,6 +402,13 @@ jobs:
       - name: Run the matrix
         run: npm run test:browsers
 
+      # FR-45's automated leg, in a real layout: axe under jsdom cannot see colour contrast or geometry, so this
+      # runs the same rule set inside each engine over a document whose AcroForm the engine has turned into HTML
+      # controls, and refuses to write a record when any audit finds a violation. It runs in both engine cells on
+      # purpose — the widget markup is the engine's, and #249 is the precedent for a floor-only a11y difference.
+      - name: Accessibility audit in a real browser
+        run: npm run a11y:browser-record
+
       # FR-49's evidence, in the same job because it needs the same browser install. The script separates
       # bars (structural, and they fail the job) from measures (timings, printed with the machine they came
       # from and never failed on) — §6's own rule is that a maximum observed on one device does not become a

@@ -1,0 +1,415 @@
+{
+  "schema": 1,
+  "producedBy": "npm run a11y:browser-record (scripts/a11y-browser-record.mjs)",
+  "environment": {
+    "machine": "princegoel",
+    "platform": "win32",
+    "osRelease": "10.0.26300",
+    "node": "v24.21.0",
+    "axeCore": "4.13.0",
+    "playwright": "1.63.0",
+    "ranAt": "2026-10-07T19:29:37.975Z",
+    "revision": "3e581ceaddcb53a6709ecd46611a22595bbfd8d0"
+  },
+  "standard": {
+    "source": "PRD.md §Access / FR-45",
+    "tags": [
+      "wcag2a",
+      "wcag2aa",
+      "wcag21a",
+      "wcag21aa",
+      "wcag22aa"
+    ],
+    "harness": "src/components/axe-audit-harness.ts (the tag list, read by scripts/axe-tags.mjs)",
+    "note": "axe inside a real engine: `color-contrast` compares painted pixels and `target-size` measures boxes, which is what the jsdom run cannot do. This is the automated leg of FR-45’s four-way evidence split; the keyboard and forced-colour rows are in the browser matrix, the touch-target geometry is now measured twice (here and by `toolbar-fold`), and the NVDA/JAWS/VoiceOver pairings are still an operator and a schedule away."
+  },
+  "totals": {
+    "audits": 6,
+    "engines": [
+      "chromium",
+      "firefox",
+      "webkit"
+    ],
+    "notRunnable": [],
+    "violationsRecorded": 0,
+    "contrastNodesMeasured": 351,
+    "targetSizeNodesMeasured": 231,
+    "rulesIncomplete": [
+      "color-contrast"
+    ]
+  },
+  "audits": [
+    {
+      "engine": "chromium",
+      "engineVersion": "153.0.8010.12",
+      "started": true,
+      "axeCore": "4.13.0",
+      "document": "form-sample.pdf",
+      "pages": 2,
+      "viewport": "1280×900 dpr 1",
+      "state": "document loaded, sidebar closed",
+      "url": "http://localhost:5199/",
+      "testEngine": {
+        "name": "axe-core",
+        "version": "4.13.0"
+      },
+      "nodesInDocument": 367,
+      "formWidgetsPainted": 8,
+      "widgetNames": [
+        "country:country",
+        "fullName:fullName",
+        "priority:priority",
+        "priority:priority",
+        "priority:priority",
+        "signatureNote:signatureNote",
+        "skills:skills",
+        "subscribe:subscribe"
+      ],
+      "linkNames": [
+        "aria-label:Link",
+        "title:Back to page one (link annotation)"
+      ],
+      "passingRules": 28,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 19,
+          "firstTarget": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+          "examples": [
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 2.39%; --font-height: 16.00px; font-family: sans-serif; --scale-x: 1.000251831670916;\">AcroForm fixture</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(3)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 8.06%; --font-height: 10.00px; font-family: sans-serif; --scale-x: 1.0002361450957402;\">Full name:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(5)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 11.34%; --font-height: 10.00px; font-family: sans-serif; --scale-x: 1.0002865433348798;\">Notes:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            }
+          ]
+        }
+      ],
+      "geometryPassingNodes": {
+        "color-contrast": 56,
+        "target-size": 36
+      }
+    },
+    {
+      "engine": "chromium",
+      "engineVersion": "153.0.8010.12",
+      "started": true,
+      "axeCore": "4.13.0",
+      "document": "form-sample.pdf",
+      "pages": 2,
+      "viewport": "1280×900 dpr 1",
+      "state": "sidebar open on the tab labelled \"Thumbnails\"",
+      "url": "http://localhost:5199/",
+      "testEngine": {
+        "name": "axe-core",
+        "version": "4.13.0"
+      },
+      "nodesInDocument": 386,
+      "formWidgetsPainted": 8,
+      "widgetNames": [
+        "country:country",
+        "fullName:fullName",
+        "priority:priority",
+        "priority:priority",
+        "priority:priority",
+        "signatureNote:signatureNote",
+        "skills:skills",
+        "subscribe:subscribe"
+      ],
+      "linkNames": [
+        "aria-label:Link",
+        "title:Back to page one (link annotation)"
+      ],
+      "passingRules": 31,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 19,
+          "firstTarget": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+          "examples": [
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 2.39%; --font-height: 16.00px; font-family: sans-serif; --scale-x: 1.0003294521554345;\">AcroForm fixture</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(3)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 8.06%; --font-height: 10.00px; font-family: sans-serif; --scale-x: 1.0004089458938377;\">Full name:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(5)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 11.34%; --font-height: 10.00px; font-family: sans-serif; --scale-x: 1.0004593232419199;\">Notes:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            }
+          ]
+        }
+      ],
+      "geometryPassingNodes": {
+        "color-contrast": 61,
+        "target-size": 41
+      }
+    },
+    {
+      "engine": "firefox",
+      "engineVersion": "155.0",
+      "started": true,
+      "axeCore": "4.13.0",
+      "document": "form-sample.pdf",
+      "pages": 2,
+      "viewport": "1280×900 dpr 1",
+      "state": "document loaded, sidebar closed",
+      "url": "http://localhost:5199/",
+      "testEngine": {
+        "name": "axe-core",
+        "version": "4.13.0"
+      },
+      "nodesInDocument": 367,
+      "formWidgetsPainted": 8,
+      "widgetNames": [
+        "country:country",
+        "fullName:fullName",
+        "priority:priority",
+        "priority:priority",
+        "priority:priority",
+        "signatureNote:signatureNote",
+        "skills:skills",
+        "subscribe:subscribe"
+      ],
+      "linkNames": [
+        "aria-label:Link",
+        "title:Back to page one (link annotation)"
+      ],
+      "passingRules": 28,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 19,
+          "firstTarget": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+          "examples": [
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+              "html": "<span style=\"left: 11.76%; top: 2.46%; --font-height: 16.00px; font-family: Calibri, sans-serif; --scale-x: 1.07574361502563;\" role=\"presentation\" dir=\"ltr\">AcroForm fixture</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(3)",
+              "html": "<span style=\"left: 11.76%; top: 8.1%; --font-height: 10.00px; font-family: Calibri, sans-serif; --scale-x: 1.1058589829527494;\" role=\"presentation\" dir=\"ltr\">Full name:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(5)",
+              "html": "<span style=\"left: 11.76%; top: 11.38%; --font-height: 10.00px; font-family: Calibri, sans-serif; --scale-x: 1.0940415287863148;\" role=\"presentation\" dir=\"ltr\">Notes:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            }
+          ]
+        }
+      ],
+      "geometryPassingNodes": {
+        "color-contrast": 56,
+        "target-size": 36
+      }
+    },
+    {
+      "engine": "firefox",
+      "engineVersion": "155.0",
+      "started": true,
+      "axeCore": "4.13.0",
+      "document": "form-sample.pdf",
+      "pages": 2,
+      "viewport": "1280×900 dpr 1",
+      "state": "sidebar open on the tab labelled \"Thumbnails\"",
+      "url": "http://localhost:5199/",
+      "testEngine": {
+        "name": "axe-core",
+        "version": "4.13.0"
+      },
+      "nodesInDocument": 386,
+      "formWidgetsPainted": 8,
+      "widgetNames": [
+        "country:country",
+        "fullName:fullName",
+        "priority:priority",
+        "priority:priority",
+        "priority:priority",
+        "signatureNote:signatureNote",
+        "skills:skills",
+        "subscribe:subscribe"
+      ],
+      "linkNames": [
+        "aria-label:Link",
+        "title:Back to page one (link annotation)"
+      ],
+      "passingRules": 31,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 19,
+          "firstTarget": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+          "examples": [
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+              "html": "<span style=\"left: 11.76%; top: 2.46%; --font-height: 16.00px; font-family: Calibri, sans-serif; --scale-x: 1.0752048987217238;\" role=\"presentation\" dir=\"ltr\">AcroForm fixture</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(3)",
+              "html": "<span style=\"left: 11.76%; top: 8.1%; --font-height: 10.00px; font-family: Calibri, sans-serif; --scale-x: 1.1026951604611883;\" role=\"presentation\" dir=\"ltr\">Full name:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(5)",
+              "html": "<span style=\"left: 11.76%; top: 11.38%; --font-height: 10.00px; font-family: Calibri, sans-serif; --scale-x: 1.0906129636815052;\" role=\"presentation\" dir=\"ltr\">Notes:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            }
+          ]
+        }
+      ],
+      "geometryPassingNodes": {
+        "color-contrast": 61,
+        "target-size": 41
+      }
+    },
+    {
+      "engine": "webkit",
+      "engineVersion": "26.6",
+      "started": true,
+      "axeCore": "4.13.0",
+      "document": "form-sample.pdf",
+      "pages": 2,
+      "viewport": "1280×900 dpr 1",
+      "state": "document loaded, sidebar closed",
+      "url": "http://localhost:5199/",
+      "testEngine": {
+        "name": "axe-core",
+        "version": "4.13.0"
+      },
+      "nodesInDocument": 367,
+      "formWidgetsPainted": 8,
+      "widgetNames": [
+        "country:country",
+        "fullName:fullName",
+        "priority:priority",
+        "priority:priority",
+        "priority:priority",
+        "signatureNote:signatureNote",
+        "skills:skills",
+        "subscribe:subscribe"
+      ],
+      "linkNames": [
+        "aria-label:Link",
+        "title:Back to page one (link annotation)"
+      ],
+      "passingRules": 28,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 19,
+          "firstTarget": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+          "examples": [
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 2.39%; --font-height: 16.00px; font-family: sans-serif; --scale-x: 0.9999817855611619;\">AcroForm fixture</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(3)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 8.06%; --font-height: 10.00px; font-family: sans-serif; --scale-x: 0.99990306497383;\">Full name:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(5)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 11.34%; --font-height: 10.00px; font-family: sans-serif; --scale-x: 0.9999537540637088;\">Notes:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            }
+          ]
+        }
+      ],
+      "geometryPassingNodes": {
+        "color-contrast": 56,
+        "target-size": 36
+      }
+    },
+    {
+      "engine": "webkit",
+      "engineVersion": "26.6",
+      "started": true,
+      "axeCore": "4.13.0",
+      "document": "form-sample.pdf",
+      "pages": 2,
+      "viewport": "1280×900 dpr 1",
+      "state": "sidebar open on the tab labelled \"Thumbnails\"",
+      "url": "http://localhost:5199/",
+      "testEngine": {
+        "name": "axe-core",
+        "version": "4.13.0"
+      },
+      "nodesInDocument": 386,
+      "formWidgetsPainted": 8,
+      "widgetNames": [
+        "country:country",
+        "fullName:fullName",
+        "priority:priority",
+        "priority:priority",
+        "priority:priority",
+        "signatureNote:signatureNote",
+        "skills:skills",
+        "subscribe:subscribe"
+      ],
+      "linkNames": [
+        "aria-label:Link",
+        "title:Back to page one (link annotation)"
+      ],
+      "passingRules": 31,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 19,
+          "firstTarget": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+          "examples": [
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(1)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 2.39%; --font-height: 16.00px; font-family: sans-serif; --scale-x: 0.9999822492296936;\">AcroForm fixture</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(3)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 8.06%; --font-height: 10.00px; font-family: sans-serif; --scale-x: 0.9999027525375938;\">Full name:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            },
+            {
+              "target": ".pjsr-page:nth-child(3) > .pjsr-text-layer.textLayer[data-main-rotation=\"0\"] > span[dir=\"ltr\"][role=\"presentation\"]:nth-child(5)",
+              "html": "<span role=\"presentation\" dir=\"ltr\" style=\"left: 11.76%; top: 11.34%; --font-height: 10.00px; font-family: sans-serif; --scale-x: 0.9999534956432116;\">Notes:</span>",
+              "why": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+            }
+          ]
+        }
+      ],
+      "geometryPassingNodes": {
+        "color-contrast": 61,
+        "target-size": 41
+      }
+    }
+  ]
+}

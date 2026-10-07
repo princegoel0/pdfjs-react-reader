@@ -18,6 +18,7 @@ export const ES_LABELS: PdfViewerLabels = Object.freeze({
   inkTool: 'Tinta',
   inkNeedsPointer: 'Para dibujar hacen falta ratón, lápiz o dedo; no hay equivalente en el teclado',
   deleteAnnotation: 'Eliminar la anotación seleccionada',
+  linkAnnotation: 'Enlace',
   highlightColour: 'Color del resaltado',
   highlightAdded: 'Resaltado añadido',
   freeTextAdded: 'Texto añadido',
