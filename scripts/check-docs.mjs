@@ -114,7 +114,10 @@ const engineAxis = (ciText) => ({
       .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
       .filter(Boolean),
   ),
-  bench: [...ciText.matchAll(/if: matrix\.engine == '([^']+)'/g)].map((m) => m[1]),
+  // Any condition that requires the cell, not only one that *starts* with the engine test: CI's evidence
+  // steps are gated on the engines having installed as well as on the engine version, and what this derives
+  // is "which cells run the benchmark" — the order the terms are written in is nobody's claim.
+  bench: [...ciText.matchAll(/if:[^\n]*matrix\.engine == '([^']+)'/g)].map((m) => m[1]),
 });
 
 function checkEngineAxis(ciText) {
@@ -465,12 +468,12 @@ const AXIS_SELFTESTS = [
   {
     name: 'the benchmark cell points at an engine no job runs',
     expect: "which no cell of the matrix names",
-    apply: (t) => t.replace("if: matrix.engine == '6.4.299'", "if: matrix.engine == '6.9.999'"),
+    apply: (t) => t.replace("matrix.engine == '6.4.299'", "matrix.engine == '6.9.999'"),
   },
   {
     name: 'the benchmark stops being gated and runs in every cell',
     expect: 'no step is gated on an engine version',
-    apply: (t) => t.replace("        if: matrix.engine == '6.4.299'\n", ''),
+    apply: (t) => t.replace(/ {8}if: always\(\) && steps\.engines\.outcome == 'success' && matrix\.engine == '6\.4\.299'\n/, ''),
   },
 ];
 

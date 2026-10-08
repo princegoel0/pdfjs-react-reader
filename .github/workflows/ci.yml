@@ -385,6 +385,7 @@ jobs:
       # WebKit is Safari's engine, which is what the macOS Safari row is claimed against; `--with-deps`
       # because WebKit's system libraries are not on the runner image.
       - name: Install browsers
+        id: engines
         run: npx playwright install --with-deps chromium firefox webkit
 
       # The swap names the rest of its tree in the *same* install. `npm i` re-resolves every caret range in
@@ -410,7 +411,15 @@ jobs:
       # `pin-tree.mjs check --exact` proving the cell): the same six audits, 0 violations, the same names and node
       # counts as at 6.3.289. So this cell buys the answer to a question #249 proved this axis can answer
       # differently, and it did not need a runner to ask it.
+      #
+      # `always()`, and the reason is a measurement: CI run 37816888885 (`dev` at de206ef) had one webkit row
+      # fail — `print-carries-an-authored-mark`, #276's family — and because the steps run in order that single
+      # red erased the accessibility record and the benchmark evidence for the whole job. Both steps refuse to
+      # write their file when their own subject is bad, so neither can report clean about a broken run; the
+      # gate that keeps them honest is inside them, not in the step before. The engines have to have installed,
+      # which is what `steps.engines` is for: without them the run would only add a second red.
       - name: Accessibility audit in a real browser
+        if: always() && steps.engines.outcome == 'success'
         run: npm run a11y:browser-record
 
       # FR-49's evidence, in the same job because it needs the same browser install. The script separates bars
@@ -429,19 +438,21 @@ jobs:
       # the artifact from the job that already runs needs no new trigger, no write token, and no commit from CI —
       # `npm run bench:update-baseline -- --record <file>` is still the deliberate act, done by a person.
       - name: Run the benchmarks twice and keep both records
+        id: bench
         # One cell, not two: §6's record is a reading of one machine per run, and the floor cell exists to
         # paint pages, not to re-time them. The version named here is the axis this job runs, and
         # `scripts/check-docs.mjs` refuses the pair if they ever disagree.
-        if: matrix.engine == '6.4.299'
+        if: always() && steps.engines.outcome == 'success' && matrix.engine == '6.4.299'
         run: |
           set -euo pipefail
           npm run bench
           cp benchmarks/latest.json benchmarks/ci-run-1.json
           npm run bench
       - name: Upload the records this machine measured
-        # Not `always()`: a run whose bars broke is not a baseline candidate, and an upload step that fails
-        # because its input is missing would only add a second red to a job that is already red.
-        if: matrix.engine == '6.4.299'
+        # Its own condition rather than `always()`: a run whose bars broke or whose timings regressed is not a
+        # baseline candidate, so the artifact exists only when the step above exited 0. The deliberate act stays
+        # `npm run bench:update-baseline -- --record <file>`, run by a person on the downloaded file.
+        if: steps.bench.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-records-pdfjs-dist-6.4.299

@@ -68,6 +68,23 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **A red browser row no longer erases the evidence steps behind it, and the gate that keeps the benchmark in
+  one cell learns to read a longer condition (FR-48, FR-49, #275, 2026-10-08).** CI run 37816888885 (`dev` at
+  `de206ef`) had exactly one row fail — `print-carries-an-authored-mark` in webkit · desktop, #276's family —
+  and because the job's steps run in order, that single red meant the accessibility record and both benchmark
+  records were never produced, and the FR-49 baseline for the runner could not be seeded from it. So the two
+  evidence steps are now `if: always() && steps.engines.outcome == 'success'`: they still fail the job on
+  their own terms (each refuses to write its file when its own subject is bad — `a11y:browser-record` on any
+  violation, `npm run bench` on a broken bar or a regressed leg), and the guard that used to be the step order
+  is now inside the scripts, which is where it was always written. The upload step is gated on the benchmark
+  step's own success rather than on `always()`, so a run that regressed cannot donate a baseline.
+
+  `scripts/check-docs.mjs` changed with it, and by its own rule that change is stated here: its derivation of
+  "which cells run the benchmark" matched only a condition that *starts* with `matrix.engine ==`, so a step
+  gated on the engines as well looked ungated and the gate failed on a step that is gated. The pattern now
+  reads the requirement wherever it appears in the condition, and the two selftests that mutate that line were
+  re-pointed at the new text — 46/46 perturbations still caught.
+
 - **A widget inside marked content reaches the tree on every engine; its `/Alt` does not, and CI found that
   before this host did (FR-43, #277, 2026-10-08).** #268's row
   `widget-named-by-its-owning-node` asserted that the `/Alt` of a widget's owning `/Form` element arrives on the

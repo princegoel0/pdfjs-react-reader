@@ -1213,7 +1213,9 @@ range is proved at both ends), type-checks the shipped `.d.ts`, builds, and asse
 *and* that the relative specifier survived · `packaging` on the same Node matrix, running `check:packaging`
 and `check:tarball` · and `browser`, the only job that starts one: `playwright install --with-deps chromium
 firefox webkit`, then `npm run test:browsers`, `npm run a11y:browser-record` and `npm run bench` (the bench in
-the `6.4.299` cell only, since §6's record is a reading of one machine per run).
+the `6.4.299` cell only, since §6's record is a reading of one machine per run). The two evidence steps after
+it run `if: always() && steps.engines.outcome == 'success'`, because one failing row must not erase the record
+the next one produces — and each still refuses to write its file when its own subject is red.
 
 **How CI gets a baseline it is allowed to use**: FR-49's gate compares a run against the accepted baseline *for
 its own environment*, so the runner's legs read `n/a` until a runner's own readings are accepted. A
