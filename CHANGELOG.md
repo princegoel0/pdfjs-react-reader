@@ -68,6 +68,34 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **A widget inside marked content reaches the tree on every engine; its `/Alt` does not, and CI found that
+  before this host did (FR-43, #277, 2026-10-08).** #268's row
+  `widget-named-by-its-owning-node` asserted that the `/Alt` of a widget's owning `/Form` element arrives on the
+  widget, and the floor cell of CI run 37684953856 (`dev` at `048c608`) failed it in chromium, firefox and webkit
+  alike. Three engines failing the same sentence is not flake, so it was reproduced here with the engine pinned
+  and `pin-tree.mjs check --exact` proving the cell, and read on the DOM at both releases. **At 6.3.289** the
+  widget carries `aria-label="Reviewer name"` and no node in the tree carries a name. **At 6.2.108** the same
+  bytes put `role=form aria-label="Reviewer name"` on the node *inside* the structure tree, and the widget keeps
+  the name the shell's own pass lends it from the field name. The floor differs in a second place too: the tree
+  claims the widget as the bare `6R`, while 6.3.289 writes `pdfjs_internal_id_6R` — `#getStructElementId` arrived
+  with the same release that routed the alt. Nothing was published in between, so the boundary is 6.3.289, and it
+  is #249's link-ownership number by coincidence of release rather than of mechanism: there the missing thing was
+  `enableLinkOwnership`, here it is where `#setAttributes` sends the alt and which id the tree writes.
+
+  **What the row claims now is the clause, not one engine's DOM.** The engine's own path is asserted at or above
+  the boundary; the degradation is asserted below it — with its own failure message, so a floor that lost the alt
+  from *both* places would be red rather than quietly passing; and on either side the row still requires what FR-43
+  actually promises: the widget is announced with a name, the tree claims it under whichever spelling that release
+  uses, and the field keeps its value and its tab stop (#267's measured refusal of `aria-hidden`). The verdict line
+  prints which path named the widget and which id claimed it, so a reading can be audited rather than trusted.
+
+  **Falsified, both directions.** Renaming `/Alt` in the fixture at 6.3.289 turns the row red with
+  `Tree nodes carrying a name: (none)`; running the unmodified fixture at 6.2.108 fails twice before the fix
+  (the label and the id namespace) and passes once both are measured. The new case in
+  `src/features/structure.engine-floor.test.tsx` reads the row's source and refuses the shape that caused this —
+  a row with one branch and one assumption — and it was itself falsified by editing
+  `WIDGET_ALT_MINIMUM` to `6.4.0`, which turns the case red. #268's own sentences that said the widget arrives
+  named by the engine are corrected in this commit's register row rather than left standing.
 ### Added
 
 - **A benchmark number can now fail a job: FR-49's second clause, which had no instrument behind it (#275,

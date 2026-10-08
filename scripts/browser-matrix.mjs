@@ -2057,7 +2057,13 @@ const CHECKS = [
      *  - `reviewerName` sits in a `/Form` element carrying `/Alt (Reviewer name)`. pdf.js's
      *    `StructTreeLayerBuilder.#setAttributes` walks such an element, and for every kid of type
      *    `annotation` it puts the `/Alt`, verbatim, into the table `AnnotationLayer` asks for by annotation
-     *    id — so the owner names the control. That is the clause's own mechanism, and it is the engine's.
+     *    id — so the owner names the control. That is the clause's own mechanism, and it is the engine's,
+     *    **and the engine only from 6.3.289.** At the advertised floor the same document puts the `/Alt` on
+     *    the `/Form` node inside the structure tree and never reaches the widget, which #277 found by
+     *    running this row at both releases on one host and in all three desktop engines in CI's floor cell.
+     *    So the row asserts the engine's half where the engine has it and the degradation where it does not,
+     *    the way #249 made the link-ownership row say the same kind of thing — reached separately, because
+     *    the two mechanisms differ and only the number coincides.
      *  - `reviewerComments` has no `/Alt` and no `/TU` either, so the engine has nothing to say. The name it
      *    arrives with is the shell's: `src/lib/annotation-names.ts` (#267) lends it the field name the engine
      *    wrote onto `name`. Asserting both in one row is the point — a file with only the first case would
@@ -2095,7 +2101,15 @@ const CHECKS = [
         const owned = [...document.querySelectorAll('.structTree [aria-owns]')].flatMap((el) =>
           (el.getAttribute('aria-owns') ?? '').split(/\s+/).filter(Boolean),
         );
-        return { fields, trees: document.querySelectorAll('.structTree').length, owned };
+        // Which node carries the alt is precisely what differs between the two releases, so the row reads
+        // the tree's own names as well as the widgets'.
+        const labelled = [...document.querySelectorAll('.structTree *')]
+          .map((el) => ({
+            role: el.getAttribute('role') ?? '',
+            label: (el.getAttribute('aria-label') ?? '').trim(),
+          }))
+          .filter((t) => t.label);
+        return { fields, trees: document.querySelectorAll('.structTree').length, owned, labelled };
       });
 
       const byName = (name) => read.fields.find((f) => f.name === name);
@@ -2110,12 +2124,35 @@ const CHECKS = [
       }
 
       const named = byName('reviewerName');
-      if (named.label !== 'Reviewer name') {
+      // Measured, not assumed (2026-10-08, chromium on this host with the engine pinned and proved by
+      // `pin-tree.mjs check --exact`, and in all three desktop engines in CI's floor cell at 048c608): at
+      // 6.3.289 the widget itself carries "Reviewer name" and no tree node is named; at 6.2.108 the /Form
+      // node in the tree carries `role=form aria-label="Reviewer name"` and the widget keeps the name the
+      // shell lends it. Nothing was published between the two, so the boundary is 6.3.289.
+      const WIDGET_ALT_MINIMUM = '6.3.289';
+      const altOnWidget = releaseAtLeast(engineVersion, WIDGET_ALT_MINIMUM);
+      const arrivesOnWidget = named.label === 'Reviewer name';
+      const arrivesOnOwningNode = read.labelled.some((t) => t.role === 'form' && t.label === 'Reviewer name');
+      const treeNames = read.labelled.map((t) => `${t.role || '(no role)'}="${t.label}"`).join(', ') || '(none)';
+      if (altOnWidget && !arrivesOnWidget) {
         fail(
-          `the widget whose owning /Form element carries /Alt "Reviewer name" arrived as ` +
-            `aria-label ${JSON.stringify(named.label)} instead${named.label === 'reviewerName' ? ' — that is the shell’s own fallback, so the structure layer named nothing: ' : ': '}` +
-            `${read.trees} structure tree(s) mounted, ${read.owned.length} owned ids`,
+          `engine ${engineVersion} is at or above the measured ${WIDGET_ALT_MINIMUM} boundary, where the owning ` +
+            `/Form element's /Alt arrives on the widget itself; it arrived as aria-label ` +
+            `${JSON.stringify(named.label)} instead. Tree nodes carrying a name: ${treeNames}; ` +
+            `${read.trees} tree(s), ${read.owned.length} owned ids`,
         );
+      }
+      if (!altOnWidget && !arrivesOnWidget && !arrivesOnOwningNode) {
+        fail(
+          `engine ${engineVersion} is below ${WIDGET_ALT_MINIMUM}, where the /Alt belongs on the owning node ` +
+            `inside the tree — but it is on neither the widget (aria-label ${JSON.stringify(named.label)}) nor a ` +
+            `role=form tree node, so the document's own alt reached no accessibility name at all. Tree nodes ` +
+            `carrying a name: ${treeNames}`,
+        );
+      }
+      // What the clause owes a reader does not depend on the boundary: the widget is announced with a name.
+      if (!named.label) {
+        fail(`the widget for reviewerName arrives with no accessible name at all on engine ${engineVersion}`);
       }
 
       const bare = byName('reviewerComments');
@@ -2136,7 +2173,16 @@ const CHECKS = [
         }
       }
 
-      const unowned = [named, bare].filter((f) => !read.owned.includes(f.id)).map((f) => `${f.name} (${f.id})`);
+      // The floor differs in one more place than the label. The id the tree writes is the bare annotation id
+      // (`6R`) while the element the annotation layer mounts is `pdfjs_internal_id_6R`: the
+      // `#getStructElementId` prefix arrived with 6.3.289, the same release that moved the /Alt onto the
+      // widget — measured on the same two pinned runs (2026-10-08, chromium, this host). The claim this row
+      // is asked to check is "the tree names the widget", which is true under either spelling, so the match
+      // accepts both and the verdict line prints which form it found.
+      const stripped = (id) => id.replace(/^pdfjs_internal_id_/, '');
+      const claimedBy = (f) =>
+        read.owned.includes(f.id) ? f.id : read.owned.includes(stripped(f.id)) ? stripped(f.id) : null;
+      const unowned = [named, bare].filter((f) => !claimedBy(f)).map((f) => `${f.name} (${f.id})`);
       if (unowned.length) {
         fail(
           `${unowned.join(' and ')} is not in any owning element's aria-owns list, so the structure tree does not ` +
@@ -2149,10 +2195,14 @@ const CHECKS = [
       }
 
       return (
-        `2 widgets, ${read.trees} tree(s): reviewerName arrives "${named.label}" from its owning /Form element's /Alt, ` +
-        `reviewerComments arrives "${bare.label}" from the shell's naming pass (the file says nothing about it); ` +
+        `2 widgets, ${read.trees} tree(s) on engine ${engineVersion}: reviewerName arrives "${named.label}" ` +
+        (altOnWidget
+          ? "from its owning /Form element's /Alt, which this release puts on the widget"
+          : `from the shell's pass, because this release is below the measured ${WIDGET_ALT_MINIMUM} boundary ` +
+            'where the /Alt reaches the widget; the /Alt itself sits on the role=form node in the tree here') +
+        `, reviewerComments arrives "${bare.label}" from the shell's naming pass (the file says nothing about it); ` +
         `both tabbable with their values (${[named, bare].map((f) => f.value).join(', ')}), both claimed by the ` +
-        `structure DOM's aria-owns`
+        `structure DOM's aria-owns as ${[named, bare].map((f) => claimedBy(f)).join(', ')}`
       );
     },
   },

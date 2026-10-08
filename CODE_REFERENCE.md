@@ -61,7 +61,7 @@ React DOM, `pdfjs-dist`, and one optional writer.
 | Names on `/edit` | **36**, on `/merge` **13** | `dist/edit.d.ts`, `dist/merge.d.ts` |
 | Distinct public names, by maturity | **323** — 263 stable, 60 experimental, 0 deprecated, plus **15** in the `removed` ledger (FR-18). The split is measured, not asserted: `npm run check:maturity` prints it, and whether 60 experimental names is the right number to carry into `1.0.0` is the owner's open decision **#207** | `api-maturity.json`, audited by `npm run check:maturity` |
 | Source files (non-test) | **89**, 18,853 lines | `src/**`, counted by `node scripts/check-docs.mjs` (`wc -l` semantics, test files excluded). 80 / 17,169 was the figure when §2 was last re-run by hand; the touch-fallback module, its engine stand-ins, this script, the handle member and walk guard of #231, the form hook’s refusal to claim a change it did not make, #238’s three cancellation guards (an already-aborted token performs no work on the print, attachment and thumbnail paths), #243’s measuring context, #241’s panel bound, #229’s signature box rule, #175’s ready-document shell mount, #247’s shared ready-shell harness (the jsdom answers, the page proxy, and the fold fake that lets the ⋯ panel mount) and #249’s engine-version helper — the comparison a feature uses to declare that one of its own behaviours needs an engine newer than the package floor, and #242’s measurement of which exception names the installed engine actually stamps have moved it since. The lines since the last sync are #257’s editor container (seven, deciding what the annotation manager is allowed to hear) and #267’s naming pass — `src/lib/annotation-names.ts` at 156 lines, plus its call site and one label key, the module that gives a form control or a link the name its own document forgot to carry, which is what the first axe run inside a real browser asked for |
-| Test files / tests | **152 files / 1,340 tests**, in five projects (`node`, `dom`, `writers`, `node-serial`, `a11y`) | `npm run test` |
+| Test files / tests | **152 files / 1,341 tests**, in five projects (`node`, `dom`, `writers`, `node-serial`, `a11y`) | `npm run test` |
 | Stylesheets | 9, from 24 to 1,348 lines | `src/styles/`, same command (`structure.css` is the small one, `viewer.css` the large) |
 | Fixtures | 23 PDFs, produced by 19 generator scripts, **all of them tracked** — `tagged-form-sample.pdf` and `make-tagged-form-pdf.mjs` are #268’s, the first file in the directory with a form widget inside marked content — the `0.10` close found `tagged-sample.pdf` missing from the index while its own test read it from disk, which is the fourth time that trap fired, and is why §22 runs `git ls-files` over every file the docs cite. `tagged-sample.pdf` is the only fixture that declares a structure tree; `scan-sample.pdf` is the only one with no text at all — twelve pages of 2550×3300 RGB scan, 0.82 MB on disk and 8.4 MP per page once decoded; `vector-sample.pdf` is the only one whose cost is operators — four A1 sheets, 336 clipped cells each, 12,922 engine-reported operators a page and 0.51 MB on disk; `oversize-sample.pdf` is the only one with a page no renderer may paint — 612×792, 12,000×9,000 and 200,000×600 pt, which is the edge-case suite's sixth shape and the 0.25-minimum refusal in 1,023 bytes | `playground/fixtures/`, `scripts/make-*.mjs` |
 | Benchmark | `npm run bench` measures §6's four profiles and separates **bars** (structural, they fail the run) from **measures** (timings, printed with the machine they came from — and never compared against *another* machine's number, per §6). A measure **is** compared against the accepted baseline for its own environment, which is what makes FR-49's "a regression is a failing job" true: see `scripts/benchmark-baseline.mjs` and **`benchmarks/baseline.json`, also tracked**. All four have committed fixtures: C is `vector-sample.pdf`, whose split between this package and the engine is read from the `pjsr:` paint marks the viewer puts in its own render path (the engine-only harness through `playground/raw.html` runs beside it as a cross-check, and the two disagree by design — see §17's `PdfPage.timing` row), and D is `scan-sample.pdf` on the committed low-memory harness — 412×915 at dpr 3 with an Android user agent and 6× CDP CPU throttling, zoomed through the toolbar's overflow menu. The report is **`benchmarks/latest.json`, tracked**: §6's environment fields, each fixture's sha256, and p50/p95/max per sampled number with p99 only where there are 100+ samples. `src/lib/benchmark-record.test.ts` is what keeps that file an evidence rather than an artifact of the last run, and `src/lib/benchmark-baseline.test.ts` keeps the gate's arithmetic honest | `scripts/benchmark.mjs`, `scripts/benchmark-baseline.mjs`, `benchmarks/latest.json`, `benchmarks/baseline.json`, `ROADMAP.md` §1 `FR-49` |
@@ -914,7 +914,7 @@ focus **twice** — palette on, then off — so the ring seen is the sheet's re-
 
 ---
 
-## 17. Tests: 152 files, 1,340 tests, five projects
+## 17. Tests: 152 files, 1,341 tests, five projects
 
 `vitest.config.ts` defines projects: **`node`** runs `src/**/*.test.ts` (pure logic, real fixtures read from
 disk) except `ssr.test.ts`, **`dom`** runs `src/**/*.test.tsx` (jsdom + Testing Library) except the audits and
@@ -1052,11 +1052,15 @@ section has ever itemised; the rest are named, not counted, so a stale figure ca
   **`features/structure` (10)** — the gate counted by reads of the peer class (zero for an untagged file,
   one for a tagged one), both `MarkInfo` shapes, the document changing under it, and the merged page props
   carrying the class rather than only the switch;
-  **`features/structure.engine-floor` (4)** (#249) — the same tier read at each side of the boundary it declares
+  **`features/structure.engine-floor` (5)** (#249) — the same tier read at each side of the boundary it declares
   for itself: the requirement is *on* the feature (its behaviour, its minimum, what a reader gets below it), the
   published state is `false` at `6.2.108` and `true` at `6.3.289`, and the fourth case refuses the arrangement
-  where `scripts/browser-matrix.mjs` asserts a different release than the contract names. Only the engine's
-  reported version is stubbed, so the comparison and the publication run for real;
+  where `scripts/browser-matrix.mjs` asserts a different release than the contract names. The fifth (#277) reads
+  the *widget* row's source and refuses the shape that made CI red: a row asserting one release's DOM at both
+  ends. It requires the measured `6.3.289` constant, a branch on each side of it, the claim the clause actually
+  makes on both paths, and the `pdfjs_internal_id_` id spelling the tree writes only from that release — and it
+  was falsified by editing the constant to `6.4.0`, which turns the case red. Only the engine's reported version
+  is stubbed, so the comparison and the publication run for real;
   **`features/annotate.lifecycle` (5)** — the manager's whole lifetime as FR-29 states it: built with the
   document whose `annotationStorage` an incremental save commits, once per document, rebuilt *and disposed* on a
   swap, untouched by a page coming and going while that page's own layer is rebuilt against the same instance,
