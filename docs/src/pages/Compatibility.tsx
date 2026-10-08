@@ -294,7 +294,10 @@ export function Compatibility() {
               <code>FR-48</code> rather than retyped here. Chromium&rsquo;s mobile profile skips the wheel check,
               because that emulation delivers no wheel events to the page at all — a finding about the profile, not the
               viewer. Every responsive, printing and form check in the log was run here too. The engine is Chromium 153
-              against §8&apos;s floor of 125, so this is the current build passing, not the floor pinned.
+              against §8&apos;s floor of 125, so this is the current build passing, not the floor pinned — and the floor
+              has now been run: <code>npm run test:floors</code> starts the pinned Chromium 125 build and the viewer
+              mounts its chrome, then reports <code>Failed to load PDF: URL.parse is not a function</code>, because the
+              engine this package rides on calls an API Chromium gained after 125.
             </td>
           </tr>
           <tr>
@@ -305,9 +308,13 @@ export function Compatibility() {
               checks through <code>npm run test:browsers</code> at both profiles, and what it skips belongs to the
               emulation rather than the viewer: the mobile profile dispatches no wheel events and exposes no{' '}
               <code>Touch</code> constructor to synthesise a pinch from. Each run&rsquo;s reading is recorded with its
-              run id in <code>fr-evidence.json</code> under <code>FR-48</code>. That is not the floor §8 claims either.
-              Its Safari row asks for a reproducible Safari 18 / WebKit runner, and its own policy is that a current
-              browser passing the suite does not certify an older floor — and a Linux WebKit is not macOS Safari. The{' '}
+              run id in <code>fr-evidence.json</code> under <code>FR-48</code>. That is not the floor §8 claims either,
+              and the floor has now been measured rather than wished: <code>npm run test:floors</code> starts the pinned
+              WebKit 18.0 build, and it never reaches a first paint — <code>pdf.mjs</code> evaluates
+              <code>Iterator.prototype</code> at module scope and the page throws <code>Can&apos;t find variable:
+              Iterator</code>. Its Safari row asks for a reproducible Safari 18 / WebKit runner, and its own policy is
+              that a current browser passing the suite does not certify an older floor — and a Linux WebKit is not macOS
+              Safari. The{' '}
               <code>@media</code> fallbacks beside every <code>@container</code> rule and the{' '}
               <code>overflow: clip</code> → <code>hidden</code> fallback were written for a Safari 14 target that the
               2026-10-02 lock replaced: at a floor of 18, container queries and <code>overflow: clip</code>
@@ -320,9 +327,10 @@ export function Compatibility() {
             <td>
               Runs on the runner, and passes: Firefox 155 takes the same checks at both profiles, with the same two
               mobile skips and the same reasons, and each run&rsquo;s reading is recorded with its run id in{' '}
-              <code>fr-evidence.json</code> under <code>FR-48</code>. §8&apos;s floor is 124, which no runner here
-              produces — Playwright installs its current build — so by that table&apos;s execution policy the floor is
-              still unverified even though the engine has finally started. A screen-reader pass with NVDA (FR-45) is
+              <code>fr-evidence.json</code> under <code>FR-48</code>. §8&apos;s floor is 124, and <code>npm run
+              test:floors</code> now runs exactly that pinned build: it throws <code>Iterator is not defined</code>
+              before the application mounts, so the floor is measured and fails, rather than being unverified for the
+              reason it was — that a runner could not produce it. A screen-reader pass with NVDA (FR-45) is
               Firefox evidence of a different kind and has not happened.
             </td>
           </tr>
@@ -344,8 +352,10 @@ export function Compatibility() {
         <code>npm run test:browsers</code> job — locally, and on CI&apos;s Linux runner on every push to{' '}
         <code>dev</code> since 2026-10-04, where its reading per run is in <code>fr-evidence.json</code> — drives all
         three engines and classifies a browser that cannot start as <code>unverified</code> rather than passed. What
-        remains outside it is what a Linux runner cannot produce: a pinned old-version floor, macOS Safari, Edge, and
-        iOS or Android hardware.
+        remains outside it is macOS Safari, Edge, and iOS or Android hardware. The pinned old-version floor is no longer
+        one of those: <code>npm run test:floors</code> runs the three §8 browser builds themselves, all three fail to
+        render a document, and each names the engine API it is missing — which makes §8&apos;s browser minimums a
+        question about the table, not a hole in this matrix.
       </div>
 
       <h2>Bundle size</h2>

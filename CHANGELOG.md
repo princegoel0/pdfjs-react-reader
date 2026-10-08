@@ -68,6 +68,37 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **§8's pinned browser floors are an instrument now, and the first reading is a refusal (FR-48, #269,
+  2026-10-09).** For five days this row answered the execution-policy clause honestly and left it there: the
+  matrix runs Chromium 153, Firefox 155 and WebKit 26, and "a current browser passing the suite does not certify
+  an old-version floor". `npm run test:floors` (`scripts/browser-floors.mjs`) is the half that was missing — the
+  pinned build itself. A Playwright release ships exactly one browser version per engine, so the pins were found
+  by reading each release's `browsers.json`: Chromium 125 is Playwright 1.44.1, Firefox 124 is 1.43.1, WebKit
+  18.0 is 1.46.1. The script takes those directories as `--drivers=…`, starts the playground, and exits 2 naming
+  §8 if any engine is unpinned, because the run that measures the current build and calls it the floor is the one
+  the policy forbids. `scripts/browser-matrix.mjs` grew the same seam (`PJSR_PLAYWRIGHT`) so the current-build
+  suite and the floor run can be driven by the same instrument shape.
+  **What it measured:** none of the three floors rendered the fixture. Chromium 125 mounts the application and
+  then the shell's own status line reads `Failed to load PDF: URL.parse is not a function` — FR-54's surface
+  reporting the engine, with `URL.parse` and `Promise.try` both absent there; Firefox 124 and WebKit 18.0 never
+  reach a first paint, throwing `Iterator is not defined` / `Can't find variable: Iterator`, because `pdf.mjs`
+  evaluates `Iterator.prototype` at module scope. Those are the engine's calls, and the census says how widely: the
+  registry publishes five 6.x releases (`6.0.227`, `6.1.200`, `6.2.108`, `6.3.289`, `6.4.299`) and **every one of
+  them** calls `URL.parse` eight times in `pdf.mjs` and three times in the worker, and `Promise.try` four times in
+  each, while the module-scope `Iterator.prototype` check arrives with `6.2.108` — the advertised engine floor.
+  WebKit 18.0 does have `URL.parse`, and is missing `Promise.try` as well as the `Iterator` global, so it fails on
+  two of the three. §8's browser minimums therefore sit below the minimum its own engine floor requires. That is an amendment question, not a defect to code around, so the instrument stays out of CI — where
+  it would be red by design — and the rows stay `unverified`.
+  **The instrument's own first reading was wrong, and is in the record because the fix is a test:** the very first
+  cell printed `status "(none)"` for a page that was displaying that failure, because the probe read
+  `.pjsr-error` while `ViewerParts.tsx` renders a load failure into `.pjsr-status` (`role="alert"`).
+  `src/lib/browser-floors.test.ts` now pins the selector to the class the component carries — matched against the
+  `querySelectorAll` string, not the file, since the first version of that case passed while falsified by reading
+  a comment — and the suite also refuses a floor that reports as unverified rather than as a failure, refuses the
+  script keeping a second copy of the floor numbers, and reads the *installed engine's source* for
+  `typeof Iterator.prototype.join`, `URL.parse(` and `Promise.try(`, which is the only way this repository learns
+  the engine's requirement moved without re-running three browsers by hand.
+
 - **FR-49's regression gate is per runner class, and CI said so out loud (FR-49, #279, 2026-10-09).** The fold that
   gave the runner a baseline worked: run 37819563810's two records are eleven live legs for
   `AMD EPYC 7763 64-Core Processor · linux x86_64 · 15.6 GB · node 22 · pdfjs-dist 6.4.299`, tolerance at the 1.5×

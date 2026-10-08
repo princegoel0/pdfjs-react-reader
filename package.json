@@ -222,6 +222,7 @@
     "a11y:record": "node scripts/a11y-record.mjs",
     "a11y:browser-record": "node scripts/a11y-browser-record.mjs",
     "test:browsers": "node scripts/browser-matrix.mjs",
+    "test:floors": "node scripts/browser-floors.mjs",
     "probe:canvas": "node scripts/canvas-probe.mjs",
     "probe:worker": "node scripts/worker-default-browser.mjs",
     "bench": "node scripts/benchmark.mjs",

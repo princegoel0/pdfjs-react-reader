@@ -27,12 +27,30 @@
  *    `consumer` job's engine matrix), or about React majors (the `react` job).
  */
 import { readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createServer } from 'vite';
-import { chromium, firefox, webkit } from 'playwright';
 
-const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
+/*
+ * §8's browser-floor policy says a floor claim must be backed by "a pinned browser image, container, Playwright
+ * browser build … or equivalent reproducible environment", and that "a current browser passing the suite does not
+ * certify an old-version floor". The browser a Playwright release drives is fixed by that release, so running a
+ * floor means running a *different Playwright* than this repository's own — and installing it over `node_modules`
+ * would turn the cell into a reading of a tree nobody ships, which is what #244 was written to stop. The driver is
+ * therefore resolved from `PJSR_PLAYWRIGHT` (a package directory) when a job names one, and the run prints the
+ * release it loaded: a floor claim that does not say what drove it is the claim §8 refuses to accept.
+ */
+const repoDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+const driverDir = process.env.PJSR_PLAYWRIGHT
+  ? resolve(process.env.PJSR_PLAYWRIGHT)
+  : join(repoDir, 'node_modules', 'playwright');
+// `index.mjs` is the package's ESM surface; older releases ship only `index.js`, whose named exports Node
+// re-derives from the CommonJS module — both are the same driver, and the floor build is what is under test.
+const driverEntry = existsSync(join(driverDir, 'index.mjs')) ? 'index.mjs' : 'index.js';
+const { chromium, firefox, webkit } = await import(pathToFileURL(join(driverDir, driverEntry)).href);
+const driverVersion = JSON.parse(readFileSync(join(driverDir, 'package.json'), 'utf8')).version;
+
+const repo = repoDir;
 const engineVersion = JSON.parse(
   readFileSync(join(repo, 'node_modules', 'pdfjs-dist', 'package.json'), 'utf8'),
 ).version;
@@ -4366,7 +4384,11 @@ const server = await createServer({
 });
 await server.listen();
 const baseUrl = server.resolvedUrls?.local[0] ?? 'http://127.0.0.1:5299/';
-console.log(`playground served from ${baseUrl} (pdfjs-dist ${engineVersion})`);
+console.log(
+  `playground served from ${baseUrl} (pdfjs-dist ${engineVersion}, Playwright ${driverVersion}${
+    process.env.PJSR_PLAYWRIGHT ? ', pinned driver' : ''
+  })`,
+);
 
 const cells = [];
 for (const engineName of ONLY_ENGINES) {

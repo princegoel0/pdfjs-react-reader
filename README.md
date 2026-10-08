@@ -750,7 +750,24 @@ constructor to synthesise a pinch from. What that is *not* is floor evidence. §
 older floor; no Edge check has ever run anywhere, and no real device has been touched. The CI `browser` job
 has now run — green on 2026-10-04 with the same 67 ok / 5 skipped over six cells — but it installs
 Playwright's current builds, so it is the same evidence as a local run and not the pinned-floor job §8's
-execution policy names. The CSS ships `@media`
+execution policy names.
+
+**That gap is now an instrument rather than an intention, and the instrument says the floors are wrong.**
+`npm run test:floors` drives the playground in the pinned browser build each §8 row names — a browser build comes
+from the Playwright release cut against it, so Chromium 125 is Playwright 1.44.1, Firefox 124 is 1.43.1 and
+WebKit 18.0 is 1.46.1 — and it refuses to run at all unless the drivers are pinned, because the current build
+passing is exactly the inference §8 forbids. Measured on 2026-10-09, none of the three rendered a document:
+Chromium 125 boots and then the viewer's own status line reads `Failed to load PDF: URL.parse is not a function`
+with a *Try again* button — FR-54's error surface reporting the engine, `URL.parse` and `Promise.try` both
+undefined there — while Firefox 124 and WebKit 18.0 never reach a first paint, throwing `Iterator is not defined`
+and `Can't find variable: Iterator` because `pdf.mjs` evaluates `Iterator.prototype` at module scope. Those are the
+engine's own calls, counted across all five published `pdfjs-dist` 6.x releases (`6.0.227`, `6.1.200`, `6.2.108`,
+`6.3.289`, `6.4.299`): every one calls `URL.parse` eight times in `pdf.mjs` and three in the worker, and
+`Promise.try` four times in each, while the module-scope `Iterator.prototype` check arrives with `6.2.108` — the
+floor this package advertises. So §8's browser numbers are the promise the engine it names cannot keep, and raising
+them (or lowering the engine floor, which the §6.2 advisory forbids) is a contract decision rather than a code
+change. Until it is taken, the floor rows stay `unverified` and the instrument stays out of CI, where it would be
+red by design. The CSS ships `@media`
 fallbacks beside every `@container` rule and avoids `:has()`. Both of those are written against a target that
 no longer exists: `@container` and `:has()` are older than the §8 floor of Safari 18, so the fallbacks are
 margin rather than requirement, nothing exercises them, and no test would fail if someone deleted them. If
