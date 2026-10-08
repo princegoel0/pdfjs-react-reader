@@ -1218,7 +1218,12 @@ it run `if: always() && steps.engines.outcome == 'success'`, because one failing
 the next one produces — and each still refuses to write its file when its own subject is red.
 
 **How CI gets a baseline it is allowed to use**: FR-49's gate compares a run against the accepted baseline *for
-its own environment*, so the runner's legs read `n/a` until a runner's own readings are accepted. A
+its own environment*, so a run is only ever checked against readings taken on the machine that made them, and an
+environment with no entry reads `n/a` on every leg. The runner's entry is now accepted —
+`AMD EPYC 7763 64-Core Processor · linux x86_64 · 15.6 GB · node 22 · pdfjs-dist 6.4.299`, two readings
+per leg folded from CI run 37819563810's artifact, its tolerance the 1.5× floor rather than a derived
+spread because those two passes disagreed by only 1.00–1.04× — so 21 of the file's 22 legs are live and
+this host's profile A cold page stays blind rather than being widened. A
 `workflow_dispatch` seeding job cannot work while `main` is behind `dev` — GitHub resolves the trigger against
 the default branch, and the API answers HTTP 404 (measured 2026-10-08) — so the `browser` job's bench step runs
 the benchmark twice, keeps both records and uploads them as `benchmark-records-pdfjs-dist-6.4.299`. A person

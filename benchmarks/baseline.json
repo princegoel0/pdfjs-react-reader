@@ -487,6 +487,371 @@
         "node": "v24.21.0",
         "engine": "6.3.289"
       }
+    },
+    "AMD EPYC 7763 64-Core Processor · linux x86_64 · 15.6 GB · node 22 · pdfjs-dist 6.4.299": {
+      "describe": "AMD EPYC 7763 64-Core Processor · linux x86_64 · 15.6 GB · node 22 · pdfjs-dist 6.4.299",
+      "entries": {
+        "A|document open to first ink": {
+          "fixture": {
+            "name": "long-sample.pdf",
+            "bytes": 375178,
+            "sha256": "f887d87dee2f3fb45ecdc237a341dd1ca0fe669f4265ee85b46bfdd7d68c7fc2"
+          },
+          "readings": [
+            {
+              "p50": 721,
+              "p95": 743,
+              "max": 743,
+              "samples": 5,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 716,
+              "p95": 769,
+              "max": 769,
+              "samples": 5,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 718.5,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "A|cold page": {
+          "fixture": {
+            "name": "long-sample.pdf",
+            "bytes": 375178,
+            "sha256": "f887d87dee2f3fb45ecdc237a341dd1ca0fe669f4265ee85b46bfdd7d68c7fc2"
+          },
+          "readings": [
+            {
+              "p50": 255,
+              "p95": 278,
+              "max": 278,
+              "samples": 5,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 256,
+              "p95": 269,
+              "max": 269,
+              "samples": 5,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 255.5,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "A|frame gaps / main thread": {
+          "fixture": {
+            "name": "long-sample.pdf",
+            "bytes": 375178,
+            "sha256": "f887d87dee2f3fb45ecdc237a341dd1ca0fe669f4265ee85b46bfdd7d68c7fc2"
+          },
+          "readings": [
+            {
+              "p50": 16.7,
+              "p95": 16.7,
+              "max": 33.3,
+              "samples": 362,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 16.7,
+              "p95": 16.8,
+              "max": 33.3,
+              "samples": 363,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 16.7,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "B|document open to first ink": {
+          "fixture": {
+            "name": "scan-sample.pdf",
+            "bytes": 816275,
+            "sha256": "e92ea6fbe9a8142a64dfdb04441cb0706bb16f312a5cce97a93baff6a1a311a0"
+          },
+          "readings": [
+            {
+              "p50": 737,
+              "p95": 781,
+              "max": 781,
+              "samples": 5,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 740,
+              "p95": 998,
+              "max": 998,
+              "samples": 5,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 738.5,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "B|cold page": {
+          "fixture": {
+            "name": "scan-sample.pdf",
+            "bytes": 816275,
+            "sha256": "e92ea6fbe9a8142a64dfdb04441cb0706bb16f312a5cce97a93baff6a1a311a0"
+          },
+          "readings": [
+            {
+              "p50": 340,
+              "p95": 348,
+              "max": 348,
+              "samples": 5,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 321,
+              "p95": 356,
+              "max": 356,
+              "samples": 5,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 330.5,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "B|frame gaps / main thread": {
+          "fixture": {
+            "name": "scan-sample.pdf",
+            "bytes": 816275,
+            "sha256": "e92ea6fbe9a8142a64dfdb04441cb0706bb16f312a5cce97a93baff6a1a311a0"
+          },
+          "readings": [
+            {
+              "p50": 16.7,
+              "p95": 16.7,
+              "max": 33.3,
+              "samples": 271,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 16.7,
+              "p95": 16.7,
+              "max": 33.3,
+              "samples": 276,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 16.7,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|document open to first ink": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 740,
+              "p95": 843,
+              "max": 843,
+              "samples": 5,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 804,
+              "p95": 847,
+              "max": 847,
+              "samples": 5,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 772,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|cold page": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 393,
+              "p95": 451,
+              "max": 451,
+              "samples": 5,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 387,
+              "p95": 441,
+              "max": 441,
+              "samples": 5,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 390,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|engine render, viewer absent": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 154.3,
+              "p95": 163.7,
+              "max": 163.7,
+              "samples": 5,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 152,
+              "p95": 156.3,
+              "max": 156.3,
+              "samples": 5,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 153.2,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|engine render, marked inside the viewer’s own load": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 265.4,
+              "p95": 274.6,
+              "max": 274.6,
+              "samples": 5,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 257.1,
+              "p95": 278.2,
+              "max": 278.2,
+              "samples": 5,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 261.3,
+          "tolerance": 1.5,
+          "status": "live"
+        },
+        "C|frame gaps / main thread": {
+          "fixture": {
+            "name": "vector-sample.pdf",
+            "bytes": 512758,
+            "sha256": "433e723b7f6ce34100634bbc1eedae4b0143d32bbe56be4fcf4dfb0383cccfea"
+          },
+          "readings": [
+            {
+              "p50": 16.7,
+              "p95": 33.4,
+              "max": 66.7,
+              "samples": 153,
+              "at": "2026-10-08T17:55:12.482Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            },
+            {
+              "p50": 16.7,
+              "p95": 33.4,
+              "max": 66.7,
+              "samples": 156,
+              "at": "2026-10-08T17:56:29.002Z",
+              "revision": "0f83b08347e0d0e3960634f054bc3743c69d6ca4",
+              "browser": "chromium 153.0.8010.12",
+              "osRelease": "6.17.0-1022-azure"
+            }
+          ],
+          "reference": 16.7,
+          "tolerance": 1.5,
+          "status": "live"
+        }
+      },
+      "environment": {
+        "machine": "AMD EPYC 7763 64-Core Processor",
+        "platform": "linux",
+        "arch": "x86_64",
+        "memoryGb": 15.6,
+        "node": "v22.23.3",
+        "engine": "6.4.299"
+      }
     }
   }
 }

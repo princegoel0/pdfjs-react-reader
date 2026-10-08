@@ -183,8 +183,12 @@ to bite — and never up on a claim nobody can make fail.
   downloaded record into the entry for *its* environment, because `mergeRecord` keys on the record's own
   environment block and not on the machine running the command. Two passes of one tree is the better measurement
   anyway — the spread between them is the runner's noise with no code change in it. Nothing in CI writes the
-  tracked file; a person reads the tolerances the artifact produced and commits them. Until that lands, CI's
-  bench step prints twelve unverified legs and passes on the bars alone, and FR-49's row says so.
+  tracked file; a person reads the tolerances the artifact produced and commits them — and that act has now been
+  done, once: run 37819563810's artifact gave the runner two readings of its own, so the entry for
+  `AMD EPYC 7763 … node 22 · pdfjs-dist 6.4.299` carries eleven live legs, and that run's own record replayed
+  through `compareRun` reads 11 pass / 1 n/a. CI compares timings in that job now, so a regression there is a red
+  job. FR-49's row names what still cannot compare: profile D's single-sample leg, this host's own profile A cold
+  page (blind at 1.81×), and any runner whose machine has no entry.
 
 - **FR-43's clause now has its noun measured: a form widget inside marked content, and the two ways a widget gets
   a name (FR-43, #268, 2026-10-07).** The requirement says "a widget is announced with its owning node rather than

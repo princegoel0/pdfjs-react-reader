@@ -437,6 +437,10 @@ jobs:
       # `workflow_dispatch` in its copy, so `gh workflow run` answers HTTP 404 (measured 2026-10-08). Uploading
       # the artifact from the job that already runs needs no new trigger, no write token, and no commit from CI —
       # `npm run bench:update-baseline -- --record <file>` is still the deliberate act, done by a person.
+      #
+      # That act has been done once: run 37819563810's two records are the entry for this runner's own
+      # fingerprint, so from here a timing regression in this job is a failing job. A runner whose machine is
+      # not in `benchmarks/baseline.json` still reads every leg n/a — the honest answer, and never a pass.
       - name: Run the benchmarks twice and keep both records
         id: bench
         # One cell, not two: §6's record is a reading of one machine per run, and the floor cell exists to
