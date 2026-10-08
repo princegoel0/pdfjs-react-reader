@@ -766,7 +766,10 @@ engine's own calls, counted across all five published `pdfjs-dist` 6.x releases 
 `Promise.try` four times in each, while the module-scope `Iterator.prototype` check arrives with `6.2.108` — the
 floor this package advertises. So §8's browser numbers are the promise the engine it names cannot keep, and raising
 them (or lowering the engine floor, which the §6.2 advisory forbids) is a contract decision rather than a code
-change. Until it is taken, the floor rows stay `unverified` and the instrument stays out of CI, where it would be
+change. §8's stated reason for its own Safari row is not the cause either: its evidence column says the floor needs
+`light-dark()` and the nesting selector, and the probe measured both of those — plus `:has()` and
+`AbortSignal.any` — present in WebKit 18.0. Until the decision is taken, the floor rows stay `unverified` and the
+instrument stays out of CI, where it would be
 red by design. The CSS ships `@media`
 fallbacks beside every `@container` rule and avoids `:has()`. Both of those are written against a target that
 no longer exists: `@container` and `:has()` are older than the §8 floor of Safari 18, so the fallbacks are

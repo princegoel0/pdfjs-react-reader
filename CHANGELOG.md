@@ -87,7 +87,9 @@ to bite — and never up on a claim nobody can make fail.
   them** calls `URL.parse` eight times in `pdf.mjs` and three times in the worker, and `Promise.try` four times in
   each, while the module-scope `Iterator.prototype` check arrives with `6.2.108` — the advertised engine floor.
   WebKit 18.0 does have `URL.parse`, and is missing `Promise.try` as well as the `Iterator` global, so it fails on
-  two of the three. §8's browser minimums therefore sit below the minimum its own engine floor requires. That is an amendment question, not a defect to code around, so the instrument stays out of CI — where
+  two of the three. §8's browser minimums therefore sit below the minimum its own engine floor requires, and the row's
+  own stated reason did not survive the probe either: §8's Safari evidence column says the floor needs `light-dark()`
+  and the nesting selector, and those — with `:has()` and `AbortSignal.any` — all measured **present** in WebKit 18.0. That is an amendment question, not a defect to code around, so the instrument stays out of CI — where
   it would be red by design — and the rows stay `unverified`.
   **The instrument's own first reading was wrong, and is in the record because the fix is a test:** the very first
   cell printed `status "(none)"` for a page that was displaying that failure, because the probe read
