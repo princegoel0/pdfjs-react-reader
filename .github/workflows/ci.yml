@@ -438,9 +438,12 @@ jobs:
       # the artifact from the job that already runs needs no new trigger, no write token, and no commit from CI —
       # `npm run bench:update-baseline -- --record <file>` is still the deliberate act, done by a person.
       #
-      # That act has been done once: run 37819563810's two records are the entry for this runner's own
-      # fingerprint, so from here a timing regression in this job is a failing job. A runner whose machine is
-      # not in `benchmarks/baseline.json` still reads every leg n/a — the honest answer, and never a pass.
+      # Done once, and read back once. Run 37819563810's two records are the entry for
+      # `AMD EPYC 7763 64-Core Processor · linux x86_64 · 15.6 GB · node 22 · pdfjs-dist 6.4.299`, and that run's
+      # own record replayed through the gate reads 11 pass / 1 n/a. The run after it (37822702432, dev at fdb31ec)
+      # landed on `AMD EPYC 9V74 80-Core Processor` and printed `0/12 legs compared` — the gate refusing to compare
+      # one machine's numbers against another's, which is §6 working as written. So a live timing leg is a property
+      # of a runner class, not of this job, and each class that wants one needs its own fold by a person.
       - name: Run the benchmarks twice and keep both records
         id: bench
         # One cell, not two: §6's record is a reading of one machine per run, and the floor cell exists to
@@ -453,10 +456,12 @@ jobs:
           cp benchmarks/latest.json benchmarks/ci-run-1.json
           npm run bench
       - name: Upload the records this machine measured
-        # Its own condition rather than `always()`: a run whose bars broke or whose timings regressed is not a
-        # baseline candidate, so the artifact exists only when the step above exited 0. The deliberate act stays
-        # `npm run bench:update-baseline -- --record <file>`, run by a person on the downloaded file.
-        if: steps.bench.outcome == 'success'
+        # `always()` AND its own condition, and the second one is not a formality: a run whose bars broke or whose
+        # timings regressed is not a baseline candidate, so the artifact exists only when the step above exited 0.
+        # The `always()` is what the run of 2026-10-08 was missing — the webkit row above went red, every step
+        # without it was skipped, and the records this machine had already measured never left the runner. That is
+        # the same erasure `0f83b08` was written to stop, found one step later than it was fixed.
+        if: always() && steps.bench.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-records-pdfjs-dist-6.4.299

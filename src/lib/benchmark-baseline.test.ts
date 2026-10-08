@@ -319,6 +319,32 @@ describe("FR-49's regression gate", () => {
     expect(source).not.toMatch(/never failed on/);
   });
 
+  it('keeps every step that writes evidence alive when the row above it is red (FR-49, #279)', () => {
+    // A record that is skipped because something else failed is not evidence, and CI run 37822702432 is the
+    // measurement: the webkit row failed, the upload step was the last one in the job still written without
+    // `always()`, and the two benchmark records that runner had produced never left it. So the gate is not
+    // "the bench step has an always()" — it is that every step whose output a later reading depends on has one.
+    const workflow = readFileSync(join(process.cwd(), '.github', 'workflows', 'ci.yml'), 'utf8');
+    const evidence = [
+      'Accessibility audit in a real browser',
+      'Run the benchmarks twice and keep both records',
+      'Upload the records this machine measured',
+    ];
+    for (const name of evidence) {
+      const started = workflow.indexOf(`- name: ${name}`);
+      expect(started, `no ${name} step in ci.yml`).toBeGreaterThan(-1);
+      const rest = workflow.slice(started);
+      const ends = rest.search(/\n {6}- name: /);
+      const step = ends < 0 ? rest : rest.slice(0, ends);
+      const condition = step.match(/^\s*if: (.+)$/m)?.[1];
+      expect(condition, `${name} has no if: line, so the first red step skips it`).toBeTruthy();
+      expect(
+        condition,
+        `${name} would be skipped by a red row above it — the evidence of a run is not optional`,
+      )?.toMatch(/always\(\)/);
+    }
+  });
+
   it('keeps the committed baseline honest about the arithmetic that wrote it', () => {
     const text = readFileSync(join(process.cwd(), 'benchmarks', 'baseline.json'), 'utf8');
     const baseline = JSON.parse(text) as Baseline;

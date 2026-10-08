@@ -68,6 +68,39 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **FR-49's regression gate is per runner class, and CI said so out loud (FR-49, #279, 2026-10-09).** The fold that
+  gave the runner a baseline worked: run 37819563810's two records are eleven live legs for
+  `AMD EPYC 7763 64-Core Processor · linux x86_64 · 15.6 GB · node 22 · pdfjs-dist 6.4.299`, tolerance at the 1.5×
+  floor because those two passes of one tree disagreed by 1.00–1.04×. The run *after* it (37822702432, `dev` at
+  `fdb31ec`) landed on `AMD EPYC 9V74 80-Core Processor` and printed `0/12 legs compared` — every leg `n/a`, none
+  of them a pass. That is the gate refusing to compare one machine's numbers against another's, which is the rule
+  §6 wrote, so the honest shape of the clause is now stated where it is enforced: a live timing leg belongs to a
+  runner class, and a class nobody has folded has no gate. Two sentences that said CI's bench step compares timings
+  "now" were falsified by that reading and are rewritten in this pass, in the register row and in the workflow's own
+  comment. The same run showed the upload step had been left out of #275's `always()` fix, so the records the runner
+  had measured never left it; a new case in `src/lib/benchmark-baseline.test.ts` reads every evidence step in
+  `ci.yml` back for `always()`, and was falsified by removing the condition from that one step.
+
+  `scripts/check-docs.mjs` changed in the same breath, and by its own rule that change is stated here: it read
+  the workflow with `readFileSync` and searched for `\njobs:\n`, so a `core.autocrlf=true` checkout — which is
+  what restoring the file from `HEAD` produced on this host — made it fail with "ci.yml has no `jobs:` mapping to
+  count" about a file that has one on line 20. `read()` now normalises CRLF to LF, because the gate is meant to
+  measure the document and not the transport; 46/46 selftest perturbations and the full gate are green on both
+  endings.
+
+- **The print row watches the fold instead of accusing it (FR-19, FR-48, #278, 2026-10-09).** CI's webkit · desktop
+  cell has failed `print-carries-an-authored-mark` with "no copy of the scope control a pointer could reach was
+  present" while the row that runs before it, in the same cell, wrote that same control's value through the ⋯ panel's
+  copy at 795,288. The difference was never the application: the second row's fallback scans the DOM once and never
+  opens the panel, while the first puts it back (`browser-matrix.mjs:2828`). So the row now polls — every copy, what
+  each one reads, whether a pointer could reach it, and what the panel is doing, sampled while the control is being
+  reached for — opens the panel before it calls a folded control unreachable, and says in its verdict which door
+  wrote the value and whether the control changed place while it was being held. A probe at a narrowed viewport on
+  this host falsified two things that had been assumed: the panel does **not** close by itself (open for the whole
+  three seconds, five rows, zero mutations), and an open panel does **not** cover the bar's own Ink control (no
+  overlap; the point hit the button's own icon). What the runner does is still unmeasured, and the trace exists to
+  name it on the next reading rather than to win the argument now.
+
 - **A red browser row no longer erases the evidence steps behind it, and the gate that keeps the benchmark in
   one cell learns to read a longer condition (FR-48, FR-49, #275, 2026-10-08).** CI run 37816888885 (`dev` at
   `de206ef`) had exactly one row fail — `print-carries-an-authored-mark` in webkit · desktop, #276's family —
@@ -76,8 +109,10 @@ to bite — and never up on a claim nobody can make fail.
   evidence steps are now `if: always() && steps.engines.outcome == 'success'`: they still fail the job on
   their own terms (each refuses to write its file when its own subject is bad — `a11y:browser-record` on any
   violation, `npm run bench` on a broken bar or a regressed leg), and the guard that used to be the step order
-  is now inside the scripts, which is where it was always written. The upload step is gated on the benchmark
-  step's own success rather than on `always()`, so a run that regressed cannot donate a baseline.
+  is now inside the scripts, which is where it was always written. **The upload step was left out of that fix, and
+  the next run proved it: it was gated on the benchmark step's success with no `always()`, so the same red webkit
+  row that motivated the change skipped it and the two records the runner had already measured never became an
+  artifact (#279, 2026-10-09).** It carries both conditions now.
 
   `scripts/check-docs.mjs` changed with it, and by its own rule that change is stated here: its derivation of
   "which cells run the benchmark" matched only a condition that *starts* with `matrix.engine ==`, so a step
@@ -184,11 +219,16 @@ to bite — and never up on a claim nobody can make fail.
   environment block and not on the machine running the command. Two passes of one tree is the better measurement
   anyway — the spread between them is the runner's noise with no code change in it. Nothing in CI writes the
   tracked file; a person reads the tolerances the artifact produced and commits them — and that act has now been
-  done, once: run 37819563810's artifact gave the runner two readings of its own, so the entry for
-  `AMD EPYC 7763 … node 22 · pdfjs-dist 6.4.299` carries eleven live legs, and that run's own record replayed
-  through `compareRun` reads 11 pass / 1 n/a. CI compares timings in that job now, so a regression there is a red
-  job. FR-49's row names what still cannot compare: profile D's single-sample leg, this host's own profile A cold
-  page (blind at 1.81×), and any runner whose machine has no entry.
+  done, once, and read back once: run 37819563810's artifact gave the runner two readings of its own, so the entry
+  for `AMD EPYC 7763 … node 22 · pdfjs-dist 6.4.299` carries eleven live legs, and that run's own record replayed
+  through `compareRun` reads 11 pass / 1 n/a. **The run after it said something else.** CI run 37822702432 (dev at
+  `fdb31ec`) landed on `AMD EPYC 9V74 80-Core Processor` and printed `0/12 legs compared`: the gate refused to
+  compare one machine's numbers against another's, which is §6 working rather than broken, so a live timing leg is
+  a property of a *runner class* and not of the job, and every class that wants one needs its own fold by a person.
+  That run also left no artifact at all — the upload step was the one step in the job still without `always()`, so
+  the red webkit row above it skipped it and the records never came off the runner: the same erasure `0f83b08` was
+  written to stop, found one step later, and fixed here. FR-49's row names all of it: profile D's single-sample
+  leg, this host's own profile A cold page (blind at 1.81×), and any runner class with no entry.
 
 - **FR-43's clause now has its noun measured: a form widget inside marked content, and the two ways a widget gets
   a name (FR-43, #268, 2026-10-07).** The requirement says "a widget is announced with its owning node rather than

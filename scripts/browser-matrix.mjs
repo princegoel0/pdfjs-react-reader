@@ -3748,10 +3748,15 @@ const CHECKS = [
       const jobCount = () => page.evaluate(() => window.__jobs.length);
       const lastJob = () => page.evaluate(() => window.__jobs[window.__jobs.length - 1] ?? null);
 
-      /** Every copy of the scope select, with what each one reads and whether a pointer could reach it. */
-      const scopeCopies = () =>
-        page.evaluate(() =>
-          Array.from(
+      /**
+       * Every copy of the scope select, what each one reads, whether a pointer could reach it — and what the ⋯
+       * panel is doing. The panel belongs in the same reading because a folded control lives behind it, and a row
+       * that reports only the copies cannot tell "the reader would have to open the panel" from "the application
+       * lost the control". (#278)
+       */
+      const readScope = () =>
+        page.evaluate(() => {
+          const copies = Array.from(
             document.querySelectorAll(
               '.pjsr-toolbar [aria-label="Print pages"], .pjsr-overflow-menu [aria-label="Print pages"]',
             ),
@@ -3763,23 +3768,110 @@ const CHECKS = [
                 : 'bar',
             value: el.value,
             painted: el.getBoundingClientRect().width > 0 && getComputedStyle(el).visibility !== 'hidden',
-          })),
-        );
+          }));
+          const trigger = document.querySelector('.pjsr-toolbar [aria-label="More controls"]');
+          return {
+            copies,
+            panel: {
+              open: !!document.querySelector('.pjsr-overflow-menu'),
+              expanded: trigger ? (trigger.getAttribute('aria-expanded') ?? '(none)') : 'no trigger',
+              rows: Array.from(document.querySelectorAll('.pjsr-overflow-menu .pjsr-overflow-label')).map(
+                (row) => row.textContent?.trim() ?? '',
+              ),
+            },
+          };
+        });
+      const scopeCopies = () => readScope().then((state) => state.copies);
+
+      /*
+       * One read of a folded control cannot answer the question this row is really asking, which is *where the
+       * control went*. #278: CI's webkit · desktop cell failed saying "no copy a pointer could reach was present"
+       * with only the hidden measuring copy in the dump, while `print-sheets-hide-the-application`, in the same
+       * cell minutes earlier, wrote this same control's value through the ⋯ panel's copy at 795,288. So the panel
+       * had closed between the reach and the read, and a single DOM scan read that as the application losing the
+       * control. The row now polls while it reaches, and puts the panel back the way that row does, before it is
+       * allowed to accuse.
+       */
+      const traceWhile = (flag, trace) => {
+        const started = Date.now();
+        return (async () => {
+          while (flag.on) {
+            const state = await readScope();
+            const at = Date.now() - started;
+            const last = trace[trace.length - 1];
+            const same =
+              last && JSON.stringify([last.copies, last.panel]) === JSON.stringify([state.copies, state.panel]);
+            if (same) last.over = at;
+            else trace.push({ at, ...state, over: null });
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        })();
+      };
+
+      /** The trace condensed to its transitions, so a failure reads as a story rather than as 300 snapshots. */
+      const traceText = (trace) =>
+        trace
+          .map(
+            (snap) =>
+              `${snap.at}ms: ${
+                snap.copies.length
+                  ? snap.copies.map((c) => `${c.where}${c.painted ? '' : '(unpainted)'}`).join('+')
+                  : 'no copy at all'
+              } panel ${
+                snap.panel.open ? `open (${snap.panel.rows.length} rows)` : `closed/${snap.panel.expanded}`
+              }${snap.over === null ? '' : ` held ${snap.over - snap.at}ms`}`,
+          )
+          .join(' → ');
+
+      /**
+       * How many times the set of copies changed shape while the control was being reached for. bar ↔ panel is
+       * what a reader would notice, and #243's family; a row that only names the door cannot tell a fold that sat
+       * still from a control that flickered between the bar and the panel (#278).
+       */
+      const movesIn = (trace) => {
+        const shape = (snap) => snap.copies.map((c) => `${c.where}${c.painted ? '' : '(unpainted)'}`).join('+');
+        let moves = 0;
+        for (let i = 1; i < trace.length; i += 1) if (shape(trace[i]) !== shape(trace[i - 1])) moves += 1;
+        return moves;
+      };
+
+      /** Open the ⋯ panel if it is not open, the way a reader does it: a pointer click on the trigger. */
+      const openPanelIfClosed = async () => {
+        if ((await readScope()).panel.open) return 'the panel was already open';
+        const trigger = page.locator(`${BAR} [aria-label="More controls"]:visible`);
+        if ((await trigger.count()) === 0) return 'there was no ⋯ trigger to click';
+        await trigger.click();
+        await page.waitForSelector('.pjsr-overflow-menu', { timeout: 5_000 }).catch(() => undefined);
+        return (await readScope()).panel.open
+          ? 'a pointer click reopened the panel that had closed'
+          : 'the ⋯ trigger was clicked and no panel appeared';
+      };
 
       /*
        * Choose "All pages", and prove the application took it.
        *
-       * The scope is not assumed because rows share one page and `print-sheets-hide-the-application` leaves it
-       * on "From–to" — a job of one sheet for page 2, which would make the sheet this row reads a different
-       * page from the one it drew on. WebKit refuses `selectOption` on a native `<select>` (that engine's note
-       * is in the print row), so the fallback puts the value on through the event the application listens for,
-       * on the copy a pointer could reach rather than the hidden measuring one (#243).
+       * The scope is not assumed because rows share one page and `print-sheets-hide-the-application` leaves it on
+       * "From–to" — a job of one sheet for page 2, which would make the sheet this row reads a different page from
+       * the one it drew on. WebKit refuses `selectOption` on a native `<select>` (that engine's note is in the
+       * print row), so the fallback puts the value on through the event the application listens for, on the copy a
+       * pointer could reach rather than the hidden measuring one (#243) — and since #278, when that copy is behind
+       * a panel that has closed, the row opens the panel and looks again before it calls the control unreachable.
        */
+      let scopeDoor = 'locator.selectOption';
       const pickAll = async () => {
         const control = await reveal('Print pages');
+        const trace = [];
+        const flag = { on: true };
+        const poller = traceWhile(flag, trace);
+        const finish = async () => {
+          flag.on = false;
+          await poller;
+        };
         try {
           await control.selectOption('all');
         } catch (error) {
+          const refusal = firstLine(error);
+          const door = await openPanelIfClosed();
           const wrote = await page.evaluate(() => {
             const copies = Array.from(
               document.querySelectorAll(
@@ -3794,21 +3886,29 @@ const CHECKS = [
             return `${copies.length} copy(ies)`;
           });
           if (wrote === 'none') {
+            await finish();
             fail(
-              `"All pages" could not be written and no copy of the scope control a pointer could reach was ` +
-                `present after ${firstLine(error)}: ${JSON.stringify(await scopeCopies())}`,
+              `"All pages" could not be written and no copy of the scope control a pointer could reach was present ` +
+                `after ${refusal} — ${door}. The control went: ${traceText(trace) || '(no samples)'}, so this is ` +
+                'not a panel that merely closed on a control still sitting behind it',
             );
           }
+          scopeDoor = `${door}, then the change event on ${wrote}`;
         }
         const settled = await waitFor(async () => {
           const copies = await scopeCopies();
           return copies.length > 0 && copies.every((copy) => copy.value === 'all') ? copies : null;
         }, 5_000);
+        await finish();
         if (!settled) {
           fail(
-            `the print scope never settled on "all" — it read ${JSON.stringify(await scopeCopies())} after 5 s, ` +
-              'so the sheet counts below would be some other selection\'s',
+            `the print scope never settled on "all" — it read ${JSON.stringify(await scopeCopies())} after 5 s, so ` +
+              `the sheet counts below would be some other selection's. The control went: ${traceText(trace)}`,
           );
+        }
+        const moves = movesIn(trace);
+        if (moves) {
+          scopeDoor += `, after the control changed place ${moves} time(s) while it was being reached for`;
         }
         return settled;
       };
@@ -3961,7 +4061,8 @@ const CHECKS = [
       }
 
       return (
-        `${engine}: ${scopePath.length} copies of the scope control read "all", ${first.length} sheets at ` +
+        `${engine}: ${scopePath.length} copies of the scope control read "all" (written by ${scopeDoor}), ` +
+        `${first.length} sheets at ` +
         `${first[0].width}x${first[0].height} device px, and page 1's own ${first[0].pixels} px box went ` +
         `${first[0].marks} → ${second[0].marks} dark px for one authored mark held in annotation storage ` +
         `(${editors} ink editor committed, the draw layer gone), while page 2's sheet in the same box moved ` +

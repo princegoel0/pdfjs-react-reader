@@ -1037,7 +1037,7 @@ section has ever itemised; the rest are named, not counted, so a stale figure ca
   document never described (still focusable, because hiding it took a working `/Dest` out of the tab order —
   measured), a control it cannot name reported rather than papered over, and the call site read out of
   `PdfPage.tsx` so the page cannot stop calling it while every unit case above stays green
-* The benchmark regression gate (`FR-49`): **`benchmark-baseline` (14)** reads
+* The benchmark regression gate (`FR-49`): **`benchmark-baseline` (15)** reads
   `benchmarks/baseline.json` — the timings a person has accepted, per environment — and the arithmetic over them.
   The fabricated numbers are the point: waiting for a machine to get slower is not a test. A halved reference fails
   the leg with the ratio in its message, an environment with no entry reads `n/a` rather than passing (§8's own
@@ -1046,8 +1046,10 @@ section has ever itemised; the rest are named, not counted, so a stale figure ca
   ceiling, and a forced reading cannot widen anything — it goes blind. The key ignores the two fields a runner
   image changes by itself (OS build, Chromium build) so the legs do not go blind on someone else's schedule, the
   committed file's stored reference and tolerance are re-derived from its own readings so a hand-edited ceiling
-  is a red test, and the wiring is read out of `scripts/benchmark.mjs`: the comparison has to be in the exit code,
-  or it is documentation
+  is a red test, the wiring is read out of `scripts/benchmark.mjs` because the comparison has to be in the exit
+  code or it is documentation, and every step in `ci.yml` that writes evidence — the browser audit, the two bench
+  passes, the upload of what they measured — is read back for `always()`, because the run that loses the record is
+  the run that had a red row somewhere above it (#279 found the third of the three still missing it)
 * Tiers: `features/download` `edit` (11) `edit.extract` (5) `edit.signatures` (8), and
   **`features/structure` (10)** — the gate counted by reads of the peer class (zero for an untagged file,
   one for a tagged one), both `MarkInfo` shapes, the document changing under it, and the merged page props
@@ -1220,10 +1222,14 @@ the next one produces — and each still refuses to write its file when its own 
 **How CI gets a baseline it is allowed to use**: FR-49's gate compares a run against the accepted baseline *for
 its own environment*, so a run is only ever checked against readings taken on the machine that made them, and an
 environment with no entry reads `n/a` on every leg. The runner's entry is now accepted —
-`AMD EPYC 7763 64-Core Processor · linux x86_64 · 15.6 GB · node 22 · pdfjs-dist 6.4.299`, two readings
-per leg folded from CI run 37819563810's artifact, its tolerance the 1.5× floor rather than a derived
-spread because those two passes disagreed by only 1.00–1.04× — so 21 of the file's 22 legs are live and
-this host's profile A cold page stays blind rather than being widened. A
+`AMD EPYC 7763 64-Core Processor · linux x86_64 · 15.6 GB · node 22 · pdfjs-dist 6.4.299`, two readings per
+leg folded from CI run 37819563810's artifact, its tolerance the 1.5× floor rather than a derived spread
+because those two passes disagreed by only 1.00–1.04×. The run after it (37822702432, dev at fdb31ec)
+landed on `AMD EPYC 9V74 80-Core Processor` and printed `0/12 legs compared`: the gate refused to compare
+one machine against another's numbers, which is §6 working rather than broken, so a live leg is a property
+of a *runner class* and not of the job. That run also produced no artifact — the upload step was the one
+step still missing `always()`, so the red webkit row above it skipped it, which is the same erasure
+`0f83b08` was written to stop and is now fixed for the third step too. A
 `workflow_dispatch` seeding job cannot work while `main` is behind `dev` — GitHub resolves the trigger against
 the default branch, and the API answers HTTP 404 (measured 2026-10-08) — so the `browser` job's bench step runs
 the benchmark twice, keeps both records and uploads them as `benchmark-records-pdfjs-dist-6.4.299`. A person

@@ -43,7 +43,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const repo = process.cwd();
-const read = (path) => readFileSync(join(repo, path), 'utf8');
+/**
+ * Every derivation below looks for line-anchored patterns (`\njobs:\n`, `^  name:`), and a Windows
+ * `core.autocrlf=true` checkout hands back CRLF — which is the same file with a different transport, not a
+ * document that changed. The run of 2026-10-09 proved the difference matters: restoring `ci.yml` from `HEAD`
+ * rewrote it with CRLF, and this gate failed with "ci.yml has no `jobs:` mapping" about a file that has one on
+ * line 20. Normalising here means the gate reads the document rather than the checkout.
+ */
+const read = (path) => readFileSync(join(repo, path), 'utf8').replace(/\r\n/g, '\n');
 const digits = (s) => Number(String(s).replace(/,/g, ''));
 const commas = (n) => n.toLocaleString('en-US');
 
