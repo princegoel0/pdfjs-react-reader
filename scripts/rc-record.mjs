@@ -66,7 +66,14 @@ for (const pair of args.filter((a) => a.startsWith('--leg=')).map((a) => a.slice
   legs.set(pair.slice(0, at), pair.slice(at + 1));
 }
 
-const runId = flag('run-id', process.env.GITHUB_RUN_ID ?? '');
+/*
+ * An empty environment variable and an absent one are the same thing to a record: the fields below are
+ * identity, and a runner that exports GITHUB_SHA= would otherwise fill the record with a value that looks set
+ * and is nothing. CI run 37894860342 made the difference observable — a test that blanked these variables read
+ * `runner: ''` where a local shell read `unknown`, so the same script wrote two different records.
+ */
+const env = (name) => process.env[name] || '';
+const runId = flag('run-id', env('GITHUB_RUN_ID'));
 const artifact = flag('artifact', '');
 const sha256 = flag('sha256', '');
 const problems = [];
@@ -107,11 +114,11 @@ const memoryGb = Number(
 const record = {
   schema: 'pjsr/release-candidate@1',
   generatedAt: new Date().toISOString(),
-  tag: flag('tag', process.env.GITHUB_REF_NAME ?? ''),
-  commit: flag('commit', process.env.GITHUB_SHA ?? ''),
-  run: { id: runId, url: process.env.GITHUB_SERVER_URL ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${runId}` : '' },
+  tag: flag('tag', env('GITHUB_REF_NAME')),
+  commit: flag('commit', env('GITHUB_SHA')),
+  run: { id: runId, url: env('GITHUB_SERVER_URL') ? `${env('GITHUB_SERVER_URL')}/${env('GITHUB_REPOSITORY')}/actions/runs/${runId}` : '' },
   environment: {
-    runner: process.env.RUNNER_NAME ?? 'unknown',
+    runner: env('RUNNER_NAME') || 'unknown',
     platform: `${process.platform} ${process.arch}`,
     osRelease: readOr('/etc/os-release').match(/PRETTY_NAME="([^"]+)"/)?.[1] ?? '',
     cpu: (readOr('/proc/cpuinfo').match(/^model name\s*:\s*(.+)$/m)?.[1] ?? 'unknown').trim(),

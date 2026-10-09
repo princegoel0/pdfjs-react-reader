@@ -1144,12 +1144,18 @@ const CHECKS = [
       const want = ['sigAlreadySigned', 'sigKid', 'sigPlain', 'sigTwoBoxes', 'sigTwoBoxes'];
       const got = sig.boxes.map((b) => b.name).sort();
       if (got.join(',') !== want.join(',')) {
+        /*
+         * The state fields come FIRST. `errText()` caps a failure at 260 characters, and the clause quote that
+         * used to open this message pushed the layer count and the engine element's class past the cut — so the
+         * detail #282 was opened to look for was in a sentence nobody could read. A verdict's useful part is the
+         * part that must survive its own length limit.
+         */
         fail(
-          `the signature fixture holds six /Sig widgets, one of which the engine paints itself, so five boxes are ` +
-            `expected and ${sig.boxes.length} were drawn (fields: ${got.join(', ') || 'none'}) — the clause is ` +
-            '"a signature widget renders as its box", and a widget with no element in the layer has nothing a ' +
-            `reader can see or aim at (layers: ${sig.layers}, engine element "${sig.engineClass}", ` +
-            `${sig.sigControls} control(s) where a box belongs)`,
+          `${sig.boxes.length} of five boxes were drawn, and the layer held ${sig.layers} annotation layer(s) with ` +
+            `the engine element "${sig.engineClass}" and ${sig.sigControls} focusable control(s) where a box belongs ` +
+            `(fields: ${got.join(', ') || 'none'}) — the signature fixture holds six /Sig widgets, one of which the ` +
+            'engine paints itself, and a widget with no element in the layer has nothing a reader can see or aim at' +
+            '(clause: "a signature widget renders as its box")',
         );
       }
       // `sigPlain` carries the same rect as `sigNoRotate` (72,660,272,720 on a 612×792 page), on the page the

@@ -37,16 +37,19 @@ const required: string[] = [...legsBlock.matchAll(/'([^']+)'/g)].map((m) => m[1]
  * the "a green with no run id" case watched a record that was properly backed and passed — four Verify cells and
  * all four React cells went red on exactly that reading (CI run 37891973684, 2026-10-09), in the same family as
  * #262, where a guard demanded an equality the peer matrix could not satisfy. A guard's result must not depend on
- * which machine typed the command, so the ambient identity is cleared here and named by the workflow instead.
+ * which machine typed the command, so the ambient identity is removed here and named by the workflow instead.
+ * Removed rather than blanked: `RUNNER_NAME=''` and an unset `RUNNER_NAME` are different values to a `??`, so the
+ * first version of this fix moved the environment dependence into the opposite field (run 37894860342, where the
+ * record case asserted a runner name and read `''`). The writer now treats an empty identity as absent, and this
+ * test deletes the variables outright, so the case has one answer on any host.
  */
-const ambient: Record<string, string> = Object.fromEntries(
-  Object.keys(process.env)
-    .filter((name) => /^(GITHUB_|RUNNER_|CI$)/.test(name))
-    .map((name) => [name, '']),
-);
+const cleanEnv = { ...process.env };
+for (const name of Object.keys(process.env)) {
+  if (/^(GITHUB_|RUNNER_)/.test(name) || name === 'CI') delete cleanEnv[name];
+}
 
 const run = (args: string[]) => {
-  const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: { ...process.env, ...ambient } });
+  const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: cleanEnv });
   return { code: result.status ?? 0, out: `${result.stdout ?? ''}${result.stderr ?? ''}` };
 };
 
