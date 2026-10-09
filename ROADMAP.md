@@ -92,7 +92,7 @@ certified on this machine at all.
 | `FR-42` | Document Merge | **met** | 4/5 | 0 | — |
 | `FR-43` | Structure-Tree Integration | **partial** | 5/5 | 3 | the clause’s consequence — a link announced with the words it is drawn over — is an engine capab… |
 | `FR-44` | High Contrast & Forced Colours | **met** | 5/5 | 0 | — |
-| `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the required NVDA+Firefox, JAWS+Chromium and VoiceOver+Safari pass has no environment, no job, n… |
+| `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the pass itself has still not been run, and the record now says so in a form a person can sign a… |
 | `FR-46` | SSR-Safe Module Graph | **met** | 5/5 | 0 | — |
 | `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the one-finger clause is now measured rather than reasoned about, in one engine: `scripts/browse… |
 | `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 5 | the browser job runs on the runner on every push to dev, and its readings are recorded here run … |

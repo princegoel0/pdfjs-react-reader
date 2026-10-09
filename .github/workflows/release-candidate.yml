@@ -131,6 +131,7 @@ jobs:
           node scripts/rc-record.mjs \
             --tag="${GITHUB_REF_NAME}" \
             --commit="${GITHUB_SHA}" \
+            --run-id="${GITHUB_RUN_ID}" \
             --artifact="${{ steps.pack.outputs.tarball }}" \
             --sha256="${{ steps.pack.outputs.sha256 }}" \
             --out="release/last-candidate-node${{ matrix.node }}.json" \

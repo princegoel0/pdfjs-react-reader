@@ -1,0 +1,114 @@
+{
+  "schema": "pjsr/a11y-certification@1",
+  "pairings": [
+    {
+      "screenReader": "NVDA",
+      "browser": "Firefox",
+      "status": "not-run",
+      "operator": null,
+      "date": null,
+      "environment": null,
+      "blocker": "no screen reader on this host: C:\\Program Files\\NVDA, %LOCALAPPDATA%\\Programs\\NVDA and %APPDATA%\\NVDA all measured absent on 2026-10-09 with no AT process running, and no operator has been named. NVDA is a free Windows download, so what this row lacks is an install, a person and a session — not a licence.",
+      "tasks": [
+        {
+          "name": "loading",
+          "done": false
+        },
+        {
+          "name": "navigation",
+          "done": false
+        },
+        {
+          "name": "search",
+          "done": false
+        },
+        {
+          "name": "forms",
+          "done": false
+        },
+        {
+          "name": "annotations",
+          "done": false
+        },
+        {
+          "name": "tagged structure",
+          "done": false
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "screenReader": "JAWS",
+      "browser": "Chromium",
+      "status": "not-run",
+      "operator": null,
+      "date": null,
+      "environment": null,
+      "blocker": "no screen reader on this host: C:\\Program Files\\Freedom Scientific, its (x86) copy and Common Files\\Freedom Scientific all measured absent on 2026-10-09. JAWS is commercial licensed software, so this row needs a licensed copy, a named operator and a session of its own.",
+      "tasks": [
+        {
+          "name": "loading",
+          "done": false
+        },
+        {
+          "name": "navigation",
+          "done": false
+        },
+        {
+          "name": "search",
+          "done": false
+        },
+        {
+          "name": "forms",
+          "done": false
+        },
+        {
+          "name": "annotations",
+          "done": false
+        },
+        {
+          "name": "tagged structure",
+          "done": false
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "screenReader": "VoiceOver",
+      "browser": "Safari",
+      "status": "not-run",
+      "operator": null,
+      "date": null,
+      "environment": null,
+      "blocker": "needs macOS with Safari: this host is win32 10.0.26300 (measured 2026-10-09) and no CI job has a macOS runner today. WebKit under Playwright is not Safari with VoiceOver — it has no assistive technology to speak with — so this row is #270 (a macOS runner) and #141 (the device pass).",
+      "tasks": [
+        {
+          "name": "loading",
+          "done": false
+        },
+        {
+          "name": "navigation",
+          "done": false
+        },
+        {
+          "name": "search",
+          "done": false
+        },
+        {
+          "name": "forms",
+          "done": false
+        },
+        {
+          "name": "annotations",
+          "done": false
+        },
+        {
+          "name": "tagged structure",
+          "done": false
+        }
+      ],
+      "evidence": []
+    }
+  ],
+  "updatedBy": "node scripts/a11y-certify.mjs --record"
+}

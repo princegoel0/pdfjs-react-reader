@@ -352,7 +352,14 @@ export function Compatibility() {
         <code>npm run test:browsers</code> job — locally, and on CI&apos;s Linux runner on every push to{' '}
         <code>dev</code> since 2026-10-04, where its reading per run is in <code>fr-evidence.json</code> — drives all
         three engines and classifies a browser that cannot start as <code>unverified</code> rather than passed. What
-        remains outside it is macOS Safari, Edge, and iOS or Android hardware. The pinned old-version floor is no longer
+        remains outside it is a device and Edge. Real Safari and an Android emulator are no longer sentences about what
+        cannot be reached: two scheduled jobs ask the cheap question first — <code>scripts/safari-probe.mjs</code>{' '}
+        drives Safari itself through <code>safaridriver</code> and reports the browser&apos;s own version string, the
+        APIs this table argues from, and whether a single scripted interaction reaches a document;{' '}
+        <code>scripts/android-probe.mjs</code> reports whether the runner has KVM, whether an AVD boots, which Chrome
+        for Android version is in the image, and whether the viewer was the page that browser had open. Both are
+        probes, not matrices: they run no gesture, they certify nothing, they are wired into no build gate, and their
+        readings live in the job artifacts rather than in this page. The pinned old-version floor is no longer
         one of those: <code>npm run test:floors</code> runs the three §8 browser builds themselves, all three fail to
         render a document, and each names the engine API it is missing — which makes §8&apos;s browser minimums a
         question about the table, not a hole in this matrix.

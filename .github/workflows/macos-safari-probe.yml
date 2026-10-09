@@ -1,0 +1,53 @@
+name: macOS Safari probe
+# §8's compatibility matrix runs WebKit under a Playwright driver, and this repository has been saying — in §8, in
+# `fr-evidence.json`, in #141 — that real Safari and real hardware are outside what it can reach. #267 measured
+# that a "cannot" nobody has tested is usually a "has not", so this job asks before anyone writes a harness against
+# an environment that may not exist: it reports what a macOS runner actually offers (the OS and Safari versions,
+# whether `safaridriver` can be enabled and driven, whether the viewer's shell mounts inside Safari itself and
+# whether one React-controlled interaction is possible) and writes that reading to an artifact. It is a probe,
+# not a pass: it asserts nothing about WCAG, VoiceOver or a device, and its own output says so.
+"on":
+  workflow_dispatch:
+  schedule:
+    # Twice a week, so a runner-image change that breaks the probe is noticed before a release needs it.
+    - cron: '17 4 * * 2,5'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: What is this machine?
+        run: |
+          {
+            echo "os=$(sw_vers -productVersion)"
+            echo "safari=$(plutil -extract CFBundleShortVersionString raw /Applications/Safari.app/Contents/Info.plist 2>/dev/null || echo '(unreadable)')"
+            echo "safaridriver=$(command -v safaridriver || echo '(absent)')"
+            echo "playwright=$(npx playwright --version 2>/dev/null || echo '(no playwright cli)')"
+          } | tee .spike/macos-facts.txt
+      - name: Drive Safari through its own WebDriver
+        # No new dependency: `safaridriver` speaks the W3C protocol over HTTP and Node has fetch, so the probe is
+        # one script and the playground's own dev server. That is also part of the finding — a browser that needs
+        # a package installed first is a browser nobody will run on a branch.
+        run: |
+          mkdir -p .spike
+          sudo safaridriver --enable || echo "safaridriver --enable exited $?"
+          node scripts/safari-probe.mjs | tee .spike/safari-probe.txt
+      - name: Upload the reading
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safari-probe
+          path: |
+            .spike/macos-facts.txt
+            .spike/safari-probe.txt
+          if-no-files-found: error

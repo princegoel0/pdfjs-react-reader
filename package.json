@@ -240,8 +240,9 @@
     "check:tarball": "node scripts/tarball-check.mjs",
     "check:upgrade": "node scripts/upgrade-check.mjs",
     "rc:record": "node scripts/rc-record.mjs",
-    "verify": "npm run typecheck && npm run test && npm run build && npm run size && npm run check:packaging && npm run check:examples && npm run check:maturity && npm run check:deps && npm run check:docs && npm run check:fr-evidence",
-    "prepublishOnly": "npm run verify"
+    "verify": "npm run typecheck && npm run test && npm run build && npm run size && npm run check:packaging && npm run check:examples && npm run check:maturity && npm run check:deps && node scripts/a11y-certify.mjs --check && npm run check:docs && npm run check:fr-evidence",
+    "prepublishOnly": "npm run verify",
+    "a11y:certify": "node scripts/a11y-certify.mjs"
   },
   "engines": {
     "node": ">=22.13.0"

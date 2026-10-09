@@ -31,8 +31,22 @@ const OUT = join('.spike', 'rc-record-test.json');
 const legsBlock = /(?:const REQUIRED_LEGS = \[)([\s\S]*?)(?:\n\])/.exec(source)?.[1] ?? '';
 const required: string[] = [...legsBlock.matchAll(/'([^']+)'/g)].map((m) => m[1] as string);
 
+/*
+ * The writer's `--run-id`, `--tag` and `--commit` fall back to `GITHUB_*`, which is right for the job that fills
+ * them and wrong for a test that forgot to ask. Run inside GitHub Actions this file inherited a real run id, so
+ * the "a green with no run id" case watched a record that was properly backed and passed — four Verify cells and
+ * all four React cells went red on exactly that reading (CI run 37891973684, 2026-10-09), in the same family as
+ * #262, where a guard demanded an equality the peer matrix could not satisfy. A guard's result must not depend on
+ * which machine typed the command, so the ambient identity is cleared here and named by the workflow instead.
+ */
+const ambient: Record<string, string> = Object.fromEntries(
+  Object.keys(process.env)
+    .filter((name) => /^(GITHUB_|RUNNER_|CI$)/.test(name))
+    .map((name) => [name, '']),
+);
+
 const run = (args: string[]) => {
-  const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: { ...process.env, ...ambient } });
   return { code: result.status ?? 0, out: `${result.stdout ?? ''}${result.stderr ?? ''}` };
 };
 

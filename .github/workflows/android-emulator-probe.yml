@@ -1,0 +1,68 @@
+name: Android emulator probe
+# §9's device row names real hardware, and #141 is the person with a phone — not something a work order builds.
+# What a job *can* ask for is an Android emulator on a Linux runner, and this repository has twice been wrong
+# about an environment it had never tested (#267, #276), so this probe measures the four things that decide
+# whether a device leg could ever be CI evidence: does the runner have KVM, does the SDK boot an AVD, is Chrome
+# for Android in the image and what version, and can the viewer be reached from inside that browser at all.
+# It runs the probe and uploads the reading. It does not run the matrix, does not measure a gesture and does not
+# certify a device — an emulator that boots is a *precondition*, and the row says so.
+"on":
+  workflow_dispatch:
+  schedule:
+    - cron: '33 5 * * 3,6'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install the SDK command line tools
+        run: |
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          curl -sSLo tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q tools.zip -d "$ANDROID_HOME/cmdline-tools"
+          mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+          rm tools.zip
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" \
+            "system-images;android-34;google_apis;x86_64" | tail -2
+      - name: Create and start the AVD
+        run: |
+          echo "no" | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n pjsr-probe \
+            -k "system-images;android-34;google_apis;x86_64" -d pixel_6
+          sudo chmod 666 /dev/kvm 2>/dev/null || echo "/dev/kvm not usable ($(ls -l /dev/kvm 2>&1))"
+          nohup "$ANDROID_HOME/emulator/emulator" -avd pjsr-probe -no-window -no-audio -no-boot-anim \
+            -gpu swiftshader_indirect -camera-back none > .spike-emulator.log 2>&1 &
+          mkdir -p .spike
+      - name: Wait for the device
+        timeout-minutes: 20
+        run: |
+          adb wait-for-device
+          for i in $(seq 1 120); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
+            sleep 5
+          done
+          adb shell getprop sys.boot_completed | tr -d '\r'
+      - name: Probe it
+        run: node scripts/android-probe.mjs | tee .spike/android-probe.txt
+      - name: Upload the reading
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-probe
+          path: |
+            .spike/android-probe.txt
+            .spike-emulator.log
+          if-no-files-found: error

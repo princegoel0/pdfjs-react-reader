@@ -69,6 +69,45 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **§8's two "no environment" sentences became questions (#270, #271, 2026-10-09).** The register had been
+  carrying "no macOS Safari, iOS or Android job exists" for days, and this repository has twice been wrong about
+  an environment it had never tested — #267 found axe running in all three engines on a Windows host, #276 found a
+  "webkit defect" that was a row's own un-awaited click. So two scheduled jobs now ask the cheap question first.
+  `scripts/safari-probe.mjs` drives **real Safari** through its own `safaridriver` over the W3C protocol using
+  nothing but Node's `fetch` — no new dependency, which is part of the finding — and reports the browser's own
+  version string, the APIs §8's floors are argued from (`Iterator`, `URL.parse`, `Promise.try`, `AbortSignal.any`,
+  `has()`, `light-dark()`), whether the shell mounts, and whether one React-controlled interaction (native value
+  setter, `input` event, submit) reaches a document. `scripts/android-probe.mjs` reports the four things that
+  decide whether a device leg could be CI evidence at all: `/dev/kvm` and the CPU flags behind it, the AVD's
+  `sys.boot_completed`, the `com.android.chrome` `versionName` with the Android release and ABI, and whether the
+  viewer was the page that browser had open, read off its DevTools endpoint (`/json/list` — url and title, no
+  WebSocket client). Neither is a matrix: no gestures, no assertions about a11y, no certification. Neither is
+  wired into `verify`, `ci.yml` or the candidate chain, both are dispatch + schedule only, and each uploads its
+  reading `if: always()` with `if-no-files-found: error` — the #279 rule, read per step block. Eight cases in
+  `src/lib/device-probes.test.ts`, one of which **executes** the Android probe with `ANDROID_HOME` cleared and
+  requires exit 2 plus the written refusal, because `COULD NOT PROBE` and "the leg refused" are different
+  sentences and only one of them is a product result.
+
+- **FR-45's fourth evidence leg has a log, and the log says `not-run` (#273, 2026-10-09).** FR-45 splits its
+  evidence four ways and closes by saying an automated audit is not proof of conformance; three legs had files
+  something writes, and the screen-reader pass had nothing. `a11y/certifications.json` now carries one row per
+  pairing — NVDA+Firefox, JAWS+Chromium, VoiceOver+Safari — and `scripts/a11y-certify.mjs` derives both those
+  pairings and the six tasks from FR-45's own sentence rather than a list typed beside it, so a clause edit that
+  renames a reader moves the record or stops the writer. Today every row is `not-run` with the missing thing
+  measured and named: `C:\Program Files\NVDA`, `%LOCALAPPDATA%\Programs\NVDA` and `%APPDATA%\NVDA` are absent, so
+  are both `Freedom Scientific` trees and `Common Files\Freedom Scientific`, no AT process was running, and
+  VoiceOver needs macOS with Safari (#270) rather than WebKit under a driver. The writer refuses the nine shapes
+  that would make the file worthless — a `pass` with no person, a generic "qa", a future date, a thin environment,
+  four of six tasks, an evidence path that is not in the tree, no evidence at all, a `not-run` naming nothing it
+  waits for, and a pairing the clause does not name — and `--check` fails a record with a pairing *missing*, which
+  is how a comparison could otherwise be true of a shorter list. `verify` runs `--check` on every push. Sixteen
+  cases, one of them writing a complete pass to a scratch copy so the refusals are rules rather than a script that
+  rejects everything, and one proving the "no document may claim a pass" prohibition matches the sentence form it
+  forbids. The writer's first run also caught its own derivation reading **five** tasks, because the clause has no
+  Oxford comma before "tagged structure" — `--check` reddened the file it had just written, which is the guard
+  working on its author. Runbook in `docs/src/pages/Accessibility.tsx`; the row stays `partial`, because a
+  container is not a session.
+
 - **Two browser rows can now name their own cause, and one of them did (#276, #278, #281; FR-48, FR-29, FR-16,
   2026-10-09).** `authored-ink-survives-scroll-and-save` had failed every webkit · desktop reading since
   2026-10-07 with `no "Ink" control in the 1280px bar, and no overflow menu to look in`, and the row was on trial
@@ -80,11 +119,13 @@ to bite — and never up on a claim nobody can make fail.
   count and the feature boxes before it is allowed to call anything unreachable. Three of the four local runs
   after that read the ink row green — and put `form-widgets-are-html-controls` red twice in the same cell with
   `5 boxes expected and 0 were drawn`, which is a redder variant of a reading this row already carries, so that
-  message names the layer count and the engine element's class now too. The same instrument pass settled #281:
-  run 37883913248 repeats webkit's `_DrawingEditor.#currentDraw.isCancellable` uncaught word for word, which
-  falsifies the "seen once and not again" this register wrote from the run before it, and both engine builds hold
-  the identical unguarded static read (`6.2.108`'s `pdf.mjs:23686`, `6.4.299`'s `:22495`), so the fact that both
-  sightings landed in the current-engine cell is a sample of two, not the engine axis it looks like. The route
+  message names the layer count and the engine element's class now too. CI run 37891973684 then read the ink row
+  ok in all three engines, which is the remote agreeing with the local runs. The same pass settled #281 and then
+  corrected itself: run 37883913248 repeats webkit's `_DrawingEditor.#currentDraw.isCancellable` uncaught word for
+  word, which falsifies the "seen once and not again" this register wrote from the run before it — and the next run
+  put the same crash in the **6.2.108** cell with 6.4.299 green, which falsifies the engine-axis shape the first two
+  sightings looked like. The two builds had already been opened and say the same thing the tallies now do: the
+  unguarded static read is at `6.2.108`'s `pdf.mjs:23686` and `6.4.299`'s `:22495`. The route
   from the null static to a live handler is in that source — the session's `AbortController` is overwritten at its
   only assignment site without aborting the previous one, so a second session begun before the first is cleaned
   leaves the first session's capture-phase `pointerdown` listener reading a static that has since been nulled — and
@@ -229,7 +270,6 @@ to bite — and never up on a claim nobody can make fail.
   a row with one branch and one assumption — and it was itself falsified by editing
   `WIDGET_ALT_MINIMUM` to `6.4.0`, which turns the case red. #268's own sentences that said the widget arrives
   named by the engine are corrected in this commit's register row rather than left standing.
-### Added
 
 - **A benchmark number can now fail a job: FR-49's second clause, which had no instrument behind it (#275,
   FR-49, 2026-10-08).** The row was read clause by clause. "A committed fixture for each benchmark profile in §6
@@ -3321,6 +3361,10 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
   regex-parsing the config text — that version is gone, and the sentence about it is in the file.
   `testTimeout` stays at vitest's 5 s by ruling: an audit that genuinely needs longer is a measurement, and a
   suite that cannot report one is the thing that should fail. The suite was **1,070 tests in 113 files** at that moment; #225 and #226 have since taken it to 1,097 in 117.
+
+### Fixed
+
+- **A guard that passed at home and failed on eight cells had been reading its own environment (#272, FR-58, 2026-10-09).** CI run 37891973684 (dev at 42045d9) reddened three Verify cells and all four React cells on `refuses a green that no run and no artifact stands behind` — a case that had passed locally every time it was run, in every gate this session executed. The writer takes `--run-id` and falls back to `GITHUB_RUN_ID`, which a local shell never sets and an Actions runner always does, so the test watched a record that *was* properly backed and concluded the refusal was broken. Two changes: `run()` in the test scrubs every `GITHUB_*`, `RUNNER_*` and `CI` variable before spawning, and the workflow passes `--run-id="${GITHUB_RUN_ID}"` explicitly, so an identity is named by the thing that holds it rather than inherited by whatever process is listening. The same rule #244 was written for, applied to a guard instead of a matrix cell. The other failure in that run was the product's, not the instrument's: the webkit uncaught #281 tracks moved from the 6.4.299 cell to the 6.2.108 one, which is recorded under FR-48.
 
 ## [0.11.0] — 2026-10-01
 

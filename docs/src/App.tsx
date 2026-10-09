@@ -8,6 +8,7 @@ import { Features } from './pages/Features';
 import { Headless } from './pages/Headless';
 import { Theming } from './pages/Theming';
 import { Api } from './pages/Api';
+import { Accessibility } from './pages/Accessibility';
 // Read rather than typed, because a badge that has to be edited at each release is
 // a badge that says 0.4.0 three releases late.
 import { version } from '../../package.json';
@@ -29,6 +30,7 @@ const PAGES: DocPage[] = [
   { id: 'headless', title: 'Headless hooks', group: 'Using it', Component: Headless },
   { id: 'theming', title: 'Theming', group: 'Using it', Component: Theming },
   { id: 'recipes', title: 'Recipes', group: 'Using it', Component: Recipes },
+  { id: 'accessibility', title: 'Accessibility & the pass', group: 'Using it', Component: Accessibility },
   { id: 'api', title: 'The API surface', group: 'Reference', Component: Api },
 ];
 
