@@ -1881,6 +1881,30 @@ package runs, and was verified against both tarballs on 2026-10-07 rather than r
 
 ### Changed
 
+- **A crash that finally named its own row, a green that did not repeat it, and a registry write that still will not
+  land (FR-48, §9 — #278, #207, #281, 2026-10-09).** Two readings first. Run 37828297862 (`dev` at `1dd838b`) failed
+  one check in webkit · desktop, and for the first time the failure said which row produced it:
+  `no-uncaught-errors → 1 uncaught: [print-carries-an-authored-mark] null is not an object (evaluating
+  '_DrawingEditor.#currentDraw.isCancellable')`, with the print row itself ok — 2 sheets for the whole two-page
+  document, 1 for `Current page`, 1 for `From-to 2-2`, the 1,000-page refusal intact — and the cell at
+  97 ok / 7 skipped / 1 failed. That is #258's row stamp doing the job it was written for: nine earlier runner
+  messages about that row had named nothing but themselves. Then the run after it (37836406231, `dev` at `e112431`)
+  came back green in **both** matrix cells at 98 ok / 7 skipped / 0 failed, 0 uncaught in that engine, so the throw
+  is one sighting and not a settled defect — #278 stays open on that basis rather than closing on a green. The two
+  readings together also end the idea that this row alternated for one reason: the scope-copy question is closed by
+  #278's polling instrument, and what remains is an engine-side throw inside pdf.js's own drawing editor, reached
+  while the print row runs.
+  **Second, §9's registry write.** The owner generated an npm token for this, so it was attempted from here.
+  `npm whoami` answers as the owning account, which measures W9's sentence wrong — it said this machine "either has
+  no session or has one that does not own the package". The actual blocker is that both `npm deprecate` calls return
+  `EOTP`, npm requiring a one-time password for a write, and the registry still reads `deprecated` empty for every
+  published version: **`0.1.0` and `0.1.1` are not deprecated yet.** W9 now names the two remedies that exist — the
+  write run with `--otp=` while a code is live, or an npm **Automation**-type token, the kind allowed to skip it.
+  Recorded against the instrument too: the first attempt launched npm through a shell, so the message's `>=6.2.108`
+  reached bash as a *redirection*, npm received twenty words instead of three, and an empty file named `22.13.0`
+  appeared in the repository root; the retry invokes npm's own CLI through node, the message arrives intact (checked
+  in npm's argv log), and the stray file is gone.
+
 - **#210's closure was wrong, and a quiet machine proved it (#259, 2026-10-07).** That task recorded webkit's
   1,000-page stall as port contention — "not reproducible solo". It is now reproducible solo, five times, with
   nothing else running, and chromium is unaffected in the same breath: `--engines=chromium,webkit
