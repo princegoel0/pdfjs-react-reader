@@ -9,3 +9,4 @@ playground/dist/
 # staged. Anything produced here has to be reproduced by a real test or script
 # before its result is relied on.
 .spike/
+npmToken.md
