@@ -1655,6 +1655,36 @@ const CHECKS = [
       const engine = page.context().browser()?.browserType().name();
       await page.locator('.app-features label', { hasText: 'annotate' }).locator('input').check();
       await load('page-order-sample.pdf', 20);
+      /*
+       * Wait for the consequence of the click, not just its effect on the box. Playwright's `check()` reads the
+       * input's `checked` property, which the browser sets as it processes the click — before React's `onChange`
+       * has mounted the feature's controls — so this row used to reach `reveal('Ink')` against a bar that had
+       * never been asked to grow (#276: webkit desktop, three runs of `no "Ink" control … and no overflow menu
+       * to look in`, in a cell where the row after it armed the same pen and drew). An absent control group with
+       * the box still checked is a product finding and this row says so; an unchecked box is this row's own
+       * click, and the message names that too. The wait sits after the load because a bar with no document in
+       * it is not the bar this row is about.
+       */
+      const mounted = await page
+        .waitForSelector('.pjsr-annotate', { timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!mounted) {
+        const box = await page.evaluate(() => ({
+          annotate: [...document.querySelectorAll('.app-features input')].find((i) =>
+            (i.closest('label')?.textContent ?? '').includes('annotate'),
+          )?.checked,
+          group: document.querySelectorAll('.pjsr-annotate').length,
+          labels: [...document.querySelectorAll('.pjsr-toolbar [aria-label]')].map((n) =>
+            n.getAttribute('aria-label'),
+          ),
+        }));
+        fail(
+          `the annotate box reads ${box.annotate} and ${box.group} control group(s) are rendered 10 s after the ` +
+            `document was ready, so this row's own precondition never arrived ` +
+            `(${box.labels.length} labelled control(s) in the bar)`,
+        );
+      }
       // A box this row owns: the earlier rows leave the zoom wherever they parked it, and "out of the window"
       // is a statement about how much of a page a window holds.
       await page.selectOption(`${BAR} [aria-label="Zoom level"]`, 'automatic');
@@ -4259,7 +4289,47 @@ async function runCell(engineName, profileName, baseUrl) {
       if ((await page.locator(`${BAR} [aria-label="${label}"]:visible`).count()) > 0) return control;
       const menu = page.locator(`${BAR} [aria-label="More controls"]:visible`);
       if ((await menu.count()) === 0) {
-        fail(`no "${label}" control in the ${profile.viewport.width}px bar, and no overflow menu to look in`);
+        /*
+         * #276: this line failed in webkit desktop for three runs with a sentence about the viewer and no way
+         * to tell which of two things it had found — a control the application never rendered, or a control the
+         * row reached for before the application had been told to want it. So the verdict now carries the bar's
+         * own state: every label it holds, where each copy of the missing control is (bar, measuring sizer,
+         * overflow panel) and whether a pointer could reach it, the bar's width against its scroll width, and
+         * the playground's feature boxes, since a control group is a feature's and a folded bar with no
+         * overflow to open is what a *shorter* bar looks like.
+         */
+        const seen = await page.evaluate((wanted) => {
+          const bar = document.querySelector('.pjsr-toolbar');
+          const where = (node) =>
+            node.closest('.pjsr-toolbar-sizer') ? 'sizer' : node.closest('.pjsr-overflow-menu') ? 'panel' : 'bar';
+          const copies = [...document.querySelectorAll(`[aria-label="${wanted}"]`)].map((n) => {
+            const r = n.getBoundingClientRect();
+            const cs = getComputedStyle(n);
+            return `${where(n)} ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)} ${cs.visibility}`;
+          });
+          return {
+            labels: [...document.querySelectorAll('.pjsr-toolbar [aria-label]')]
+              .filter((n) => {
+                const r = n.getBoundingClientRect();
+                return r.width > 0 && r.height > 0 && getComputedStyle(n).visibility !== 'hidden';
+              })
+              .map((n) => n.getAttribute('aria-label')),
+            copies,
+            bar: bar ? `${bar.clientWidth}/${bar.scrollWidth}px` : '(no bar)',
+            panel: document.querySelectorAll('.pjsr-overflow-menu').length,
+            features: [...document.querySelectorAll('.app-features input')]
+              .map((i) => `${(i.closest('label')?.textContent ?? '').trim() || '?'}=${i.checked}`)
+              .join(','),
+          };
+        }, label);
+        fail(
+          `no "${label}" control in the ${profile.viewport.width}px bar, and no overflow menu to look in: ` +
+            `the bar holds [${seen.labels.join(', ') || '(nothing visible)'}], bar clientWidth/scrollWidth ` +
+            `${seen.bar}, ${seen.panel} panel(s), ${seen.copies.length} copy(ies) of that label ` +
+            `${seen.copies.length ? `[${seen.copies.join('; ')}]` : '— the application never rendered it'}${
+              seen.features ? `, features ${seen.features}` : ''
+            }`,
+        );
       }
       /*
        * Open the panel; never toggle it. The first version clicked whenever the control was not in the bar, so a
@@ -4389,6 +4459,50 @@ console.log(
     process.env.PJSR_PLAYWRIGHT ? ', pinned driver' : ''
   })`,
 );
+
+/*
+ * FR-58, §9: "the release candidate is built and tested on a clean runner **from the packed npm artifact**", and
+ * `PJSR_TARGET=dist` is how the playground is pointed at the build instead of the sources. An environment variable
+ * is a claim, not a witness: a stale alias, an unbuilt `dist/`, or a config that stopped honouring the flag all
+ * still print `dist` while the browser loads `src`. So the copy under test is read off the module graph the page
+ * actually requested — Vite serves the repository's own files under `/@fs/<repo>/dist/…` or `/@fs/<repo>/src/…`,
+ * which is the difference between the two — and a run that asked for the artifact and got the sources refuses to
+ * produce readings at all. The same shape as `prebundleMismatch()` above: measure what the browser got, or say nothing.
+ */
+async function servedLibraryCopy() {
+  const driver = { chromium, firefox, webkit }[ONLY_ENGINES[0]];
+  if (!driver) return { observed: 'unreadable', detail: `no driver for ${ONLY_ENGINES[0]}` };
+  let browser;
+  try {
+    browser = await driver.launch();
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.app-header', { timeout: 30_000 }).catch(() => undefined);
+    const urls = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
+    const count = (segment) => urls.filter((url) => url.includes(segment)).length;
+    const dist = count('pdfjs-react-reader/dist/');
+    const src = count('pdfjs-react-reader/src/');
+    const observed = dist > 0 && src === 0 ? 'dist' : src > 0 && dist === 0 ? 'src' : dist > 0 ? 'mixed' : 'unreadable';
+    return { observed, detail: `${dist} artifact module(s), ${src} source module(s)` };
+  } catch (error) {
+    return { observed: 'unreadable', detail: String(error.message ?? error).split('\n')[0].slice(0, 120) };
+  } finally {
+    await browser?.close();
+  }
+}
+
+const requestedCopy = process.env.PJSR_TARGET === 'dist' ? 'dist' : 'src';
+const served = await servedLibraryCopy();
+console.log(`library copy under test: ${served.observed} (${served.detail}) — asked for ${requestedCopy}`);
+if (requestedCopy === 'dist' && served.observed !== 'dist') {
+  console.error(
+    `FAIL  PJSR_TARGET=dist was asked for and the browser got \`${served.observed}\`: ${served.detail}.\n` +
+      '      FR-58 tests the artifact, so a run that silently serves the sources is not evidence about the artifact.\n' +
+      '      Run `npm run build` first, and check that dist/ holds index.js plus the feature and locale entries.',
+  );
+  await server.close();
+  process.exit(2);
+}
 
 const cells = [];
 for (const engineName of ONLY_ENGINES) {

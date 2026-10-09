@@ -1,0 +1,151 @@
+name: Release candidate
+
+# FR-58 and PRD §9: "the release candidate is built and tested on a clean runner from the packed npm artifact",
+# and the evidence is "recorded with its environment, operator and date". Every leg below runs against the tarball
+# this commit packs, or against `dist/` that the packed copy holds — never against `src/` — because the defect class
+# this job exists for is the one that only the artifact has (0.1.0 shipped a worker URL no bundler could rewrite,
+# and 0.1.1 shipped an ESM-only map that a CommonJS host could not load at all).
+#
+# It is `workflow_dispatch` as well as a tag trigger because §9's chain has to be runnable *before* a tag exists:
+# the first candidate is proof of the chain, and a job that can only run once a release is declared cannot be the
+# thing that decides whether to declare one.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Nothing here publishes. It installs, tests, and writes one JSON record.
+permissions:
+  contents: read
+
+concurrency:
+  group: rc-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    name: Candidate ${{ github.ref_name }} (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor §8 puts the Node rows at, and the current LTS. Not the whole `verify` matrix: a candidate is
+        # certified at the boundary and at the top, and 22.x in between adds a runner class to the benchmark gate
+        # without adding a contract claim.
+        node: ['22.13.0', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # The whole of `verify` on the checked-out tree: typecheck, 153 test files, build, size, packaging, examples,
+      # maturity, the §6.2 dependency scan, the docs gate and the register gate.
+      - name: Verify chain
+        id: verify
+        run: npm run verify
+
+      - name: Pack the artifact
+        id: pack
+        run: |
+          set -euo pipefail
+          npm pack > /dev/null
+          TARBALL=$(ls pdfjs-react-reader-*.tgz | head -1)
+          SHA=$(sha256sum "$TARBALL" | cut -d' ' -f1)
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "packing ${TARBALL} — sha256 ${SHA}"
+
+      # `always()` on the three legs below and on the last three, for the reason #279 measured: a step without it is
+      # skipped by a red step above, and the run then has no record of the evidence it could still have produced.
+      # Each step still refuses to write anything clean about a subject that failed, so the honesty gate is inside
+      # the command, not in the ordering.
+      #
+      # FR-41 over the tarball: install it beside its real peers, resolve every published path through `require()`
+      # and `import()`, and compile one identical source file as `.mts` and `.cts` so a missing `.d.cts` is an error
+      # rather than a silent `any`.
+      - name: Packed artifact contract
+        id: artifact
+        if: always() && steps.pack.outcome == 'success'
+        run: npm run check:tarball
+
+      # §5.6: every documented example type-checked against the artifact, with each skip printed with the
+      # requirement it waits on.
+      - name: Examples compile against the artifact
+        id: examples
+        if: always() && steps.pack.outcome == 'success'
+        run: npm run check:examples
+
+      # FR-58's own clause: the previous public release, upgraded in place the way a host does it, with the
+      # lockfile migration and the published-name comparison read back afterwards. Needs the network, like
+      # `check:tarball`.
+      - name: Upgrade from the published release
+        id: upgrade
+        if: always() && steps.pack.outcome == 'success'
+        run: npm run check:upgrade
+
+      - name: Install browsers
+        id: engines
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      # The copy under test is read off the module graph, not off the environment variable: the harness refuses to
+      # run at all when `PJSR_TARGET=dist` is asked for and the browser is served `src`.
+      - name: Browser matrix from the artifact
+        id: matrix
+        env:
+          PJSR_TARGET: dist
+        run: npm run test:browsers
+
+      - name: Accessibility audit in a real browser
+        if: always() && steps.engines.outcome == 'success'
+        id: a11y
+        run: npm run a11y:browser-record
+
+      # FR-49's gate compares a run against the accepted baseline *for its own environment*, so a runner class with
+      # no entry prints `n/a` per leg rather than passing — §6's rule that an unverified row is not a pass, applied
+      # to a machine. Two passes because the tolerance needs a distribution to compare against, and it is the
+      # machine's own readings it may not be compared with another's.
+      - name: Run the benchmarks twice and keep both records
+        if: always() && matrix.node == '22.13.0'
+        id: bench
+        run: |
+          set -euo pipefail
+          npm run bench
+          npm run bench
+
+      # `always()`, and by the measurement that made it true elsewhere: the run that loses the record is the run
+      # that had a red leg above it, and #279 found a gate still skipping its own evidence upload. The record
+      # refuses to write itself if a leg is missing, unrecognised, or claimed green with no run id and no digest to
+      # bind it to — and it has no option that spells `certified`, because §9 is signed by a person.
+      - name: Write the candidate record
+        if: always()
+        run: |
+          set -euo pipefail
+          node scripts/rc-record.mjs \
+            --tag="${GITHUB_REF_NAME}" \
+            --commit="${GITHUB_SHA}" \
+            --artifact="${{ steps.pack.outputs.tarball }}" \
+            --sha256="${{ steps.pack.outputs.sha256 }}" \
+            --out="release/last-candidate-node${{ matrix.node }}.json" \
+            --leg="verify-chain:${{ steps.verify.outcome }}" \
+            --leg="packed-artifact-contract:${{ steps.artifact.outcome }}" \
+            --leg="examples-compile:${{ steps.examples.outcome }}" \
+            --leg="upgrade-path:${{ steps.upgrade.outcome }}" \
+            --leg="browser-matrix-from-artifact:${{ steps.matrix.outcome }}" \
+            --leg="accessibility-audit:${{ steps.a11y.outcome }}" \
+            --leg="benchmarks:${{ steps.bench.outcome }}"
+
+      - name: Upload the candidate record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate-node${{ matrix.node }}
+          path: release/last-candidate-node${{ matrix.node }}.json
+          if-no-files-found: error

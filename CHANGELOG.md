@@ -68,6 +68,32 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **§9's release-candidate chain exists, and it cannot flatter itself (FR-58, #272, 2026-10-09).** FR-58 was the
+  register's one `absent` row, and two of its clauses had no code at all: *validate upgrade from the previous public
+  release*, and *record evidence with its environment, operator and date*. `npm run check:upgrade` does the first —
+  install the registry's current release into a throwaway consumer, apply the packed candidate over it the way a host
+  does, then read back the lockfile entry, the peer resolutions and **every published name the older release exposed**,
+  with a vanished name failing unless `api-maturity.json` already announced it. Measured locally: `0.1.2 → 0.11.0`,
+  lockfile migrated, 2 entries before and 15 after, 15 root and 7 headless names gone with the ledger naming every one
+  of them, 79 and 63 gained. `npm run rc:record` writes the candidate record and **refuses**: a leg that is absent, a
+  leg no job produces, a `success` with no run id or no artifact digest behind it, a conclusion no step can emit, and
+  any `--certified` flag — §9 is signed by a person, so a script that could write the word eventually writes it by
+  accident. `.github/workflows/release-candidate.yml` runs seven legs on Node 22.13.0 and 24 against the artifact, and
+  `ci.yml` gained `tags: ['v*']` so a candidate tag also runs the React and engine axes that job does not.
+  `PJSR_TARGET=dist` now points the playground at the build the way the docs build does, and the matrix **reads which
+  copy the browser actually requested** off the module graph rather than trusting the variable: today it prints
+  `library copy under test: dist (41 artifact module(s), 0 source module(s))`, and with `dist/` moved aside it exits 2
+  instead of reporting readings from the wrong file.
+  Three defects the pass caught in its own instrument, each now a case: the export-map reader understood only the
+  candidate's shape, so the base release looked like it published **nothing** and the name comparison was true of an
+  empty set — an empty base is a refusal now; the peer matcher used `every` across a `||` range and anchored its
+  version pattern to the bare form, so it accused three healthy hosts of being stranded; and the generated typecheck
+  file imported each name once per entry point, which is `Duplicate identifier`, not a package defect. The falsifications
+  that prove the new guards bite: deleting an `if: always()` from a leg step reddens the wiring case, and dropping
+  `./headless` from the export map makes the upgrade check fail with *"a published entry point cannot disappear in a
+  minor"* (manifest restored by checksum). Ten cases in `src/lib/release-candidate.test.ts`; the row moves
+  `absent → partial`, because the chain has never run — first dispatch, then the record.
+
 - **§8's pinned browser floors are an instrument now, and the first reading is a refusal (FR-48, #269,
   2026-10-09).** For five days this row answered the execution-policy clause honestly and left it there: the
   matrix runs Chromium 153, Firefox 155 and WebKit 26, and "a current browser passing the suite does not certify

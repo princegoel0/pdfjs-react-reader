@@ -40,25 +40,41 @@ function servePdfjsAssets(): Plugin {
   };
 }
 
+/*
+ * Which copy of the library the playground runs. Source is the default because that is what hot-reload is
+ * for. `PJSR_TARGET=dist` is FR-58's: §9 says the release candidate is *tested from the packed artifact*, and
+ * a browser matrix that loads `src` cannot evidence that — it certifies code the consumer never installs. The
+ * same switch already exists for the docs build (`DOC_TARGET=dist`), so the artifact has two consumers in the
+ * toolchain rather than one argument repeated.
+ */
+const fromDist = process.env.PJSR_TARGET === 'dist';
+const target = (file: string) => r(fromDist ? `../dist/${file}` : `../src/${file}`);
+
 export default defineConfig({
   plugins: [react(), servePdfjsAssets()],
   resolve: {
     alias: [
-      { find: /^pdfjs-react-reader\/styles\.css$/, replacement: r('../src/styles/viewer.css') },
+      { find: /^pdfjs-react-reader\/styles\.css$/, replacement: target(fromDist ? 'styles.css' : 'styles/viewer.css') },
       // Each feature ships its own sheet, so a tier is a JS import and a CSS
-      // import, and the playground runs from source rather than from dist.
-      { find: /^pdfjs-react-reader\/(\w+)\.css$/, replacement: r('../src/styles/$1.css') },
-      { find: /^pdfjs-react-reader\/features\/(\w+)$/, replacement: r('../src/features/$1.tsx') },
-      // Shipped locale catalogs, same source-for-dist substitution as the features.
-      { find: /^pdfjs-react-reader\/locales\/(\w\w)$/, replacement: r('../src/locales/$1.ts') },
+      // import, and both layouts are the same two patterns.
+      { find: /^pdfjs-react-reader\/(\w+)\.css$/, replacement: target(`${fromDist ? '' : 'styles/'}$1.css`) },
+      {
+        find: /^pdfjs-react-reader\/features\/(\w+)$/,
+        replacement: target(`features/$1.${fromDist ? 'js' : 'tsx'}`),
+      },
+      // Shipped locale catalogs, same two layouts.
+      {
+        find: /^pdfjs-react-reader\/locales\/(\w\w)$/,
+        replacement: target(`locales/$1.${fromDist ? 'js' : 'ts'}`),
+      },
       // The writer tier is its own entry, not a feature: it is the one place the
       // optional peer may be imported.
-      { find: /^pdfjs-react-reader\/edit$/, replacement: r('../src/edit.tsx') },
+      { find: /^pdfjs-react-reader\/edit$/, replacement: target(`edit.${fromDist ? 'js' : 'tsx'}`) },
       // Merge is a separate entry so a consumer can pull in the writer without the
       // editing UI; the playground's merge demo is what imports it.
-      { find: /^pdfjs-react-reader\/merge$/, replacement: r('../src/merge.ts') },
-      { find: /^pdfjs-react-reader\/headless$/, replacement: r('../src/headless.ts') },
-      { find: /^pdfjs-react-reader$/, replacement: r('../src/index.ts') },
+      { find: /^pdfjs-react-reader\/merge$/, replacement: target(`merge.${fromDist ? 'js' : 'ts'}`) },
+      { find: /^pdfjs-react-reader\/headless$/, replacement: target(`headless.${fromDist ? 'js' : 'ts'}`) },
+      { find: /^pdfjs-react-reader$/, replacement: target(fromDist ? 'index.js' : 'index.ts') },
     ],
   },
   server: {

@@ -2,8 +2,13 @@ name: CI
 
 on:
   # `dev` is the integration branch; `main` only ever receives deliberate merges.
+  #
+  # `v*` is FR-58's, added by #272: §9 wants the React and engine axes covered *at the candidate*, and the release-
+  # candidate job does not run them — this file's `react` and `consumer` jobs do. A tag that triggered nothing would
+  # leave the record pointing at a commit no CI had ever built, which is the same hole as a claim with no run id.
   push:
     branches: [main, dev]
+    tags: ['v*']
   pull_request:
 
 # A new push to the same branch makes older runs pointless.

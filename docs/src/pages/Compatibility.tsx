@@ -490,6 +490,20 @@ export function Compatibility() {
         Every change a host had to act on, in the order it happened. Nothing here is a judgement call the library made
         quietly: each line is something an application compiling against the previous version would have had to change.
       </p>
+      <p>
+        The table below is the human-readable half. The mechanical half is <code>npm run check:upgrade</code>: it
+        installs the release the registry currently serves into a throwaway consumer, applies the packed candidate
+        over it the way <code>npm install</code> would, and then reads back the lockfile entry, the peer resolutions
+        and <strong>every published name the older release exposed</strong>. A name that disappeared is a build
+        failure unless <code>api-maturity.json</code> records it as withdrawn, which is what makes the withdrawals
+        above — <code>usePdfInk</code> and the fourteen other ink names FR-18 retired, each with the successor named
+        — a checked property rather than a promise in prose. <code>npm run test:browsers</code> with{' '}
+        <code>PJSR_TARGET=dist</code> runs the same browser rows against the build rather than the sources, and the
+        harness <em>refuses to run</em> when it is asked for the artifact and the page is served <code>src</code>.
+        Both are steps in <code>.github/workflows/release-candidate.yml</code>, which is what PRD §9 means by a
+        candidate tested on a clean runner from the packed artifact — and, said plainly, that chain has not run yet,
+        so it is built rather than certified.
+      </p>
       <table className="doc-table">
         <thead>
           <tr>

@@ -105,7 +105,7 @@ certified on this machine at all.
 | `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |
 | `FR-57` | Runtime Resource Budget Contract | **met** | 5/5 | 0 | — |
-| `FR-58` | Release Evidence & Consumer Verification | **absent** | 2/5 | 3 | no release candidate has ever been built and tested on a clean runner from a packed artifact. Th… |
+| `FR-58` | Release Evidence & Consumer Verification | **partial** | 5/5 | 3 | the chain now exists and is guarded, and it has still never run. `npm run check:upgrade` install… |
 
 <!-- FR-EVIDENCE:STATUS:END -->
 
