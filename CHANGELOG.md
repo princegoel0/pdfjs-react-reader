@@ -61,12 +61,34 @@ three gaps to one, and the sentence each now lacks is a different kind of thing 
 the 27 members the writer is relied on for and resolved them against the installed package — and the registry read
 taken the same afternoon found that `^2.11.1` holds exactly one published version today, so an upper end was never
 there to measure; what the row still lacks is the step that notices when one appears and a speaker nobody has (two codes no consumer can receive). §8's
-Chromium row counts **twenty-one** checks: #239 added one and #253 added two, and all three of #253's rows ran green
-in Chromium, Firefox *and* WebKit on this host. That is the
+Chromium row's check count belongs to `npm run check:docs` rather than to this file — it was **twenty-one** when
+the line below was written, and all three of #253's rows ran green in Chromium, Firefox *and* WebKit on this host.
+That is the
 direction the count takes from here: down where a guard turns out to be decoration, up where a test is shown
 to bite — and never up on a claim nobody can make fail.
 
 ### Added
+
+- **Two browser rows can now name their own cause, and one of them did (#276, #278, #281; FR-48, FR-29, FR-16,
+  2026-10-09).** `authored-ink-survives-scroll-and-save` had failed every webkit · desktop reading since
+  2026-10-07 with `no "Ink" control in the 1280px bar, and no overflow menu to look in`, and the row was on trial
+  for an engine-shaped viewer defect. It was the row's own precondition: it clicks the playground's `annotate`
+  box and reaches for the control group that box's `onChange` mounts, and nothing waited for the mount — so it
+  described a bar the application had never been asked to grow, and a bar without those seven controls has no
+  overflow to open. The row now waits for `.pjsr-annotate` and fails naming the box's state; `reveal()` prints
+  the bar's visible labels, every copy of the missing control with its box, `clientWidth`/`scrollWidth`, the panel
+  count and the feature boxes before it is allowed to call anything unreachable. Three of the four local runs
+  after that read the ink row green — and put `form-widgets-are-html-controls` red twice in the same cell with
+  `5 boxes expected and 0 were drawn`, which is a redder variant of a reading this row already carries, so that
+  message names the layer count and the engine element's class now too. The same instrument pass settled #281:
+  run 37883913248 repeats webkit's `_DrawingEditor.#currentDraw.isCancellable` uncaught word for word, which
+  falsifies the "seen once and not again" this register wrote from the run before it, and both engine builds hold
+  the identical unguarded static read (`6.2.108`'s `pdf.mjs:23686`, `6.4.299`'s `:22495`), so the fact that both
+  sightings landed in the current-engine cell is a sample of two, not the engine axis it looks like. The route
+  from the null static to a live handler is in that source — the session's `AbortController` is overwritten at its
+  only assignment site without aborting the previous one, so a second session begun before the first is cleaned
+  leaves the first session's capture-phase `pointerdown` listener reading a static that has since been nulled — and
+  it is read, not reproduced, which is why the row stays open with a named suspect.
 
 - **§9's release-candidate chain exists, and it cannot flatter itself (FR-58, #272, 2026-10-09).** FR-58 was the
   register's one `absent` row, and two of its clauses had no code at all: *validate upgrade from the previous public

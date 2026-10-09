@@ -1148,7 +1148,8 @@ const CHECKS = [
           `the signature fixture holds six /Sig widgets, one of which the engine paints itself, so five boxes are ` +
             `expected and ${sig.boxes.length} were drawn (fields: ${got.join(', ') || 'none'}) — the clause is ` +
             '"a signature widget renders as its box", and a widget with no element in the layer has nothing a ' +
-            'reader can see or aim at',
+            `reader can see or aim at (layers: ${sig.layers}, engine element "${sig.engineClass}", ` +
+            `${sig.sigControls} control(s) where a box belongs)`,
         );
       }
       // `sigPlain` carries the same rect as `sigNoRotate` (72,660,272,720 on a 612×792 page), on the page the
