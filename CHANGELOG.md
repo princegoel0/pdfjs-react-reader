@@ -86,7 +86,11 @@ to bite — and never up on a claim nobody can make fail.
   reading `if: always()` with `if-no-files-found: error` — the #279 rule, read per step block. Eight cases in
   `src/lib/device-probes.test.ts`, one of which **executes** the Android probe with `ANDROID_HOME` cleared and
   requires exit 2 plus the written refusal, because `COULD NOT PROBE` and "the leg refused" are different
-  sentences and only one of them is a product result.
+  sentences and only one of them is a product result. Neither has a reading yet, for a reason worth naming: GitHub
+  resolves `workflow_dispatch` and `schedule` against the **default branch**, `gh api …/contents/.github/workflows?ref=main`
+  lists `ci.yml` and `docs.yml` alone, and dispatching from `dev` answers `HTTP 404: workflow … not found on the
+  default branch`. A probe that is not allowed a `push:` trigger is a probe that lives on a branch — which is a
+  registration fact, not a capability, and FR-48's gap now says so.
 
 - **FR-45's fourth evidence leg has a log, and the log says `not-run` (#273, 2026-10-09).** FR-45 splits its
   evidence four ways and closes by saying an automated audit is not proof of conformance; three legs had files
