@@ -1894,16 +1894,20 @@ package runs, and was verified against both tarballs on 2026-10-07 rather than r
   readings together also end the idea that this row alternated for one reason: the scope-copy question is closed by
   #278's polling instrument, and what remains is an engine-side throw inside pdf.js's own drawing editor, reached
   while the print row runs.
-  **Second, §9's registry write.** The owner generated an npm token for this, so it was attempted from here.
-  `npm whoami` answers as the owning account, which measures W9's sentence wrong — it said this machine "either has
-  no session or has one that does not own the package". The actual blocker is that both `npm deprecate` calls return
-  `EOTP`, npm requiring a one-time password for a write, and the registry still reads `deprecated` empty for every
-  published version: **`0.1.0` and `0.1.1` are not deprecated yet.** W9 now names the two remedies that exist — the
-  write run with `--otp=` while a code is live, or an npm **Automation**-type token, the kind allowed to skip it.
-  Recorded against the instrument too: the first attempt launched npm through a shell, so the message's `>=6.2.108`
-  reached bash as a *redirection*, npm received twenty words instead of three, and an empty file named `22.13.0`
-  appeared in the repository root; the retry invokes npm's own CLI through node, the message arrives intact (checked
-  in npm's argv log), and the stray file is gone.
+  **Second, §9's registry write — landed the same day.** The owner generated an npm token for this, so it was
+  attempted from here. `npm whoami` answers as the owning account, which measures W9's sentence wrong — it said this
+  machine "either has no session or has one that does not own the package". The actual blocker was the account's
+  two-factor write protection: the first token refused both writes with `EOTP`, npm requiring a one-time password,
+  and the registry still read `deprecated` empty for every published version at that point. The owner then issued a
+  second token as npm's **Automation** type — the class npm lets write — and both `npm deprecate` calls exited 0.
+  **Read back from the registry: `0.1.0` and `0.1.1` now carry the approved message and `0.1.2` reads undeprecated**,
+  which is the state §9 asks for and the reason `0.1.2` was excluded from the range. Recorded against the instrument
+  too: the first attempt launched npm through a shell, so the message's `>=6.2.108` reached bash as a *redirection*,
+  npm received twenty words instead of three, and an empty file named `22.13.0` appeared in the repository root; the
+  retry invokes npm's own CLI through node, npm's argv log shows the message intact, and the stray file is gone. The
+  credential never entered the working tree — read from the gitignored `npmToken.md`, handed over through a config
+  written outside the repo and deleted after, with 395 tracked files, 984 scratch files and `git log --all -S`
+  swept to confirm nothing was left behind.
 
 - **#210's closure was wrong, and a quiet machine proved it (#259, 2026-10-07).** That task recorded webkit's
   1,000-page stall as port contention — "not reproducible solo". It is now reproducible solo, five times, with
