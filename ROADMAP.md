@@ -257,29 +257,54 @@ read back with the corrected command.
 itself requires — raise them or say they refuse); the device go plus who operates the screen readers; #227
 (taken or struck); and the merge. Everything in P1 and P2 is a work order.
 
-### The toolchain the remaining evidence needs
+### The toolchain: the audit, re-derived rather than remembered
 
-What the gate needs is already installed and runs end to end from a checkout — Node at the `engines` floor or
-above, npm, Git, the GitHub CLI, the repo's own toolchain, and Playwright with exactly the browser builds its
-version names. The list below is only what the *remaining evidence* asks for, because each line is a reason a
-row still reads `partial`.
+Written so this question is answered once. The requirement list was derived from the tree — every binary any
+script spawns is `adb`, `git`, `npm`, `npx` and `safaridriver`; every command any workflow runs is an `npm`
+script, `npm pack`, `npx playwright install --with-deps`, or a script already named; no script touches Docker,
+Python, `qpdf`, MuPDF or Ghostscript — and then the claims in §8 and §9 that stand on an environment rather
+than on a test. The four tiers are the point, because they are four different answers to "do we need it":
+**Tier 1 a script fails without, Tier 2 a register row stays `partial` without, Tier 3 only a person brings,
+Tier 4 nobody should spend money on.** Measured on this machine 2026-10-14.
 
-| Tool or service | What it unblocks | Status here | Cost |
+**Tier 1 — required by code, and all present.** Node at or above the `engines` floor of 22.13.0 (this machine
+runs 24.21.0; CI proves 22.13.0, which is a different claim and the row says so). npm for installs, `npm pack`
+and the tarball proof. Git, because the guards read the working tree and the commit. The repo's own toolchain —
+TypeScript, vitest, tsup, vite, jsdom, axe-core, @testing-library/react, the engine peer and the writer peer —
+plus **both** esbuild and Rollup, since the size gate is deliberately worst-of-two-bundlers and dropping
+either would quietly relax it. Playwright with exactly the three browser builds its version names, verified in
+the cache. The GitHub CLI is load-bearing for reading runner evidence but no gate step needs it.
+
+| Tier 1 item needed somewhere | Where it actually lives | Does this machine need it? |
+| :--- | :--- | :--- |
+| `safaridriver` | `scripts/safari-probe.mjs` spawns it and waits on `/status` — Apple ships it inside Safari, so it exists on a macOS runner and nowhere on Windows | **No.** It is a runner requirement; the probe's whole purpose is to find out whether that runner can be driven |
+| `adb`, Android `cmdline-tools`, KVM | `scripts/android-probe.mjs` spawns `adb` and `avdmanager` and first asks whether the runner exposes KVM, because an emulator without it boots in software | **No.** This is a Linux-runner job. *An earlier reading here said the probe "cannot start" because this machine has no `adb` — true, and beside the point: it was never meant to run on Windows. Corrected 2026-10-14* |
+
+**Tier 2 — required by an evidence claim, not by any script.** Each row is why a row of the register still
+reads `partial`.
+
+| What | Which claim it closes | Status here | What it costs |
 | :--- | :--- | :--- | :--- |
-| Android `adb` client (platform-tools) | `scripts/android-probe.mjs` spawns `adb` from the PATH, so the probe cannot start at all without it | not installed | free, small |
-| Pinned older Playwright builds, handed to `npm run test:floors` through `--drivers=chromium=<dir>,…` | §8's browser-floor execution policy: a floor claim needs the build the floor names, and the job refuses without one | not installed, and **no system change needed** — `npm i --no-save playwright@<v>` into scratch directories, plus deriving which browser each version ships from that version's own `browsers.json` | free |
-| BrowserStack Automate / App Automate | the real-device halves of §8's iOS and Android rows, and the touch arbitration FR-47 cannot prove in a desktop-shaped WebKit | tunnel installed, account authenticating, iOS 18 and Android 15 hardware on the plan, one parallel session | the owner's minutes and go |
-| Firefox (standalone) and NVDA | the NVDA + Firefox pairing in FR-45's record, which today says `not-run` and means it | neither installed | free |
-| JAWS | the JAWS + Chromium pairing | not installed | licence cost, and a trial short enough that the honest options are buy or amend §9 |
-| A Mac, or an iPhone with VoiceOver | the VoiceOver + Safari pairing, and iPhone Safari as hardware | no Apple machine here; BrowserStack automates browsers, not assistive technology | the owner's, or struck |
-| An independent PDF reader — `qpdf --check`, MuPDF, Poppler's `pdfinfo` | every save, flatten, page-edit and signature round trip is validated today by pdf.js, the engine this package builds on; a second implementation reading our output is stronger evidence than a second test of the same one | absent; the only tool present is `pdftotext`, shipped inside Git for Windows | free |
-| Java, Android Studio and an AVD | an alternative Android path if the owner rejects a device cloud | absent | several gigabytes, and weaker than hardware for §8's purposes |
+| **Pinned floor drivers** for `npm run test:floors` — the §8 execution policy refuses the runner's default browser | FR-48's floors, and the evidence half of #269/#280 | **The hard part is already on the disk.** Mapping the cached Playwright revisions against each release's own `browsers.json`: `chromium-1117` is Chromium 125.0.6422.26, `firefox-1447` is Firefox 124.0 and `webkit-2051` is WebKit 18.0 — the three versions §8 names as floors. The job wants a *playwright package* directory, so what is missing is `npm i --no-save playwright@1.44.0`, `@1.43.0` and `@1.46.0` into scratch dirs: no download, no installer, no elevation | free |
+| **A real-device service or hardware** — §8 separates a device pass from emulation on purpose, and FR-47's touch arbitration is the row emulation cannot carry | §8's iOS Safari and Android Chrome rows; FR-49's device half; #141 | BrowserStack Local installed and the account authenticates; the plan carries iOS 18 hardware (iPhone 16 among them) and Android 15 (Galaxy S25, Pixel 9); **one parallel session**, so a pass is serial | the owner's minutes and go |
+| **An Apple machine** for VoiceOver, and iPhone Safari as hardware | §8's iOS row, FR-45's VoiceOver pairing | Hosted `macos-14` covers driving Safari; a handset covers the hardware row; nothing here covers the reader | the owner's, or the claim is amended |
+| **An independent PDF reader** — `qpdf --check`, MuPDF, Poppler's `pdfinfo` | the save, flatten, page-edit and signature round trips, which are today re-opened by pdf.js: the same engine family that wrote them | absent; the only tool on the PATH is `pdftotext`, shipped inside Git for Windows, which reads text and nothing else | free |
+| **A second engine version locally** | the 6.2.108 / 6.4.299 spread is runner evidence; a local run measures the one installed engine and must not be read as the axis | satisfied by CI; nothing to install | — |
 
-**Not needed, stated so nobody buys it:** native build tools (no dependency in the tree compiles), an image
-editor, a PDF suite like Acrobat or Foxit, a PATH copy of ffmpeg (Playwright ships its own), and system Chrome
-or Edge for CI — the matrix drives the browsers its own version pins.
+**Tier 3 — only a person brings these.** NVDA with a standalone Firefox for the NVDA + Firefox pairing; JAWS for
+JAWS + Chromium, whose licence cost makes the honest options buy or amend §9; VoiceOver on Apple hardware. None
+of it is automatable through any service, and `a11y/certifications.json` already refuses a `pass` row without a
+named operator, a real environment and a date — which is the correct shape: the record states plainly that no
+session has run rather than letting a machine imply one.
 
+**Tier 4 — not required, listed so nobody spends on it.** Native build tools (no dependency in the tree
+compiles); Java, Android Studio and an AVD, which a real-device cloud supersedes for §8's purposes and which the
+free-emulator route could not satisfy anyway, an Android 9 image being years below the floors being claimed; an
+image editor or a PDF suite like Acrobat or Foxit; a PATH copy of ffmpeg, which Playwright ships; Docker, which
+is installed here and used by nothing in the gate; and system Chrome or Edge for CI, since the matrix drives the
+browsers its own version pins.
 
+### What each release measured, requirement by requirement
 
 Every requirement, its release, and the narrative of how it got there. This table replaces the range
 sentence this section used to carry (`FR-01`–`FR-19` and `FR-21`–`FR-23` are implemented), which was
