@@ -3490,6 +3490,41 @@ const CHECKS = [
       };
 
       /**
+       * Read the whole page only once the whole page has stopped changing.
+       *
+       * `until()` answers the moment *its own* band satisfies its predicate, and the predicate for a band going
+       * off is satisfied inside the repaint that removes it — the canvas is cleared and re-rendered, so the
+       * sample a caller takes in the next breath can find every other band empty. That reading is what
+       * `switching one group off took more than that group with it` was built out of: heading, body, stamp and
+       * plain all zero, including `plain`, the band that belongs to no group and cannot be taken down by any
+       * switch (#291, three runs on 2026-10-14, in webkit · desktop and chromium · desktop and in both engine
+       * cells — a browser-shaped coincidence that was never about a browser). So a verdict about *other* bands
+       * waits for those bands to be painted and to repeat the same count, and it reports how long it waited,
+       * because a slow repaint is a fact worth keeping and a fast one passing silently is not.
+       */
+      const settledRead = async (selector, ranges, names, timeout = 20_000) => {
+        let last = null;
+        let previous = null;
+        let repeats = 0;
+        const started = Date.now();
+        const stable = await waitFor(async () => {
+          last = await read(selector, ranges);
+          if (!last) return null;
+          const painted = names.every((name) => inked(last[name]));
+          const signature = names.map((name) => last[name].marks).join(',');
+          if (!painted) {
+            previous = null;
+            repeats = 0;
+            return null;
+          }
+          repeats = signature === previous ? repeats + 1 : 0;
+          previous = signature;
+          return repeats >= 1 ? last : null;
+        }, timeout);
+        return { bands: stable ?? last, stable: stable !== null, waited: Date.now() - started };
+      };
+
+      /**
        * Every tab in the sidebar, with what a pointer landing on its centre would hit.
        *
        * The tablist is `flex: 1 1 auto` inside a 248 px sidebar and does not wrap, so a third tab runs past the
@@ -3656,9 +3691,13 @@ const CHECKS = [
             'reads looks like',
         );
       }
-      const widened = await read(ONE, PAGE1);
-      if (!inked(widened.plain) || !inked(widened.heading) || !inked(widened.body)) {
-        fail(`switching one layer on took other content away: ${shown(widened)}`);
+      const widened = await settledRead(ONE, PAGE1, ['plain', 'heading', 'body']);
+      if (!widened.stable) {
+        fail(
+          `switching one layer on took other content away: ${shown(widened.bands)} after ${widened.waited} ms of ` +
+            `settling (${engine}) — the band belonging to no group and the two other groups' bands were expected ` +
+            'to be painted and holding the same counts, and one of them never came back.',
+        );
       }
 
       await toggle('Stamp layer', false);
@@ -3676,9 +3715,16 @@ const CHECKS = [
       if (!p1body.settled) {
         fail(`switching the Body layer off left page 1's grouped line painted: ${shown(p1body.bands)}`);
       }
-      const p1left = await read(ONE, PAGE1);
-      if (!inked(p1left.heading) || !inked(p1left.plain)) {
-        fail(`switching one group off took more than that group with it: ${shown(p1left)}`);
+      const p1left = await settledRead(ONE, PAGE1, ['heading', 'plain']);
+      if (!p1left.stable) {
+        fail(
+          `switching one group off took more than that group with it: ${shown(p1left.bands)} after ` +
+            `${p1left.waited} ms of settling (${engine}). The wait is what makes this verdict mean something: ` +
+            'before #291 the row took a single unpolled sample in the breath after its own band went blank, ' +
+            'which is inside the repaint, and reported an empty page — including the band that belongs to no ' +
+            'group and no switch can take down — as a defect in the layer. What a failure says now is that the ' +
+            'heading and the ungrouped line did not come back and hold their counts.',
+        );
       }
 
       // The second page, reached the way a reader reaches it, with the panel still showing what it read for page 1.
@@ -3696,7 +3742,7 @@ const CHECKS = [
       if (!blank(p2.body)) {
         fail(
           `page 2 still paints its Body-layer line (${p2.body.marks}/${p2.body.pixels} dark px) after the panel ` +
-            `switched that group off for page 1 (${shown(p1left)}) — the clause says *every* page redraws from the ` +
+            `switched that group off for page 1 (${shown(p1left.bands)}) — the clause says *every* page redraws from the ` +
             'same instance, and a config fetched per render leaves this page on the document defaults',
         );
       }
@@ -3718,7 +3764,7 @@ const CHECKS = [
         `the Layers tab ${pointerReached ? 'took a pointer click' : `was reached by ${opened.how}`}, ` +
         `page 1's Stamp band went ${start.stamp.marks} → ${on.bands.stamp.marks} → ${off.bands.stamp.marks} dark px ` +
         `of ${on.bands.stamp.pixels} for one switch on and back off, with the other three bands still painted ` +
-        `(${shown(widened)}); page 2's grouped band followed the same panel to ${p2.body.marks} px blank and back ` +
+        `(${shown(widened.bands)}, settled in ${widened.waited} ms); page 2's grouped band followed the same panel to ${p2.body.marks} px blank and back ` +
         `to ${p2back.bands.body.marks} px while its ungrouped line stayed at ${p2back.bands.plain.marks}`
       );
     },
