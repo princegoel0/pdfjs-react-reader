@@ -1,14 +1,16 @@
 # Roadmap
 
-Version plan from the `0.1.0` baseline to a `1.0.0` that ships **all 51 requirements**. Each release
+Version plan from the `0.1.0` baseline to a `1.0.0` that ships **all 58 requirements**. Each release
 carries one theme so the version number means something beyond "several things changed".
 
-**The plan grew on 2026-09-29, and this is the consequence.** `PRD.md` was rewritten as a *target*
+**The plan grew on 2026-09-29, and grew again on 2026-10-02.** `PRD.md` was rewritten as a *target*
 specification — the package we want, not a description of the one we have — and went from 33 requirements
-to 51. The owner's decision is that **`1.0.0` ships all 51**, so the sequence no longer ends at `0.8`:
-four more releases are planned below (`0.9` Reach, `0.10` Access, `0.11` Index & Assemble, `0.12` Prove)
-before GA. The rule from `PRD.md` still holds in the other direction — FR-01…FR-33 kept their ids, wording
-and subsections, so nothing already recorded here stopped being true.
+to 51; the lock then took it to **58**, and `FR-01`–`FR-58` is what §9 gates on. The owner's decision is
+that **`1.0.0` ships all 58**, so the sequence did not end at `0.8`: `0.9` Reach, `0.10` Access,
+`0.11` Index & Assemble and `0.12` Prove were planned below, and all four are now built. What is left
+before GA is not a feature release — it is the certification work in **The route to 1.0.0**. The rule from
+`PRD.md` still holds in the other direction — FR-01…FR-33 kept their ids, wording and subsections, so
+nothing already recorded here stopped being true.
 
 * Feature requirements are `FR-nn` in `PRD.md` §4; the versioning policy is in `CHANGELOG.md`.
 * File and line references were verified against `src/` on 2026-09-24, and re-checked against `src/`
@@ -182,7 +184,7 @@ package is something later packages need, and each has an exit test that is not 
 | **W6** | **Ink retirement.** Remove the core freehand surface from root and `/headless`, make `annotateFeature` the only pen, move its rules out of the core sheet, re-baseline sizes, and name every removed export in the changelog — they are in the published 0.1.2, so this is a public-API removal. | FR-18, the FR-19 clause, FR-22 | W3 | the exports are gone from `dist`, `check:maturity` agrees, and the size gate is re-accepted in the same diff | #200, #124, #155 |
 | **W7** | **Support floors and the jobs that prove them.** `engines.node >=22.13.0`; CI off Node 20; latest-supported-6.x engine job; React minimum-patch rows; pinned browser floors instead of Playwright defaults; an Edge row or its withdrawal; **a CI job that calls `npm run verify`**, which today none does. | FR-41, FR-46, FR-48, FR-50, FR-53, every §8 row | — | the first real run of `browser`, `packaging` and `consumer` on a clean runner | #202, #194, #269 |
 | **W8** | **Evidence, fixtures and the missing tests.** Profiles C and D; the oversize-page fixture; a committed benchmark record with machine, OS, browser, engine, fixture hash, date and p50/p95; a thumbnail test; the in-place text-layer assertion; the rotation-registration assertion; the annotation-carried attachment listing test. | FR-49, FR-51, FR-11, FR-06, FR-09, FR-13, FR-25 | W4, W7 | `npm run bench` fails on a profile C or D regression; FR-11 gains its first automated guard | #192, #195 |
-| **W9** | **Certification.** Real-device passes; NVDA+Firefox, JAWS+Chromium, VoiceOver+Safari with a named environment, date and operator; the `0.1.2` → `1.0.0` upgrade path exercised against the artifact; §9 signed. | FR-43's announcement half, FR-44, FR-45, FR-58 | all of the above. **The two decisions W9 used to wait on are taken (2026-10-05):** FR-50's baseline stays the `aed9fd6` commit and §5.5 says so with its reason — and says the rule expires with the pre-1.0 window, because at the `1.0.0` close the tags are re-derived from the export map that release actually publishes, as a reviewed diff naming every name it moves down; and `0.1.0`/`0.1.1` are to be deprecated while `0.1.2` stays live — recorded in §9, and executed on the registry 2026-10-09. **One of §9's items is a registry write, so it is the owner's action, not a job's — and it is now done.** `0.1.0` and `0.1.1` carry the message below on the registry as of 2026-10-09 and `0.1.2` reads undeprecated, which is the state §9 asks for; both were read back out of the published packument rather than taken from a command's exit code. How it got there is worth keeping, because it is why the item is the owner's: the line was run from the dev machine on 2026-10-07 with the owner's authorization and the registry answered `404` to the `PUT`; on 2026-10-09 the first token the owner issued answered `npm whoami` as the owning account and then refused both writes with `EOTP` — *this operation requires a one-time password* — so the blocker was the account's two-factor write protection and not, as this row first guessed, the absence of a session that owns the package; the second token, issued as npm's **Automation** type, is the class npm lets write, and the two calls exited 0. The credential never enters the repository — it is read from a file `.gitignore` already covers and handed to npm through a config written outside the working tree and deleted after. The published facts before the write were three versions — `0.1.0`, `0.1.1`, `0.1.2`, none of them deprecated — the first two declaring `pdfjs-dist ^5.0.0` as their only engine peer and `engines.node >=20`. This is the line that was run, and it is also the check to repeat the same way at the `1.0.0` close (`npm view pdfjs-react-reader versions deprecated --json` — an empty answer for a version means the write did not land):<br>`npm deprecate "pdfjs-react-reader@>=0.1.0 <0.1.2" "pdfjs-react-reader 0.1.0 and 0.1.1 accept pdfjs-dist 5.x, which is unsupported: CVE-2026-16633 has no 5.x fix. Install 0.1.2 with pdfjs-dist >=6.2.108 on Node >=22.13.0, or wait for 1.0.0."`<br>The range excludes `0.1.2` deliberately — deprecating it would leave no installable package at all, and its `^5.0.0 || ^6.2.108` peer range is a limit of the published surface that `1.0.0` corrects by declaring `^6.2.108` alone. | §8 has no `unverified` row left, and every claim cites the run that proved it | #141, #156, #207 |
+| **W9** | **Certification.** Real-device passes; NVDA+Firefox, JAWS+Chromium, VoiceOver+Safari with a named environment, date and operator; the `0.1.2` → `1.0.0` upgrade path exercised against the artifact; §9 signed. | FR-43's announcement half, FR-44, FR-45, FR-58 | all of the above. **The two decisions W9 used to wait on are taken (2026-10-05):** FR-50's baseline stays the `aed9fd6` commit and §5.5 says so with its reason — and says the rule expires with the pre-1.0 window, because at the `1.0.0` close the tags are re-derived from the export map that release actually publishes, as a reviewed diff naming every name it moves down; and `0.1.0`/`0.1.1` are to be deprecated while `0.1.2` stays live — recorded in §9, and executed on the registry 2026-10-09. **One of §9's items is a registry write, so it is the owner's action, not a job's — and it is now done.** `0.1.0` and `0.1.1` carry the message below on the registry as of 2026-10-09 and `0.1.2` reads undeprecated, which is the state §9 asks for; both were read back out of the published packument rather than taken from a command's exit code. How it got there is worth keeping, because it is why the item is the owner's: the line was run from the dev machine on 2026-10-07 with the owner's authorization and the registry answered `404` to the `PUT`; on 2026-10-09 the first token the owner issued answered `npm whoami` as the owning account and then refused both writes with `EOTP` — *this operation requires a one-time password* — so the blocker was the account's two-factor write protection and not, as this row first guessed, the absence of a session that owns the package; the second token, issued as npm's **Automation** type, is the class npm lets write, and the two calls exited 0. The credential never enters the repository — it is read from a file `.gitignore` already covers and handed to npm through a config written outside the working tree and deleted after. The published facts before the write were three versions — `0.1.0`, `0.1.1`, `0.1.2`, none of them deprecated — the first two declaring `pdfjs-dist ^5.0.0` as their only engine peer and `engines.node >=20`. This is the line that was run, and it is also the check to repeat at the `1.0.0` close — read back **per version**, since that is the only form that answers: `npm view pdfjs-react-reader@0.1.0 deprecated` and `npm view pdfjs-react-reader@0.1.1 deprecated` each print the sentence above, and `npm view pdfjs-react-reader@0.1.2 deprecated` prints nothing, which is what "stays installable" looks like from outside. *(The read-back command this row carried was wrong, corrected 2026-10-13: it named `npm view pdfjs-react-reader versions deprecated --json`, and that call was run and prints only the version list — it cannot see a deprecation for any version, which is worse than no command because it reads like a passing check. The write itself was verified at the time the other way, out of the published packument, so no claim in this row was resting on the broken form.)*<br>`npm deprecate "pdfjs-react-reader@>=0.1.0 <0.1.2" "pdfjs-react-reader 0.1.0 and 0.1.1 accept pdfjs-dist 5.x, which is unsupported: CVE-2026-16633 has no 5.x fix. Install 0.1.2 with pdfjs-dist >=6.2.108 on Node >=22.13.0, or wait for 1.0.0."`<br>The range excludes `0.1.2` deliberately — deprecating it would leave no installable package at all, and its `^5.0.0 || ^6.2.108` peer range is a limit of the published surface that `1.0.0` corrects by declaring `^6.2.108` alone. | §8 has no `unverified` row left, and every claim cites the run that proved it | #141, #156, #207 |
 
 Three rules make the order mean something. **A package is not closed when its code merges** — it is closed when
 its register rows read `met` and the gate passes, because the gate is the only reader that checks. **No package
@@ -191,7 +193,93 @@ in W3 quotes `CONFIGURATION_ERROR` rather than defining its own. And **measured 
 subpath counts — are refreshed at a close, never mid-flight**, so the numbers in this file stay honest about
 when they were true.
 
-### What each release measured, requirement by requirement
+### The route to 1.0.0 — §9 read one bullet at a time
+
+The plan above is how the features got here. This is what is left, and it is ordered by **what kind of thing
+closes each item**, because the release kept being described as though "nearly every row is `met`" and "the
+gate is satisfied" were the same sentence. They are not: §9 gates on evidence, and it says outright that
+without the real-device and screen-reader certifications *"1.0.0 does not ship"*. The register is deliberately
+not restated with numbers here — `npm run check:fr-evidence` is the status of record, and #240's rule in this
+file is to point at the command rather than type a figure the next push moves.
+
+| §9 condition | Where it stands, read against the tree | What kind of thing closes it |
+| :--- | :--- | :--- |
+| Every accepted FR has implementation *and* verification evidence | rows still `partial` carry their gaps by name, and the gate refuses a `met` row that lists one | **P1 — code and instruments** |
+| Public error, cancellation, worker, feature, dependency and TypeScript contracts tested | the suite is green, but §3.1's no-React-in-core rule, §3.2.1's public-`any` rule and four §6.2/§5.5 prose rules are asserted by nobody | **P2 — assertions that do not exist yet** |
+| §8's browser, accessibility, benchmark and edge-case evidence certified | `npm run test:floors` refuses for want of pinned drivers (a refusal working as designed, not a failure); the benchmark gate prints legs it cannot compare instead of counting them; FR-45's page-words contrast leg is open | **P1's tail, then a ruling (#280)** |
+| The packed artifact passes consumer, SSR, ESM/CJS and declaration checks **on a clean runner** | every one of those passes locally from the packed tarball; the runner leg has never run | **P3 — needs the merge** |
+| The release candidate built and tested on a clean runner from the packed npm artifact | the chain is built and guarded (#272) and has never executed, because `workflow_dispatch` and `schedule` are resolved against the default branch | **P3 — needs the merge** |
+| The `0.1.2` → `1.0.0` upgrade path exercised | `npm run check:upgrade` is green from this machine; its runner sibling waits on the same branch | **P3 — needs the merge** |
+| The required real-device mobile pass is complete | no device session has been recorded against a commit | **P3 — an owner's go and minutes** |
+| Real-device **and** screen-reader certifications, each with a named environment, date and operator | `a11y/certifications.json` holds the three pairings as `not-run`, each naming the thing missing, and the writer refuses a `pass` it cannot sign | **P3 — a person, not a job** |
+| Bundle budgets, feature isolation and CSS boundaries pass without disabling required functionality | green, with one deliberate exception held back: #227 is the withdrawal of a `stable` published name, which §5.5 puts in a major | **P4 — an owner's ruling** |
+| The pre-1.0 line is deprecated, with the commands in this file's certification row | done on the registry and recorded in **W9**'s row; the read-back command that row carried has been corrected, per the note there | **—** |
+| React 18/19 with matching `react-dom`; the engine floor and latest-supported-6.x jobs; canvas and print budgets deterministically tested; `check:examples` green with every skip ticketed; withdrawn FRs keeping their ids and reasons; no intermediate publication | each is green where it is runnable, and the ones that are runner-only are recorded per run in `fr-evidence.json` rather than claimed here | **—** |
+
+**P1 — the rows code can move, in the order that returns information fastest.** *#282 first, and it is a
+question about the harness rather than the product:* in one webkit mobile profile the signature row has come
+back with the full set of boxes, with three of them, and with none, while the desktop profile of the same
+browser was steady across every reading this file is willing to cite. The fix is not to re-run it hoping for a
+green — it is to read the layer twice, once on the row's own schedule and once after the annotation layer has
+settled, and print both counts. If the settled count is the whole set, the instrument was the bug and FR-16's
+row stops being evidence of anything until it is re-measured; if it stays short, we have a rendering defect at
+a phone-class viewport and devicePixelRatio 2, which is a product answer. *Then #278 and #281:* the print row
+now prints its own weakened premise — it admits the scope control was reached only through the automation API —
+and that sentence should either be a refusal or a weaker recorded claim, not a passing row with a confession
+inside it. *Then FR-49:* profile D's leg is sampled once per run, so there is no median to accept and the gate
+rightly says so; and the blind-leg message prints a spread and calls it past the ceiling the *computed*
+tolerance crossed, which is a one-line fix with a case pinning the arithmetic. *Then FR-45's contrast leg and
+FR-52's never-published-subpaths half*, the latter being a statement about publication history that the rc
+artifact listing can settle. *Then FR-37:* either the virtualizer's slot status reaches the published page
+model or the clause changes — this file will not code the fiction in the meantime.
+
+**P2 — turn the rules into something that runs (#284–#288).** Six assertions the PRD audit found missing
+behind `met` rows; §3.1's no-React-in-core rule and §3.2.1's public-`any`/engine-internal rule; §6 and §2.1's
+performance language reconciled with the committed benchmark records instead of with optimism; four §6.2/§5.5
+prose rules made gates; and every hand-typed number or citation in this file either re-derived or dated. The
+last one is the same class of defect this section just corrected in itself, which is why it stays in the plan
+rather than being called a tidy-up.
+
+**P3 — the certifications, none of which is a build step.** The device pass, in the shape the toolchain table
+below describes: serial, because the plan permits one session at a time; recorded in a committed device file
+with a `--check` that refuses a row missing a model, an OS build, a browser version, a session id, a tunnel id,
+a commit, an artifact digest, a timestamp or an operator — the same refusal shape as #273's screen-reader
+record and #272's candidate chain. The three screen-reader pairings, each run by a named human. And the merge
+`dev → main`, which is what makes the dispatched probes, the scheduled runs and the release-candidate chain
+executable at all; until it happens #270, #271 and #272 are built-and-blocked, not built-and-done.
+
+**P4 — release mechanics.** #227 rebased and re-measured before it is taken (its byte figure is the spike's, not
+a promise about today's tree), the `api-maturity.json` `removed` entry with `removedIn: 1.0.0`, the version
+bump, `CHANGELOG.md` and the docs re-derived from the tree, `dev → main`, publish, and the deprecation row
+read back with the corrected command.
+
+**Four things are the owner's and nothing else on this list is:** #280 (the §8 floors are below what the engine
+itself requires — raise them or say they refuse); the device go plus who operates the screen readers; #227
+(taken or struck); and the merge. Everything in P1 and P2 is a work order.
+
+### The toolchain the remaining evidence needs
+
+What the gate needs is already installed and runs end to end from a checkout — Node at the `engines` floor or
+above, npm, Git, the GitHub CLI, the repo's own toolchain, and Playwright with exactly the browser builds its
+version names. The list below is only what the *remaining evidence* asks for, because each line is a reason a
+row still reads `partial`.
+
+| Tool or service | What it unblocks | Status here | Cost |
+| :--- | :--- | :--- | :--- |
+| Android `adb` client (platform-tools) | `scripts/android-probe.mjs` spawns `adb` from the PATH, so the probe cannot start at all without it | not installed | free, small |
+| Pinned older Playwright builds, handed to `npm run test:floors` through `--drivers=chromium=<dir>,…` | §8's browser-floor execution policy: a floor claim needs the build the floor names, and the job refuses without one | not installed, and **no system change needed** — `npm i --no-save playwright@<v>` into scratch directories, plus deriving which browser each version ships from that version's own `browsers.json` | free |
+| BrowserStack Automate / App Automate | the real-device halves of §8's iOS and Android rows, and the touch arbitration FR-47 cannot prove in a desktop-shaped WebKit | tunnel installed, account authenticating, iOS 18 and Android 15 hardware on the plan, one parallel session | the owner's minutes and go |
+| Firefox (standalone) and NVDA | the NVDA + Firefox pairing in FR-45's record, which today says `not-run` and means it | neither installed | free |
+| JAWS | the JAWS + Chromium pairing | not installed | licence cost, and a trial short enough that the honest options are buy or amend §9 |
+| A Mac, or an iPhone with VoiceOver | the VoiceOver + Safari pairing, and iPhone Safari as hardware | no Apple machine here; BrowserStack automates browsers, not assistive technology | the owner's, or struck |
+| An independent PDF reader — `qpdf --check`, MuPDF, Poppler's `pdfinfo` | every save, flatten, page-edit and signature round trip is validated today by pdf.js, the engine this package builds on; a second implementation reading our output is stronger evidence than a second test of the same one | absent; the only tool present is `pdftotext`, shipped inside Git for Windows | free |
+| Java, Android Studio and an AVD | an alternative Android path if the owner rejects a device cloud | absent | several gigabytes, and weaker than hardware for §8's purposes |
+
+**Not needed, stated so nobody buys it:** native build tools (no dependency in the tree compiles), an image
+editor, a PDF suite like Acrobat or Foxit, a PATH copy of ffmpeg (Playwright ships its own), and system Chrome
+or Edge for CI — the matrix drives the browsers its own version pins.
+
+
 
 Every requirement, its release, and the narrative of how it got there. This table replaces the range
 sentence this section used to carry (`FR-01`–`FR-19` and `FR-21`–`FR-23` are implemented), which was
@@ -2463,7 +2551,7 @@ recipe wrote a 5,134-byte file that reopened in the reader with its pages in pla
   incremental timing is one cold measurement on one fixture, not the profile suite (`FR-49` B and C are still
   unwritten); and no browser but the one attached here has opened a merged file.
 
-### 0.12.0 — Prove: the evidence, automated (FR-41, FR-48 – FR-51)
+### 0.12.0 — Prove: the evidence, automated (FR-41, and FR-48 through FR-58)
 
 Last, and deliberately so: this release certifies everything before it, and a matrix written before the
 features exist is a table of intentions.
@@ -2516,20 +2604,27 @@ Every row of the §Where we are table — all `FR-01`–`FR-33`, where that clai
 genuinely green or documented as an explicit exclusion, the performance bar in `PRD.md` §2.1 measured on a
 document large enough to mean it, and strict semver from then on.
 
-**The gate is now all 51 requirements (owner's decision, 2026-09-29).** The PRD rewrite took the target
-from 33 requirements to 51, and `PRD.md` §7 ends with "1.0 — the lot". For one day this file disagreed
-with it and said so; the disagreement is resolved in the PRD's favour. `1.0.0` ships FR-01 … FR-51, which
-means four more releases before GA — `0.9` Reach, `0.10` Access, `0.11` Index & Assemble, `0.12` Prove —
-planned below. The sentence this section opened with still holds for the rows it was written about: every
-one of FR-01 – FR-33 is genuinely green or documented as an explicit exclusion, and the §Where we are
-table is what says which.
+**The gate is all 58 requirements (the owner set it to 51 on 2026-09-29; the lock made it 58 on 2026-10-02).**
+The PRD rewrite took the target from 33 requirements to 51, and `PRD.md` §7 ends with "1.0 — the lot". For one
+day this file disagreed with it and said so; the disagreement is resolved in the PRD's favour. The lock then
+added `FR-52`–`FR-58`, which are contracts the other rows have to satisfy rather than reader-facing behaviour,
+and `1.0.0` ships `FR-01` … `FR-58`. The four releases this paragraph used to carry as "planned below" — `0.9`
+Reach, `0.10` Access, `0.11` Index & Assemble, `0.12` Prove — are built; the §Where we are table is what says
+which of their rows are green. The sentence this section opened with still holds for the rows it was written
+about: every one of `FR-01` – `FR-33` is genuinely green or documented as an explicit exclusion, and the
+§Where we are table is what says which.
 
-Two consequences of the decision, stated rather than absorbed silently. **The release is further away than
-it was this morning**, and most of the distance is verification infrastructure — matrices, fixtures,
-audits, maturity tags — rather than reader-facing behaviour. And **`0.12` cannot be proven where it is
-built**: its whole theme is CI jobs, and nothing is pushed until `1.0.0`, so the first real run of the
-browser and engine matrices is the release push itself. That is a known hole in the plan and it is recorded
-here rather than discovered later.
+Two consequences were stated here when the decision was new, and one of them has since become false, so it is
+corrected rather than quietly dropped. **The distance to `1.0.0` is verification rather than features** —
+matrices, fixtures, audits, maturity tags — and that has held at every close since. What did **not** hold is
+this row's claim that **`0.12` "cannot be proven where it is built", on the reasoning that nothing is pushed
+until `1.0.0`.** `dev` is pushed, the browser and consumer jobs run there on every push, and each reading is
+recorded against its run id in `fr-evidence.json` rather than tallied here. Corrected 2026-10-13. The real
+boundary is narrower than the sentence implied: what a checkout cannot prove is the pinned §8 floor
+environments — `npm run test:floors` refuses without `--drivers`, which is the refusal working as designed —
+and anything whose trigger GitHub resolves against the default branch, namely a dispatched or scheduled job
+and the release-candidate chain. Those wait on the `dev → main` merge, not on the push discipline this
+paragraph assumed had not started.
 
 **One breaking change is already decided, and deliberately not taken yet (#227, owner's call 2026-10-05).**
 `DEFAULT_LABELS` — `src/lib/labels.ts:211`, re-exported from the root entry at `src/index.ts:206` — stops being
@@ -2550,20 +2645,34 @@ its superseding note; and the new entry point moves `check:docs`'s subpath count
 list with it, which is the whole argument for having made those derived.
 
 Five things joined that list from the review of the documents against the code and from the signing work
-it led to. Three are still open — `#124`, `#141` and `#143`, each one a decision or a device rather than
-a piece of code. The other two, `#144` and the `#145`/`#146` pair, were **closed by measuring rather than
-by coding**, which is worth saying plainly because neither was resolved by writing the feature someone
-had asked for:
+it led to. **One is still open — `#141`** — and it is a device and a person rather than a piece of code.
+`#124` and `#143` have since been closed, each recorded below with what closed it; the other two, `#144` and
+the `#145`/`#146` pair, were **closed by measuring rather than by coding**, which is worth saying plainly
+because neither was resolved by writing the feature someone had asked for:
 
 * **`#124`** — whether the core's freehand ink is retired now that `annotate`'s ink is the one that
-  saves. The owner's call, still unanswered.
-* **`#141`** — the real-device matrix, which cannot be run from this harness. Either a Safari and an
-  Android pass happen or the device claim comes out of `README.md` and `PRD.md` §8.
-* **`#143`** — the accessibility audit, moved here from the `0.8` row that promised it. It has a named
-  item now: `PdfPage` passes `structTreeLayer: null` in two places, so the tagged-PDF structure the
-  `PRD.md` §6's Accessibility NFR asks screen readers to be given is declined in code, not merely unaudited.
-  *(Written at the `0.9` close; `FR-43` built it a day later — see §0.10. The audit itself is still open,
-  and what remains of it is an assistive-technology pass rather than code.)*
+  saves. **Closed: the owner took the call on 2026-10-05 and `#200` executed it.** The core surface is
+  withdrawn from root and `/headless`, `annotateFeature`'s ink is the only pen, and FR-18 keeps its id with
+  the permanent reason — which is what §9's second bullet and §2.5's withdrawal rule require rather than a
+  deletion.
+* **`#141`** — the real-device matrix. **What changed is the environment, not the evidence.** BrowserStack
+  Local is installed on this machine, its account authenticates against the platform API, and the plan
+  carries iOS 18 hardware (iPhone 16 among the devices offered at that OS) and Android 15 hardware
+  (Galaxy S25, Pixel 9), with **one parallel session**, so device passes run serially and the harness must be
+  built that way. The catalog offers no Safari 18.0 — 18.4 and later are what it lists — so a device pass
+  cannot certify §8's pinned floor, and #280's ruling is not affected by it. Still missing: the owner's go on
+  spending the minutes, and a named operator for the screen-reader half. See
+  *Real devices: claim or strike* for what that path now looks like.
+* **`#143`** — the accessibility audit, moved here from the `0.8` row that promised it. **Closed on both
+  halves, on different dates.** The named item — `PdfPage` passing `structTreeLayer: null` in two places, so
+  the tagged-PDF structure §6's Accessibility NFR asks screen readers to be given was declined in code — went
+  when `FR-43` built the layer the day after this line was written (§0.10, `#154`, `#178`), and the tagged
+  fixture exists so the clause is measured instead of assumed (`#177`). The audit half closed in the automated
+  sense: axe runs over the ready-document shell (#247), in a real browser rather than only jsdom (#267), and
+  leaves a committed record a gate reads (#252). What remains was never an audit this repository can run: the
+  assistive-technology pass is FR-45's, and #273 put it in `a11y/certifications.json` as three `not-run` rows
+  with each blocker measured. That belongs to `#141`'s person, not to a build step. *(Written at the `0.9`
+  close; corrected 2026-10-13, because it still described the code as declined rather than built.)*
 * **`#144`** — **closed by measuring, both halves.** A written appearance paints in our viewer, and so
   does a written *in-session* one. Loading `signature-signed-sample.pdf` showed each of the three marks
   inside its own box — the 200 × 60, the 150 × 40 and the `/F 20` box on page two — against nothing in
@@ -2635,6 +2744,14 @@ what `0.4` shipped; each is recorded so the later releases inherit the list rath
 Prepared 2026-10-05 so the owner can pick without further work. Nothing here is measured on a device; the point
 of the list is that each line says exactly what it would take. **Recommendation at the bottom.**
 
+*Updated 2026-10-13, because one premise of the first version has gone.* It was written on the assumption that
+no device environment was reachable from this machine and none could be had cheaply. A device cloud is now
+installed here and its account authenticates, and its catalog carries iOS 18 hardware and Android 15 hardware —
+so the thing between a device row and device evidence is no longer an absent environment. It is the owner's go
+on spending the minutes, and a named human for the screen-reader half, which no cloud automates. The checklist
+below did not change, because the same rows still have to be looked at; **the path that reaches them did**, and
+it is described under *The claim path*.
+
 ### Every claim that stands on a device today
 
 | # | The claim | Where it is written | What would retire it |
@@ -2662,6 +2779,22 @@ of the list is that each line says exactly what it would take. **Recommendation 
 
 ### The claim path — what a device pass actually runs
 
+**There are now two ways to reach a real device, and the second is the cheap one.** *Path A — a handset in
+hand*: the steps below as they were prepared on 2026-10-05, a LAN dev server, the phone's own browser, a person
+reading the console. *Path B — a device cloud, driven rather than watched*: the Local tunnel installed here
+forwards the same served playground to a remote iPhone or Android phone; a script starts the session over
+WebDriver against the provider's hub, reading the access key from the environment only and never from a tracked
+file; and every step a machine can take — open a fixture, count mounted pages, read a widget box, sample a
+region, ask for `navigator.userAgent`, `maxTouchPoints` and `devicePixelRatio` — is taken by the script instead
+of a thumb, which is what makes the record re-derivable rather than remembered. Path B cannot do the voice of
+VoiceOver or a real operating-system high-contrast theme, so those halves stay with a person. Two limits belong
+in the same breath as the advantages: the plan permits **one parallel session**, so a release pass is a serial
+queue and the harness must be resumable rather than fanned out; and no cloud catalog certifies §8's pinned
+floor, because Safari 18.0 is not in it and this file's own execution policy is that a newer browser passing
+does not prove an older one.
+
+*Path A, as prepared 2026-10-05. Path B runs the same checklist, recorded by the script.*
+
 1. Serve the playground on the LAN: `npm run dev -- --host` (Vite prints a *Network* URL next to the local one;
    the device opens that). No build step and no `public/` copy is needed — the dev server already serves
    `/fixtures/<name>.pdf` from the repo root and `/pdfjs-dist/<folder>/<file>` from the installed engine, which is
@@ -2679,7 +2812,12 @@ of the list is that each line says exactly what it would take. **Recommendation 
    navigate loading → search → forms → annotations (row 5).
 4. Record it where §8's evidence column can cite it: a dated `device/` entry with device model, OS build, engine
    version, operator, and the pasted JSON. The register rows then gain an `acceptance` line naming that file, and
-   `check:fr-evidence` requires the file to exist because the row cites it.
+   `check:fr-evidence` requires the file to exist because the row cites it. Path B carries what only a machine can
+   carry and nothing should be allowed to forget — the provider's session id and tunnel id, the commit the session
+   actually loaded, the artifact digest of the `dist` it was served, a UTC timestamp, and a verdict per row rather
+   than per run — and its record gains the same refusal shape #273's screen-reader file and #272's candidate chain
+   already have: a `--check` that rejects a row missing any one of those fields, because a device claim that
+   cannot name its machine is a sentence, not evidence.
 
 ### The strike path — exact replacement wording, held in reserve
 
@@ -2706,6 +2844,16 @@ So leave the contract, fix the marketing sentence, and schedule one device sessi
 with a phone in hand covers rows 1, 2, 4, 6, 7 and 8, and only row 5 needs a second person with a screen reader.
 Striking §8's rows would be the cheaper edit and the worse document: it would say the package does not intend to
 work on a phone, which the whole of FR-47 and FR-45 assume it does.
+
+**The recommendation stands, with one clause moved off the person and onto the harness (2026-10-13).** Rows 1, 2,
+4, 6 and 8 are questions about what a real browser on real hardware paints, scrolls, arbitrates and probes, and
+Path B can ask them of a remote iPhone and a remote Android phone on every release train, serially, with the
+answer recorded in a file a gate reads. Rows 5 and the OS high-contrast half remain a person's: VoiceOver is not
+automatable through a device cloud, and a screen-reader pass scripted by somebody who does not use the reader is
+the kind of claim this file has been correcting for a month. So the sentence that used to read "thirty minutes
+with a phone in hand" becomes: a build step for the automatable rows, a scheduled human for the two that are
+not, and #141 stays open until both have run against a commit — not until the environment exists, which it now
+does.
 
 ## Spikes and gates
 
