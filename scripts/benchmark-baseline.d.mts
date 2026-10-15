@@ -105,7 +105,16 @@ export type EntryState =
       tolerance: number;
       floored: boolean;
     }
-  | { live: false; blind: true; provisional: false; readings: number; spread: number; reason: string }
+  | {
+      live: false;
+      blind: true;
+      provisional: false;
+      readings: number;
+      spread: number;
+      /** The tolerance the rule compared — `spread × GATE.safetyMargin` — which is what the reason quotes (#295). */
+      tolerance: number;
+      reason: string;
+    }
   | { live: false; provisional: true; blind: false; readings: number; reason: string };
 
 export interface GateLine {

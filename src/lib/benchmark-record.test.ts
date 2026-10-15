@@ -25,6 +25,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { GATE } from '../../scripts/benchmark-baseline.mjs';
 
 interface Distribution {
   samples: number;
@@ -176,5 +177,24 @@ describe('the committed benchmark record (FR-49)', () => {
         `profile ${profile.id} is absent from the run and the record does not say why`,
       ).toBeGreaterThan(0);
     }
+  });
+
+  /**
+   * The instrument, not only its output (#295). Profile D's harness leg was sampled once per run for its whole
+   * life, and a leg sampled fewer than `GATE.minimumSamples` times is refused by the gate — so that leg could
+   * never enter a baseline and therefore could never fail on a regression, which is FR-49's fourth clause
+   * unmet in the one place it was supposed to hold. The committed record cannot prove the fix (a record is
+   * written by whoever ran it last, and a noisy host writes a bad one), so this reads the number off the
+   * script that takes the samples and compares it with the number the gate needs.
+   */
+  it('samples profile D at least as often as the gate needs before a median means anything (#295)', () => {
+    const source = readFileSync(join(process.cwd(), 'scripts', 'benchmark.mjs'), 'utf8');
+    const declared = source.match(/const HARNESS_COLD_SAMPLES = (\d+);/);
+    expect(declared, 'profile D must declare its cold-run count where a reader can find it').not.toBeNull();
+    expect(
+      Number(declared?.[1]),
+      `profile D's harness leg is sampled ${declared?.[1]} time(s) and the gate refuses a leg sampled fewer ` +
+        `than ${GATE.minimumSamples} — a leg that can never be accepted can never fail on a regression`,
+    ).toBeGreaterThanOrEqual(GATE.minimumSamples);
   });
 });

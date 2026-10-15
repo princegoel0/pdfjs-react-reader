@@ -120,7 +120,19 @@ export function entryState(entry) {
       provisional: false,
       readings: readings.length,
       spread,
-      reason: `this environment's accepted p50 readings disagree by ${spread.toFixed(2)}×, past the ${GATE.toleranceCeiling}× ceiling at which a timing comparison means anything`,
+      tolerance: Number(wanted.toFixed(2)),
+      /*
+       * The quantity the rule compares is the *tolerance* — the demonstrated spread multiplied by the safety
+       * margin — so this is the sentence that has to print it (#295). An earlier version quoted the spread
+       * against the ceiling and read as arithmetic that did not hold: profile A's cold page on this host
+       * disagrees by 1.81×, and 1.81 is not past 2, while 1.81 × 1.25 = 2.26 is. A message that prints a
+       * different number from the one its own rule compared is how a gate loses its reader's trust, which is
+       * the failure mode the whole header of this file is written against.
+       */
+      reason:
+        `this environment's accepted p50 readings disagree by ${spread.toFixed(2)}×; with the ` +
+        `${GATE.safetyMargin}× safety margin that is a ${wanted.toFixed(2)}× tolerance, past the ` +
+        `${GATE.toleranceCeiling}× ceiling at which a timing comparison means anything`,
     };
   }
   return {

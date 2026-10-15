@@ -430,6 +430,15 @@ async function cappedZoom(browser, baseUrl, profile) {
  */
 const COLD_SAMPLES = 5;
 
+/**
+ * Profile D's harness leg takes three cold runs rather than one (#295), because the gate refuses to compare a
+ * leg sampled fewer than `GATE.minimumSamples` times and a leg that can never be accepted can never fail on a
+ * regression. Each sample is a freshly opened document inside the same throttled context: the context *is* the
+ * profile — a phone-class viewport, dpr 3 and the CDP rate — and a second paint of one load is warm in every
+ * other respect.
+ */
+const HARNESS_COLD_SAMPLES = 3;
+
 /** The box the viewer drew a named page into: what an engine-only comparison has to reproduce. */
 const COLD_BOX = (pageNumber) => {
   const canvas = document.querySelector(`.pjsr-page-canvas[aria-label="Page ${pageNumber}"]`);
@@ -527,50 +536,75 @@ async function setZoom(page, percent) {
  * the control it went through.
  */
 async function runLowMemory(browser, profile, baseUrl) {
-  const context = await browser.newContext({ ...LOW_MEMORY_HARNESS });
-  const page = await context.newPage();
-  page.setDefaultTimeout(120_000);
+  /*
+   * Three cold runs, each in its own harness context (#295) — and here the context *is* the profile: §6's
+   * profile D is a phone-class UA at 412×915 and dpr 3 with a main thread deliberately made to wait, and the
+   * throttle is attached to the CDP session of the page it was set on. Re-navigating one page reuses a warm
+   * render pipeline, and a second page in the same context is not throttled at all, so the later numbers would
+   * measure a different profile than the first while still being called cold. (The first version of this loop
+   * re-opened the fixture in one page and profile D broke on `locator.fill` — which is the instrument's own
+   * answer to why the sample has to be a new context.)
+   *
+   * One sample carries no median, and §6 lets a baseline be reported only with its distribution — which is why
+   * this leg has read `1 sample: a median of one is not a median` on every run since the gate existed, and why
+   * the committed baseline can never hold a profile-D entry, let alone fail on a regression in it.
+   */
+  const coldTimes = [];
+  let reached = null;
+  let ink = 0;
+  let at = null;
   let throttle = `${LOW_MEMORY_HARNESS.cpuThrottleRate}x via CDP`;
-  try {
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: LOW_MEMORY_HARNESS.cpuThrottleRate });
-  } catch (error) {
-    throttle = `not applied (${String(error?.message ?? error).split('\n')[0].slice(0, 60)})`;
-  }
-
-  await openDocument(page, baseUrl, profile.fixture);
-  const reached = await setZoom(page, 300);
-  const started = Date.now();
-  await jumpTo(page, profile.coldPage);
-  await page.waitForSelector(`.pjsr-page-canvas[aria-label="Page ${profile.coldPage}"]`);
-  const ink = await waitForInk(page, profile.coldPage, 90_000);
-  const coldMs = Date.now() - started;
-
-  const at = await page.evaluate(() => {
-    const live = [...document.querySelectorAll('.pjsr-page-canvas')].filter((c) => c.isConnected);
-    // The largest buffer in the window, with the box it is drawn into: comparing a page's device area
-    // against another page's CSS box would invent an effective scale rather than measure one.
-    let widest = null;
-    let area = -1;
-    for (const canvas of live) {
-      const pixels = canvas.width * canvas.height;
-      if (pixels > area) {
-        area = pixels;
-        widest = canvas;
-      }
+  let context = null;
+  for (let sample = 0; sample < HARNESS_COLD_SAMPLES; sample += 1) {
+    if (context) await context.close();
+    context = await browser.newContext({ ...LOW_MEMORY_HARNESS });
+    const page = await context.newPage();
+    page.setDefaultTimeout(120_000);
+    try {
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: LOW_MEMORY_HARNESS.cpuThrottleRate });
+    } catch (error) {
+      throttle = `not applied (${String(error?.message ?? error).split('\n')[0].slice(0, 60)})`;
     }
-    const box = widest ? widest.getBoundingClientRect() : null;
-    return {
-      alive: true,
-      mounted: live.length,
-      slots: document.querySelectorAll('.pjsr-page-slot').length,
-      dpr: devicePixelRatio,
-      area: Math.max(0, area),
-      cssArea: box ? box.width * box.height : 0,
-      widest: Math.max(0, ...live.flatMap((c) => [c.width, c.height])),
-      longTaskMs: window.__longest ?? 0,
-    };
-  });
+
+    await openDocument(page, baseUrl, profile.fixture);
+    reached = await setZoom(page, 300);
+    const started = Date.now();
+    await jumpTo(page, profile.coldPage);
+    await page.waitForSelector(`.pjsr-page-canvas[aria-label="Page ${profile.coldPage}"]`);
+    ink = await waitForInk(page, profile.coldPage, 90_000);
+    coldTimes.push(Date.now() - started);
+
+    at = await page.evaluate(() => {
+      const live = [...document.querySelectorAll('.pjsr-page-canvas')].filter((c) => c.isConnected);
+      // The largest buffer in the window, with the box it is drawn into: comparing a page's device area
+      // against another page's CSS box would invent an effective scale rather than measure one.
+      let widest = null;
+      let area = -1;
+      for (const canvas of live) {
+        const pixels = canvas.width * canvas.height;
+        if (pixels > area) {
+          area = pixels;
+          widest = canvas;
+        }
+      }
+      const box = widest ? widest.getBoundingClientRect() : null;
+      return {
+        alive: true,
+        mounted: live.length,
+        slots: document.querySelectorAll('.pjsr-page-slot').length,
+        dpr: devicePixelRatio,
+        area: Math.max(0, area),
+        cssArea: box ? box.width * box.height : 0,
+        widest: Math.max(0, ...live.flatMap((c) => [c.width, c.height])),
+        longTaskMs: window.__longest ?? 0,
+      };
+    });
+  }
+  // `median` is a local of `runProfile`, and reaching for it here is how this leg printed
+  // `BAR FAIL profile ran — median is not defined` on the first attempt at sampling it three times.
+  const coldSorted = [...coldTimes].sort((a, b) => a - b);
+  const coldMs = Number(pct(coldSorted, 0.5).toFixed(0));
 
   const effective = at.cssArea > 0 ? Math.sqrt(at.area / at.cssArea) : 0;
   const mobileCeiling = caps.maxPixelsMobile;
@@ -597,8 +631,11 @@ async function runLowMemory(browser, profile, baseUrl) {
     ),
     measure(
       'cold page on the harness',
-      `${coldMs} ms to ink on page ${profile.coldPage} at ${throttle}; longest long task ${at.longTaskMs.toFixed(0)} ms since the document opened. A throttled desktop core is not a handset, and §6 also asks for the real-device pass.`,
-      [coldMs],
+      `${coldMs} ms to ink on page ${profile.coldPage} at ${throttle}, the median of ${coldSorted.join('/')} ms from ` +
+        `${HARNESS_COLD_SAMPLES} cold runs, each in its own throttled harness context; longest long task ` +
+        `${at.longTaskMs.toFixed(0)} ms in the last of them. A throttled desktop core is not a handset, and §6 also ` +
+        'asks for the real-device pass.',
+      coldTimes,
     ),
     note(
       'what profile D is and is not',

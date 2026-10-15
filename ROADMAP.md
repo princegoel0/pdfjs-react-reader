@@ -235,9 +235,12 @@ moves between the bar and the ⋯ panel, and the second keystroke reaches the vi
 Chromium then held a control reading "all" against a state of "current" and printed one sheet, which the old
 first-match wait was willing to ship — so the row now states its claim at exactly its strength (the sheet and the
 state, with the door the value came in by printed) and the keyboard path is open as **#302**, not as a note. The
-structure row fell into the same family on the same push and is **#301**. *Then FR-49:* profile D's leg is sampled once per run, so there is no median to accept and the gate
-rightly says so; and the blind-leg message prints a spread and calls it past the ceiling the *computed*
-tolerance crossed, which is a one-line fix with a case pinning the arithmetic. *Then FR-45's contrast leg and
+structure row fell into the same family on the same push and is **#301**. *FR-49's two leftovers became #295:* profile D's harness leg is sampled three times per run, each in its own throttled context, and a test reads that count off the script and refuses anything below the number the gate needs —
+a leg the gate refuses is a leg that can never fail on a regression. The blind-leg message now prints the tolerance its
+rule compared rather than the spread that fed it, with a case on the boundary where the two differ (a spread of
+1.86× under the ceiling, a tolerance of 2.33× over it). What is left is a quiet machine: three runs of one tree today
+took profile A's cold page from 439 to 652 to 1544 ms, so no reading from this host was committed as evidence and
+profile D has still never entered a baseline. *Then FR-45's contrast leg and
 FR-52's never-published-subpaths half*, the latter being a statement about publication history that the rc
 artifact listing can settle. *FR-37 is closed (#292, 2026-10-15):* the virtualizer's slot set now reaches the published page
 model as a state the hook answers, instead of the clause changing: `pageStatus(page)` says `unrequested` for any page

@@ -219,7 +219,9 @@ describe("FR-49's regression gate", () => {
       RUN(environment, [measure('cold page', [200, 202, 204, 206, 208])]),
       RUN(environment, [measure('cold page', [195, 200, 205, 208, 210])]),
     );
-    // One sample, which is exactly what profile D's harness leg produces on every run.
+    // One sample. This is exactly the state profile D's harness leg was in on every run until #295 gave it
+    // three cold runs of a freshly opened document, and the refusal below is why that leg could never be
+    // accepted into a baseline, let alone fail on a regression.
     const run = RUN(environment, [measure('cold page', [4000])]);
     const line = lineFor(compareRun({ baseline, environment, profiles: run.profiles }).lines, 'A|cold page');
     expect(line.status).toBe('na');
@@ -255,6 +257,29 @@ describe("FR-49's regression gate", () => {
     const line = lineFor(compareRun({ baseline, environment, profiles: run.profiles }).lines, 'A|cold page');
     expect(line.status).toBe('blind');
     expect(summarise(compareRun({ baseline, environment, profiles: run.profiles }).lines).blind).toBe(1);
+  });
+
+  /**
+   * The blind verdict at the boundary the real host sits on (#295): a spread that is itself *under* the ceiling,
+   * and a tolerance that is over it. The message therefore has to carry both numbers, because the sentence that
+   * quoted only the spread said "1.81×, past the 2× ceiling" — arithmetic that does not hold — while the rule
+   * compared 1.81 × 1.25 = 2.26. Pinning the figure the rule used is what stops the message drifting back.
+   */
+  it('names the tolerance it compared when a spread under the ceiling still goes blind', () => {
+    const entry: Entry = {
+      fixture: FIXTURE(),
+      readings: [READING(100), READING(102), READING(190)],
+      reference: null,
+      tolerance: null,
+      status: 'provisional',
+    };
+    const state = entryState(entry);
+    if (!state.blind) throw new Error(`expected blind, got ${JSON.stringify(state)}`);
+    expect(state.spread).toBeLessThan(GATE.toleranceCeiling);
+    expect(state.tolerance).toBeGreaterThan(GATE.toleranceCeiling);
+    expect(state.reason).toMatch(/1\.86×/);
+    expect(state.reason).toMatch(/2\.33× tolerance/);
+    expect(state.reason).toMatch(/past the 2× ceiling/);
   });
 
   it('holds the tolerance at the measured floor so two quiet runs cannot make a gate that cries wolf', () => {
