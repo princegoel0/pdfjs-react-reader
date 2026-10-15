@@ -235,7 +235,8 @@ moves between the bar and the ⋯ panel, and the second keystroke reaches the vi
 Chromium then held a control reading "all" against a state of "current" and printed one sheet, which the old
 first-match wait was willing to ship — so the row now states its claim at exactly its strength (the sheet and the
 state, with the door the value came in by printed) and the keyboard path is open as **#302**, not as a note. The
-structure row fell into the same family on the same push and is **#301**. *FR-49's two leftovers became #295:* profile D's harness leg is sampled three times per run, each in its own throttled context, and a test reads that count off the script and refuses anything below the number the gate needs —
+structure row fell into the same family on the same push: **#301** settled it on the eight declared roles, and running
+that pair exposed **#303** — the ink-editor count taken once after a scroll back, which alternates alone at home and was green in every CI cell today. *FR-49's two leftovers became #295:* profile D's harness leg is sampled three times per run, each in its own throttled context, and a test reads that count off the script and refuses anything below the number the gate needs —
 a leg the gate refuses is a leg that can never fail on a regression. The blind-leg message now prints the tolerance its
 rule compared rather than the spread that fed it, with a case on the boundary where the two differ (a spread of
 1.86× under the ceiling, a tolerance of 2.33× over it). What is left is a quiet machine: three runs of one tree today

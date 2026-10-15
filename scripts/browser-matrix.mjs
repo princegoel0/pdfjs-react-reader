@@ -2061,17 +2061,46 @@ const CHECKS = [
        * read-back: the row has to wait for the state its claim is about, and the below-minimum branch still
        * asserts the absence, so an engine that gained the ownership is caught rather than waited away.
        */
+      /*
+       * The eight roles the fixture declares are the wait's target, not a post-condition (#301). CI run
+       * 38721596049 reddened this row in one cell of the 6.4.299 job — `carries no figure, table, row,
+       * columnheader, cell — it read heading, list, listitem, paragraph` — while another cell of the same job
+       * read all eight, which is a tree still being written, not a builder that cannot finish one. The wait
+       * before this line checked for a tree with a mounted link and then read the roles once: the link and the
+       * first structural nodes arrive together, and `table` and its cells come after them, so the read could
+       * land with the heading and the list already home. Same shape as #291's page and #293's boxes.
+       */
+      const wanted = ['heading', 'list', 'listitem', 'figure', 'table', 'row', 'columnheader', 'cell'];
       let dom = null;
+      const roleTrail = [];
+      let rolesHeld = 0;
+      let previousRoles = null;
       const settledDom = await waitFor(async () => {
         dom = await readDom();
-        if (!dom || dom.roots === 0 || !dom.link) return null;
-        return ownsLinks ? (dom.link.ownsCount > 0 ? dom : null) : dom;
+        if (!dom || dom.roots === 0 || !dom.link) {
+          previousRoles = null;
+          rolesHeld = 0;
+          return null;
+        }
+        if (ownsLinks && dom.link.ownsCount === 0) {
+          previousRoles = null;
+          rolesHeld = 0;
+          return null;
+        }
+        const arrived = wanted.filter((role) => dom.roles.includes(role)).join(',');
+        if (roleTrail.at(-1) !== arrived) roleTrail.push(arrived);
+        rolesHeld = arrived === previousRoles ? rolesHeld + 1 : 0;
+        previousRoles = arrived;
+        return arrived === wanted.join(',') && rolesHeld >= 1 ? dom : null;
       }, 20_000);
+      const missing = wanted.filter((role) => !dom.roles.includes(role));
       if (!settledDom) {
         fail(
-          `no structure tree with a mounted link annotation settled within 20 s on ${engine} ` +
-            `(${engineVersion}): ${JSON.stringify(dom)} — the tree is built by the tier's lazy import and the ` +
-            'link by the annotation layer, and the ownership is written after both',
+          `${missing.length} of ${wanted.length} declared roles never arrived and held: no ${missing.join(', ') || '(none)'} ` +
+            `on ${engine} ${engineVersion} — the tree read ${dom.roles.join(', ') || '(no roles)'} having grown ` +
+            `${roleTrail.map((k) => (k ? k.split(',').length : 0)).join(' → ')} of ${wanted.length}, with ` +
+            `${dom.roots} tree(s), link ${dom.link ? `owning ${dom.link.ownsCount}` : 'absent'} — the tree is built ` +
+            'by the tier\u2019s lazy import, the link by the annotation layer, and the ownership after both',
         );
       }
       dom = settledDom;
@@ -2081,13 +2110,6 @@ const CHECKS = [
       }
       if (taggedFetch === 0) {
         fail('a tagged document mounted a structure tree without fetching the viewer it is built from — the tree came from somewhere the tier does not name');
-      }
-      // The hierarchy the clause names, read off the elements the builder wrote. Every role here is one the
-      // fixture declares: `tagged-sample.pdf` is authored as H1, three list items, a figure and a table.
-      const wanted = ['heading', 'list', 'listitem', 'figure', 'table', 'row', 'columnheader', 'cell'];
-      const missing = wanted.filter((role) => !dom.roles.includes(role));
-      if (missing.length) {
-        fail(`the structure tree carries no ${missing.join(', ')} — it read ${dom.roles.join(', ')}`);
       }
       if (!dom.link) {
         fail('the tagged fixture carries a link annotation and the annotation layer mounted none, so the ownership half of the clause could not be asked');
