@@ -1068,35 +1068,39 @@ const CHECKS = [
         ['country', 'select', 'select-one'],
         ['skills', 'select', 'select-multiple'],
       ];
-      const settledFields = () =>
-        settleOn(
-          readFields,
-          (f) =>
-            `${f.controls
-              .map((c) => `${c.name}:${c.tag}[${c.type}]`)
-              .sort()
-              .join(',')}\u0000${f.boxes}`,
-          null,
-        );
-      const formRead = await settledFields();
+      /*
+       * Settle on the six identities the clause names, not on "the set stopped changing" — and that correction
+       * came from the runner, not from this machine. CI run 38721596049 failed this row in the 6.2.108 cell with
+       * `6 of 6 field types is not a real HTML control` while eleven local runs of the row alone passed it, and
+       * the difference is the row's neighbour: on the runner the row before has just left a *different* document
+       * mounted, and its layer answers the first two polls, so a wait for "unchanged" settles on the previous
+       * document and calls it the new one. Run alone at home there is nothing to inherit, and every reading is
+       * correct. A target the stale DOM cannot satisfy is the only wait that means the same thing in both places.
+       */
+      const identity = ([name, tag, type]) => `${name}:${tag}[${type}]`;
+      const allIdentities = wanted.map(identity).sort().join(',');
+      const presentIdentities = (f) =>
+        wanted
+          .filter(([name, tag, type]) =>
+            f.controls.some((c) => c.name === name && c.tag === tag && c.type === type),
+          )
+          .map(identity)
+          .sort()
+          .join(',');
+      const formRead = await settleOn(readFields, presentIdentities, allIdentities);
       const fields = formRead.value;
-      if (!formRead.stable) {
-        fail(
-          `${fields.controls.length} control(s) in ${fields.boxes} box(es) at the last read, and the set never ` +
-            `repeated itself within ${Math.round(formRead.waited / 1000)} s — it went through ` +
-            `${trailText(formRead.trail)} controls — so the ` +
-            'assertions below would be reading a layer still being written (clause: "render interactive form ' +
-            'fields as real HTML controls")',
-        );
-      }
       const missing = wanted
         .filter(([name, tag, type]) => !fields.controls.some((c) => c.name === name && c.tag === tag && c.type === type))
         .map(([name, tag, type]) => `${tag}[type=${type}] name=${name}`);
-      if (missing.length) {
+      if (!formRead.stable) {
         fail(
-          `${missing.length} of ${wanted.length} field types is not a real HTML control: ${missing.join('; ')} — ` +
-            `the layer holds ${fields.controls.length} control(s): ` +
-            fields.controls.map((c) => `${c.tag}[${c.type}]${c.name ? `(${c.name})` : ''}`).join(', '),
+          `${missing.length} of ${wanted.length} field types never arrived as a real HTML control within ` +
+            `${Math.round(formRead.waited / 1000)} s: ${missing.join('; ') || 'none missing'} — the layer read ` +
+            `${fields.controls.length} control(s) in ${fields.boxes} box(es), of which the wanted ones were ` +
+            `${presentIdentities(fields) || 'none of them'}, and the wanted set went ` +
+            `${trailText(formRead.trail)} of ${wanted.length} — ` +
+            'so either a widget never paints or this is the previous document\u2019s layer still on screen ' +
+            '(clause: "render interactive form fields as real HTML controls")',
         );
       }
       const untabbable = fields.controls.filter((c) => !c.focusable).map((c) => `${c.tag}(${c.name})`);
@@ -2926,8 +2930,22 @@ const CHECKS = [
 
       const pickScope = async (scope) => {
         const pages = await reveal('Print pages');
-        // Which door the value came in by is part of what the next engine's reading means, so it is carried to
-        // the read-back rather than being inferred from the absence of a note.
+        /*
+         * Which door the value came in by is part of what the next engine's reading means, so it is carried to
+         * the read-back rather than being inferred from the absence of a note.
+         *
+         * The reader's own door was tried here and does not work, and that is a finding rather than a preference
+         * (#294). Focusing this `<select>` and pressing arrow keys stepped it correctly *once*: the toolbar
+         * re-measures on every scope change — `range` grows two number inputs beside the select — the control
+         * moves between the bar and the ⋯ panel, the focused element is destroyed with it, and the second
+         * keystroke arrives at the viewport, where `isEditableTarget` no longer protects it and the viewer pages
+         * the document. Chromium printed one sheet for a scope of "all" with the control reading "all" and the
+         * app's state left on "current", which is what the settled read-back below now refuses instead of
+         * shipping. So the value keeps going in through `selectOption` — the automation API, which is why the
+         * row's sentence is about the sheet and the app's state and never about a finger on the control — and
+         * the keyboard's own claim is open as #302: a toolbar control that moves when its value changes drops a
+         * keyboard user mid-selection.
+         */
         let how = `${engine} took the selection through Playwright's selectOption`;
         try {
           await pages.selectOption(scope);
@@ -3007,19 +3025,32 @@ const CHECKS = [
         let closedAfter = null;
         /** `null` is what "no copy a reader could use" looks like in a list of readings. */
         const said = (r) => (r.value === null ? `(no usable copy; state reads "${r.mirror}")` : r.value);
+        /*
+         * Two agreeing readings, not one (#294). The first version of this wait returned on the first reading
+         * that matched — which was already a thin claim, and the comment above it said so — and the keyboard
+         * door broke it: stepping a `<select>` fires one `change` per keystroke, and the row clicked Print on
+         * the first moment the control read "all" while React's own state was still catching up from the
+         * intermediate option. Chromium then printed one sheet for a scope of "all" and the row was right to
+         * say so. So the app's state has to agree, twice in a row, before the row is allowed to reach for the
+         * button: a value the control holds and the state does not is not a selection, it is a frame.
+         */
+        let agreeStreak = 0;
         const settled = await waitFor(async () => {
           last = await readScopeControl(null);
           if (last.panel) panelSeenOpen = true;
           else if (panelSeenOpen && closedAfter === null) closedAfter = seenValues.length;
-          if (last.value === scope || (last.value === null && last.mirror === scope)) return true;
+          const agrees = last.mirror === scope && (last.value === scope || last.value === null);
+          agreeStreak = agrees ? agreeStreak + 1 : 0;
+          if (agreeStreak >= 2) return true;
           const now = said(last);
           if (seenValues[seenValues.length - 1] !== now) seenValues.push(now);
           return null;
-        }, 3_000);
+        }, 8_000);
         if (!settled) {
           fail(
-            `the scope select never read "${scope}" — it read ${seenValues.length ? seenValues.join(', ') : '(nothing)'} ` +
-              `over 3 s after ${how}; at the last reading, ${stateOf(last)}`,
+            `the app's own state never agreed with a scope of "${scope}" twice in a row — the readings were ` +
+            `${seenValues.length ? seenValues.join(', ') : '(nothing)'} over 8 s after ${how}; at the last ` +
+            `reading, ${stateOf(last)}`,
           );
         }
         /*
@@ -4028,9 +4059,10 @@ const CHECKS = [
        * The scope is not assumed because rows share one page and `print-sheets-hide-the-application` leaves it on
        * "From–to" — a job of one sheet for page 2, which would make the sheet this row reads a different page from
        * the one it drew on. WebKit refuses `selectOption` on a native `<select>` (that engine's note is in the
-       * print row), so the fallback puts the value on through the event the application listens for, on the copy a
-       * pointer could reach rather than the hidden measuring one (#243) — and since #278, when that copy is behind
-       * a panel that has closed, the row opens the panel and looks again before it calls the control unreachable.
+       * print row), so the row reaches for the keyboard first (#294) and only then puts the value on through the
+       * event the application listens for, on the copy a pointer could reach rather than the hidden measuring one
+       * (#243), and since #278 it reopens a panel that has closed over that copy before calling the control
+       * unreachable.
        */
       let scopeDoor = 'locator.selectOption';
       const pickAll = async () => {
@@ -4070,15 +4102,20 @@ const CHECKS = [
           }
           scopeDoor = `${door}, then the change event on ${wrote}`;
         }
+        // Twice in a row, for the same reason as the print row above (#294): one reading that matches can be a
+        // frame between two keystrokes rather than a settled selection.
+        let held = 0;
         const settled = await waitFor(async () => {
           const copies = await scopeCopies();
-          return copies.length > 0 && copies.every((copy) => copy.value === 'all') ? copies : null;
-        }, 5_000);
+          const agrees = copies.length > 0 && copies.every((copy) => copy.value === 'all');
+          held = agrees ? held + 1 : 0;
+          return held >= 2 ? copies : null;
+        }, 8_000);
         await finish();
         if (!settled) {
           fail(
-            `the print scope never settled on "all" — it read ${JSON.stringify(await scopeCopies())} after 5 s, so ` +
-              `the sheet counts below would be some other selection's. The control went: ${traceText(trace)}`,
+            `the print scope never held "all" on every copy twice in a row — it read ${JSON.stringify(await scopeCopies())} ` +
+              `after 8 s, so the sheet counts below would be some other selection's. The control went: ${traceText(trace)}`,
           );
         }
         const moves = movesIn(trace);

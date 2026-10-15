@@ -216,20 +216,26 @@ file is to point at the command rather than type a figure the next push moves.
 | The pre-1.0 line is deprecated, with the commands in this file's certification row | done on the registry and recorded in **W9**'s row; the read-back command that row carried has been corrected, per the note there | **—** |
 | React 18/19 with matching `react-dom`; the engine floor and latest-supported-6.x jobs; canvas and print budgets deterministically tested; `check:examples` green with every skip ticketed; withdrawn FRs keeping their ids and reasons; no intermediate publication | each is green where it is runnable, and the ones that are runner-only are recorded per run in `fr-evidence.json` rather than claimed here | **—** |
 
-**P1 — the rows code can move, in the order that returns information fastest.** *#282 is executed, and the
-reading it asked for is the runner's.* The signature boxes are React's — `PdfPage` renders `.pjsr-sig-layer` once
-the annotation list is in the page's state — while the element the row waited for is pdf.js's own DOM in the
-container beside it, so the row was sampling between two clocks. `scripts/browser-matrix.mjs` now settles each of
-that row's three reads (the form's control set, the five boxes, the set after page 2 turns) and prints how long
-each waited; eleven local runs of the row came back with the whole set, and the same loop caught a second race the
-row had been tolerating — a run that asserted `8 controls in 9 boxes` and passed, because checking one control *per
-field type* is not defeated by a widget that has not arrived. Three counterfactuals reddened the three new branches
-with the counts they had actually seen. What is left is not a build step: the condition that moves FR-16 off `met`
-is a *settled* read that still comes back short at a phone-class viewport and devicePixelRatio 2, which is a
-product answer rather than an instrument one. *Then #278 and #281:* the print row
-now prints its own weakened premise — it admits the scope control was reached only through the automation API —
-and that sentence should either be a refusal or a weaker recorded claim, not a passing row with a confession
-inside it. *Then FR-49:* profile D's leg is sampled once per run, so there is no median to accept and the gate
+**P1 — the rows code can move, in the order that returns information fastest.** *#282 is closed by the runner.*
+The signature boxes are React's — `PdfPage` renders `.pjsr-sig-layer` once the annotation list is in the page's
+state — while the element the row waited for is pdf.js's own DOM in the container beside it, so the row was sampling
+between two clocks. `scripts/browser-matrix.mjs` now settles each of that row's three reads and prints how long each
+waited; the runner answered on the first push that carried it (CI run 38721596049, 6.4.299 job — every cell returned
+the whole five-box set, settling in 165–300 ms), which is the reading the #282 sentence asked for and no longer
+needs. The same push also reddened that row for a defect it had just introduced: the first settle waited for the
+control set to stop changing, and on the runner the previous row leaves a *different* document mounted, so two polls
+of the stale layer read as settled — eleven local runs of the row alone could not see it, because run alone there is
+nothing to inherit. The wait now takes a target (the six identities the clause names, twice), the previous commit's
+own script reproduces the runner's red behind its predecessor, and a seventh impossible identity reddens the branch.
+A local run of a row alone is not the runner's cell, and a wait for *unchanged* is not a wait for *arrived*.
+*#278's confession is gone, and #281 is still an engine finding.* #294 put the print rows' scope read-back on two
+agreeing readings of the application's own state — because trying the reader's door for real (arrow keys on the
+scope `<select>`) turned out to lose the element after one key: changing the scope re-flows the toolbar, the control
+moves between the bar and the ⋯ panel, and the second keystroke reaches the viewport, where it pages the document.
+Chromium then held a control reading "all" against a state of "current" and printed one sheet, which the old
+first-match wait was willing to ship — so the row now states its claim at exactly its strength (the sheet and the
+state, with the door the value came in by printed) and the keyboard path is open as **#302**, not as a note. The
+structure row fell into the same family on the same push and is **#301**. *Then FR-49:* profile D's leg is sampled once per run, so there is no median to accept and the gate
 rightly says so; and the blind-leg message prints a spread and calls it past the ceiling the *computed*
 tolerance crossed, which is a one-line fix with a case pinning the arithmetic. *Then FR-45's contrast leg and
 FR-52's never-published-subpaths half*, the latter being a statement about publication history that the rc
