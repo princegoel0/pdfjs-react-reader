@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PdfPageStatus } from '../lib/status';
 import {
   applyRotation,
   automaticFitMode,
@@ -104,9 +105,28 @@ export interface UsePdfVirtualizerResult {
   scrollToPage: (pageNumber: number, behavior?: ScrollBehavior, offsetInPagePx?: number) => void;
   /** Report a page's intrinsic (scale-1) dimensions once measured. */
   reportPageDims: (index: number, dims: PageDims) => void;
+  /**
+   * Where page `pageNumber` stands in §3.5's page model, as this virtualizer's ask decides it.
+   *
+   * `unrequested` is not a page's own report — a page that has not been asked for is not mounted, so nothing
+   * exists to report it. It is the *ask* that is false, and this hook is the only thing in the package that
+   * knows it. That is why the member lives here rather than in `PdfPage`: FR-37 says a state the model cannot
+   * reach is a defect rather than an unused branch, and §3.5 defines the state as "the virtualizer has not
+   * asked for it". A page inside the window answers with whatever it last reported, or `queued` when it has
+   * been mounted long enough to have a request outstanding and nothing reported yet — the state `PdfPage`
+   * reports in its first effect.
+   */
+  pageStatus: (pageNumber: number) => PdfPageStatus;
+  /**
+   * Feed the model from the page component's own `onStatusChange`. Report every state the page goes through;
+   * the ask-set, not the report, is what makes a page read `unrequested` again once it leaves the window.
+   */
+  reportPageStatus: (pageNumber: number, status: PdfPageStatus) => void;
 }
 
 const DIM_CHUNK_SIZE = 25;
+/** Before a page has reported anything. Shared so the first render allocates nothing. */
+const NO_STATUSES: ReadonlyMap<number, PdfPageStatus> = new Map();
 /**
  * How many pages are weighed to size the rows the sweep has not reached yet. See
  * {@link meanBox}: the figure is the laid-out height's error at first paint, and a
@@ -507,6 +527,41 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
     [applyJump, numPages, slots.length],
   );
 
+  /**
+   * The pages this virtualizer has asked for, 1-based, read off the slots it actually built.
+   *
+   * §3.5 defines `unrequested` as "the virtualizer has not asked for it", so the set is derived from the same
+   * `virtualSlots` the shell renders from rather than from a second computation of the window — two ways of
+   * knowing would be two ways to disagree, and the state would then be a coin flip.
+   */
+  const askedPages = useMemo(() => {
+    const set = new Set<number>();
+    for (const slot of virtualSlots) for (const index of slot.indices) set.add(index + 1);
+    return set;
+  }, [virtualSlots]);
+
+  /**
+   * The last state each page reported. Deliberately not pruned when a page leaves the window: `pageStatus`
+   * answers from the ask-set first, so a stale entry is never read, and one entry per page ever mounted is a
+   * handful of bytes against the canvas a page actually holds. It goes when the component goes.
+   */
+  const [statuses, setStatuses] = useState<ReadonlyMap<number, PdfPageStatus>>(NO_STATUSES);
+
+  const reportPageStatus = useCallback((pageNumber: number, status: PdfPageStatus) => {
+    setStatuses((previous) => {
+      if (previous.get(pageNumber) === status) return previous;
+      return new Map(previous).set(pageNumber, status);
+    });
+  }, []);
+
+  const pageStatus = useCallback(
+    (pageNumber: number): PdfPageStatus => {
+      if (!askedPages.has(pageNumber)) return 'unrequested';
+      return statuses.get(pageNumber) ?? 'queued';
+    },
+    [askedPages, statuses],
+  );
+
   return {
     containerRef,
     virtualSlots,
@@ -518,5 +573,7 @@ export function usePdfVirtualizer(options: UsePdfVirtualizerOptions): UsePdfVirt
     viewportHeight: viewport.height,
     scrollToPage,
     reportPageDims,
+    pageStatus,
+    reportPageStatus,
   };
 }

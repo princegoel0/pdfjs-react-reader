@@ -69,6 +69,15 @@ to bite — and never up on a claim nobody can make fail.
 
 ### Added
 
+- **`pageStatus` and `reportPageStatus` on the virtualizer's result (#292, 2026-10-15; FR-37).** §3.5's page
+  model names `unrequested` — "the virtualizer has not asked for it. No work, no memory" — and FR-37 says a
+  member the model cannot reach is a defect rather than an unused branch, with `destroyed` its only named
+  exception. `PdfPage` can never report it, because a page nobody asked for is not mounted, so the state now
+  comes from the hook that decides the ask: `pageStatus(page)` answers `unrequested` for any page outside the
+  current slots whatever it last reported, and for one inside them the state it reported — or `queued`, the
+  first thing a mounted page emits, before it has emitted anything. `reportPageStatus(page, status)` is the seam
+  a host feeds from `PdfPage`'s own `onStatusChange`. Additive to `UsePdfVirtualizerResult`; the published union
+  is unchanged, so this needs no maturity-ledger entry.
 - **§8's two "no environment" sentences became questions (#270, #271, 2026-10-09).** The register had been
   carrying "no macOS Safari, iOS or Android job exists" for days, and this repository has twice been wrong about
   an environment it had never tested — #267 found axe running in all three engines on a Windows host, #276 found a

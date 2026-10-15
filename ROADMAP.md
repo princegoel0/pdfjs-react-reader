@@ -86,7 +86,7 @@ certified on this machine at all.
 | `FR-34` | Network Contract | **met** | 4/5 | 0 | — |
 | `FR-35` | Bounded Retries | **met** | 4/5 | 0 | — |
 | `FR-36` | Cancellation Tokens | **met** | 4/5 | 0 | — |
-| `FR-37` | Published State Models | **partial** | 4/5 | 1 | the page union's `unrequested` member is written by no code path and asserted only as never-repo… |
+| `FR-37` | Published State Models | **met** | 4/5 | 0 | — |
 | `FR-38` | Source Utilities | **met** | 4/5 | 0 | — |
 | `FR-39` | Incremental, Viewport-Prioritised Indexing | **met** | 4/5 | 0 | — |
 | `FR-40` | Injectable External Index | **met** | 4/5 | 0 | — |
@@ -230,8 +230,11 @@ inside it. *Then FR-49:* profile D's leg is sampled once per run, so there is no
 rightly says so; and the blind-leg message prints a spread and calls it past the ceiling the *computed*
 tolerance crossed, which is a one-line fix with a case pinning the arithmetic. *Then FR-45's contrast leg and
 FR-52's never-published-subpaths half*, the latter being a statement about publication history that the rc
-artifact listing can settle. *Then FR-37:* either the virtualizer's slot status reaches the published page
-model or the clause changes — this file will not code the fiction in the meantime.
+artifact listing can settle. *FR-37 is closed (#292, 2026-10-15):* the virtualizer's slot set now reaches the published page
+model as a state the hook answers, instead of the clause changing: `pageStatus(page)` says `unrequested` for any page
+outside the current rows whatever that page last reported and the reported state — or `queued`, the first thing a
+mounted page emits — inside them, and `reportPageStatus` is the seam a host feeds from `PdfPage`'s `onStatusChange`.
+`src/headless/usePdfVirtualizer.page-status.test.tsx` is the guard; it fails when the ask stops deciding the answer.
 
 **P2 — turn the rules into something that runs (#284–#288).** Six assertions the PRD audit found missing
 behind `met` rows; §3.1's no-React-in-core rule and §3.2.1's public-`any`/engine-internal rule; §6 and §2.1's
