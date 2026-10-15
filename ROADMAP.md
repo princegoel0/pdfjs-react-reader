@@ -227,7 +227,9 @@ control set to stop changing, and on the runner the previous row leaves a *diffe
 of the stale layer read as settled — eleven local runs of the row alone could not see it, because run alone there is
 nothing to inherit. The wait now takes a target (the six identities the clause names, twice), the previous commit's
 own script reproduces the runner's red behind its predecessor, and a seventh impossible identity reddens the branch.
-A local run of a row alone is not the runner's cell, and a wait for *unchanged* is not a wait for *arrived*.
+A local run of a row alone is not the runner's cell, and a wait for *unchanged* is not a wait for *arrived*. The push
+that carried the correction reported from both jobs (CI run 38728971438): twelve cells, five boxes and nine controls
+in every one, settling in 129–758 ms, both jobs successful — including the 6.2.108 job that had been the red one.
 *#278's confession is gone, and #281 is still an engine finding.* #294 put the print rows' scope read-back on two
 agreeing readings of the application's own state — because trying the reader's door for real (arrow keys on the
 scope `<select>`) turned out to lose the element after one key: changing the scope re-flows the toolbar, the control
