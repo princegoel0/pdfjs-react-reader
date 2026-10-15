@@ -997,21 +997,56 @@ const CHECKS = [
       const painted = (selector) =>
         page.evaluate((s) => document.querySelectorAll(s).length, selector);
 
+      /*
+       * Read until a counted thing stops changing, and — when the caller names what it expects — until that
+       * has arrived and then repeated (#293). This row read its layers once, on its own schedule, after waits
+       * that named *other* elements: `painted(...) >= 1` is not the annotation layer having finished, and the
+       * signature boxes are written by React's commit while the engine's own element is written by pdf.js into
+       * the same container, so two clocks sit behind one assertion. #282 is the finding that came out of that
+       * (one webkit · mobile profile returning the whole set, three, and none across four runs), and the local
+       * rate the register carries for this row is two reds in eleven runs of the row alone. A settled read
+       * cannot make that alternate; a count that never arrives is still a failure, now with the counts that did
+       * arrive named in it — and named first, because `errText()` caps a failure at 260 characters and the
+       * clause quote that used to open this verdict pushed the numbers past the cut, so the detail #282 was
+       * opened to look for sat in a sentence nobody could read.
+       */
+      const settleOn = async (read, keyOf, target, timeout = 20_000) => {
+        let last = null;
+        let previous = null;
+        let repeats = 0;
+        const trail = [];
+        const started = Date.now();
+        const stable = await waitFor(async () => {
+          last = await page.evaluate(read);
+          const key = keyOf(last);
+          if (trail.at(-1) !== key) trail.push(key);
+          if (!key) {
+            previous = null;
+            repeats = 0;
+            return null;
+          }
+          repeats = key === previous ? repeats + 1 : 0;
+          previous = key;
+          if (repeats < 1) return null;
+          return target === null || key === target ? last : null;
+        }, timeout);
+        return { value: stable ?? last, stable: stable !== null, waited: Date.now() - started, trail };
+      };
+      /** How many items a trail key counted, for a message that has to fit inside 260 characters. */
+      const keyCount = (key) => (key ? key.split(',').length : 0);
+      const trailText = (trail) => trail.map(keyCount).join(' → ') || '0';
+
       await load('form-sample.pdf', 2);
-      // Wait only for the layer to paint *something*; the assertions below name what is missing, which is a
-      // better report than a magic count that can move with the zoom the previous row left behind. The
-      // predicate has to await the read — `painted(...) >= 1` compares a Promise to a number, which is false
-      // for any value, and the first version of this line reported "never painted" for a layer holding six
-      // controls.
-      if (
-        !(await settle(
-          async () =>
-            (await painted('.pjsr-annotation-layer input, .pjsr-annotation-layer select, .pjsr-annotation-layer textarea')) >= 1,
-        ))
-      ) {
-        fail('the form fixture never painted a single widget within 20 s — the annotation layer is not rendering at all');
-      }
-      const fields = await page.evaluate(() => {
+      /*
+       * The same settle as the signature read below (#293), and for the same reason: the wait here was
+       * `painted(...) >= 1` — one control anywhere is not the layer having finished — and the read that
+       * followed it was a single sample. Eight runs of this row alone in webkit · desktop on 2026-10-15 put
+       * the cost of that in the open: seven returned `9 controls in 10 boxes` and one returned `8 controls in
+       * 9 boxes`, both green, because the assertions below check one control *per field type*, which a widget
+       * that has not arrived yet does not defeat. A settled read cannot make that alternate, so the count the
+       * row prints is now the count the row waited for.
+       */
+      const readFields = () => {
         const out = [];
         for (const layer of document.querySelectorAll('.pjsr-annotation-layer')) {
           for (const el of layer.querySelectorAll('input, select, textarea')) {
@@ -1024,7 +1059,7 @@ const CHECKS = [
           }
         }
         return { controls: out, boxes: document.querySelectorAll('.pjsr-annotation-layer [class*="Widget"]').length };
-      });
+      };
       const wanted = [
         ['fullName', 'input', 'text'],
         ['notes', 'textarea', 'textarea'],
@@ -1033,6 +1068,27 @@ const CHECKS = [
         ['country', 'select', 'select-one'],
         ['skills', 'select', 'select-multiple'],
       ];
+      const settledFields = () =>
+        settleOn(
+          readFields,
+          (f) =>
+            `${f.controls
+              .map((c) => `${c.name}:${c.tag}[${c.type}]`)
+              .sort()
+              .join(',')}\u0000${f.boxes}`,
+          null,
+        );
+      const formRead = await settledFields();
+      const fields = formRead.value;
+      if (!formRead.stable) {
+        fail(
+          `${fields.controls.length} control(s) in ${fields.boxes} box(es) at the last read, and the set never ` +
+            `repeated itself within ${Math.round(formRead.waited / 1000)} s — it went through ` +
+            `${trailText(formRead.trail)} controls — so the ` +
+            'assertions below would be reading a layer still being written (clause: "render interactive form ' +
+            'fields as real HTML controls")',
+        );
+      }
       const missing = wanted
         .filter(([name, tag, type]) => !fields.controls.some((c) => c.name === name && c.tag === tag && c.type === type))
         .map(([name, tag, type]) => `${tag}[type=${type}] name=${name}`);
@@ -1127,7 +1183,25 @@ const CHECKS = [
           boxes,
         };
       };
-      const sig = await page.evaluate(readSig);
+      /*
+       * Why this read in particular needed the settle: the five boxes are React's — `PdfPage` renders them into
+       * `.pjsr-sig-layer` from the annotation list it is holding — while the engine element the two waits above
+       * waited for is pdf.js's own DOM inside the same container. Two clocks behind one assertion, so the row
+       * could legitimately see the engine's element and still be sampling the boxes one commit early.
+       */
+      const want = ['sigAlreadySigned', 'sigKid', 'sigPlain', 'sigTwoBoxes', 'sigTwoBoxes'];
+      const boxNames = (r) => r.boxes.map((b) => b.name).sort().join(',');
+      const first = await settleOn(readSig, boxNames, want.join(','));
+      const sig = first.value;
+      if (!first.stable) {
+        fail(
+          `${sig.boxes.length} of five signature boxes at the last read, and the count went ` +
+            `${trailText(first.trail)} without holding the whole set twice in ${Math.round(first.waited / 1000)} s ` +
+            `(ended on ${boxNames(sig) || 'none'}, layers ${sig.layers}, engine element "${sig.engineClass}") — ` +
+            'the fixture carries six /Sig widgets, one of which the engine paints itself, so a widget with no ' +
+            'element has nothing a reader can see (clause: "a signature widget renders as its box")',
+        );
+      }
       if (sig.sigControls) {
         fail(
           `${sig.sigControls} focusable control(s) stand where FR-16 promises a signature box — capturing a mark ` +
@@ -1141,23 +1215,6 @@ const CHECKS = [
         );
       }
       const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 0.002);
-      const want = ['sigAlreadySigned', 'sigKid', 'sigPlain', 'sigTwoBoxes', 'sigTwoBoxes'];
-      const got = sig.boxes.map((b) => b.name).sort();
-      if (got.join(',') !== want.join(',')) {
-        /*
-         * The state fields come FIRST. `errText()` caps a failure at 260 characters, and the clause quote that
-         * used to open this message pushed the layer count and the engine element's class past the cut — so the
-         * detail #282 was opened to look for was in a sentence nobody could read. A verdict's useful part is the
-         * part that must survive its own length limit.
-         */
-        fail(
-          `${sig.boxes.length} of five boxes were drawn, and the layer held ${sig.layers} annotation layer(s) with ` +
-            `the engine element "${sig.engineClass}" and ${sig.sigControls} focusable control(s) where a box belongs ` +
-            `(fields: ${got.join(', ') || 'none'}) — the signature fixture holds six /Sig widgets, one of which the ` +
-            'engine paints itself, and a widget with no element in the layer has nothing a reader can see or aim at' +
-            '(clause: "a signature widget renders as its box")',
-        );
-      }
       // `sigPlain` carries the same rect as `sigNoRotate` (72,660,272,720 on a 612×792 page), on the page the
       // engine did render — so a box that agrees with that element's fractions agrees with the engine's own
       // coordinate system, at whatever zoom the row happens to be at.
@@ -1200,8 +1257,25 @@ const CHECKS = [
       };
       await jumpTo(2);
       await (await reveal('Rotate clockwise')).click();
-      await page.waitForTimeout(1_500);
-      const spun = await page.evaluate(readSig);
+      /*
+       * The same settle as the first read (#293). A turn rebuilds the layer, so a fixed 1.5 s and one sample
+       * asked the page-2 boxes to have arrived by the clock — and the drift comparison below matches names one
+       * by one, which is how a harness that did not wait reports a product defect: `sigKid's box disappeared
+       * when the page turned` is a true sentence about the read and a false one about the viewer. The settle
+       * key is the whole five-box set again, because both sheets of this fixture have to be mounted for the
+       * comparison to have a before and an after at all.
+       */
+      const spunRead = await settleOn(readSig, boxNames, want.join(','));
+      const spun = spunRead.value;
+      if (!spunRead.stable) {
+        fail(
+          `after the turn the boxes never settled on all five twice in a row within ` +
+            `${Math.round(spunRead.waited / 1000)} s — the count went ${trailText(spunRead.trail)} and ended on ` +
+            `${boxNames(spun) || 'none'}, of which ${spun.boxes.filter((b) => b.secondPage).length} sit on page 2 ` +
+            `against the ${turned.length} the comparison needs — a box that does not survive a rotation is not ` +
+            'the widget’s box',
+        );
+      }
       const after = {
         boxes: spun.boxes.filter((b) => b.secondPage).map((b) => ({ name: b.name, share: share(b.rect), aspect: aspect(b.size) })),
         engineShare: spun.engineRect ? share(spun.engineRect) : null,
@@ -1237,7 +1311,7 @@ const CHECKS = [
       await (await reveal('Rotate counterclockwise')).click();
       await page.waitForTimeout(1_000);
 
-      return `${fields.controls.length} controls in ${fields.boxes} boxes, all focusable (text/textarea/checkbox/radio×3/combo/list); signature document, ${sig.layers} layer(s) mounted, ${sig.boxes.length} boxes drawn and 1 left to the engine (${sig.engineClass}, agreeing with sigPlain's box to within 0.002 of the page), ${before.boxes.length} of them holding through a 90° turn of page 2 alongside the engine's element, no sig control focusable, none taking the pointer`;
+      return `${fields.controls.length} controls in ${fields.boxes} boxes, all focusable (text/textarea/checkbox/radio×3/combo/list, settled in ${formRead.waited} ms); signature document, ${sig.layers} layer(s) mounted, ${sig.boxes.length} boxes drawn and 1 left to the engine (${sig.engineClass}, agreeing with sigPlain's box to within 0.002 of the page), settled in ${first.waited} ms, ${before.boxes.length} of them holding through a 90° turn of page 2 alongside the engine's element (settled in ${spunRead.waited} ms), no sig control focusable, none taking the pointer`;
     },
   },
   {

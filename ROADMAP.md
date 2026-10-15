@@ -216,14 +216,17 @@ file is to point at the command rather than type a figure the next push moves.
 | The pre-1.0 line is deprecated, with the commands in this file's certification row | done on the registry and recorded in **W9**'s row; the read-back command that row carried has been corrected, per the note there | **—** |
 | React 18/19 with matching `react-dom`; the engine floor and latest-supported-6.x jobs; canvas and print budgets deterministically tested; `check:examples` green with every skip ticketed; withdrawn FRs keeping their ids and reasons; no intermediate publication | each is green where it is runnable, and the ones that are runner-only are recorded per run in `fr-evidence.json` rather than claimed here | **—** |
 
-**P1 — the rows code can move, in the order that returns information fastest.** *#282 first, and it is a
-question about the harness rather than the product:* in one webkit mobile profile the signature row has come
-back with the full set of boxes, with three of them, and with none, while the desktop profile of the same
-browser was steady across every reading this file is willing to cite. The fix is not to re-run it hoping for a
-green — it is to read the layer twice, once on the row's own schedule and once after the annotation layer has
-settled, and print both counts. If the settled count is the whole set, the instrument was the bug and FR-16's
-row stops being evidence of anything until it is re-measured; if it stays short, we have a rendering defect at
-a phone-class viewport and devicePixelRatio 2, which is a product answer. *Then #278 and #281:* the print row
+**P1 — the rows code can move, in the order that returns information fastest.** *#282 is executed, and the
+reading it asked for is the runner's.* The signature boxes are React's — `PdfPage` renders `.pjsr-sig-layer` once
+the annotation list is in the page's state — while the element the row waited for is pdf.js's own DOM in the
+container beside it, so the row was sampling between two clocks. `scripts/browser-matrix.mjs` now settles each of
+that row's three reads (the form's control set, the five boxes, the set after page 2 turns) and prints how long
+each waited; eleven local runs of the row came back with the whole set, and the same loop caught a second race the
+row had been tolerating — a run that asserted `8 controls in 9 boxes` and passed, because checking one control *per
+field type* is not defeated by a widget that has not arrived. Three counterfactuals reddened the three new branches
+with the counts they had actually seen. What is left is not a build step: the condition that moves FR-16 off `met`
+is a *settled* read that still comes back short at a phone-class viewport and devicePixelRatio 2, which is a
+product answer rather than an instrument one. *Then #278 and #281:* the print row
 now prints its own weakened premise — it admits the scope control was reached only through the automation API —
 and that sentence should either be a refusal or a weaker recorded claim, not a passing row with a confession
 inside it. *Then FR-49:* profile D's leg is sampled once per run, so there is no median to accept and the gate
