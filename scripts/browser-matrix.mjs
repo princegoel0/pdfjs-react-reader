@@ -1788,16 +1788,6 @@ const CHECKS = [
           scrolled: Math.round(document.querySelector('.pjsr-viewport')?.scrollTop ?? -1),
         }));
 
-      /** Poll the live DOM until `predicate` accepts a reading, and hand back whichever reading it settled on. */
-      const until = async (predicate, timeout = 12_000) => {
-        let last = null;
-        const hit = await waitFor(async () => {
-          last = await read();
-          return predicate(last) ? last : null;
-        }, timeout);
-        return hit ?? last;
-      };
-
       /*
        * The top-left of page 1, clamped to what is actually visible, resolved after the arming (the bar grows
        * the pen's pointer-only sentence, which pushes the page down) — the same three lessons
@@ -1863,33 +1853,95 @@ const CHECKS = [
        * all. This row found that out by failing: the same gesture, measured after disarming, gives one editor.
        */
       await pen.click();
-      const drawn = await until((state) => state.inkEditors >= 1);
-      if (drawn.inkEditors < 1) {
+      /*
+       * Three reads, each settled rather than sampled — #303.
+       *
+       * The row polled `inkEditors >= 1` after the disarm, `=== 0` after the jump away and `>= 1` again after
+       * the jump back. Two of those three are the shape this file keeps getting wrong: a poll for *at least
+       * one* succeeds on the first editor a layer that is still building has mounted, and a poll for
+       * *disappearance* succeeds inside the transition it is waiting for. The count then alternated ok / FAIL
+       * / ok when the row ran alone, which is what a read taken between the pipeline's DOM and React's commit
+       * looks like from outside. Six solo runs on 2026-10-17 (three chromium, three webkit) were green, so the
+       * alternation did not reproduce and no verdict is claimed about its cause — but the settle is what the
+       * row should have had either way, and it prints what it waited for.
+       *
+       * The reference and the target are different questions and are asked differently: after the disarm the
+       * count has to stop changing (there is no number to aim at, because it is whatever the gesture
+       * committed), while after the return it has to reach *that* number and repeat. A wait for unchanged is
+       * not a wait for arrived, so the second leg aims.
+       */
+      const settle = async (accept, aim, timeout = 20_000) => {
+        let last = null;
+        let previous = null;
+        let repeats = 0;
+        const trail = [];
+        const started = Date.now();
+        const stable = await waitFor(async () => {
+          last = await read();
+          if (trail.at(-1) !== last.inkEditors) trail.push(last.inkEditors);
+          repeats = accept(last) && last.inkEditors === previous ? repeats + 1 : 0;
+          previous = last.inkEditors;
+          if (repeats < 1) return null;
+          return aim === null || last.inkEditors === aim ? last : null;
+        }, timeout);
+        return { value: stable ?? last, stable: stable !== null, waited: Date.now() - started, trail };
+      };
+      const atLeastOne = (state) => state.inkEditors >= 1;
+
+      const drawnRead = await settle(atLeastOne, null);
+      const drawn = drawnRead.value;
+      if (!drawnRead.stable) {
         fail(
-          `a mouse drag over (${at.x},${at.y}) with the pen armed, and the tool then taken off, produced ` +
-            `${drawn.inkEditors} ink editors (layer "${drawn.layerClass}", aria-pressed ${drawn.pressed}) — ` +
-            'nothing was drawn, so the rest of this row has nothing to follow',
+          `a mouse drag over (${at.x},${at.y}) with the pen armed, and the tool then taken off, never settled on ` +
+            `an ink editor count (trail ${drawnRead.trail.join(' → ') || '0'}, last ${drawn.inkEditors}, layer ` +
+            `"${drawn.layerClass}", aria-pressed ${drawn.pressed}) — nothing was drawn, so the rest of this row ` +
+            'has nothing to follow',
         );
       }
 
-      // The scroll-out leg, and its premise proved by the element going away.
+      // The scroll-out leg, and its premise proved by the element going away and staying away.
       await jumpTo(14);
-      const away = await until((state) => state.inkEditors === 0);
-      if (away.inkEditors !== 0) {
+      const awayRead = await settle((state) => state.inkEditors === 0, 0);
+      const away = awayRead.value;
+      if (!awayRead.stable) {
         fail(
           `page 1's ink editor was still in the document after jumping to page 14 (${away.inkEditors} editors, ` +
-            `${away.mountedPages} of 20 pages mounted, scroll ${away.scrolled}) — the page never left the ` +
-            'virtualized window, so "survives scrolling out and back" was never asked',
+            `trail ${awayRead.trail.join(' → ')}, ${away.mountedPages} of 20 pages mounted, scroll ` +
+            `${away.scrolled}) — the page never left the virtualized window, so "survives scrolling out and ` +
+            'back" was never asked',
         );
       }
       const mountedAway = away.mountedPages;
       await jumpTo(1);
-      const back = await until((state) => state.inkEditors >= 1);
-      if (back.inkEditors < 1) {
+      /*
+       * The premise of this leg is that page 1 is back in the window, and the reading that filed #303 is what
+       * it looks like when it is not: `page 1 came back with 0 ink editors (4 pages mounted, scroll 19203,
+       * layer "disabled nonEditing") after holding 1` — 19203 is the *previous* page's scroll position, so the
+       * jump had not landed and the row blamed the reader's mark for a page that never returned. The return is
+       * therefore waited for on its own terms before an editor is counted, and its failure says which of the
+       * two it was.
+       */
+      const returned = await waitFor(async () => {
+        const state = await read();
+        return state.scrolled >= 0 && state.scrolled < 500 ? state : null;
+      }, 15_000);
+      if (!returned) {
+        const state = await read();
         fail(
-          `page 1 came back with ${back.inkEditors} ink editors (${back.mountedPages} pages mounted, scroll ` +
-            `${back.scrolled}, layer "${back.layerClass}") after holding ${drawn.inkEditors} — the mark the ` +
-            `reader drew did not survive its page leaving the window (${mountedAway} pages mounted there)`,
+          `page 1 never came back into the window after the jump: scroll ${state.scrolled} with ` +
+            `${state.mountedPages} of 20 pages mounted, so the editor count that follows would describe the ` +
+            'page the reader left rather than the one they returned to',
+        );
+      }
+      const backRead = await settle(atLeastOne, drawn.inkEditors);
+      const back = backRead.value;
+      if (!backRead.stable) {
+        fail(
+          `page 1 came back holding ${back.inkEditors} ink editor(s) and never settled on the ` +
+            `${drawn.inkEditors} it left with (trail ${backRead.trail.join(' → ')}, ` +
+            `${back.mountedPages} pages mounted, scroll ${back.scrolled}, layer "${back.layerClass}") — the ` +
+            `mark the reader drew did not survive its page leaving the window (${mountedAway} pages mounted ` +
+            'there)',
         );
       }
 
@@ -1931,9 +1983,10 @@ const CHECKS = [
       }
       return (
         `drew at (${at.x},${at.y}) of a ${at.canvas} page 1 in ${at.win}: ${drawn.inkEditors} editor ` +
-        `committed, ${mountedAway} pages mounted at 14 with page 1 gone, back to ${back.inkEditors} editor on ` +
-        `return, ${download.suggestedFilename()} saved as ${bytes.length} bytes and re-opened with ` +
-        `${saved.count} /Ink on page 1 against ${control.count} in the fixture`
+        `committed (settled in ${drawnRead.waited} ms), ${mountedAway} pages mounted at 14 with page 1 gone ` +
+        `(in ${awayRead.waited} ms), back to ${back.inkEditors} editor on return, settled on the count it left ` +
+        `with in ${backRead.waited} ms, ${download.suggestedFilename()} saved as ${bytes.length} bytes and ` +
+        `re-opened with ${saved.count} /Ink on page 1 against ${control.count} in the fixture`
       );
     },
   },
