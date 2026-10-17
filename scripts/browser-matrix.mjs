@@ -2956,17 +2956,24 @@ const CHECKS = [
          * Which door the value came in by is part of what the next engine's reading means, so it is carried to
          * the read-back rather than being inferred from the absence of a note.
          *
-         * The reader's own door was tried here and does not work, and that is a finding rather than a preference
-         * (#294). Focusing this `<select>` and pressing arrow keys stepped it correctly *once*: the toolbar
-         * re-measures on every scope change — `range` grows two number inputs beside the select — the control
-         * moves between the bar and the ⋯ panel, the focused element is destroyed with it, and the second
-         * keystroke arrives at the viewport, where `isEditableTarget` no longer protects it and the viewer pages
-         * the document. Chromium printed one sheet for a scope of "all" with the control reading "all" and the
-         * app's state left on "current", which is what the settled read-back below now refuses instead of
-         * shipping. So the value keeps going in through `selectOption` — the automation API, which is why the
-         * row's sentence is about the sheet and the app's state and never about a finger on the control — and
-         * the keyboard's own claim is open as #302: a toolbar control that moves when its value changes drops a
-         * keyboard user mid-selection.
+         * The reader's own door works, and this row does not use it — a division of labour rather than a doubt
+         * (#294, corrected by #302 on 2026-10-16). The note this comment carried said that arrow keys on this
+         * `<select>` lost the element after one key, on the reasoning that a scope change re-flows the toolbar
+         * and the control moves between the bar and the ⋯ panel, destroying the focused element. Measured
+         * rather than inherited — Chromium inline at 1,280 px and all three engines folded at 375 px, where the
+         * ⋯ button was reached by Tab and opened with Enter — the focus stayed on the same node through every
+         * key, the value and the application's own title followed each step, and the viewport never moved.
+         * `keyboard-scope-selection` is that measurement kept as a row, with both halves of the retired claim as
+         * counterfactuals: keying the select by its scope reddens it as a destroyed control, and dropping
+         * `SELECT` from `isEditableTarget` reddens it as a key the viewer took.
+         *
+         * What *does* produce a control reading one scope while the application holds another is a write to
+         * `el.value` that dispatches nothing, and that was reproduced on purpose: `bar "all"` beside
+         * `sizer "current"` and a title still reading the old range, unchanged 400 ms later, and healed by the
+         * `input` + `change` pair the fallback below sends. So the fallback is safe and a bare assignment in a
+         * probe is not — which is the shape the retired note described, from the instrument rather than from a
+         * finger. The value still goes in through `selectOption` here, because this row's claim is the sheet and
+         * the state, and the door the value came in by is printed with it rather than inferred.
          */
         let how = `${engine} took the selection through Playwright's selectOption`;
         try {
@@ -3893,6 +3900,237 @@ const CHECKS = [
         `of ${on.bands.stamp.pixels} for one switch on and back off, with the other three bands still painted ` +
         `(${shown(widened.bands)}, settled in ${widened.waited} ms); page 2's grouped band followed the same panel to ${p2.body.marks} px blank and back ` +
         `to ${p2back.bands.body.marks} px while its ungrouped line stayed at ${p2back.bands.plain.marks}`
+      );
+    },
+  },
+  {
+    /*
+     * FR-45's "keyboard-complete operation with no trap" and FR-19's "the selected pages", on the door a
+     * reader uses rather than the automation API.
+     *
+     * `print-sheets-hide-the-application` drives this control through Playwright's `selectOption` and says so
+     * in its own detail line, because #294 inherited a note claiming the keyboard door loses the element after
+     * one key: the scope change re-flows the toolbar, the control moves between the bar and the ⋯ panel, the
+     * focused element is destroyed with it, and the second keystroke reaches the viewport and pages the
+     * document. #302 measured that instead of carrying it forward, in both shapes the bar takes — inline at
+     * 1,280 px in Chromium, and folded into the panel at 375 px in Chromium, Firefox and WebKit, where the ⋯
+     * button was reached by Tab and opened with Enter — and the claim did not
+     * survive: focus stayed on the same node through four arrow keys, the value and the application's own title
+     * followed every step, `scrollTop` never moved and nothing was removed from the toolbar. The one shape that
+     * *does* produce a control reading one scope while the state holds another is a write to `el.value` that
+     * bypasses React, which is the fallback `readScopeControl(write)` uses, so the note described the
+     * instrument.
+     *
+     * What this row asserts, in the order a reader meets it:
+     *  - **the control is reachable without a pointer.** Tab only, from the bar's first control, through the
+     *    ⋯ button opened with Enter when the bar has folded the control away. The stop count is printed,
+     *    because "reachable" is a claim about the tab order and not about the selector.
+     *  - **each arrow key changes the selection and nothing else.** The value a key should produce is computed
+     *    from the option list, clamped at both ends rather than wrapping — which is what the engine does, and
+     *    the walk spends two keys proving it — and the read settles on that value with the same marked node
+     *    still holding focus, twice in a row, before anything is asserted about it.
+     *  - **the application's state followed the control**, read as the page range off the print button's own
+     *    title and compared with the scope the select shows: `all` is 1–numPages, `current` is one page, and
+     *    `range` is the two fields the choice revealed. The desync the retired note described was these two
+     *    disagreeing, so they are compared rather than each asserted alone.
+     *  - **the viewer did not page behind the reader**: no `onPageChange` and no scroll movement across the
+     *    whole walk, which is the half of that note that would have been a real defect.
+     *  - **the fields `range` reveals are on screen beside the select**, which is #243's claim reached by
+     *    keyboard: a field no Tab reaches is a range nobody can type.
+     */
+    name: 'keyboard-scope-selection',
+    run: async ({ page, load, profile, watchPageChanges, pageChanges }) => {
+      await load('form-sample.pdf', 2);
+      await watchPageChanges();
+      const engine = page.context().browser()?.browserType().name();
+      const OPTIONS = ['all', 'current', 'range'];
+
+      /** The two numbers the application says it will print, read off the bar rather than off the scope. */
+      const documentPages = () =>
+        page.evaluate(() => {
+          const of = /^of (\d+)$/.exec((document.querySelector('.pjsr-page-count')?.textContent ?? '').trim());
+          // The field is `hideOnly` at a narrow width, so the reading comes from whichever copy the DOM has —
+          // both are bound to the same state, which is the point of the sizer.
+          const field = document.querySelector('.pjsr-page-input');
+          return { numPages: of ? Number(of[1]) : 0, currentPage: Number(field?.value) || 0 };
+        });
+
+      /**
+       * One reading of everything the row compares. `window.__pjsrScopeTarget` is the node the tab walk landed
+       * on, kept by reference so "still focused" means the same element and not merely another copy of it.
+       */
+      const read = () =>
+        page.evaluate(() => {
+          const target = window.__pjsrScopeTarget ?? null;
+          const active = document.activeElement;
+          const where = (el) =>
+            !el || !el.closest
+              ? 'none'
+              : el.closest('.pjsr-toolbar-sizer')
+                ? 'sizer'
+                : el.closest('.pjsr-overflow-menu')
+                  ? 'panel'
+                  : el.closest('.pjsr-toolbar')
+                    ? 'bar'
+                    : 'outside';
+          const visible = (el) => {
+            const box = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+          };
+          const copies = [...document.querySelectorAll('[aria-label="Print pages"]')];
+          const at = where(target);
+          const print = [...document.querySelectorAll('[aria-label="Print document"]')].find(
+            (el) => where(el) === at,
+          );
+          const viewport = document.querySelector('.pjsr-viewport');
+          const range = /(\d+)[^\d]+(\d+)\s*$/.exec(print?.getAttribute('title') ?? '');
+          return {
+            focused: Boolean(target) && active === target,
+            // Which kind of loss it is: a control the toolbar destroyed when its value changed, or one that is
+            // still there with the focus taken from it. The two have different causes and different fixes.
+            inDocument: Boolean(target) && document.contains(target),
+            focusNow: active?.getAttribute?.('aria-label') ?? active?.tagName?.toLowerCase() ?? 'nothing',
+            at,
+            value: target ? target.value : null,
+            // Every copy, because a controlled select rendered twice that disagrees is its own finding.
+            copies: copies.map((el) => `${where(el)}:${el.value}`).join(' ') || 'none',
+            agree: copies.length > 0 && copies.every((el) => el.value === copies[0].value) ? copies[0].value : null,
+            title: print?.getAttribute('title') ?? null,
+            titleRange: range ? [Number(range[1]), Number(range[2])] : null,
+            fields: [...document.querySelectorAll('.pjsr-print-scope-input')]
+              .filter((el) => where(el) === at && visible(el))
+              .map((el) => Number(el.value)),
+            scrollTop: viewport ? Math.round(viewport.scrollTop) : null,
+            panel: Boolean(document.querySelector('.pjsr-overflow-menu')),
+          };
+        });
+
+      // ---- the door: Tab only ---------------------------------------------------------------------
+      const first = page.locator(`${BAR} button:visible, ${BAR} select:visible, ${BAR} input:visible`).first();
+      if ((await first.count()) === 0) {
+        fail(`the ${profile.viewport.width}px bar holds no focusable control to tab from, so the keyboard door to the print scope cannot be asked about`);
+      }
+      await first.focus();
+      const trail = [];
+      let opened = false;
+      let stops = 0;
+      let reached = false;
+      for (let i = 0; i < 40 && !reached; i += 1) {
+        await page.keyboard.press('Tab');
+        stops += 1;
+        const at = await page.evaluate(() => {
+          const el = document.activeElement;
+          const label = el?.getAttribute?.('aria-label') ?? null;
+          if (label === 'Print pages' && !el.closest('.pjsr-toolbar-sizer')) {
+            window.__pjsrScopeTarget = el;
+            return 'target';
+          }
+          return label ? `${el.tagName.toLowerCase()}[${label}]` : (el?.tagName?.toLowerCase() ?? 'nothing');
+        });
+        trail.push(at);
+        if (at === 'target') {
+          reached = true;
+          break;
+        }
+        /*
+         * A menu button is opened with Enter the way it is with a pointer, and the panel's controls sit next in
+         * DOM order — so the walk continues into it rather than treating the fold as the end of the tab order.
+         */
+        if (at.endsWith('[More controls]') && !opened) {
+          await page.keyboard.press('Enter');
+          opened = true;
+          await page.waitForSelector('.pjsr-overflow-menu', { timeout: 5_000 }).catch(() => {});
+          trail.push('(Enter)');
+        }
+      }
+      if (!reached) {
+        fail(
+          `no Print pages control in the tab order after ${stops} Tab presses on ${engine} at ` +
+            `${profile.viewport.width}px — the walk read ${trail.slice(-8).join(' → ')}`,
+        );
+      }
+      const door = `${opened ? `the ⋯ panel opened with Enter, ${stops}` : `${stops}`} tab stops from the bar's first control`;
+
+      // ---- the walk -------------------------------------------------------------------------------
+      const nums = await documentPages();
+      if (nums.numPages === 0) fail(`the page count read no "of N", so the range the scope means cannot be computed`);
+      const startTop = (await read()).scrollTop;
+      const steps = [];
+      let value = (await read()).value;
+      /*
+       * Seven keys from any starting scope: two that clamp at the top, the walk down to `range` and back. The
+       * previous row leaves the scope wherever its last job put it, so the expectation is computed from the
+       * value the control actually reads rather than from a scope this row assumes it inherited.
+       */
+      for (const key of ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp', 'ArrowUp']) {
+        const index = OPTIONS.indexOf(value);
+        const next = OPTIONS[key === 'ArrowDown' ? Math.min(index + 1, 2) : Math.max(index - 1, 0)];
+        await page.keyboard.press(key);
+        let agreed = 0;
+        let last = null;
+        const started = Date.now();
+        const settled = await waitFor(async () => {
+          last = await read();
+          const arrived = last.focused && last.value === next && last.agree === next;
+          agreed = arrived ? agreed + 1 : 0;
+          return agreed >= 2 ? last : null;
+        }, 8_000);
+        if (!settled) {
+          fail(
+            `${key} from "${value}" never settled on "${next}" on ${engine} at ${profile.viewport.width}px: ` +
+              `focus ${last?.focused ? 'held' : `left for ${last?.focusNow}`} and the control ` +
+              `${last?.inDocument ? 'is still in the toolbar' : 'was destroyed by the value change'}, ` +
+              `copies ${last?.copies}, title "${last?.title}"`,
+          );
+        }
+        // The state half: what the button says it will print, against what the scope the reader chose means.
+        const want =
+          next === 'all'
+            ? [1, nums.numPages]
+            : next === 'current'
+              ? nums.currentPage
+                ? [nums.currentPage, nums.currentPage]
+                : null
+              : settled.fields.length === 2
+                ? settled.fields
+                : null;
+        if (want && (settled.titleRange?.[0] !== want[0] || settled.titleRange?.[1] !== want[1])) {
+          fail(
+            `the control reads "${next}" and the application will print ${settled.titleRange?.join('–') ?? 'nothing'} ` +
+              `(${next === 'range' ? `fields ${settled.fields.join(',')}` : `expected ${want.join('–')}`}) — ` +
+              'a scope the reader chose by keyboard that the job does not follow',
+          );
+        }
+        if (next === 'current' && !nums.currentPage && settled.titleRange?.[0] !== settled.titleRange?.[1]) {
+          fail(`"current" printed a two-page range ${settled.titleRange.join('–')} on a document whose page field this width does not show`);
+        }
+        const fieldsWanted = next === 'range' ? 2 : 0;
+        if (settled.fields.length !== fieldsWanted) {
+          fail(
+            `scope "${next}" shows ${settled.fields.length} range field(s) in the ${settled.at} ` +
+              `(values ${settled.fields.join(',') || 'none'}) where the clause wants ${fieldsWanted}: ` +
+              'a field no Tab reaches is a range nobody can type',
+          );
+        }
+        if (settled.scrollTop !== startTop) {
+          fail(
+            `the viewer scrolled ${startTop} → ${settled.scrollTop}px while the reader was stepping the print scope ` +
+              `with ${key} — the keystroke reached the page as well as the control`,
+          );
+        }
+        steps.push(`${key.slice(5)}→${next} in ${Date.now() - started} ms`);
+        value = next;
+      }
+
+      const paged = await pageChanges();
+      if (paged.length) {
+        fail(`the document paged ${paged.join(' → ')} while the reader was stepping the print scope by keyboard`);
+      }
+      const end = await read();
+      return (
+        `${door} to the select in the ${end.at}; ${steps.join(', ')}; copies ${end.copies}; ` +
+        `the job reads "${end.title}"; scroll held at ${end.scrollTop}px and no onPageChange fired`
       );
     },
   },

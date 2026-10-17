@@ -231,12 +231,20 @@ A local run of a row alone is not the runner's cell, and a wait for *unchanged* 
 that carried the correction reported from both jobs (CI run 38728971438): twelve cells, five boxes and nine controls
 in every one, settling in 129–758 ms, both jobs successful — including the 6.2.108 job that had been the red one.
 *#278's confession is gone, and #281 is still an engine finding.* #294 put the print rows' scope read-back on two
-agreeing readings of the application's own state — because trying the reader's door for real (arrow keys on the
-scope `<select>`) turned out to lose the element after one key: changing the scope re-flows the toolbar, the control
-moves between the bar and the ⋯ panel, and the second keystroke reaches the viewport, where it pages the document.
-Chromium then held a control reading "all" against a state of "current" and printed one sheet, which the old
-first-match wait was willing to ship — so the row now states its claim at exactly its strength (the sheet and the
-state, with the door the value came in by printed) and the keyboard path is open as **#302**, not as a note. The
+agreeing readings of the application's own state, and the reason that row gave for the change — that the reader's
+own door loses the control after one arrow key, because a scope change re-flows the toolbar and the focused element
+is destroyed with it — was measured on 2026-10-16 as **#302** rather than inherited, and it is false. In Chromium
+with the control inline at 1,280 px, and in all three engines with it folded at 375 px where the ⋯ button is
+reached by Tab and opened with Enter, focus stayed on the same node through every key, the value and the
+application's own title followed each step, and the viewport never moved. What does produce a control reading "all"
+against a state of "current" is a write to `el.value` that dispatches nothing: reproduced on purpose, still apart
+400 ms later, and healed by the `input` + `change` pair the row's fallback sends — so the desync was the
+instrument's, and the two-agreeing-readings settle stays because it is what lets the row claim the sheet and the
+state at exactly their strength. The keyboard door is a row of its own now, `keyboard-scope-selection`, carrying
+both halves of the retired claim as counterfactuals: keying the select by its scope reddens it as a destroyed
+control, and dropping `SELECT` from `isEditableTarget` reddens it as a key the viewer took. It is the
+twenty-third check, so §8's spelled count moved with it, and FR-45's keyboard leg now cites a door a reader uses
+instead of an automation API. The
 structure row fell into the same family on the same push: **#301** settled it on the eight declared roles, and running
 that pair exposed **#303** — the ink-editor count taken once after a scroll back, which alternates alone at home and was green in every CI cell today. *FR-49's two leftovers became #295:* profile D's harness leg is sampled three times per run, each in its own throttled context, and a test reads that count off the script and refuses anything below the number the gate needs —
 a leg the gate refuses is a leg that can never fail on a regression. The blind-leg message now prints the tolerance its
