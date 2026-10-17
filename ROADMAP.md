@@ -115,14 +115,18 @@ certified on this machine at all.
 
 Rows of the narrative table below disagree with the register, and the count is deliberately not written down
 here: it moves every time a row closes, and nothing derives it. None of the disagreements is a lie, and none of
-they will be edited by hand. They were true when written, and then the lock **added clauses underneath
+them will be edited by hand. They were true when written, and then the lock **added clauses underneath
 them**: `FR-02` says done because worker configuration was measured end to end in a real browser across four
 states — it was — and the
 rewrite asked, on top of that, for conflicting worker URLs to surface as `CONFIGURATION_ERROR`. `FR-37` says
 built because both unions are exported and produced — they are — and the lock asked for `cancelled` to be
 observable and for the page path to publish the retry it names. `FR-41` says built, and it is; the floor then
-moved to Node 22.13.0 and `engines` still says `>=20`. `FR-11` says done and has **no automated test of any
-kind**. A range is not a status, and neither is a release note.
+moved to Node 22.13.0 while `engines` still said `>=20` — it says `>=22.13.0` now, which W7 changed and
+the `packaging` job proves on three Node versions. `FR-11` said done with **no automated test of any
+kind**; it has three (`PdfThumbnail.test.tsx`, `.abort.test.tsx`, `.xfa.test.tsx`), which W8 wrote. Those
+two are kept here as the shape of the thing rather than as live disagreements, and the distinction
+matters: a row can read `done` for a reason that was true when it was written, and the lock or a later
+package then moves the ground under it. A range is not a status, and neither is a release note.
 
 So the narrative table keeps its job, which the generated block cannot do: it records *why* a row moved — the
 measurement that retired a requirement, the engine behaviour that turned out to be impossible, the premise a
@@ -341,6 +345,15 @@ source found that `0.6`, `0.7` and the signing work had shipped four capabilitie
 any of them — `PRD.md` §4 stopped at FR-28 and nobody had added a row since `0.5`. Its `Status` column
 now reads as history: the state of record is the generated block above.
 
+This table is also the assignment of record, and it does not agree with `PRD.md` §7 about which
+milestone four requirements belong to: §7 puts `FR-24` and `FR-25` in **Trust**, `FR-39` and `FR-40` in
+**Compose** and `FR-42` in **Author**, while they shipped in `0.5`, `0.11` and `0.11`. §7 delegates the
+assignment here ("Forward work is versioned internally in `ROADMAP.md`, which assigns each requirement to
+a development milestone"), and its eight milestone names are not the eleven release themes below —
+Author is `0.6` Mark plus `0.7` Edit, and `0.8` Freeze and `0.11` Index & Assemble have no §7 name at
+all. Nothing derives the mapping, so the differences are recorded rather than reconciled: the requirement
+is what ships, and the grouping is bookkeeping.
+
 | FR | Requirement | Release | Status |
 | --- | --- | --- | --- |
 | `FR-01` | Input flexibility (URL, bytes, base64, `File`/`Blob`) | `0.1` | done |
@@ -391,9 +404,16 @@ now reads as history: the state of record is the generated block above.
 | `FR-46` | SSR-safe module graph | `0.9` | **built 2026-09-30, as a test rather than a claim.** `src/lib/ssr.test.ts` runs in the node project and asserts the premise first — `document`, `window`, `HTMLCanvasElement` and `Worker` are each `typeof … === 'undefined'`, stated as its own test because a premise nobody checks is a premise that quietly stops being true when a config changes — then imports **every JS target in `package.json`'s export map** (13 modules that day), each resolved from `dist/…` back to its `src/…` file. The list is read from the map rather than typed out, so the day a fourteenth entry is added it is covered by the same loop or the loop fails to find its source and says so. **That day came:** the loop has since picked up `features/structure` and `/merge` without being edited, and it is fifteen modules wide. It also proves the helpers that *reach* for the DOM degrade instead of crashing: `resolveSourceUrl` with no `document.baseURI`, `isAllowedSource` where a path entry has no origin to bind to (a relative string still matches as text, and a cross-origin absolute does not — both pinned, because that asymmetry is the security property), and `classifySource` / `base64ToBytes` running server-side. 17 tests. **Two claims corrected on the way:** `README.md` said pdf.js "needs DOM globals at import time, so this package is client-side only" — false, and now contradicted by a passing test; and the Installation callout said the library "never touches `window` at module scope" without ever having been checked. Both now say the true, narrower thing: **importing is safe anywhere, rendering is browser-only**, so `'use client'` is about the render, and the pure helpers belong on the server where a source string actually gets decided. What is *not* claimed: SSR rendering or hydration, and `dist/` is not what the test imports (`npm test` runs before `npm run build`), so the property is proven at source level and the `0.12` browser matrix is where the shipped bundle gets its own check. **#263 amended the clause, not this row:** the boundary the gap had been circling is now stated in `FR-46` itself — the promise is this package's module scope, and server import additionally needs the peer to be importable in Node, which 6.2.108's modern entry is not (measured 2026-10-07 against both tarballs: `DOMMatrix is not defined`, while its `legacy` entry imports the same 62 names), so the row reads `met` and the host-facing remedy is named on the Installation page rather than assumed |
 | `FR-47` | Touch and gesture arbitration | `0.10` | **built 2026-10-01, and one gesture was dead.** pdf.js's `TouchManager` claims a two-finger `touchmove` with `preventDefault` and `stopPropagation` *before* it knows whether the span between the fingers changed, and this viewer answered only the zoom half — so a two-finger pan reached us, did nothing, and was taken away from the browser that would have scrolled. `onPanning` now scrolls the container by the midpoint delta; the viewport declares `touch-action: pan-x pan-y` and `overscroll-behavior: contain`, which is the only way to state the policy before a listener can win a race; the freehand layer keeps the fingers while it is armed; and a consumed gesture still bubbles with `defaultPrevented` set rather than being stopped, because starving the host's listeners is the failure the requirement names. Measured in Chromium with synthetic touches: pinch `fit-width → 1.73` with the move prevented, and a 120 px two-finger drag moving `scrollTop` by 120 with the scale unchanged. What still needs the devices of `#141` is narrower than it was: whether the browser commits to its own pan before the first `touchmove` reaches JavaScript |
 | `FR-48` | Browser and engine verification matrices | `0.12` | **built, and run in three engines on the runner.** `npm run test:browsers` (`scripts/browser-matrix.mjs`) serves the playground from source and drives the checks `scripts/browser-matrix.mjs` names — the count is derived and printed by `npm run check:docs`, and PRD §8 spells the same word — in Chromium, Firefox and WebKit at 1280×900 and a 375×812 dpr-2 mobile profile: painted ink over the whole canvas, backing-store density against `devicePixelRatio`, selectable text, search marks and the no-hits state, thumbnails and outline, the 1,000-page fixture's slot count, the fold at 375, keyboard paging *including* the documented `ArrowRight` exemption, wheel zoom against plain scroll, pinch against two-finger pan, forced colours, uncaught errors. What a run tallied is recorded run by run in `fr-evidence.json` under `FR-48`, deliberately **not** here: this row carried a hand-written count and a hand-written engine story, and both went stale — once by six checks, and once by claiming two engines had never started when they had. Chromium's cells skip one check, and the skip is a finding: its mobile emulation delivers no wheel events to the page at all. Firefox starts and passes on this host and on the runner. WebKit passes on the runner; on this host it launches some hours and reports `not runnable` others, which the harness files as unverified rather than as a pass. `ci.yml` grew a sixth job, `browser`, on `ubuntu-latest` with `--with-deps`, and it runs on every push to `dev`; what each run read is recorded run by run, with its CI run id, in `fr-evidence.json` under `FR-48`. No count of those runs lives in this file — the one this sentence carried was stale the day after it was written, and a stale tally reads exactly like a live one, so `node scripts/check-docs.mjs` now refuses a CI tally or a cell's `ok`/`skipped` reading typed into `ROADMAP.md` (#240). The engine axis *inside a browser* is a job rather than a wish since #194: the `browser` matrix declares `engine: ['6.2.108', '6.4.299']` and refuses a cell whose disk disagrees with that request. §8's **browser** floors are an instrument too as of #269 (`npm run test:floors`, 2026-10-09), and that reading points the other way: pinned Chromium 125, Firefox 124 and WebKit 18.0 each fail to render a document, because the engine calls `URL.parse` and `Promise.try` and evaluates `Iterator.prototype` at module scope — so those rows are not merely unevidenced, they are contradicted at the numbers §8 names, which is an amendment question rather than a job to build. Edge's per-release pass and the real-device passes (`#141`) are a different kind of evidence and are not this job |
-| `FR-49` | Benchmark fixture suite, profiles A–D | `0.12` | **A and B have fixtures and a harness; C and D have neither.** `npm run bench` (`scripts/benchmark.mjs`) serves the playground, drives the fixtures in Chromium, and keeps §6's two kinds of number apart: **bars** are structural and fail the run — bounded canvas count, canvases released rather than kept, the caps binding where they should — and **measures** are timings printed with the machine and never failed on, because §6's rule is that a maximum observed on one device is not a promise a slower one keeps. Profile A (`long-sample.pdf`): a cold page reached ink in **100 ms** — at §6's bar, not under it, which is the honest reading of one machine — with 4 canvases and 4 slots the most mounted anywhere in a forty-step pass and no blank sample. Profile B (`scan-sample.pdf`, new: `scripts/make-scan-pdf.mjs`, twelve 2550×3300 RGB scans, 0.82 MB on disk and 8.4 MP per page decoded): **25 % ink** per page where a text page manages 0.5 %, cold page 25 ms, 3 canvases and 3 slots at the peak. The most useful result is which ceiling actually binds: at dpr 2 and 500 % a letter page would want 48.5 MP, the screen-relative cap on a 1280×900 display says 13.8 MP, the canvas came back at 13.8 MP rendered at **1.07× instead of 2×** — and the page still painted. Three of this script's own bars were wrong before they were right, and the file says how: a 400 % zoom on a dpr-1 desktop never engaged any cap; counting canvases that had left the DOM measured nothing, because a removed element is not in `document` to be queried; and comparing live *pixel* totals across the scroll failed on A for a reason that was not a leak — its pages have three boxes, so the count is the box-independent instrument. **Open:** profile C (vector-heavy) and D (low-memory device) have no fixture, and the harness reports that rather than reporting nothing about them |
+| `FR-49` | Benchmark fixture suite, profiles A–D | `0.12` | **All four profiles have a fixture and a harness; C and D arrived after this row was first written.** `npm run bench` (`scripts/benchmark.mjs`) serves the playground, drives the fixtures in Chromium, and keeps §6's two kinds of number apart: **bars** are structural and fail the run — bounded canvas count, canvases released rather than kept, the caps binding where they should — and **measures** are timings printed with the machine and never failed on, because §6's rule is that a maximum observed on one device is not a promise a slower one keeps. Profile A (`long-sample.pdf`): a cold page reached ink in **100 ms** — at §6's bar, not under it, which is the honest reading of one machine — with 4 canvases and 4 slots the most mounted anywhere in a forty-step pass and no blank sample. Profile B (`scan-sample.pdf`, new: `scripts/make-scan-pdf.mjs`, twelve 2550×3300 RGB scans, 0.82 MB on disk and 8.4 MP per page decoded): **25 % ink** per page where a text page manages 0.5 %, cold page 25 ms, 3 canvases and 3 slots at the peak. The most useful result is which ceiling actually binds: at dpr 2 and 500 % a letter page would want 48.5 MP, the screen-relative cap on a 1280×900 display says 13.8 MP, the canvas came back at 13.8 MP rendered at **1.07× instead of 2×** — and the page still painted. Three of this script's own bars were wrong before they were right, and the file says how: a 400 % zoom on a dpr-1 desktop never engaged any cap; counting canvases that had left the DOM measured nothing, because a removed element is not in `document` to be queried; and comparing live *pixel* totals across the scroll failed on A for a reason that was not a leak — its pages have three boxes, so the count is the box-independent instrument. **Since written (#192, #295):** profile C is `vector-sample.pdf` (`scripts/make-vector-pdf.mjs`), and D is the low-memory harness — a throttled Chromium context with a phone-class user agent at 412×915 and dpr 3, sampled three times per run so its median means something — and `benchmarks/latest.json` carries bars and measures for both. What is still open is a real device for D (§6 asks for one; `#141`) and a quiet machine: three runs of one tree on 2026-10-15 took profile A’s open-to-first-ink p50 from 439 to 652 to 1544 ms, so nothing from that host was accepted into a baseline that day |
 | `FR-50` | Published API maturity tags | `0.12` | **built.** `api-maturity.json` carries a state for each distinct name reachable from the twelve JS entries — **320** as this is written, 263 stable and 57 experimental, with the 15 withdrawn names in a `removed` ledger — and `npm run check:maturity`, the last step of `verify`, reads the surface out of `dist/` through `scripts/api-names.mjs` (shared with the §4 inventory, so the two cannot disagree about what is public) and fails on an untagged export, a tag with no name behind it, a non-stable name with no reason, or an invented fifth state; it grades nine synthetic violations against itself first, because a check that has never seen a bad input has not been shown to be a check. The classification is derived rather than decided: stable means reachable from a published entry at the `0.9.0` close, experimental means it arrived in the still-unpublished `0.10`/`0.11` — a shape cannot be learned from use that has had none. Twelve older names were moved by hand and each states its reason: the core freehand ink group (open `#124` proposes retiring it) and the four signing helpers (where the signing surface lives is open even though the capability is not). The docs site's *Stability* table is generated from the same JSON, so it cannot drift from the promise. **Not done:** the manifest is not shipped in the tarball and has no export-map subpath — a consumer reads the states from the docs, not from `node_modules` |
-| `FR-51` | Edge-case suite | `0.12` | **built and consolidated.** `src/lib/edge-cases.test.ts` is the matrix in one named place: the six shapes the requirement words — truncated mid object, xref past the end, encrypted, wrong password, rotated page, over-large page — each carrying one of exactly three outcomes (`recovers` / `refuses` / `parks`), so the distinction the reader depends on is the thing asserted rather than inferred from six files. Four rows are re-established against the engine in that process; two are cited to the file that must hold them, and the file says why: the wrong-password re-prompt loops at ~27,000 asks a second and starves every later load in the Node fake worker, and the over-large page has no fixture — its ceilings are arithmetic in `canvas.test.ts`, and the honest statement of that gap is a task, not a passing test. Three guards keep the table from quietly becoming decoration: the six keys are pinned to the requirement's list, every citation must still anchor on an `it(` in the file it names, and the four in-process rows record that they ran, which an `it.skip` cannot hide. It also establishes a fact no earlier test had: `/Rotate` reaches `page.rotate` from the file and `getViewport` swaps the box (page 5 rotated, page 8 wide with no rotation, so the swap is not a reporting quirk). **Open:** an oversize-page fixture, so that row can be measured against a document rather than a formula |
+| `FR-51` | Edge-case suite | `0.12` | **built and consolidated.** `src/lib/edge-cases.test.ts` is the matrix in one named place: the six shapes the requirement words — truncated mid object, xref past the end, encrypted, wrong password, rotated page, over-large page — each carrying one of exactly three outcomes (`recovers` / `refuses` / `parks`), so the distinction the reader depends on is the thing asserted rather than inferred from six files. Four rows are re-established against the engine in that process; two are cited to the file that must hold them, and the file says why: the wrong-password re-prompt loops at ~27,000 asks a second and starves every later load in the Node fake worker, and the over-large page has no fixture — its ceilings are arithmetic in `canvas.test.ts`, and the honest statement of that gap is a task, not a passing test. Three guards keep the table from quietly becoming decoration: the six keys are pinned to the requirement's list, every citation must still anchor on an `it(` in the file it names, and the four in-process rows record that they ran, which an `it.skip` cannot hide. It also establishes a fact no earlier test had: `/Rotate` reaches `page.rotate` from the file and `getViewport` swaps the box (page 5 rotated, page 8 wide with no rotation, so the swap is not a reporting quirk). **Since written (#195):** `oversize-sample.pdf` exists (`scripts/make-oversize-pdf.mjs`), so that row is measured against a document rather than against a formula |
+| `FR-52` | Public API and export contract | `0.12`, W5/W7 | **built, one gap that is about publication history rather than code.** The export map is the authoritative surface and is checked rather than reviewed: `scripts/check-packaging.mjs` requires *and* imports all 25 targets and compares the name lists, `scripts/check-examples.mjs` compiles every unmarked example against the packed artifact (§5.6), and `api-maturity.json` classifies every published name with `check:maturity` refusing an untagged one. The gap is that 21 of those 25 subpaths have never been published — `0.1.2` shipped four (`.`, `./headless`, `./styles.css`, `./package.json`), ESM only — so the classification is a promise `1.0.0` makes rather than one it inherits |
+| `FR-53` | Dependency and engine contract | `0.12`, W1/W7 | **built.** React and `react-dom` match majors, `pdfjs-dist` is the documented 6.x contract with floor `6.2.108`, and `@cantoo/pdf-lib` is an optional peer used only by the edit and merge entries. `src/lib/pdf-write.peer-contract.test.ts` states what the writer promise means (27 members, resolved on the installed package and on live objects where the call sites hold them), and the `consumer` job asks the registry whether `^2.11.1` has grown a member, because a caret range grows by itself and nothing in the suite can see it. The one thing still missing is a tripwire for the day it does (#266 named it, and the discovery step is that tripwire) |
+| `FR-54` | Stable error and cancellation contract | `0.12`, W1 | **built.** `PdfError` and `PdfErrorCode` are published types, `cancelled` is observable on the document path rather than arriving as an ordinary failure, a published page retry names the attempt, and a refusal names the origin and never a signed URL’s query. #242 then measured the code table against what the engine can actually deliver and found one of the eighteen had no producer, so the published set is seventeen — a table that had been written from intent and was corrected from a grep |
+| `FR-55` | Worker and source security contract | `0.12`, W4 | **built.** One worker configuration applies per JavaScript realm and a conflicting second one is `CONFIGURATION_ERROR` rather than a silent last-writer-wins; the source policy is same-origin plus an explicit allowlist, with `SOURCE_NOT_ALLOWED` naming the origin; embedded JavaScript stays disabled and `enableScripting` is asserted rather than assumed |
+| `FR-56` | Feature lifecycle contract | `0.12`, W3 | **built.** A feature has a stable id, a declared dependency list, registration and cleanup, ordering, and deterministic duplicate and cyclic-dependency failures — three failure kinds, each with a test that fails when the validation is removed, which is the exit test W3 was written against. Stylesheets are declared on the feature value, so a tier’s CSS is its own published entry and never a rule in the core sheet |
+| `FR-57` | Runtime resource budget contract | `0.12`, W4 | **built.** §6.1’s budgets live in one module and are referenced from everywhere else; the effective ceiling is the *minimum* of the package default, the host budget, the probed platform-safe ceiling and the viewport-derived working set, so a host value constrains and never overrides; the platform ceiling is probed by allocating and cached per realm, with a user agent allowed to lower the probe’s starting point and never to raise it; below the 0.25 minimum the page is refused with `RESOURCE_LIMIT` rather than painted blank. `npm run bench`’s cap bars are the part that fails a run |
+| `FR-58` | Release evidence and consumer verification | `0.12`, W7/W9 | **built and never executed, which is the honest state.** `npm run check:upgrade` installs the registry’s current release into a throwaway consumer, applies the packed candidate over it and reads back the lockfile, the peer resolutions and every published name a `0.1.2` host could reach; `scripts/rc-record.mjs` writes the candidate record and refuses a leg that is absent, a `success` with no run id or artifact digest, and any attempt to write the word `certified`; `.github/workflows/release-candidate.yml` runs the seven legs against the artifact. What no job can supply is the run itself — `workflow_dispatch` and `schedule` register against the default branch, so the first candidate waits on the `dev → main` merge — or the device and screen-reader sessions §9 requires |
 
 **`FR-20` in full**, because it is the item whose answer is now split across two tiers. The default
 download offers the original bytes or pdf.js's incremental save, and `usePdfDownload`'s options say so:
@@ -403,14 +423,28 @@ the sentence stays true of the core — a host who imports only the viewer never
 parser — and the limit becomes a choice. See *0.7.0 — Edit* for the measured difference between the two
 files.
 
-**One bar, now measured.** `PRD.md` §2.1 promises "60 FPS scrolling on 1,000+ page documents with
-sub-100ms viewport render times". Until `0.7` closed, every frame-timing measurement in this project's
-history had been made on documents of 3–14 pages. `scripts/make-long-pdf.mjs` now writes a 1,000-page
-fixture with a nested page tree and three cycling page boxes, and against it in Chromium the bar is
-met: **38–55 ms** to reach and paint a cold page anywhere in the document, and **no frame over 16.7 ms**
-across a reader-speed scroll of 400 frames with two to four canvases mounted throughout. What that does
-*not* buy is a device claim — the harness ran at about 145 Hz, and no Safari or Android measurement
-exists. `0.8` closed with the desktop side done and that half still owed (`#141`), so it is now a `1.0`
+**One bar, measured twice, and the two readings do not agree.** `PRD.md` §2.1 promises "60 FPS scrolling on
+1,000+ page documents with sub-100ms viewport render times", and §6.2 restates the second half as a cold page
+under 100 ms anywhere in a 1,000-page document. `scripts/make-long-pdf.mjs` writes that fixture — 1,000 pages,
+a nested tree, three cycling page boxes — and until `0.7` closed every frame-timing measurement in this
+project's history had been made on documents of 3–14 pages. Against the long one, in Chromium, `0.7` read
+**38–55 ms** to reach and paint a cold page, with **no frame over 16.7 ms** across a reader-speed scroll of 400
+frames and two to four canvases mounted throughout, and this paragraph then said the bar was met.
+**That figure is not the release evidence, and §6.2 says so in terms:** "the previous informal 38–55 ms
+baseline is retained as historical context but is not release evidence until those fields are recorded". What
+is recorded is `benchmarks/latest.json`, which `npm run bench` writes with the machine, OS, browser, engine,
+fixture hash and date the clause asks for, and its profile A cold page reads **a median 110 ms of five samples
+(103–116 ms)** — i5-14450HX, Windows, chromium 153.0.8010.12, pdfjs-dist 6.3.289, measured 2026-10-13. That is
+above the bar, as it is on every machine that has measured it, and FR-49's row carries the miss in its own
+words rather than rounding it away (a runner read 236 ms). The frame half is weaker than the sentence above it
+claimed, for a reason the record states instead of hiding: headless has no vsync, so no frame *rate* is claimed
+at all, and the frame-gap distribution it does carry peaks at 16.8 ms on profile A and 33.3 ms on profile C.
+The miss is reported rather than failed, because §6's rule is that a maximum observed on one device is not a
+promise a slower reader's machine breaks, and because a budget may never disable functionality. So what is owed
+is a quiet machine or an amendment to the bar — **#298** — and an amendment is the owner's, not a docs edit.
+What the `0.7` harness still buys is its shape: bounded canvas counts, off-screen buffers released rather than
+kept, no blank page in a forty-step pass, and the ceiling that binds at dpr 2 / 500 %. Those are bars, they fail
+the run, and they hold. No Safari or Android measurement exists; that half is `#141`'s, and it is a `1.0`
 condition rather than a `0.8` task. See *0.7.0 — closed* for the whole table.
 
 `FR-21`–`FR-23` were added on 2026-09-24 alongside the tier decision below; `FR-24`–`FR-28` were
@@ -606,23 +640,31 @@ Every requested feature, and the release that ships it.
 
 ## Releases
 
-**How these ship (decided 2026-09-25, extended 2026-09-29 and corrected 2026-10-02).** Every release from
-`0.2` to `0.12` is committed on `dev` and kept **local**; nothing is pushed, merged to `main` or published
-along the way. When the sequence is done we push `dev`, tag `1.0.0`, merge to `main`, and publish that one
-version. **`0.1.2` was in fact published** — this paragraph said it never would be, which the specification
-lock corrected: `0.1.2` is the final pre-1.0 public release, and its published surface is why the removals in
-`FR-18` have to be named in the changelog rather than just dropped. The accepted cost is unchanged: Actions do
-not run on any of this work, so `npm run verify` locally is the only gate, and the Pages docs site stays on
-0.1.x content until the final merge.
+**How these ship (decided 2026-09-25, extended 2026-09-29, corrected 2026-10-02 and again 2026-10-17).**
+The rule as first written was that every release from `0.2` to `0.12` stays local, that nothing is pushed,
+and that Actions therefore never run on any of it. **That half stopped being true when `dev` started
+carrying pushes, and the GA section below corrected it on 2026-10-13 while this paragraph did not
+follow** — which is the defect #288 exists to catch. Read from the tree instead: `origin/dev` and `dev`
+are level, `ci.yml` runs six jobs (`verify`, `docs`, `react`, `consumer`, `packaging`, `browser`) on every
+push, and each browser reading is recorded against its run id in `fr-evidence.json` rather than tallied
+here. What survives of the rule is the publication half, unchanged: no `0.x` after `0.1.2` is published,
+`0.2.0`–`0.12.0` are internal milestone labels (§7, §9), and the sequence ends with one merge to `main`,
+one tag and one npm publish of `1.0.0`. **`0.1.2` was in fact published** — an earlier version of this
+paragraph said it never would be, which the specification lock corrected: `0.1.2` is the final pre-1.0
+public release, and its published surface is why the removals in `FR-18` have to be named in the changelog
+rather than just dropped. The Pages docs site stays on 0.1.x content until the final merge.
 
-That cost is now larger than it was, and worth restating rather than letting it hide: the sequence was
+**What the corrected rule does not retract is the size of the sequence**, and that is worth restating rather
+than letting it hide: the sequence was
 seven releases when the rule was made and is **eleven** now. `0.12`'s whole theme is automated
 verification — browser and engine matrices, the fixture suite, published maturity tags, the edge-case suite —
 and the lock added seven contract requirements to it (`FR-52`–`FR-58`: the export map, the dependency and
 engine promise, the error and cancellation vocabulary, the worker and source security rule, the feature
-lifecycle, the resource budgets and the release-evidence gate), none of which can run until something is
-pushed. So the plan is to land the CI work as code on `dev`, prove it locally where a job can be proven
-locally, and accept that the first real run of any of it is the `1.0.0` push. `FR-48`'s browser matrix is the
+lifecycle, the resource budgets and the release-evidence gate), all of which run on `dev` today. So the plan
+as it stood — land the CI work as code, prove it
+locally where a job can be proven locally, and accept that the first real run of any of it is the `1.0.0`
+push — was overtaken: the jobs run on every push to `dev`, and what still waits on the merge is narrower
+and named in *The route to 1.0.0* (a dispatched or scheduled job, and the release-candidate chain). `FR-48`'s browser matrix is the
 sharpest case: it is the requirement that makes `PRD.md` §8's compatibility table true, and a table whose
 evidence has never executed is the exact defect `#141` was opened for.
 
@@ -2622,12 +2664,16 @@ features exist is a table of intentions.
   refuses a cell that is not the cell the matrix asked for; `scripts/check-docs.mjs` refuses the two jobs' axes
   drifting apart. What stays open is a reading rather than a mechanism: no runner has painted a page at the
   advertised floor yet, so the floor cell is a job that exists, not a compatibility claim that has executed.
-* **`FR-49` benchmark fixture suite. PARTLY BUILT 2026-10-02** — profiles A and B have fixtures, `npm run
-  bench` has the bars-and-measures split §6 asks for, and the §1 row carries the numbers and the three ways
-  the harness was wrong before it was right. B's fixture is new (`scripts/make-scan-pdf.mjs`: twelve
-  2550×3300 scans, 0.82 MB on disk, 8.4 MP per page once decoded, and no text operators at all — asserted in
-  `scan.test.ts`, because a fixture with a text layer on it would answer a different question with the same
-  number). C (vector-heavy) and D (low-memory device) still have no fixture, and the script says so in the
+* **`FR-49` benchmark fixture suite. PARTLY BUILT 2026-10-02, and the two missing profiles are built now** —
+  profiles A and B had fixtures and `npm run bench` had the bars-and-measures split §6 asks for, with B’s
+  fixture new at the time (`scripts/make-scan-pdf.mjs`: twelve 2550×3300 scans, 0.82 MB on disk, 8.4 MP per
+  page once decoded, and no text operators at all — asserted in `scan.test.ts`, because a fixture with a
+  text layer on it would answer a different question with the same number). C is `vector-sample.pdf`
+  (`scripts/make-vector-pdf.mjs`) and D is the low-memory harness, sampled three times per run since #295 so
+  its median means something, and `benchmarks/latest.json` carries bars and measures for all four. What the
+  script still reports honestly is the *reach* of two of them: D’s harness is a throttled desktop Chromium
+  with a phone-class user agent and not a handset (§6 asks for the device pass; `#141`), and no profile has
+  been accepted into a baseline from a quiet machine., and the script says so in the
   report.
 * **`FR-50` published maturity tags. BUILT 2026-10-02** — the manifest, the derivation, the twelve
   hand-moved names and the check that grades itself are in the §1 row. The plan said `scripts/inventory.mjs`
@@ -2640,7 +2686,17 @@ features exist is a table of intentions.
   `encrypted.test.ts`, the wrong password in `encrypted.reprompt.test.ts` (which closed with `FR-03` in
   `0.9`, retiring the earlier reading that the second prompt never arrives), rotation in `layout.test.ts`,
   and the over-large page in `canvas.test.ts`. What was missing was the *distinction* in one place, and one
-  fixture: an oversize page remains arithmetic until a document exists to measure.
+  fixture — and that fixture exists now (`oversize-sample.pdf` from `scripts/make-oversize-pdf.mjs`, #195),
+  so the sixth row is measured against a document rather than against `canvas.test.ts`’s arithmetic.
+* **`FR-52` – `FR-58`, the seven contracts the lock added. BUILT, but across W1, W3, W4, W5 and W7
+  rather than in this release’s own passes**, because each is a rule other work has to satisfy and *The
+  order of work* sequenced them that way on purpose: the error and cancellation vocabulary (W1/#196), the
+  feature lifecycle (W3/#197), the budgets and the platform probe (W4/#198), the export map and the example
+  gate (W5/#201), and the floors, matrices and packaging jobs (W7/#202, #209, #269). The
+  requirement-by-requirement table above now carries each one’s evidence and its guard, which it did not
+  when this section’s heading promised them. **`FR-58` is the one that has never executed**: its chain is
+  built and its writers refuse to lie, and a dispatched or scheduled job registers against the default
+  branch, so the first candidate run waits on the merge rather than on any code.
 * **`FR-41` dual ESM and CJS output. BUILT 2026-10-01 — the shape, the two checks and the one boundary are in the §1 row; what remains is the measurement the `packaging` job will make on three Node versions, which is the release's own hole.** Placed here rather than in `0.9` because it is a build and packaging
   concern, and the `consumer` job is what proves it — a CJS artifact that does not resolve from a packed
   tarball is worse than no CJS artifact, since it fails in a toolchain we cannot see.
@@ -3000,21 +3056,32 @@ existing `scripts/make-*-pdf.mjs`, not downloads.
   choice is to keep two small defensive reads, test both shapes in `attachments.test.ts`, and be exact in
   the docs that no *other* 5.x surface is supported or verified. What the bullet got right stands: the
   `consumer` matrix collapsed to one engine, and v5 is not advertised.
-* **v6 runtime coverage.** `0.1.2` verified 6.3.289 by hand in a browser and the CI `consumer` job now
-  builds the packed tarball against `^5` and `^6.2.108`. That coverage must be kept: every later
-  release should pass on both, and `0.7`'s writer work should be measured on 6.x, not 5.7.284.
+* **v6 runtime coverage — resolved, and the sentence this bullet carried was stale.** It said the CI
+  `consumer` job builds the packed tarball against `^5` and `^6.2.108` and that every later release should
+  pass on both. Neither half survives: FR-53 limits `pdfjs-dist` support to the documented 6.x contract
+  with floor `6.2.108`, and the job’s matrix is `engine: ['6.2.108', '6.4.299']` — the floor and the
+  latest supported 6.x, pinned to exact versions so a green run means "this pair was built against" and
+  never "whatever npm served today". That is what the peer-floor bullet directly above resolved to when v5
+  was dropped, and `scripts/check-docs.mjs` refuses the two jobs’ axes drifting apart. The coverage worth
+  keeping is therefore the two ends of the *advertised* range, refreshed at a release close; `0.7`’s
+  writer work was measured on 6.x as this bullet asked.
 * **Breaking `0.4` props.** `enablePrint` / `enableDownload` / `renderForms` change meaning when they
   become features. Permitted pre-1.0, but it must be one deliberate release with a changelog entry,
   not an incidental fallout of a refactor.
 * **Changing the unpkg default in `0.3`** is a behavior change. `CHANGELOG.md` counts only API, CSS
   token and supported-major changes as breaking, so a default flip is arguably a minor — decide it
   deliberately rather than by accident.
-* **FR-18 asks for "freehand drawing/signatures"; the engine cannot sign.** `PRD.md` FR-18 names signatures
-  alongside freehand drawing, and Spike A measured that pdf.js 6.3 will not do it: a signature editor needs
-  a `SignatureManager`, which is not among the 62 names the package root exports, and while an editor with
-  no signature data sits in the annotation storage `saveDocument()` throws — so offering the tool would put
-  a reader's download at risk for a mark they cannot complete. The resolution `0.6` takes is that the
-  requirement's drawn mark is served by ink (already shipped: freehand strokes that print and save), a
-  cryptographic `/Signature` widget is not in any release, and the PRD row stays as the customer wrote it
-  rather than being edited to match what turned out to be possible. If signatures are genuinely required,
-  they are a separate feature to price, not a toggle to flip.
+* **FR-18’s "freehand drawing/signatures" — resolved twice over, and the premise this bullet argued from
+  is gone.** It was written against a PRD whose FR-18 asked for freehand drawing and signatures and, as the
+  bullet put it, "stays as the customer wrote it rather than being edited to match what turned out to be
+  possible". The locked PRD says something else: FR-18 is *Annotations: View*, and its own words are "No
+  core drawing or pen tool is included: authoring, ink included, is provided only by FR-29 through
+  `annotateFeature`. This is also a withdrawal with a name" — the core pen left root and `/headless` in
+  W6/#200 with all fifteen names in `api-maturity.json`’s `removed` ledger. The signature half is FR-32,
+  *Visual Signing*, and it is built: a mark drawn on a pad, written into the field’s appearance stream and
+  scaled into every widget box that field declares, with a field that already carries a `/V` refused on that
+  value rather than on the presence of an appearance. What still does not exist anywhere is a
+  *cryptographic* signature, and this bullet was right about that for the wrong reason: not because the
+  engine cannot sign, but because a `/V` is a certificate operation §2.5 puts out of scope. Spike A’s
+  measurement stands as history — pdf.js 6.3 creates no signature editor, and an editor with no signature
+  data makes `saveDocument()` throw — and it is why FR-32 writes an appearance instead of offering a tool.
