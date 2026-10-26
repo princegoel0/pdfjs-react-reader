@@ -159,7 +159,7 @@ for (const [engine, rowLabel] of Object.entries(ROWS)) {
     entry.thrown = thrown.slice(0, 2);
     entry.outcome = painted > 0 ? 'renders' : below ? 'below the floor it claims' : 'does not render';
     entry.detail =
-      `chrome/firefox version that started: ${started}; header ${booted ? 'mounted' : 'NEVER MOUNTED'}; ` +
+      `browser build that started: ${started}; header ${booted ? 'mounted' : 'NEVER MOUNTED'}; ` +
       `page count "${count}"; ${painted} painted canvas(es); status "${status}"; ` +
       `Iterator=${caps.Iterator}, URL.parse=${caps['URL.parse']}, Promise.try=${caps['Promise.try']}` +
       (thrown.length ? `; threw: ${thrown[0].slice(0, 90)}` : '');

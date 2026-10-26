@@ -231,18 +231,48 @@ describe('Trusted Types', () => {
     expect(mocks.destroyed).toHaveLength(1);
   });
 
-  it('wraps a cross-origin worker URL the way pdf.js does', async () => {
+  it('wraps a cross-origin worker URL the way pdf.js does, and revokes the wrapper when the load ends', async () => {
     stubTrustedTypes();
     configureTrustedTypes('app#worker');
     stubFetch([200]);
     stubWorker();
+    const revoked = vi.spyOn(URL, 'revokeObjectURL');
     Reflect.set(globalThis, 'location', { href: 'https://app.example/index.html' });
     try {
       const owned = await createPdfWorker();
-      expect(mocks.workers[0]?.url.startsWith('signed(blob:')).toBe(true);
+      const wrapped = /^signed\((blob:[^)]*)\)$/.exec(mocks.workers[0]?.url ?? '')?.[1];
+      expect(wrapped, 'a CDN script reached the constructor through an import wrapper').toBeTruthy();
+      // §6.2: the wrapper belongs to this load, so it dies with the load and not before it — revoking at
+      // construction would race the worker's own script fetch, which reads the URL after the constructor
+      // returns. Both halves are the assertion: not-early, and not-never.
+      expect(revoked, 'revoked before the worker could read its own script').not.toHaveBeenCalled();
       owned?.dispose();
+      expect(revoked).toHaveBeenCalledTimes(1);
+      expect(revoked).toHaveBeenCalledWith(wrapped);
     } finally {
       Reflect.deleteProperty(globalThis, 'location');
+      revoked.mockRestore();
+    }
+  });
+
+  it('creates no object URL for a same-origin script, so there is nothing to revoke and nothing to leak', async () => {
+    stubTrustedTypes();
+    configureTrustedTypes('app#worker');
+    const revoked = vi.spyOn(URL, 'revokeObjectURL');
+    Reflect.set(globalThis, 'location', { href: 'https://app.example/index.html' });
+    try {
+      await ensureWorker('https://app.example/pdf.worker.mjs');
+      stubFetch([200]);
+      stubWorker();
+      const owned = await createPdfWorker();
+      expect(mocks.workers[0]?.url.startsWith('signed(blob:'), 'a same-origin script needs no wrapper').toBe(
+        false,
+      );
+      owned?.dispose();
+      expect(revoked, 'the ordinary path allocates no blob, so disposing it must not revoke one').not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(globalThis, 'location');
+      revoked.mockRestore();
     }
   });
 });

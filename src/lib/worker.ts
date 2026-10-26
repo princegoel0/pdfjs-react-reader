@@ -232,19 +232,29 @@ export function isTrustedTypesConfigured(): boolean {
   return policy !== null;
 }
 
-function sameOriginOrWrapper(src: string): string {
+/**
+ * The script URL to hand the worker constructor, plus the blob URL that has to be revoked once the load is
+ * done with it — `null` when nothing was created, which is the same-origin case and the no-DOM case.
+ *
+ * §6.2 owns the second half: an object URL belongs to whoever created it and is revoked rather than left for
+ * the lifetime of the page. Revoking here, at construction, is not an option — the worker's own script fetch
+ * reads the URL after the constructor returns — so the wrapper lives exactly as long as the port that reads
+ * it and dies in `dispose`.
+ */
+function workerScript(src: string): { url: string; blob: string | null } {
   const base = typeof location === 'undefined' ? null : location.href;
-  if (!base) return src;
+  if (!base) return { url: src, blob: null };
   try {
     const url = new URL(src, base);
-    if (url.origin === new URL(base).origin) return url.href;
+    if (url.origin === new URL(base).origin) return { url: url.href, blob: null };
     // A worker script must be same-origin, so a CDN URL is reached through an
     // import wrapper — the same trick pdf.js uses internally.
-    return URL.createObjectURL(
+    const blob = URL.createObjectURL(
       new Blob([`await import(${JSON.stringify(url.href)});`], { type: 'text/javascript' }),
     );
+    return { url: blob, blob };
   } catch {
-    return src;
+    return { url: src, blob: null };
   }
 }
 
@@ -270,7 +280,8 @@ export async function createPdfWorker(workerSrc?: string): Promise<OwnedPdfWorke
   await ensureWorker(workerSrc);
   const src = GlobalWorkerOptions.workerSrc;
   if (!src) return null;
-  const scriptURL = policy.createScriptURL(sameOriginOrWrapper(src));
+  const script = workerScript(src);
+  const scriptURL = policy.createScriptURL(script.url);
   const port = new Worker(scriptURL, { type: 'module' });
   // pdf.js declares this constructor parameter as `port?: null` in its own .d.ts
   // while accepting a `Worker` at runtime (it is the documented shared-port
@@ -281,6 +292,7 @@ export async function createPdfWorker(workerSrc?: string): Promise<OwnedPdfWorke
     dispose: () => {
       worker.destroy();
       port.terminate();
+      if (script.blob) URL.revokeObjectURL(script.blob);
     },
   };
 }

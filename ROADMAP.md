@@ -209,7 +209,7 @@ file is to point at the command rather than type a figure the next push moves.
 | §9 condition | Where it stands, read against the tree | What kind of thing closes it |
 | :--- | :--- | :--- |
 | Every accepted FR has implementation *and* verification evidence | rows still `partial` carry their gaps by name, and the gate refuses a `met` row that lists one | **P1 — code and instruments** |
-| Public error, cancellation, worker, feature, dependency and TypeScript contracts tested | the suite is green, but §3.1's no-React-in-core rule, §3.2.1's public-`any` rule and four §6.2/§5.5 prose rules are asserted by nobody | **P2 — assertions that do not exist yet** |
+| Public error, cancellation, worker, feature, dependency and TypeScript contracts tested | the suite is green, and the assertions this row once named as missing now exist: §3.1's two unguarded sentences (`src/lib/layering.test.ts`), §3.2.1's declaration boundary (a section of `scripts/check-packaging.mjs`) and §6.2's three absences plus its object-URL rule (`src/lib/injection-surface.test.ts`). What is still asserted by nobody is §6/§2.1's performance language against the committed benchmark records, and the §5.5 prose rules | **P2 — the remainder** |
 | §8's browser, accessibility, benchmark and edge-case evidence certified | `npm run test:floors` refuses for want of pinned drivers (a refusal working as designed, not a failure); the benchmark gate prints legs it cannot compare instead of counting them; FR-45's page-words contrast leg is open | **P1's tail, then a ruling (#280)** |
 | The packed artifact passes consumer, SSR, ESM/CJS and declaration checks **on a clean runner** | every one of those passes locally from the packed tarball; the runner leg has never run | **P3 — needs the merge** |
 | The release candidate built and tested on a clean runner from the packed npm artifact | the chain is built and guarded (#272) and has never executed, because `workflow_dispatch` and `schedule` are resolved against the default branch | **P3 — needs the merge** |
@@ -268,7 +268,28 @@ behind `met` rows; §3.1's no-React-in-core rule and §3.2.1's public-`any`/engi
 performance language reconciled with the committed benchmark records instead of with optimism; four §6.2/§5.5
 prose rules made gates; and every hand-typed number or citation in this file either re-derived or dated. The
 last one is the same class of defect this section just corrected in itself, which is why it stays in the plan
-rather than being called a tidy-up.
+rather than being called a tidy-up. *Since written (2026-10-23):* three of the five have landed, each with its
+counterfactuals proven rather than assumed. §3.1's two unguarded sentences are `src/lib/layering.test.ts` — the
+core glue's ban on a React *value* import (its one React import is `import type { ComponentType }`, which the
+guard classifies apart rather than allowing by silence), the glue's ban on any edge that leaves `src/lib`, and
+a headless hook's ban on rendering and on a module-scope DOM read, the last asserted by importing every hook
+where there is no DOM at all; three injected violations reddened five of its twelve cases, and the scans are
+proved non-blind because a pattern that matches nothing passes a ban vacuously. §3.2.1's declaration boundary
+is a section of `scripts/check-packaging.mjs`, which had never been cited anywhere in the tree: it scans the
+built `.d.ts`/`.d.cts` set with comments stripped, and finds exactly one `any` in a type position —
+`AnyPdfFeature`, the hatch §3.2.1 permits because it is intentional, named and identified in the reference —
+and exactly three engine names on the public surface, `AnnotationEditorUIManager`, `PDFDocumentProxy` and
+`PDFPageProxy`, imported from the published root and from nowhere deeper; both lists are asserted in both
+directions, so a stale allowance fails as loudly as a new one, and four injected violations each named
+themselves. §6.2's absences are `src/lib/injection-surface.test.ts`: no document-supplied string written as
+HTML, nothing needing `unsafe-eval`, no navigation performed here, each in its own case so one violation
+cannot hide behind another — and the object-URL rule, which is where the audit found a **real leak rather than
+a missing test**. `sameOriginOrWrapper` built a blob URL for a cross-origin `workerSrc` and nothing ever
+revoked it, so a host reloading documents against a CDN worker leaked one URL per load for the lifetime of the
+page; `workerScript` now returns the URL it allocated beside the one it hands the constructor, and `dispose`
+revokes it — not at construction, because the worker's own script fetch reads that URL after the constructor
+returns, which `worker.test.ts` asserts as both halves. What is left of P2 is the performance language and the
+§5.5 prose rules, plus the re-derivation of this file's hand-typed numbers.
 
 **P3 — the certifications, none of which is a build step.** The device pass, in the shape the toolchain table
 below describes: serial, because the plan permits one session at a time; recorded in a committed device file

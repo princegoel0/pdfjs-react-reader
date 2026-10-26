@@ -56,6 +56,19 @@
       "reviewBy": "2026-11-01"
     },
     {
+      "advisory": "GHSA-qxg6-89mg-rqv8",
+      "url": "https://github.com/advisories/GHSA-qxg6-89mg-rqv8",
+      "title": "Vitest: Code injection via unauthenticated manual mock registration",
+      "severity": "moderate",
+      "affectedRange": ">=2.1.0-beta.7 <4.1.12",
+      "packages": ["@vitest/mocker"],
+      "surface": "development",
+      "decision": "upgrade-blocked",
+      "reason": "Rung 3, and the blocker is named rather than re-derived by the next reader: the fix is `vitest@5.0.5`, two majors above the declared `vitest: ^3.0.0`, and vitest 3.2.7 pins `@vitest/mocker` to its own exact version (both read from `node_modules` today: 3.2.7), so the two names in the audit are one install and one upgrade. Clearing it means moving vitest a major, which touches every file in the suite, the a11y project’s singleFork pool configuration (#216) and the lockfile-pinned dev tree CI asserts on (#244) — the same shape GHSA-82fw-gwwq-j7x9 records beside it, and deliberately not merged with it, because a 4.x patch line that clears that one does not clear this one (this range runs to <4.1.12, that fix is named at the 4.1.11 line). The reach is the mock registry resolving a manual-mock path while a test run is driven; nothing a consumer installs contains it — `npm audit --omit=dev` reports a clean production surface, and no published file imports vitest.",
+      "reviewedOn": "2026-10-22",
+      "reviewBy": "2026-11-01"
+    },
+    {
       "status": "precedent",
       "advisory": "GHSA-hq66-cqwq-w95j",
       "cve": "CVE-2026-16633",

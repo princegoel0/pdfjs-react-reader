@@ -18,7 +18,7 @@
  */
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /** Every file path an export entry names, however deep the conditions go. */
@@ -276,6 +276,110 @@ if (rows.length < 2) {
 }
 
 /**
+ * §3.2.1: the declaration boundary — no accidental public `any`, and no engine internal reached by inference.
+ *
+ * Two rules the PRD states and nothing measured. "MUST NOT accidentally expose a PDF.js internal object merely
+ * because it appears in an inferred TypeScript type" is invisible to every other check here: the declarations
+ * compile, the two formats agree on their names, the tarball resolves — and an engine class inferred into a
+ * public prop would pass all of them while handing a host a type whose shape an engine minor may change, which
+ * is why §5.5 makes that a breaking change to *our* surface. "MUST ship declarations without accidental public
+ * `any`" is the same failure in a different hat, and §3.2.1 leaves exactly one exception: an escape hatch that
+ * is intentional, named and documented.
+ *
+ * Both are therefore asserted as a set that has to match in both directions. A name arriving fails, and an
+ * allow-listed name that has stopped appearing fails too, because a stale allowance is a hole nobody is looking
+ * through any more — the same two-sided shape FR-23's marker rule uses.
+ */
+const declarationFiles = [];
+(function walkDeclarations(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) walkDeclarations(path);
+    else if (/\.d\.[cm]?ts$/.test(entry.name)) declarationFiles.push(path);
+  }
+})(join(root, 'dist'));
+
+/** The only `any` §3.2.1 permits on the public surface: intentional, named, and identified in the reference. */
+const ANY_HATCHES = ['AnyPdfFeature'];
+
+/** The raw engine types deliberately part of the public surface, which §3.2.1 says documentation must identify. */
+const ENGINE_SURFACE = ['AnnotationEditorUIManager', 'PDFDocumentProxy', 'PDFPageProxy'];
+
+/** Repo-relative with forward slashes, so a failure names a path a reader can open on any platform. */
+const repoPath = (path) => relative(root, path).split(/[\\/]+/).join('/');
+
+/** Comments removed, so a doc comment reasoning about `any` is not read as a type position. */
+const stripComments = (text) =>
+  text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/[^\n]*/g, '$1');
+
+console.log('\ndeclaration boundary (§3.2.1)');
+if (!declarationFiles.length) fail('dist holds no declaration files, so there is nothing to scan');
+
+let proseAny = 0;
+const unexplainedAny = [];
+const hatchesSeen = new Set();
+const engineNames = new Set();
+const engineSpecifiers = new Set();
+
+for (const file of declarationFiles) {
+  const text = readFileSync(file, 'utf8');
+  const code = stripComments(text);
+  proseAny += (text.match(/\bany\b/g) ?? []).length - (code.match(/\bany\b/g) ?? []).length;
+  code.split('\n').forEach((line, index) => {
+    if (!/\bany\b/.test(line)) return;
+    const hatch = ANY_HATCHES.find((name) => new RegExp(`\\b(?:type|interface)\\s+${name}\\b`).test(line));
+    if (hatch) hatchesSeen.add(hatch);
+    else unexplainedAny.push(`${repoPath(file)}:${index + 1} ${line.trim().slice(0, 90)}`);
+  });
+  for (const match of code.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"](pdfjs-dist[^'"]*)['"]/g)) {
+    engineSpecifiers.add(match[2]);
+    for (const name of match[1].split(',').map((part) => part.trim()).filter(Boolean)) engineNames.add(name);
+  }
+  for (const match of code.matchAll(/import\s+['"](pdfjs-dist[^'"]*)['"]/g)) engineSpecifiers.add(match[1]);
+}
+
+for (const position of unexplainedAny) fail(`public \`any\` in no named hatch: ${position}`);
+for (const hatch of ANY_HATCHES) {
+  if (!hatchesSeen.has(hatch)) {
+    fail(`${hatch} is allow-listed as a documented escape hatch, but no declaration declares it any more`);
+  }
+}
+for (const specifier of engineSpecifiers) {
+  if (specifier !== 'pdfjs-dist') {
+    fail(`a declaration reaches into the engine's internals through '${specifier}'; the published root is the only door`);
+  }
+}
+const inferred = [...engineNames].filter((name) => !ENGINE_SURFACE.includes(name));
+const stale = ENGINE_SURFACE.filter((name) => !engineNames.has(name));
+if (inferred.length) {
+  fail(`an engine type reached the public surface by inference: ${inferred.join(', ')} — §3.2.1 asks whether that is deliberate, and the answer has to be written down before it ships`);
+}
+if (stale.length) fail(`${stale.join(', ')} is allow-listed as deliberately public, but no declaration imports it`);
+
+// The "identified" half of the clause, checked rather than assumed: CODE_REFERENCE.md is the as-built API
+// reference the PRD names as the record of every export, so a deliberately public engine type or a named
+// escape hatch that it does not mention is a surface a host cannot read about.
+const reference = readFileSync(join(root, 'CODE_REFERENCE.md'), 'utf8');
+for (const name of [...ENGINE_SURFACE, ...ANY_HATCHES]) {
+  if (!reference.includes(name)) {
+    fail(`${name} is public and §3.2.1 requires it to be identified; CODE_REFERENCE.md never mentions it`);
+  }
+}
+
+// The scan's own health. These declarations discuss `any` in prose constantly, so a strip that silently
+// stopped working would judge every one of those mentions as a type position — and a set-equality that passed
+// because nothing was ever imported is indistinguishable from a correct one unless the scan is seen to find
+// something.
+if (proseAny < 5) fail(`expected the declarations to mention "any" in prose as well as in types; the strip removed ${proseAny}`);
+if (!engineNames.size) fail('the scan found no engine import at all, so the surface equality above proves nothing');
+if (!failed) {
+  console.log(
+    `  ok    ${declarationFiles.length} declaration files: no public \`any\` outside ${ANY_HATCHES.join(', ')}, ` +
+      `engine surface exactly ${ENGINE_SURFACE.join(', ')} and only from the published root`,
+  );
+}
+
+/**
  * The boundary the build cannot cross: `pdfjs-dist` is ESM-only with no `exports` map, so a `require()`
  * that reaches it depends on Node's own `require(esm)` support. Reported here so the version this ran on is
  * in the log next to the verdict, and so a future failure says which side of the boundary broke.
@@ -285,7 +389,8 @@ console.log(`\nran on node ${process.version}; ${jsPaths.length} JS subpaths che
 if (failed) {
   console.error(
     '\nA published surface is wrong: a format, its types, its names (FR-41), an export-map key that is ' +
-      'not one of the classes §4.10 lists (FR-52), or a side-effects list that exempts JavaScript (FR-22).',
+      'not one of the classes §4.10 lists (FR-52), a side-effects list that exempts JavaScript (FR-22), ' +
+      'or a declaration that publishes an `any` nobody named or an engine type nobody decided on (§3.2.1).',
   );
   process.exit(1);
 }
