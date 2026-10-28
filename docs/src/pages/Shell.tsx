@@ -8,7 +8,7 @@ const PROPS: [string, string, string][] = [
   ['find', 'PdfFindController', 'Replace the finding strategy, keep the find bar. Any object shaped like `usePdfSearch`’s result works — a server-side index, a stemmed or fuzzy matcher. The marks, the counter and Enter/Shift+Enter all read your answers.'],
   ['workerSrc', 'string', 'Pins the pdf.js worker location. Auto-detected when omitted.'],
   ['assetUrl', "'cdn' | string", 'Root for cmaps/, standard_fonts/ and wasm/. Defaults to a version-pinned unpkg root; pass a directory you serve.'],
-  ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Unrestricted by default; pass ["*"] to say so out loud.'],
+  ['allowedSources', 'readonly string[]', 'URLs a string src may point at: prefixes, bare origins, or same-origin paths. Byte inputs are always accepted. Today an unset option places no restriction (`[\'*\']` says so explicitly rather than by omission) — so pass a list for any URL you did not author. FR-55 asks for same-origin by default with cross-origin opt-in; until that default is built, the omission is the host\'s own risk, recorded in CODE_REFERENCE §20.'],
   ['httpHeaders', 'Record<string, string>', 'Request headers for a URL src — an `Authorization` bearer, a signed-URL token, a tenant id. Forwarded to the engine’s fetch verbatim, never logged and never echoed into an error. Read when a load starts, so an inline literal does not reload the document; reopen the URL to apply new ones.'],
   ['withCredentials', 'boolean', 'Send cookies and HTTP auth for a cross-origin URL src.'],
   ['rangeChunkSize', 'number', 'Bytes per range request; the engine’s default applies when omitted.'],

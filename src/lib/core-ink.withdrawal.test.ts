@@ -265,3 +265,38 @@ describe('FR-18: the removal is recorded, not merely done', () => {
     expect(Object.keys(inventory.tags).length).toBeGreaterThan(300);
   });
 });
+
+describe('FR-18: the consumer documents say the pen belongs to the feature', () => {
+  /*
+   * Every case above reads `src/`, and that is how this one nearly escaped: the names left the barrels, the
+   * ink left the print path, and `README.md` went on offering "Freehand ink without the feature … it prints"
+   * for weeks afterwards — the exact defect the withdrawal exists to close, restated to the people choosing
+   * the package. A host reads the documentation first, so the documentation is the half of a withdrawal that
+   * rots without anyone noticing, and a scanner over `src/` cannot see it.
+   */
+  const DOCS = ['README.md', 'docs/src/pages/Features.tsx', 'docs/src/pages/Headless.tsx'];
+  const BANNED: Array<[RegExp, string]> = [
+    [/freehand ink without the feature/i, 'Freehand ink without the feature is stored in PDF user space'],
+    [/ink, zoom, rotation/i, 'pages, selectable text, search, thumbnails, ink, zoom, rotation, layout'],
+  ];
+
+  it('finds no document offering a core pen', () => {
+    const hits = DOCS.flatMap((file) =>
+      BANNED.filter(([pattern]) => pattern.test(read(file))).map(([pattern]) => `${file}: ${pattern}`),
+    );
+    expect(hits, 'FR-18 withdrew the core ink; a document still offering it re-promises silently lost marks').toEqual([]);
+  });
+
+  it('bans sentences it can actually match, and leaves the feature ink alone', () => {
+    // Two directions, or the case above is decoration: each pattern has to fire on a sentence shaped like
+    // the one it exists to catch, and the documents have to keep talking about ink — the annotate tier's
+    // ink is the surviving half of the requirement, and a guard that silenced that would be worse than the
+    // drift it prevents.
+    for (const [pattern, control] of BANNED) {
+      expect(pattern.test(control), `the ban ${pattern} does not match its own example`).toBe(true);
+    }
+    const readme = read('README.md');
+    expect(readme, 'the documents must still describe ink authoring').toMatch(/ink/);
+    expect(readme, 'and the withdrawn surface is named as withdrawn, not hidden').toMatch(/FR-18/);
+  });
+});

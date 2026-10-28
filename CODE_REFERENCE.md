@@ -95,7 +95,10 @@ reports the worse of the two. Decimal kB. Reproduced by `npm run size`.
 | `dist/merge.js` on its own | 1.60 | — |
 | one language file (`de` / `es` / `fr`) | 2.40 / 2.39 / 2.42 | — |
 
-**The baseline was re-accepted at the `0.11` close, so every number above equals `npm run size` today.**
+**These figures are the `0.11`-close snapshot, dated, and they are not what `npm run size` prints now** —
+core read 29.09 kB there against **33.39 kB** on the 2026-10-26 build. The live numbers are the ones the
+gate writes: `docs/src/size-figures.json`, rendered by the docs site and quoted in `README.md`'s two size
+tables, both held to that file row by row by `npm run check:docs`, so nothing here is re-typed again.
 Core moved **+1.08 kB** since `0.10` (28.01 → 29.09) and the root `index.js` path **+1.61** (59.14 → 60.75),
 which is more than a release whose shell changes are two search labels and a partial-answer counter should
 cost. The column that explains it is *Over core*: every feature's cost is within a few tens of bytes of what
@@ -371,7 +374,7 @@ From `src/components/PdfViewer.tsx`. Anything not marked required has a sensible
 | --- | --- |
 | `src` *(required)* | URL, relative path, `File`/`Blob`, `ArrayBuffer`, `Uint8Array`, a `data:` URL, or raw base64. All six shapes are normalised in `src/lib/source.ts`. |
 | `workerSrc` | Where pdf.js's worker script lives. Omit it and the package finds it (see §10). |
-| `assetUrl` | Where cMaps and standard fonts live. Defaults to your own origin; a string or `{ cMaps, standardFonts }`. |
+| `assetUrl` | Root for cMaps, standard fonts and wasm. Defaults to a unpkg root pinned to the engine version (`'cdn'` names that default); any other string is a root you serve, holding those three folders as pdf.js calls them. `cMapUrl` and `standardFontUrl` override one of the three. There is no automatic self-hosted discovery: pdf.js concatenates a *directory* with a filename at runtime, and a bundler only emits files it was told about by name (§10). |
 | `allowedSources` | A security option: list of path prefixes `src` may be. Anything else is refused **before a request is made**. Does not apply to bytes you pass directly. |
 | `enableXfa` | LiveCycle form rendering. **On by default**, and that carries a risk: a document whose template pdf.js can't lay out fails to load instead of showing a blank page. |
 
@@ -554,7 +557,11 @@ Freezing them is a contract change deliberately held back for `1.0` (§20). The 
 3. The worker is resolved **once per page, not per document** (`src/lib/worker.ts`):
    * an explicit `workerSrc` always wins, and it writes pdf.js's **process-global**
      `GlobalWorkerOptions.workerSrc` — so a second viewer passing its own value changes what every
-     *later* load resolves to, while already-open documents keep their worker;
+     *later* load resolves to, while already-open documents keep their worker. Passing **two different
+     URLs while both are in use is not supported**: the URL is one value per JavaScript realm, so the
+     second conflicting configuration fails with `CONFIGURATION_ERROR` naming both origins rather than
+     silently moving a live document's parsing to another worker (§3.4, FR-02, FR-55; asserted in
+     `src/headless/usePdfDocument.worker-conflict.test.tsx`).
    * `ensureWorker` probes only when `GlobalWorkerOptions.workerSrc` is **empty**, and which realms start
      that way is measured rather than assumed: every browser does, and no Node one does (`npm run
      probe:worker`, `src/lib/worker.default.test.tsx`), because pdf.js assigns the field from its own
@@ -598,12 +605,12 @@ overlay:
 
 | Layer | Notes |
 | --- | --- |
-| canvas | The page picture. Area and side clamped to §9's caps; a canvas too big to allocate **paints nothing rather than crashing**. |
+| canvas | The page picture. Area and side clamped to §9's caps; an over-large page is drawn at the **lower scale that fits**, and only a page that cannot be represented at or above §6.1's minimum render scale is refused — with `RESOURCE_LIMIT` named on the page rather than left as a blank slot. |
 | text layer | Invisible spans for selection, copy and screen readers. Its class list includes pdf.js's own **`textLayer`** — not our naming, and load-bearing: the editors find a selection's layer with `target.closest('.textLayer')`. |
 | annotation layer | Form widgets, links, popups. `role="region"` with a label so a screen reader can find it; popups are click-to-open (hover-only tooltips failed 84 px from a viewport edge with no way back). After the engine renders, `src/lib/annotation-names.ts` names whatever the document left silent — pdf.js reaches for the annotation’s `/TU` and stops, so on a file that declares none the controls arrive unnamed and axe calls it a violation in every engine at once (#267). |
 | editor layer | Only when a feature that edits is mounted. `isEditing` is passed so an armed editor doesn't paint a duplicate over the canvas copy; the repaint is gated on *this* page having editable annotations. |
 | XFA layer | A `position: absolute` child, because pdf.js's own `XfaLayer` CSS is **not** shipped — we restate the rules we depend on. |
-| structure tree | Only when `structureFeature` is mounted, the document declares itself tagged, and the page's text layer has finished. `role`d elements that `aria-owns` the text spans, appended to the canvas wrapper — **not inside the canvas**, which is where pdf.js puts its own. Measured in Chromium: our canvas is `role="img"`, and `img` makes its descendants presentational, so a tree inside it is in the DOM and nowhere in the accessibility tree. pdf.js gets away with it because its canvas is `role="presentation"`, and taking that role instead would cost the page its name. The same instance also goes to the **annotation** and **editor** layers at construction, which is how a link gets the `aria-owns` of the words it is drawn over. |
+| structure tree | Only when `structureFeature` is mounted, the document declares itself tagged, and the page's text layer has finished. `role`d elements that `aria-owns` the text spans, appended to the canvas wrapper — **not inside the canvas**, which is where pdf.js puts its own. Measured in Chromium: our canvas is `role="img"`, and `img` makes its descendants presentational, so a tree inside it is in the DOM and nowhere in the accessibility tree. pdf.js gets away with it because its canvas is `role="presentation"`, and taking that role instead would cost the page its name. The same instance also goes to the **annotation** and **editor** layers at construction, which is how a link gets the `aria-owns` of the words it is drawn over — **from `6.3.289` up**: `enableLinkOwnership` appears nowhere in `6.2.108`'s `build/pdf.mjs`, so below that boundary the link keeps its destination as its name while the heading, list, table and figure hierarchy still arrives. The tier says this about itself on `structureFeature.engineRequirements` and publishes `linkOwnershipAvailable`, so a host reads the degradation instead of discovering it (FR-43, #249). |
 
 
 Three behaviours here were measured, and they are the difference between a smooth 1,000-page document
@@ -713,7 +720,9 @@ stays visible and explains itself rather than disappearing.
 **Download.** If `annotationStorage` is empty, the **original bytes** — pdf.js's incremental save of an
 untouched document writes a damaged subset with no `/Root`. If something was edited, the incremental
 save. Never calls `saveDocument()` when the store is empty: pdf.js warns about exactly that, so a clean
-session would log a warning per write for something the reader never did.
+session would log a warning per write for something the reader never did. **A pure-XFA document is the
+exception and is refused with a reason rather than attempted** (`options.saveEdits && current.isPureXfa ===
+true` routes to the refusal, FR-33); a save is never a flatten, and the two are named distinctly (FR-20).
 
 **Forms.** Widgets are collected once and grouped by field (radio buttons share one name). Values live
 in pdf.js annotation storage, which is why printing and saving carry them with no extra plumbing.
@@ -749,7 +758,10 @@ is broken.
   be wrong. **Split is two arrangements from one `saveDocument()`** and must work with no plan at all
   ("split here at page 10" is the common case). Two files rather than N, because a fourth download in one
   click is a browser permission the viewer can't earn.
-* **Flatten** bakes every mark and field value into the page. It also now gives any signature widget
+* **Flatten** turns supported widgets and supported signature appearances into page content — what the
+  reader actually filled in. Markup annotations (highlight, text markup, ink, free-text) are carried
+  through as annotations rather than redrawn, because a flatten that fakes an appearance it cannot
+  reproduce is worse than one that leaves the mark alone (FR-31). It also now gives any signature widget
   *without* an appearance an empty one first — because `flatten()` demands each widget's `/N` and threw
   `Unexpected N type: undefined` on any unsigned form, which is what an unsigned form looks like. That
   was a live defect from `0.7`, found by the signing fixture rather than by a reader.
@@ -1327,9 +1339,14 @@ defined` from the engine's own module scope and prints "Please use the `legacy` 
 24.21.0, which has no `DOMMatrix` global of its own. In a browser `6.2.108` loads and 22 of the matrix's 23
 Chromium checks pass, but `pinch-vs-pan` fails because that release's `TouchManager` has no `onPanning` (zero
 occurrences in its `build/pdf.mjs` and in its `.d.ts`), so the second finger's `touchmove` is preventDefaulted
-and nothing is handed back. Two requirements carry that as a named gap — FR-46's Node-side import and FR-47's
-pan half — and the peer-range question itself is open (task #211: move the floor to `^6.3.289`, or scope those
-two promises and say where).
+and nothing is handed back. Two requirements carry it, and both now say so in the contract rather than as an
+open question: **FR-46** states its own boundary — this package's module scope is the promise, and server-side
+import additionally needs the peer to be importable in Node, which holds from `6.3.289`, so a host pinned to
+the floor is named the engine's `legacy` alias on the Installation page instead of being assumed to work —
+and **FR-47**'s pan half is closed in code by `src/lib/touch-pan.ts`, which asks the installed engine whether
+it reports panning and pans the document itself when it does not (measured in Chromium at `6.2.108`, 2026-10-05).
+The owner decided on 2026-10-05 that **the advertised floor stays at `^6.2.108`** and these two gaps are the
+package's to close rather than the range's to narrow, so #211 is decided, not open.
 
 The 5.x *data shapes* in `src/lib/attachments.ts` are still tolerated, by decision rather than
 oversight — deleting them would turn a graceful "nothing to fetch" into a throw inside pdf.js's click
@@ -1342,6 +1359,7 @@ handler — but **no other 5.x surface is supported or tested**, and `PRD.md`'s 
 | Item | State |
 | --- | --- |
 | **Real-device matrix** (`#141`) | **Never run.** §8 puts iOS Safari 18 and Android Chrome 125 in the contract; every frame number in every document is Chromium on one Windows machine at ~145 Hz. The `:has()` container-query fallback is written but has never executed on a Safari. Either it gets run or the device claims come out |
+| **The same-origin source default** (FR-55, §6.2) | **Not built.** §6.2 says same-origin absolute and relative URLs are allowed by default and a cross-origin URL needs an explicit `allowedSources` entry, and FR-55 repeats it. `normalizeSource` (`src/lib/source.ts:321`) applies the check **only when the host passes a list**, so an omitted option leaves any origin loadable — a host rendering a URL it did not author gets no protection it was told it had. Byte inputs are correctly always accepted, and `['*']` already means "no restriction, stated out loud", so the work is one default plus the tests that pin it, not new surface. `Shell.tsx` documents the shipped behaviour and points here |
 | **Accessibility audit** (`#143`) | **Built in `0.10`, and it earned its keep**: axe-core over the shell's three document states, the sidebar on each tab, the search bar, four primitives and the real `PdfPage`, in the suite and as a named CI step (§17). Its first run reported `aria-required-children` on the sidebar's tablist — a close button among the tabs — which eleven earlier accessibility test files had walked past. What is left is what no audit under jsdom can see: contrast and target size need a layout, and an assistive technology has to be the reader |
 | **Whether a screen reader sees the tree** | **Not established.** The DOM is verified in Chromium (14 role nodes across the fixture's two pages, every `aria-owns` resolving to a real element, the figure's `/Alt` as its name), but the accessibility snapshot available here *filters unnamed nodes*, and pdf.js's heading and list elements carry no name of their own — they own their text by reference. So "a screen reader announces these as headings" is a claim for the `0.12` device matrix with a real AT, not something this pass proved |
 | **Core freehand ink retirement** (`#124`, executed as `#200`) | **Done at FR-18.** The shell's own ink duplicated `annotate`'s and only `annotate`'s survives a save, so the core surface is withdrawn: fifteen published names, the toolbar's `draw` control, the transient print composite and the core sheet's drawing chrome. Recorded in `api-maturity.json` under `removed`, listed in `CHANGELOG.md`, guarded by `src/lib/core-ink.withdrawal.test.ts` |

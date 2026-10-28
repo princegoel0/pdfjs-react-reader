@@ -235,7 +235,7 @@ export function Api() {
             <td>
               <code>PasswordPrompt</code>
             </td>
-            <td>The modal an encrypted document arrives with: the field, the wrong-password message, the cancel.</td>
+            <td>The prompt an encrypted document arrives with — the field, the wrong-password message, the cancel. It replaces the page area inside the viewport rather than opening a modal or an overlay, so nothing outside the viewer is claimed.</td>
           </tr>
           <tr>
             <td>

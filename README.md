@@ -34,7 +34,7 @@ export function Report() {
 ```
 
 `<PdfViewer src="…" />` on its own is a viewer that reads: pages, selectable text, search,
-thumbnails, ink, zoom, rotation, layout. Print, save, fillable form widgets, the bookmarks tab, the
+thumbnails, zoom, rotation, layout. Print, save, fillable form widgets, the bookmarks tab, the
 layers tab, the attachments tab and marking up the document are `printFeature`, `downloadFeature`,
 `formsFeature`, `outlineFeature`, `layersFeature`, `attachmentsFeature` and `annotateFeature`. Moving,
 turning, deleting, extracting and splitting whole pages is `editFeature`, which also draws a signature into a form's signature field. Combining pages from two documents into a third file
@@ -63,8 +63,10 @@ Core, in every import of the shell:
   `annotateFeature` turns that layer into an editor: highlight, free text and ink, a colour chosen from
   the engine's own palette, and a Delete that is live only while a mark is selected. The marks are real
   PDF annotations, so they survive zoom, rotation and scrolling a page out of the way, and
-  `downloadFeature` writes them into the file. Freehand ink without the feature is stored in PDF user
-  space, so zoom and rotation both map correctly, and it prints.
+  `downloadFeature` writes them into the file. There is no pen without the feature: the core freehand
+  surface that shipped at `0.1.2` is withdrawn (FR-18), because two ink paths means one of them does not
+  survive a save, and a reader who drew with the wrong one would lose the mark silently. Printing carries
+  the marks `annotateFeature` persisted, which is why they are in annotation storage before they are on paper.
 - **XFA forms render** — a pure-XFA document is painted from its template by `XfaLayer` rather than
   showing nothing, at the page size the template asks for, and search marks land on its text as they do
   on a text layer. Saving one back is not offered: measured against every `/XFA` container shape this
@@ -77,9 +79,10 @@ Core, in every import of the shell:
 - **Document structure that acts** — a link that switches a layer does switch it, and the layers panel
   agrees with it; a paperclip annotation saves the file it carries on double-click or `Ctrl/Cmd + Enter`.
 - **Encrypted documents** with a built-in password prompt you can replace.
-- **Production edges** — a canvas area ceiling (an over-large canvas paints blank rather than
-  throwing), an `allowedSources` allowlist for URLs you did not author, pdf.js support assets served
-  from your own origin, an opt-in Trusted Types policy, and a `capabilities` report of what the
+- **Production edges** — a canvas area ceiling that lowers render scale before it gives up and refuses
+  with `RESOURCE_LIMIT` rather than painting a blank slot, an `allowedSources` allowlist for URLs you did
+  not author, pdf.js support assets from a root pinned to the engine version (or one you serve), an opt-in
+  Trusted Types policy, and a `capabilities` report of what the
   opened document declares.
 - **Driven from code** — a `ref` handle (`goToPage`, `zoomTo`, `rotatePage`, `search`,
   `toggleFullscreen`, …) and change events that report what the user did rather than what mounted:
@@ -114,7 +117,7 @@ Opt-in, one import each:
 | `features/attachments` | A sidebar tab listing the files embedded in the PDF and saving any one of them. | 1.45 kB |
 | `features/annotate` | Marking up the document: pdf.js's own editor manager behind three tools — highlight, free text, ink — with a highlight colour from the engine's palette, and a Delete that is live only while a mark is selected. Undo and redo are on the state the feature publishes, so the controls are yours to place. | 2.06 kB |
 | `features/structure` | The document's own structure tree, as accessibility structure: headings, lists, tables and named figures become `role`d elements that own the words they describe, for the one class of PDF that declares them. Contributes no control and no panel — there is nothing for a reader to press — and fetches its peer payload only for a document that says it is tagged. | 0.74 kB |
-| `edit` | Whole pages, and a file that no longer depends on a reader: a **Pages** sidebar tab that moves, turns and removes pages through a plan you can step back before writing anything, then applies it, extracts the planned pages as a new file, or splits the list at any row into two. Plus **Flatten**, which bakes every mark and field value into the page so it survives a viewer with no editor to show it.
+| `edit` | Whole pages, and a file that no longer depends on a reader: a **Pages** sidebar tab that moves, turns and removes pages through a plan you can step back before writing anything, then applies it, extracts the planned pages as a new file, or splits the list at any row into two. Plus **Flatten**, which turns supported widgets and supported signature appearances into page content, so what a reader actually filled in survives a viewer with no editor to show it. Markup annotations — highlight, text markup, ink, free-text — are carried through as annotations rather than redrawn, because faking an appearance the writer cannot reproduce is worse than leaving the mark alone.
   A **Sign** section appears in that tab when the document has signature fields: draw a mark, choose a box, and it is
   written into the field's appearance. It is a picture of a signature — the file is never given a signature value, and
   a box that already holds a real one is refused rather than covered over. One of the two tiers with its own dependency — `@cantoo/pdf-lib`, an *optional* peer, imported by nothing else in the package. | 6.43 kB |
@@ -152,12 +155,13 @@ plan lives: rows move by button or by drag, each carries its own controls, the b
 | `pdfjs-dist` | `^6.2.108` | 6.3.289, the version installed here and the one CI's `verify` job runs. CI builds a throwaway consumer against `6.2.108` and `6.4.299`, and since #194 its `browser` matrix carries that same pair as an axis, so a page is painted at both ends of the range rather than only compiled: the swap happens inside the install that pins the rest of the tree, and the cell refuses to run if the disk is not the version it asked for. **The first run through it found a difference the range hides:** at `6.2.108` the engine has no link-ownership code at all (`enableLinkOwnership` appears nowhere in its `build/pdf.mjs`), so a link is not given the words it is drawn over — it does on `6.3.289` and later, and there is no published 6.x in between. #249 settled that by letting the *feature* declare its floor instead of moving the package's: `structureFeature.engineRequirements` names `6.3.289` for that one behaviour and says what happens below it, `structureFeature`’s state carries `linkOwnershipAvailable`, and `^6.2.108` stays the peer range because the rest of the tier works there. The matrix’s structure row reads the same boundary and, below it, asserts the degradation instead of the wiring — so a release that silently *gains* the ownership trips the row. Each reading is recorded under `FR-48` in `fr-evidence.json` |
 | `react` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, both verified locally. The 18 pass was re-run on 2026-09-29 with `@types/react@18`: `npm run verify` end to end — typecheck, all 449 tests then in the suite, both bundles, the size gate. The `react` matrix job has since run on CI: all four cells (18 and 19, minimum and latest patch) passed typecheck, the suite and the build on 2026-10-04 |
 | `react-dom` | `^18.0.0 \|\| ^19.0.0` | 19.3.0 and 18.3.1, swapped in alongside `react` for the same run |
-| `@cantoo/pdf-lib` | `^2.11.1`, **optional** — only `editFeature` asks for it | 2.11.1 |
+| `@cantoo/pdf-lib` | `^2.11.1`, **optional** — `pdfjs-react-reader/edit` and `pdfjs-react-reader/merge` ask for it, and nothing else in the package imports it | 2.11.1 |
 
 Nothing else at runtime — no state library, no date library, no polyfills, no CSS framework. The one
-exception is deliberately an *optional* peer: writing pages needs a PDF parser, and a viewer that never
-mounts the `edit` tier should not install one. Optional peers are not installed for you, so mounting
-that tier means adding the package yourself.
+exception is deliberately an *optional* peer: arranging or combining pages needs a PDF parser, and a viewer
+that never names either of those two paths should not install one. Optional peers are not installed for you,
+so mounting either tier means
+adding the package yourself.
 
 `pdfjs-dist` v4 is **not** supported: it has no `canvas` render parameter (its `render()` reads
 `canvasContext.canvas`), so a v4 install would show blank pages rather than fail loudly. 4.2.67 also
@@ -209,18 +213,24 @@ than repeated.
 
 ## Stability
 
-Every one of the **320** names this package publishes carries a maturity state, and the file that says so is
-[`api-maturity.json`](api-maturity.json): **263 stable, 57 experimental, none deprecated**, plus a `removed`
-ledger of the 15 names FR-18 withdrew — read 2026-10-04 from `npm run check:maturity`, which is the command
+Every one of the **323** names this package publishes carries a maturity state, and the file that says so is
+[`api-maturity.json`](api-maturity.json): **263 stable, 60 experimental, none deprecated**, plus a `removed`
+ledger of the 15 names FR-18 withdrew — read 2026-10-26 from `npm run check:maturity`, which is the command
 that recomputes it, because a count copied into a document is a count that goes stale. Stable means a
 breaking change needs a major version. Experimental means shipped, typed, and still being shaped by use — it
 may change in a minor, with a changelog line — and each experimental name records *why* it is in that state,
 which is what stops a temporary label from becoming permanent.
 
+Those tags are currently derived against `aed9fd6`, the `0.9` close, because only `0.1.0`–`0.1.2` were ever
+published and re-deriving from the installed surface would relabel names a consumer could never have
+installed against. That baseline **expires with `1.0.0`**: at the close the tags are re-derived from the
+export map `1.0.0` actually publishes, every name that moves down is named in the changelog with its reason,
+and nothing carries forward as a promise a reader could not have received (§5.5).
+
 The set is not maintained by hand. `npm run check:maturity` reads the published names out of the build and
 fails if one has no state, if a state has no name, if a non-stable name has no reason, or if the file invents
 a fifth state; it is the last step of `npm run verify` and a named step in the `verify` CI job, and it runs
-itself against nine synthetic violations
+itself against thirteen synthetic violations
 before it grades the real ones. The docs site's [API page](https://princegoel0.github.io/pdfjs-react-reader/)
 lists every non-stable name with its reason, generated from the same file.
 
@@ -491,7 +501,12 @@ export function ContractViewer({ src }: { src: string }) {
 
 Pin it when you serve the worker from a CDN or copy it into a fixed location. Importing the package is
 safe anywhere, a server bundle included — every entry point in the export map is imported with no DOM
-present and must not throw, which is a test rather than a hope. *Rendering* is browser-only: the worker
+present and must not throw, which is a test rather than a hope. The boundary is the peer's own
+importability rather than this package's hygiene: the engine's **modern** entry imports cleanly from
+`6.3.289` up, and on the advertised `6.2.108` floor it throws `DOMMatrix is not defined` from the engine's
+own module scope before any of this package's code runs, so a server host pinned to exactly that floor
+uses the engine's `legacy` alias (FR-46, and the Installation page says so).
+*Rendering* is browser-only: the worker
 and the canvas need a real document, so in Next.js the viewer lives in a `'use client'` component, while
 the pure helpers (`classifySource`, `base64ToBytes`, `resolveSourceUrl`, `normalizeSource`) stay usable on
 the server — which is where a source string usually gets decided.

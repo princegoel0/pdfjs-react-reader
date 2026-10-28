@@ -138,9 +138,10 @@ const { bytes, pages, removed } = await arrangePages(original, plan);`}</code>
         <strong>Flatten is a different thing, and it is worth knowing which one you want.</strong>{' '}
         <code>{'download({ saveEdits: true })'}</code> adds an incremental update, so the fields stay
         interactive and a mark stays an object a renderer may choose not to draw.{' '}
-        <code>flattenBytes</code> paints them into the page instead, which is what you want before
+        <code>flattenBytes</code> turns the supported widgets and signature appearances into page content instead,
+        which is what you want before
         sending a file to someone with no editor — and what you want never to do to a document someone
-        is still filling in.
+        is still filling in. Markup annotations are carried through as annotations, not redrawn.
       </p>
 
       <h2>Merge two documents into a third</h2>
@@ -226,23 +227,28 @@ onClick={() => scrollToPage(entry.pageIndex + 1)}`}</code>
       <h2>Partial loading over HTTP</h2>
       <pre>
         <code>{`<PdfViewer
-  src={{
-    url: 'https://cdn.example.com/atlas.pdf',
-    range: { start: 0, end: 65535 },
-    httpHeaders: { Authorization: \`Bearer \${token}\` },
-    withCredentials: true,
-  }}
+  src="https://cdn.example.com/atlas.pdf"
+  allowedSources={['https://cdn.example.com']}
+  rangeChunkSize={65536}
+  httpHeaders={{ Authorization: \`Bearer \${token}\` }}
+  withCredentials
 />`}</code>
       </pre>
       <p>
         The server must answer range requests. pdf.js reads the trailer first and fetches only the
-        objects a page needs, which is how a 400 MB atlas opens instantly.
+        objects a page needs, so a large file begins painting before its bytes have all arrived rather
+        than after — how much of it is on screen when the first page paints is what{' '}
+        <code>npm run bench</code> measures, and that record, not this sentence, is the claim.
       </p>
 
       <h2>Server rendering</h2>
       <p>
-        The package touches no browser globals at module scope, so importing it during SSR is safe.
-        Rendering is not: gate the component behind a client boundary or a mounted check, since the
+        The package touches no browser globals at module scope, so importing it during SSR is safe — with
+        one boundary that is the peer&apos;s rather than ours: the engine&apos;s modern entry imports
+        cleanly from <code>6.3.289</code> up, while on <code>6.2.108</code> it throws{' '}
+        <code>DOMMatrix is not defined</code> from its own module scope, so a server host pinned to that
+        floor uses the engine&apos;s <code>legacy</code> alias (FR-46).
+        Rendering is not safe either way: gate the component behind a client boundary or a mounted check, since the
         worker, canvas and <code>ResizeObserver</code> all need a DOM.
       </p>
       <pre>

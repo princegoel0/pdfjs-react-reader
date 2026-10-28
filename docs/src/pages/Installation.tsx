@@ -112,8 +112,12 @@ import { editFeature } from 'pdfjs-react-reader/edit';
           viewer that passes its own <code>workerSrc</code> changes what every <strong>later</strong>
           load on the page resolves to, while documents already open keep the worker they were given.
           Auto-detection probes once per page, however many documents load — <code>worker.test.ts</code>{' '}
-          pins that. Hosts who need two workers on one page pass an explicit <code>workerSrc</code> to
-          each, or let the first resolve and the rest inherit it.
+          pins that. Hosts who need several isolated documents on one page pass the <em>same</em>{' '}
+          <code>workerSrc</code> to each, or let the first resolve and the rest inherit it: worker{' '}
+          <em>allocation</em> is per document, but the worker <em>script location</em> is one process-global
+          value per realm, so two viewers configured with <strong>different</strong> URLs while both are in
+          use are unsupported and the conflict surfaces as a <code>CONFIGURATION_ERROR</code> naming both
+          origins rather than as a live document quietly switching workers (FR-02, FR-55).
         </li>
         <li>
           Otherwise it probes two specifiers for the worker and keeps the first URL that answers: a

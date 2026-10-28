@@ -5226,32 +5226,48 @@ of published versions.
   a supported `pdfjs-dist` or React major.
 - **MINOR** — new components, hooks, props or tokens, backwards compatible.
 - **PATCH** — bug fixes and compatibility work with no API change.
-- A new `pdfjs-dist` major is supported in a minor release when it needs no API change here, and is
-  announced in this file. Dropping a major that is still under the React/pdfjs-dist support window
-  is a breaking change and takes a major.
+- A new `pdfjs-dist` major is **not** adopted by a minor release. The engine is a peer, so its version is the
+  host's choice and our range is a contract: one supported major at a time with a published floor, a full
+  regression pass — the engine matrix in CI plus a consumer job that installs the packed tarball into a
+  throwaway app — *before* the range moves, and a documented support-range change with it. npm accepting a
+  version is not a support claim (`PRD.md` §6, FR-48, FR-53).
 - During `0.x` a **MINOR may break** the public API, and does so only as a deliberate, single-release
   change announced at the top of its entry here. `0.4.0` spent that allowance: `enablePrint`,
   `enableDownload` and `renderForms` became opt-in features (`PRD.md` FR-21), because a prop cannot
-  remove code from a bundle while an import can. No further breaking release is planned before `1.0.0`.
-- Size is governed by a **ratchet, not a ceiling**: `scripts/check-size.mjs` measures every consumer
-  path gzipped and fails the build on more than 2 % growth above the baseline committed in
-  `size-baseline.json`; accepting a growth is `npm run size:update`, which puts the new number in the
-  same diff as the code that caused it. What is asserted *besides* the ratchet is the tier boundary:
-  each built-in feature must cost **≤ 4 kB** gzipped over the core bundle, and each feature's marker
-  string must be absent from the core bundle and present in its own, measured through both esbuild and
-  Rollup, so a shell that re-imports a feature fails the build rather than quietly shipping
-  (`PRD.md` FR-23). There is **no absolute core ceiling**: the 8 kB figure carried in the PRD since
-  drafting described a prototype shell, and the real one measured 20.61 kB at `0.4.0`, which is a
-  number to ratchet against, not to renegotiate every release.
+  remove code from a bundle while an import can. No further breaking release is planned before `1.0.0`,
+  and none of `0.2.0`–`0.12.0` was ever published: those are internal milestone labels, and the next
+  public release after `0.1.2` is `1.0.0`.
+- Size is governed by a **ratchet, not a ceiling**: `scripts/check-size.mjs` measures every consumer path
+  gzipped against the baseline committed in `size-baseline.json` and **reports** growth beyond the
+  minifier's noise on the build output. It fails a number only at **200 % of its accepted size** — the one
+  growth that is not a feature: an arriving dependency, a static import of a tier, or a second copy of
+  something. Each feature's increment is measured as **core + feature − core** against that tier's expected
+  target and fails at twice the target (6 kB today; 4 kB until the signing work arrived), and each
+  feature's marker string must be absent from the core bundle and present in its own, measured through both
+  esbuild and Rollup, so a shell that re-imports a feature fails the build rather than quietly shipping
+  (`PRD.md` FR-23, §6.2). Accepting a growth is a reviewed change to the baseline in the same diff as the
+  code that caused it — `npm run size:update`. There is **no absolute core ceiling**, and no bundle or
+  performance budget may disable, degrade or omit required functionality at runtime: a budget that stops
+  feature work is a ceiling wearing another name.
 - The `docs/` site documents the latest release; older API shapes are described by the matching git
   tag rather than maintained as separate sites.
 
 ## How to pick a version
 
-1. Install `pdfjs-dist` 6.2.108 or later — that is the whole peer range as of `0.6`. Older majors are
-   not an option: 6.0.x, 6.1.x and every 5.x release carry CVE-2026-16633 (arbitrary JavaScript
-   execution on opening a malicious PDF) with no fix inside the line, and `0.6`'s editor layer cannot be
-   configured on 5.0.x at all because pdf.js passes the manager's arguments positionally.
-2. React 18 or 19 both work; nothing else is required at runtime.
-3. Pin an exact version in an application (`pdfjs-react-reader` `0.5.0`, not `^0.5.0`) until 1.0.0,
-   because 0.x minor releases may include breaking changes.
+1. Install `pdfjs-dist` `^6.2.108` — that is the whole peer range, and `6.2.108` is its published floor.
+   Older majors are not an option: 6.0.x, 6.1.x and every 5.x release carry CVE-2026-16633 (arbitrary
+   JavaScript execution on opening a malicious PDF) with no fix inside the line, and `0.6`'s editor layer
+   cannot be configured on 5.0.x at all because pdf.js passes the manager's arguments positionally.
+   Only versions covered by the documented compatibility evidence are *supported*; npm accepting a
+   semver match is not a support claim. One boundary is the engine's own, not this package's: the modern
+   entry is Node-importable from `6.3.289` up, and a server or Jest host on exactly `6.2.108` uses the
+   engine's `legacy` alias (`PRD.md` FR-46).
+2. React 18 or 19 both work, each with the matching `react-dom` major. Node is `>=22.13.0`: the peer is
+   ESM-only with no `exports` map of its own, so a `require()` reaching it needs Node's unflagged
+   `require(esm)`, and the peer's own `engines` starts at the same number. Nothing else is required at
+   runtime except the optional writer peer, `@cantoo/pdf-lib`, which only `/edit` and `/merge` import.
+3. Pin an exact version in an application until `1.0.0`, because the surface is still moving — and note
+   that the only versions an application *can* pin are `0.1.0`, `0.1.1` and `0.1.2`: `0.2.0`–`0.12.0` are
+   internal milestone labels, never published, and their work ships together as `1.0.0` once the release
+   gate passes. `0.1.0` and `0.1.1` are deprecated on npm, because each declares `pdfjs-dist: ^5.0.0` as
+   its only engine peer and `engines.node >=20` — exactly the pair this contract rules out.

@@ -170,9 +170,10 @@ export function Features() {
               every page and moves, turns and removes them through a <em>plan</em>: rows answer to buttons or to a drag,
               each carries its own controls, and nothing is written until Apply. Apply then replaces the document on
               screen with the result, Extract hands the planned pages to the save dialog as a new file, and Split cuts
-              the list at any row into two files. <strong>Flatten</strong> is the other half: it bakes every mark and
-              field value into the page, so the marks survive a reader who opens the file somewhere with no editor to
-              show them. One of the two tiers with a dependency of its own — <code>@cantoo/pdf-lib</code>, an{' '}
+              the list at any row into two files. <strong>Flatten</strong> is the other half: it turns supported widgets
+              and supported signature appearances into page content, so what a reader filled in arrives without an
+              editor to show it. Markup annotations — highlight, ink, free-text — stay annotations rather than being
+              redrawn. One of the two tiers with a dependency of its own — <code>@cantoo/pdf-lib</code>, an{' '}
               <em>optional</em> peer that nothing else imports. Merging two documents into a third is the other, and it
               lives on its own entry point instead of in a feature, because a merge is a way to get a document rather
               than a control over the one on screen: see <a href="#/recipes">Recipes</a>.
@@ -453,9 +454,13 @@ orderFeatures(list);
         </li>
       </ul>
       <p>
-        The same writer answers for <strong>Flatten</strong>, which is what makes marks survive outside a viewer:{' '}
-        <code>downloadFeature</code> can only add an incremental update, so the fields stay interactive and a mark is
-        still an object a renderer may choose not to draw. Flattening bakes them into the page. Both are one import, and
+        The same writer answers for <strong>Flatten</strong>, which is what makes a filled-in form survive outside a
+        viewer: <code>downloadFeature</code> can only add an incremental update, so the fields stay interactive.
+        Flattening turns the supported widgets and supported signature appearances into page content. Markup
+        annotations — highlight, text markup, ink, free-text — are carried through <em>as annotations</em> rather than
+        redrawn, because redrawing them is the content-stream surgery the specification puts out of scope, and a
+        flatten that fakes an appearance it cannot reproduce is worse than one that leaves the mark alone. Both are one
+        import, and
         the pure helpers — <code>arrangePages</code>, <code>flattenBytes</code>, the page-plan functions — are exported
         for a host who wants the mechanism without the panel.
       </p>

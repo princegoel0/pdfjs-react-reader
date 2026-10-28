@@ -216,9 +216,13 @@ export function Compatibility() {
               Node&apos;s rather than ours: <code>pdfjs-dist</code> is an ESM-only peer with no <code>exports</code>{' '}
               map, so a <code>require()</code> that reaches it needs a Node that can load ESM from CommonJS. That
               stopped being a question at <code>22.12.0</code>, which is why the floor below excludes everything older:
-              inside the advertised range, <code>require()</code> works, and <code>npm run check:tarball</code> proves
+              inside the advertised range <em>and on a Node at or above that floor</em>, <code>require()</code> works,
+              and <code>npm run check:tarball</code> proves
               it by installing the published tarball into a CommonJS project and resolving every path both ways —
-              <code>ERR_REQUIRE_ESM</code> fails that check rather than being excused.
+              <code>ERR_REQUIRE_ESM</code> fails that check rather than being excused. The same peer boundary as the
+              server-import row applies here: on <code>6.2.108</code> the engine&apos;s modern entry throws{' '}
+              <code>DOMMatrix is not defined</code> in Node whatever the caller&apos;s module format is, so
+              <code>require()</code> in Node is good from <code>6.3.289</code> up (FR-41, FR-46).
             </td>
           </tr>
           <tr>
@@ -284,7 +288,8 @@ export function Compatibility() {
           <tr>
             <td>Chromium (desktop and the mobile-shell emulation paths)</td>
             <td>
-              Verified. <code>npm run test:browsers</code> drives the checks <code>npm run check:docs</code> counts — a
+              Run in CI on the current build — which is §8&apos;s <em>implemented</em> label, not{' '}
+              <em>supported</em>. <code>npm run test:browsers</code> drives the checks <code>npm run check:docs</code> counts — a
               painted canvas measured as ink over the whole page, backing-store density against{' '}
               <code>devicePixelRatio</code>, text you can select, search that marks and advances, thumbnails and
               outline, virtualization of a 1,000-page document, the toolbar fold at 375&nbsp;px, keyboard paging
@@ -487,8 +492,13 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.11.0</code>. While it is pre-1.0, minor versions may contain breaking changes, so pin
-        exactly in an application. The full release entry, the development log and the versioning policy live in{' '}
+        The package is <code>0.11.0</code> — and that number names an <strong>internal milestone, not a
+        release</strong>. Only <code>0.1.0</code>, <code>0.1.1</code> and <code>0.1.2</code> were ever
+        published; <code>0.2</code>–<code>0.12</code> name the order the work was built in, and nothing in
+        them has been installable. The next public release is <code>1.0.0</code>, which publishes that whole
+        body of work together once §9&apos;s gate passes — so while the surface is pre-1.0, pin exactly, and
+        treat the <code>0.x</code> numbers in the tables below as history rather than as rungs to climb.
+        The full release entry, the development log and the versioning policy live in{' '}
         <code>CHANGELOG.md</code> at the repository root, which GitHub renders on the project home page.
       </p>
 
@@ -496,6 +506,9 @@ export function Compatibility() {
       <p>
         Every change a host had to act on, in the order it happened. Nothing here is a judgement call the library made
         quietly: each line is something an application compiling against the previous version would have had to change.
+        The version numbers are the internal milestones each change was built in — a host installing today is on{' '}
+        <code>0.1.2</code> and reaches <code>1.0.0</code> in one step, so this is the history of the surface rather
+        than a ladder of upgrades to perform.
       </p>
       <p>
         The table below is the human-readable half. The mechanical half is <code>npm run check:upgrade</code>: it
@@ -629,8 +642,9 @@ export function Compatibility() {
               otherwise.
             </td>
             <td>
-              If you are on any 0.x, the work to reach 1.0 is the seven steps above. Pin the version, and treat a minor
-              bump as a real upgrade from there on.
+              If you are on <code>0.1.2</code> — the only version a host could have installed — the work to reach
+              1.0 is the seven steps above taken <em>together</em>, because <code>0.2</code>–<code>0.12</code> were
+              never published. Pin the version, and treat a minor bump as a real upgrade from there on.
             </td>
           </tr>
         </tbody>

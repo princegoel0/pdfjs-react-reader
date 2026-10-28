@@ -282,19 +282,30 @@ export function Introduction() {
 
       <h2>Behaviour under load</h2>
       <p>
-        Size negotiates; this does not. Every figure is measured against <code>long-sample.pdf</code> — a thousand
-        pages, a nested page tree, three page sizes cycling so no single estimate flatters it — in Chromium on one
-        Windows machine, which is the honest limit of the evidence.
+        Size negotiates; this does not. Every figure below is a <em>baseline</em> — one machine&apos;s dated
+        reading that shows the bar is reachable — and never the bar itself, which §6 states and{' '}
+        <code>benchmarks/latest.json</code> records with machine, OS, browser, engine, fixture hash and date.
+        The number a document quotes is the record, not this sentence, so nothing here goes stale quietly.
       </p>
       <ul>
         <li>
-          <strong>Scrolling a thousand pages drops no frames:</strong> p50 7.0&nbsp;ms, max 14.1&nbsp;ms, none over
-          16.7&nbsp;ms at reader speed; a faster 1,100&nbsp;px/frame pass peaks at 14.0&nbsp;ms with the same result.
-          Two to four page canvases are live at any moment, and a row that leaves the viewport has its buffer released.
+          <strong>Scrolling a thousand pages keeps frame work inside the bar it claims:</strong> the
+          structural bars that <code>npm run bench</code> <em>fails the run</em> on are bounded canvas counts
+          and off-screen buffers released rather than kept, and they hold across a forty-step pass. No frame{' '}
+          <em>rate</em> is claimed, because the headless harness has no vsync — the recorded frame-gap
+          distribution is what a given machine did, printed beside its environment.
         </li>
         <li>
-          <strong>A cold page paints in 38–55&nbsp;ms</strong> wherever it is in the document, and a zoom step re-lays
-          out the text layer instead of rebuilding it — 39.8&nbsp;ms per page per step became 1.0&nbsp;ms.
+          <strong>A cold page is measured against §6&apos;s 100 ms bar, and the miss is said rather than
+          rounded away:</strong> <code>long-sample.pdf</code> — a thousand pages, a nested page tree, three
+          page sizes cycling so no single estimate flatters it — reaches a median above the bar on every
+          machine that has taken it, including a CI runner. The earlier informal 38–55&nbsp;ms reading is
+          retained as historical context only: §6.2 says so in terms, and its fields were not recorded.
+        </li>
+        <li>
+          <strong>A zoom step re-lays out the existing text layer instead of rebuilding it</strong> — 39.8&nbsp;ms
+          per page per step became 1.0&nbsp;ms on a 163-span page, and the overlay layers keep their identity
+          through the step.
         </li>
         <li>
           <strong>An expensive question is asked when it is needed, not when it is mounted.</strong> Reading a document

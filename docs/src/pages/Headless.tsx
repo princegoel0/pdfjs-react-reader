@@ -53,8 +53,11 @@ export function Headless() {
       <h1>Headless hooks</h1>
       <p className="doc-lede">
         Import from <code>pdfjs-react-reader/headless</code> and build the entire interface
-        yourself. You get the document proxy, the virtualizer, and the layer components — you choose
-        where every button lives. These are the same hooks the shell&apos;s built-in{' '}
+        yourself. You get the hooks and the pure functions — the document proxy, the virtualizer, the
+        search and layout maths, the source classifier — and you choose
+        where every button lives. The page, thumbnail and structure <em>components</em> are on the root
+        entry, which a bundler still shakes down to the names your file uses (§3.2: <code>/headless</code>{' '}
+        is hooks and pure functions only). These are the same hooks the shell&apos;s built-in{' '}
         <a href="#/features">features</a> wrap, so nothing a feature can do is closed to you.
       </p>
 
