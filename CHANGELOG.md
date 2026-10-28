@@ -1979,6 +1979,44 @@ package runs, and was verified against both tarballs on 2026-10-07 rather than r
   installed against stops being a promise the moment there is a release to install. Saying the rule without its
   end date would let 263 "stable" names ride into 1.0 on the strength of a build nobody could download.
 
+The four below came out of re-reading the documents against the locked spec rather than out of a failed
+check, and they follow the same test as the others: **a clause moves only when it contradicts itself, another
+clause, or a measurement.** Where the PRD was right and the code was not, the code is what changes — the
+same-origin source default (§6.2, FR-55), §6's 100 ms cold-page bar, and §5.6's promise that every documented
+example compiles are all open as work on the package, not as edits here.
+
+- **§2.4 Flattening** now reads "supported widgets and supported signature appearances turned into page
+  content … markup annotations are carried through as annotations rather than redrawn". **Reason:** the scope
+  bullet said "Widgets **and marks** turned into page content" while FR-31 — the clause it cites — says the
+  opposite about markup, and the writer behaves as FR-31 does. A summary that overstates the requirement it
+  points at is how three consumer pages came to promise that a reader's highlights would be baked in; the
+  requirement did not move, the sentence that paraphrased it did.
+- **FR-46** says the server-import property "**holds** from 6.3.289 up" where it said "is **certified** from
+  6.3.289 up". **Reason:** §8 defines exactly four evidence labels and states that certification is a
+  property of a release, not of a commit, and §8's own server-import row carries `implemented`. Using the
+  reserved word in a requirement made a version boundary read like a completed release certification; the
+  boundary itself is unchanged and still measured.
+- **§6.2** gained a sub-clause saying which timing comparison fails a job and which does not. **Reason:**
+  FR-49 requires "a regression is a failing job rather than a slower feeling" while §6.2's "a maximum observed
+  on one device is not a promise a slower reader's machine will break" was being read as its opposite — and
+  `ROADMAP.md` was quoting the second as if it retired the first. Both are requirements: a measure is gated
+  against the accepted baseline for **its own** environment, which is what #275 built, and it is never
+  compared across machines, and neither situation licenses disabling functionality to make a number pass.
+  The absolute targets are untouched; missing one is reported with its provenance until it is either met or
+  amended by the owner.
+- **FR-33**'s save clause is scoped to documents whose pages are **composed from the XFA template**, and the
+  mixed case is named. **Reason:** the sentence read "Saving an XFA document is refused", but §2.5 gives the
+  reason as LiveCycle packet behaviour, and §3.5's own capability model distinguishes `xfa` from `mixed` and
+  publishes `renderedFromXfa` precisely because they are different documents. Measured on the supported
+  engine with `enableXfa: true` — the option the package passes by default, without which pdf.js never sets
+  `isPureXfa` and the question is answered about a configuration nobody ships: a pure-XFA fixture's
+  `saveDocument()` **rejects**, so the refusal is what the engine forces; the hybrid fixture commits and
+  reopens with `/XFA` and `/AcroForm` both still declared. Refusing the mixed case would have withdrawn
+  FR-20's save from a reader whose form the AcroForm drives, for no protective benefit. What the measurement
+  does **not** establish — whether a value typed into the mixed document's widget survives that save — is
+  written into the clause as a gap rather than promised in either direction, because `annotationStorage`
+  cannot be driven from Node on either fixture. `src/lib/xfa.save.test.ts` holds both readings.
+
 
 ### Changed
 

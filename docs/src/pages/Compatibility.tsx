@@ -192,8 +192,13 @@ export function Compatibility() {
         </li>
       </ul>
       <p>
-        A document that declares XFA <em>and</em> AcroForm fields is the interesting middle case, and pdf.js settles it
-        the same way every time: the AcroForm wins, the packet is inert, and the save path is the ordinary one.{' '}
+        A document that declares XFA <em>and</em> AcroForm fields is the interesting middle case, and pdf.js settles
+        it the same way every time: the AcroForm wins, the packet is inert, and the save path is the ordinary one.
+        That is now measured rather than asserted — <code>xfa-hybrid-sample.pdf</code> commits and reopens with both
+        packets still declared, while the pure-XFA file&rsquo;s <code>saveDocument()</code> rejects, which is why
+        FR-33 refuses the document whose pages are composed from the template and not every document that mentions
+        XFA. What has <em>not</em> been established is whether a value typed into the mixed document&rsquo;s widget
+        survives that save, so no promise is made either way about it.{' '}
         <code>onCapabilities</code> tells you which document you have before a reader types into it.
       </p>
 
