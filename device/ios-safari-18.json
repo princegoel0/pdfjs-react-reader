@@ -1,0 +1,45 @@
+{
+  "schema": "pjsr/device-verification@1",
+  "provider": "BrowserStack Automate",
+  "device": "iPhone 16",
+  "model": "iPhone 16",
+  "os": "iOS 18",
+  "osVersion": "18.5",
+  "browser": "Safari on iOS",
+  "browserVersion": "18",
+  "sessionId": "418ffe63da830cb3454c526b91e24e98dd7b2336",
+  "sessionUrl": "https://automate.browserstack.com/builds/8e6782484a2a3fe41fb85b10cdf365fce90d190d/sessions/418ffe63da830cb3454c526b91e24e98dd7b2336?auth_token=5c32ea34662f87aba32211d8bb7382d87df924c4f5033b905f0666d3455af5a0",
+  "tunnelId": "rc1-tunnel",
+  "commit": "1f3e3ab0274bb8c76326a3b9ae25ac3122dd92ee",
+  "artifactDigest": "sha256-35af7ecbd606a0a0336debc6665ef0c5850548133818752a4198be3da0b81c47",
+  "timestamp": "2026-11-02T14:30:18.520Z",
+  "operator": "Prince Goel",
+  "status": "pass",
+  "environment": {
+    "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    "maxTouchPoints": 5,
+    "dpr": 3,
+    "screen": [
+      393,
+      852
+    ],
+    "mem": null,
+    "conn": null
+  },
+  "verdicts": {
+    "loading": "pass",
+    "navigation": "pass",
+    "search": "pass",
+    "forms": "pass",
+    "annotations": "pass",
+    "taggedStructure": "pass",
+    "touchArbitration": "pass",
+    "virtualizedInk": "pass"
+  },
+  "evidence": [
+    "BrowserStack Automate session 418ffe63da830cb3454c526b91e24e98dd7b2336",
+    "Canvas rasterised backing store: 1449460 device pixels at dpr 3",
+    "Hardware maxTouchPoints: 5",
+    "Screen resolution: 393x852"
+  ]
+}

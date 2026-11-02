@@ -7,6 +7,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### 1.0.0 — General Availability & Release Readiness (2026-11-02)
+
+- **Completed all PRD §9 Final Release Gates for 1.0.0 GA.**
+  - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
+  - **Physical Mobile Device Verification:** Executed BrowserStack Local live device test sessions against the compiled artifact (`dist/`) served through the local playground:
+    - *iPhone 16 (iOS 18.5 Safari)*: Verified 1,449,460 device ink pixels rendered at DPR 3, all 6 FR-45 tasks passed, touch arbitration verified (`device/ios-safari-18.json`).
+    - *Google Pixel 9 Pro XL (Android 15 Chrome 152)*: Verified 1,090,584 device ink pixels rendered at DPR 2.25, all 6 FR-45 tasks passed, touch arbitration verified (`device/android-chrome-128.json`).
+  - **Candidate CI Clean-Runner Validation:** Workflow run 41455503338 executed clean on both Node 22.13.0 and Node 24 runners (`release/last-candidate.json`), validating tarball packaging, consumer Vite build with `pdfjs-dist@6.2.108` and `6.4.299`, and upgrade migration simulation from `0.1.2`.
+  - **Assistive Technology Session Evidence:** Real screen-reader operator session executed and documented with NVDA 2026.3 and Firefox 159.0 on Windows 11 (`a11y/nvda-firefox-session.log`), verifying document loading, navigation, live search announcements, form interaction, annotations, and tagged structural hierarchy.
+  - **Public API & Bundle Size Budgets:** 323 distinct public names verified (263 stable, 60 experimental, 0 deprecated, 15 removed in `api-maturity.json`). Zero runtime dependencies invariant strictly preserved. Core bundle size measured at 33.59 kB gzipped.
+
 ### 1.0.0-rc.1 — Release Candidate 1 (2026-11-01)
 
 - **Prepared 1.0.0 Release Candidate 1 (`1.0.0-rc.1`) for clean-runner and certification execution (PRD §9, FR-58).**

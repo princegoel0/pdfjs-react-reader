@@ -1,0 +1,57 @@
+{
+  "schema": "pjsr/release-candidate@1",
+  "generatedAt": "2026-11-02T13:55:10.804Z",
+  "tag": "v1.0.0-rc.1",
+  "commit": "1f3e3ab0274bb8c76326a3b9ae25ac3122dd92ee",
+  "run": {
+    "id": "41455503338",
+    "url": "https://github.com/princegoel0/pdfjs-react-reader/actions/runs/41455503338"
+  },
+  "environment": {
+    "runner": "GitHub Actions 1000002273",
+    "platform": "linux x64",
+    "osRelease": "Ubuntu 24.04.5 LTS",
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "memoryGb": 15.6,
+    "node": "22.13.0"
+  },
+  "artifact": {
+    "file": "pdfjs-react-reader-1.0.0.tgz",
+    "sha256": "a7df1a2b0583ea15c9283801a7df9656c01427f8dc301de4c4e595617a1493ce"
+  },
+  "peers": {
+    "react": "^18.0.0 || ^19.0.0",
+    "pdfjs-dist": "6.3.289"
+  },
+  "legs": [
+    {
+      "leg": "verify-chain",
+      "conclusion": "success"
+    },
+    {
+      "leg": "packed-artifact-contract",
+      "conclusion": "success"
+    },
+    {
+      "leg": "examples-compile",
+      "conclusion": "success"
+    },
+    {
+      "leg": "upgrade-path",
+      "conclusion": "success"
+    },
+    {
+      "leg": "browser-matrix-from-artifact",
+      "conclusion": "success"
+    },
+    {
+      "leg": "accessibility-audit",
+      "conclusion": "success"
+    },
+    {
+      "leg": "benchmarks",
+      "conclusion": "success"
+    }
+  ],
+  "certification": "not certified — §9 is a human gate; see PRD.md §9 and ROADMAP.md W9"
+}

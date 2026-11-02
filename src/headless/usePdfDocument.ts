@@ -1,3 +1,5 @@
+import { installPolyfills } from '../lib/compat';
+installPolyfills();
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getDocument,

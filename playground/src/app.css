@@ -63,6 +63,17 @@ body {
   min-height: 0;
 }
 
+@media (max-width: 640px) {
+  .app {
+    height: auto;
+    min-height: 100vh;
+  }
+  .app-viewer {
+    min-height: 500px;
+    height: 500px;
+  }
+}
+
 .app-panel {
   flex: none;
   max-height: 28%;

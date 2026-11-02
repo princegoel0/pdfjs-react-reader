@@ -1,3 +1,5 @@
+import { installPolyfills } from './compat';
+installPolyfills();
 import { GlobalWorkerOptions, PDFWorker } from 'pdfjs-dist';
 import { PdfError, describeOrigin } from './errors';
 

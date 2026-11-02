@@ -275,4 +275,40 @@ describe('Trusted Types', () => {
       revoked.mockRestore();
     }
   });
+
+  describe('installPolyfills (compat)', () => {
+    it('provides Map.prototype.getOrInsertComputed fallback behavior', async () => {
+      const { installPolyfills } = await import('./compat');
+      installPolyfills();
+      const map = new Map<string, number>();
+      let computeCalls = 0;
+      const getVal = (k: string) =>
+        (map as any).getOrInsertComputed(k, () => {
+          computeCalls++;
+          return 42;
+        });
+      expect(getVal('a')).toBe(42);
+      expect(computeCalls).toBe(1);
+      expect(map.get('a')).toBe(42);
+      expect(getVal('a')).toBe(42);
+      expect(computeCalls).toBe(1);
+    });
+
+    it('provides Map.prototype.getOrInsert fallback behavior', async () => {
+      const { installPolyfills } = await import('./compat');
+      installPolyfills();
+      const map = new Map<string, string>();
+      const getVal = (k: string, def: string) => (map as any).getOrInsert(k, def);
+      expect(getVal('x', 'initial')).toBe('initial');
+      expect(map.get('x')).toBe('initial');
+      expect(getVal('x', 'other')).toBe('initial');
+    });
+
+    it('provides Uint8Array.prototype.toHex fallback behavior', async () => {
+      const { installPolyfills } = await import('./compat');
+      installPolyfills();
+      const bytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+      expect((bytes as any).toHex()).toBe('deadbeef');
+    });
+  });
 });

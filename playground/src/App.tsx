@@ -31,8 +31,9 @@ import 'pdfjs-react-reader/edit.css';
 import 'pdfjs-react-reader/structure.css';
 import './app.css';
 
-// The standard pdf.js test document (14 pages).
-const DEFAULT_PDF = 'https://raw.githubusercontent.com/mozilla/pdf.js/master/web/compressed.tracemonkey-pldi-09.pdf';
+// The standard pdf.js test document (14 pages), overridable via ?file=/fixtures/...
+const queryFile = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('file') : null;
+const DEFAULT_PDF = queryFile || '/fixtures/page-order-sample.pdf';
 
 // Deliberately partial: everything not listed here must keep its English
 // default, which is the behaviour a consumer relies on.
@@ -133,7 +134,10 @@ export default function App() {
     labels: germanCatalog ? DE_LABELS : german ? GERMAN : undefined,
     features,
     find: hostFind ? hostFindController : undefined,
-    onError: (err) => console.error('[playground] viewer error', err),
+    onError: (err) => {
+      console.error('[playground] viewer error', err);
+      if (typeof window !== 'undefined') (window as any).__pjsr_viewer_error = err?.message || String(err);
+    },
     onProgress: (p) =>
       setBytes(`${p.loaded} of ${p.total || '?'} bytes — ${p.percent ?? 'unknown'} %`),
     onPageChange: (page) => note(`onPageChange ${page}`),
