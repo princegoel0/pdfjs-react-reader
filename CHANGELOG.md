@@ -9,7 +9,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### 1.0.0 — General Availability & Release Readiness (2026-11-02)
 
-- **Completed all PRD §9 Final Release Gates for 1.0.0 GA.**
+- **PRD §9: the gates a machine can close are closed, and three it cannot are named below as open.** The clean-runner candidate chain has run, the packed artifact passes, the upgrade path is exercised and the device pass has been taken on real hardware; what §9 still requires is a signed screen-reader certification per pairing FR-45 names (the NVDA session is logged, the record is unsigned, and JAWS and VoiceOver have no session), a device harness that measures instead of assuming (it can record the operating system as the browser version, and it scores `touchArbitration` `pass` on both branches), and §8’s `unverified` browser rows moved by a pinned-floor job that is not yet a leg of the candidate chain. Until those are done the release is a `1.0.0` **candidate**, not a published release.
   - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
   - **Physical Mobile Device Verification:** Executed BrowserStack Local live device test sessions against the compiled artifact (`dist/`) served through the local playground:
     - *iPhone 16 (iOS 18.5 Safari)*: Verified 1,449,460 device ink pixels rendered at DPR 3, all 6 FR-45 tasks passed, touch arbitration verified (`device/ios-safari-18.json`).
