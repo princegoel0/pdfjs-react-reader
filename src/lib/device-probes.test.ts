@@ -27,7 +27,16 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const read = (p: string) => readFileSync(join(root, p), 'utf8');
+/**
+ * Read a file as LF.
+ *
+ * These assertions compare multi-line snippets (`permissions:` and the `contents: read` under it), and a
+ * checkout on `core.autocrlf=true` hands the workflow YAML back with CRLF — so a literal `'\n'` fails for the
+ * line ending and not for the permission, which is worse than no assertion because it reads like a defect in
+ * the workflow. `scripts/check-fr-evidence.mjs` carries the same rule for the same reason: a gate that
+ * disagrees by line ending is a gate somebody switches off.
+ */
+const read = (p: string) => readFileSync(join(root, p), 'utf8').replace(/\r\n/g, '\n');
 
 const safariScript = read('scripts/safari-probe.mjs');
 const androidScript = read('scripts/android-probe.mjs');

@@ -29,7 +29,10 @@ import { ABORT_ERROR_NAME, abortError, cancellationFrom, throwIfAborted } from '
 
 /** The §3.6 block, parsed from the specification rather than from memory of it. */
 function codesInPrd(): string[] {
-  const text = readFileSync(join(process.cwd(), 'PRD.md'), 'utf8');
+  // Read as LF: a checkout on `core.autocrlf=true` hands `PRD.md` back with CRLF, and a fenced block matched
+  // with a literal `\n` then fails for the line ending — which looks exactly like the specification having
+  // dropped its vocabulary. The comparison is about the codes, not about how the file's lines end.
+  const text = readFileSync(join(process.cwd(), 'PRD.md'), 'utf8').replace(/\r\n/g, '\n');
   const block = /### 3\.6 Error contract[\s\S]*?```text\n([\s\S]*?)```/.exec(text)?.[1];
   if (block === undefined) {
     throw new Error('PRD.md no longer has a §3.6 error-code block in the shape this test reads');
