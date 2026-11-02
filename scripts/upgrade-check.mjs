@@ -62,7 +62,7 @@ if (nMaj < fMaj || (nMaj === fMaj && (nMin < fMin || (nMin === fMin && nPat < fP
  * `22.13.0` appeared in the repository. Node's own `npm-cli.js` takes argv literally, so a range in a message or
  * an argument stays one argument.
  */
-const npmCli = join(process.execPath, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js');
+const npmCli = [join(process.execPath, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js'), join(process.execPath, '..', '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'), join(process.execPath, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')].find((p) => existsSync(p)) || join(process.execPath, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js');
 const step = (args, cwd, label, { echo = true } = {}) => {
   const result = spawnSync(process.execPath, [npmCli, ...args], {
     cwd,

@@ -4,13 +4,13 @@ import { configDefaults, defineConfig } from 'vitest/config';
 
 // Polyfill createZstdDecompress for Node.js <22.14.0 (undici >=8.12.0 compatibility on Node 22.13.0 floor)
 if (typeof (zlib as any).createZstdDecompress !== 'function') {
-  (zlib as any).createZstdDecompress = function createZstdDecompress() {
-    return new PassThrough();
-  };
-  (zlib as any).constants = (zlib as any).constants || {};
-  if (typeof (zlib as any).constants.ZSTD_d_windowLogMax !== 'number') {
-    (zlib as any).constants.ZSTD_d_windowLogMax = 23;
-  }
+  Object.defineProperty(zlib, 'createZstdDecompress', {
+    value: function createZstdDecompress() {
+      return new PassThrough();
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 /*

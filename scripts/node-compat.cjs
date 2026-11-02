@@ -12,12 +12,12 @@
 const zlib = require('node:zlib');
 
 if (typeof zlib.createZstdDecompress !== 'function') {
-  zlib.createZstdDecompress = function createZstdDecompress() {
-    const { PassThrough } = require('node:stream');
-    return new PassThrough();
-  };
-  zlib.constants = zlib.constants || {};
-  if (typeof zlib.constants.ZSTD_d_windowLogMax !== 'number') {
-    zlib.constants.ZSTD_d_windowLogMax = 23;
-  }
+  Object.defineProperty(zlib, 'createZstdDecompress', {
+    value: function createZstdDecompress() {
+      const { PassThrough } = require('node:stream');
+      return new PassThrough();
+    },
+    writable: true,
+    configurable: true,
+  });
 }
