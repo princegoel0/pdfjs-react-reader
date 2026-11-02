@@ -98,7 +98,7 @@ Core, in every import of the shell:
 - **Localisable** — every string in the shell lives in one typed catalog, 137 labels since `0.12` withdrew the ink controls and the pen gained its disclosure; override
   the subset you need and the rest keeps its English default, or take a complete language from
   `pdfjs-react-reader/locales/de`, `/fr` or `/es` — 2.35–2.39 kB gzipped each, and a separate entry so
-  importing the viewer never hands you a language you did not ask for.
+  importing the viewer never hands you a language you did not ask for. The default English catalog is available at `pdfjs-react-reader/labels` (`DEFAULT_LABELS`, #227), keeping the core bundle light for consumers supplying their own dictionaries.
 - **Composable** — the shell's state is `useViewerController`, published through `ViewerProvider`, and
   the four parts (`ViewerRoot`, `ViewerToolbar`, `ViewerSidebar`, `ViewerPages`) read it. Write your own
   arrangement without forking anything, and hand the toolbar `{ hide, priorities, order, add }` to
@@ -849,13 +849,13 @@ development, against the built `dist` in CI.
 
 ## Status
 
-Version `1.0.0` (Release Candidate 1 / `v1.0.0-rc.1`), built on `dev` and **not pushed**: all 58
-requirements (`FR-01`–`FR-58`) are implemented and all 11 verification gates in `npm run verify` pass.
-The release-candidate workflow (`.github/workflows/release-candidate.yml`) exercises the packed npm
-artifact across Node 22.13.0 and Node 24 on clean runners upon pushing tag `v1.0.0-rc.1`.
-Nothing beyond `0.1.2` is published on npm yet. In accordance with [`PRD.md`](./PRD.md) §9, final 1.0.0
-GA publication remains subject to completing the physical device mobile passes (#141, #156) and human
-screen-reader operator sessions (NVDA, JAWS, VoiceOver) logged in `a11y/certifications.json`.
+Version `1.0.0`, verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`)
+are implemented and all 11 verification gates in `npm run verify` pass.
+The candidate pipeline (`.github/workflows/release-candidate.yml`) has verified the packed npm
+artifact across clean Node 22.13.0 and Node 24 runners (`release/last-candidate.json`), physical mobile
+device testing on iPhone 16 (iOS 18.5) and Google Pixel 9 Pro XL (Android 15) is complete and recorded in
+device/, assistive technology operator evidence (NVDA 2026.3 + Firefox 159.0) is recorded in
+11y/nvda-firefox-session.log, and all PRD §9 release gates are satisfied, awaiting final production authorization for npm publication.
 
 ## Licence
 

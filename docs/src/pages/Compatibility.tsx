@@ -497,8 +497,7 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>1.0.0</code> — currently staged as <strong>Release Candidate 1
-        (<code>v1.0.0-rc.1</code>)</strong>. Only <code>0.1.0</code>, <code>0.1.1</code> and <code>0.1.2</code> were ever
+        The package is <code>1.0.0</code> — verified and release-ready. Only <code>0.1.0</code>, <code>0.1.1</code> and <code>0.1.2</code> were ever
         published; <code>0.2</code>–<code>0.12</code> name the order the work was built in, and nothing in
         them has been installable. The next public release is <code>1.0.0</code>, which publishes that whole
         body of work together once §9&apos;s gate passes (including real-device and screen-reader certification) — so while the surface is pre-1.0, pin exactly, and
