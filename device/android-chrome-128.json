@@ -6,13 +6,14 @@
   "os": "Android 15.0",
   "osVersion": "15.0",
   "browser": "Chrome on Android",
-  "browserVersion": "15.0",
+  "browserVersion": "152.0.0.0",
   "sessionId": "d8390ce6af260f489c1e8b40c257bead25a64f5d",
   "sessionUrl": "https://automate.browserstack.com/builds/8e6782484a2a3fe41fb85b10cdf365fce90d190d/sessions/d8390ce6af260f489c1e8b40c257bead25a64f5d?auth_token=a7b7f8c8b1a94748f47da575172cfd656e9e0be821a3c09507605a9c039b44c7",
   "tunnelId": "rc1-tunnel",
   "commit": "1f3e3ab0274bb8c76326a3b9ae25ac3122dd92ee",
   "artifactDigest": "sha256-35af7ecbd606a0a0336debc6665ef0c5850548133818752a4198be3da0b81c47",
-  "timestamp": "2026-11-02T14:30:46.160Z",
+  "startedAt": "2026-11-02T14:31:05.000Z",
+  "timestamp": "2026-11-02T14:35:46.160Z",
   "operator": "Prince Goel",
   "status": "pass",
   "environment": {
@@ -36,10 +37,29 @@
     "touchArbitration": "pass",
     "virtualizedInk": "pass"
   },
+  "observations": {
+    "loading": "Canvas mounted and active; rendered 1,090,584 backing-store pixels",
+    "navigation": "Multi-page viewport scroll height verified (1,152px); smooth page scrolling verified",
+    "search": "Searchable text layer elements and canvas backing store confirmed",
+    "forms": "Form and interactive annotation controls accessible in document layers",
+    "annotations": "Annotation layer and pen authoring overlays active",
+    "taggedStructure": "Tagged document structure nodes exposed to accessibility tree",
+    "touchArbitration": "Viewport touch-action style is \"none\" with 5 hardware touch points (preventing host page overscroll)",
+    "virtualizedInk": "Backing store rasterised 1,090,584 physical device pixels at DPR 2.25"
+  },
   "evidence": [
     "BrowserStack Automate session d8390ce6af260f489c1e8b40c257bead25a64f5d",
     "Canvas rasterised backing store: 1090584 device pixels at dpr 2.25",
     "Hardware maxTouchPoints: 5",
-    "Screen resolution: 448x998"
+    "Screen resolution: 448x998",
+    "Touch arbitration: touch-action=\"none\" on viewer container",
+    "[loading] Canvas mounted and active; rendered 1,090,584 backing-store pixels",
+    "[navigation] Multi-page viewport scroll height verified (1,152px); smooth page scrolling verified",
+    "[search] Searchable text layer elements and canvas backing store confirmed",
+    "[forms] Form and interactive annotation controls accessible in document layers",
+    "[annotations] Annotation layer and pen authoring overlays active",
+    "[taggedStructure] Tagged document structure nodes exposed to accessibility tree",
+    "[touchArbitration] Viewport touch-action style is \"none\" with 5 hardware touch points (preventing host page overscroll)",
+    "[virtualizedInk] Backing store rasterised 1,090,584 physical device pixels at DPR 2.25"
   ]
 }

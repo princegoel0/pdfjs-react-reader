@@ -262,6 +262,64 @@ async function runSession(target) {
     });
     const sessionDetails = (await sessionApiRes.json())?.automation_session || {};
 
+    // Extract actual browser version: refuse fallback to osVersion (Audit Finding 2)
+    let browserVersion = sessionDetails.browser_version;
+    if (!browserVersion && env?.ua) {
+      if (target.platform.toLowerCase() === 'android' || target.browserName.toLowerCase().includes('chrome')) {
+        const match = env.ua.match(/Chrome\/([0-9.]+)/);
+        if (match) browserVersion = match[1];
+      } else if (target.platform.toLowerCase() === 'ios' || target.browserName.toLowerCase().includes('safari')) {
+        const match = env.ua.match(/Version\/([0-9.]+)/);
+        if (match) browserVersion = match[1];
+      }
+    }
+    if (!browserVersion || browserVersion === target.osVersion) {
+      throw new Error(
+        `Refusing invalid browser version "${browserVersion}" for ${target.device} (${target.browserName}) — cannot fall back to osVersion (${target.osVersion})`
+      );
+    }
+
+    const touchArbitrationPass = gestureRes.value.touchAction !== 'auto' && (gestureRes.value.maxTouch ?? 0) > 0;
+    const verdicts = {
+      loading: tasks.loading ? 'pass' : 'fail',
+      navigation: tasks.navigation ? 'pass' : 'fail',
+      search: tasks.search ? 'pass' : 'fail',
+      forms: tasks.forms ? 'pass' : 'fail',
+      annotations: tasks.annotations ? 'pass' : 'fail',
+      taggedStructure: tasks.taggedStructure ? 'pass' : 'fail',
+      touchArbitration: touchArbitrationPass ? 'pass' : 'fail',
+      virtualizedInk: inkPixels > 0 ? 'pass' : 'fail',
+    };
+    const allVerdictsPass = Object.values(verdicts).every((v) => v === 'pass');
+    const status = allVerdictsPass ? 'pass' : 'fail';
+
+    const observations = {
+      loading: tasks.loading
+        ? `Canvas mounted and active; rendered ${inkPixels.toLocaleString()} backing-store pixels`
+        : 'Canvas failed to render ink',
+      navigation: tasks.navigation
+        ? `Multi-page viewport scroll height verified (${tasks.scrollHeight || 'present'}px); page navigation verified`
+        : 'Navigation failed',
+      search: tasks.search
+        ? 'Searchable text layer elements and canvas backing store confirmed'
+        : 'Text layer absent',
+      forms: tasks.forms
+        ? 'Form and interactive annotation controls accessible in document layers'
+        : 'Form layer absent',
+      annotations: tasks.annotations
+        ? 'Annotation layer and tool overlays active'
+        : 'Annotation layer absent',
+      taggedStructure: tasks.taggedStructure
+        ? 'Tagged document structure nodes exposed to accessibility tree'
+        : 'Structure layer absent',
+      touchArbitration: touchArbitrationPass
+        ? `Viewport touch-action style is "${gestureRes.value.touchAction}" with ${gestureRes.value.maxTouch} hardware touch points (not default "auto")`
+        : `Touch arbitration failed (touchAction="${gestureRes.value.touchAction}", maxTouch=${gestureRes.value.maxTouch})`,
+      virtualizedInk: inkPixels > 0
+        ? `Backing store rasterised ${inkPixels.toLocaleString()} physical device pixels at DPR ${env.dpr}`
+        : 'Zero ink pixels rendered',
+    };
+
     const record = {
       schema: 'pjsr/device-verification@1',
       provider: 'BrowserStack Automate',
@@ -270,7 +328,7 @@ async function runSession(target) {
       os: `${target.platform} ${target.osVersion}`,
       osVersion: sessionDetails.os_version || target.osVersion,
       browser: `${target.browserName} on ${target.platform}`,
-      browserVersion: sessionDetails.browser_version || target.osVersion,
+      browserVersion: browserVersion,
       sessionId: sessionId,
       sessionUrl: sessionDetails.public_url || sessionDetails.browser_url || `https://automate.browserstack.com/builds/.../sessions/${sessionId}`,
       tunnelId: localId,
@@ -278,23 +336,17 @@ async function runSession(target) {
       artifactDigest: getDistDigest(),
       timestamp: new Date().toISOString(),
       operator: gitOperator,
-      status: 'pass',
+      status: status,
       environment: env,
-      verdicts: {
-        loading: tasks.loading ? 'pass' : 'fail',
-        navigation: tasks.navigation ? 'pass' : 'fail',
-        search: tasks.search ? 'pass' : 'fail',
-        forms: tasks.forms ? 'pass' : 'fail',
-        annotations: tasks.annotations ? 'pass' : 'fail',
-        taggedStructure: tasks.taggedStructure ? 'pass' : 'fail',
-        touchArbitration: gestureRes.value.touchAction !== 'auto' ? 'pass' : 'pass',
-        virtualizedInk: inkPixels > 0 ? 'pass' : 'fail',
-      },
+      verdicts: verdicts,
+      observations: observations,
       evidence: [
         `BrowserStack Automate session ${sessionId}`,
         `Canvas rasterised backing store: ${inkPixels} device pixels at dpr ${env.dpr}`,
         `Hardware maxTouchPoints: ${env.maxTouchPoints}`,
         `Screen resolution: ${env.screen[0]}x${env.screen[1]}`,
+        `Touch arbitration: touch-action="${gestureRes.value.touchAction}" on viewer container`,
+        ...Object.entries(observations).map(([k, v]) => `[${k}] ${v}`),
       ],
     };
 

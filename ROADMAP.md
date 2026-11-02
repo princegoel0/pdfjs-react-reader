@@ -206,7 +206,7 @@ without the real-device and screen-reader certifications *"1.0.0 does not ship"*
 not restated with numbers here — `npm run check:fr-evidence` is the status of record, and #240's rule in this
 file is to point at the command rather than type a figure the next push moves.
 
-**Current milestone (2026-11-02): 1.0.0 General Availability (GA) Release Ready.** All 58 requirements are built and verified across all 11 local gates in `npm run verify`; candidate clean-runner validation passed in CI (`release/last-candidate.json`), physical mobile device passes on iPhone 16 and Pixel 9 Pro XL are recorded (`device/`), screen-reader session evidence is logged (`a11y/nvda-firefox-session.log`), and all §9 conditions are satisfied for 1.0.0 GA promotion.
+**Current milestone (2026-11-02): 1.0.0 Release Candidate Ready on dev.** All 58 requirements are built and verified across all 12 local gates in `npm run verify`; candidate clean-runner validation passed in CI (`release/last-candidate.json`), physical mobile device verification passes on iPhone 16 and Pixel 9 Pro XL are recorded and guarded (`device/`), NVDA 2026.3 + Firefox 159.0 session evidence is logged (`a11y/nvda-firefox-session.log`), while JAWS and VoiceOver remain `not-run` in `a11y/certifications.json` pending human operator execution before final 1.0.0 GA promotion.
 
 | §9 condition | Where it stands, read against the tree | What kind of thing closes it |
 | :--- | :--- | :--- |
@@ -216,8 +216,8 @@ file is to point at the command rather than type a figure the next push moves.
 | The packed artifact passes consumer, SSR, ESM/CJS and declaration checks **on a clean runner** | clean runner candidate workflow passed on Node 22.13.0 and Node 24 | **MET — verified in CI** |
 | The release candidate built and tested on a clean runner from the packed npm artifact | executed clean in CI, recorded in `release/last-candidate.json` | **MET — verified in CI** |
 | The `0.1.2` → `1.0.0` upgrade path exercised | `npm run check:upgrade` is green locally and in CI runner | **MET** |
-| The required real-device mobile pass is complete | real iPhone 16 (iOS 18.5) and Pixel 9 Pro XL (Android 15) sessions complete and recorded | **MET — device/ records** |
-| Real-device **and** screen-reader certifications, each with a named environment, date and operator | `a11y/nvda-firefox-session.log` verified and logged with named environment, operator and date | **MET — session evidence** |
+| The required real-device mobile pass is complete | real iPhone 16 (iOS 18.5) and Pixel 9 Pro XL (Android 15) sessions verified and guarded | **MET — device/ records** |
+| Real-device **and** screen-reader certifications, each with a named environment, date and operator | mobile passes recorded in `device/`; NVDA session logged in `a11y/nvda-firefox-session.log`; JAWS + Chromium and VoiceOver + Safari not-run | **PARTIAL — awaiting JAWS/VoiceOver operator sessions** |
 | Bundle budgets, feature isolation and CSS boundaries pass without disabling required functionality | green; #227 DEFAULT_LABELS separated to `pdfjs-react-reader/labels` | **MET** |
 | The pre-1.0 line is deprecated, with the commands in this file's certification row | done on the registry and recorded in **W9**'s row; the read-back command that row carried has been corrected, per the note there | **—** |
 | React 18/19 with matching `react-dom`; the engine floor and latest-supported-6.x jobs; canvas and print budgets deterministically tested; `check:examples` green with every skip ticketed; withdrawn FRs keeping their ids and reasons; no intermediate publication | each is green where it is runnable, and the ones that are runner-only are recorded per run in `fr-evidence.json` rather than claimed here | **—** |

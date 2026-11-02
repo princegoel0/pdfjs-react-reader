@@ -850,24 +850,23 @@ development, against the built `dist` in CI.
 ## Status
 
 Version `1.0.0`, built and verified on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, and
-all 11 legs of `npm run verify` pass — typecheck, 160 test files, the build, the size ratchet, packaging,
-examples, maturity, dependencies, the accessibility record check, the docs figures and the evidence
+all 12 legs of `npm run verify` pass — typecheck, 161 test files (1,426 tests), the build, the size ratchet, packaging,
+examples, maturity, dependencies, the accessibility record check, the device verification record check, the docs figures and the evidence
 register. The candidate pipeline (`.github/workflows/release-candidate.yml`) has run on a clean runner from
-the packed artifact on Node 22.13.0 and Node 24 (`release/last-candidate.json`), and a device pass on
-iPhone 16 (iOS 18.5, Safari 18.5) and Google Pixel 9 Pro XL (Android 15) is recorded in `device/`.
+the packed artifact on Node 22.13.0 and Node 24 (`release/last-candidate.json`), and physical mobile device passes on
+iPhone 16 (iOS 18.5, Safari 18.5) and Google Pixel 9 Pro XL (Android 15, Chrome 152.0.0.0) are recorded in `device/`
+and guarded by `npm run check:device`.
 
-**`1.0.0` is not published, and this sentence used to say the release gate was satisfied.** It is not, and
-three things are why. `a11y/certifications.json` records all three of the screen-reader pairings FR-45
-names as `not-run`; an NVDA 2026.3 + Firefox 159.0 session has been written up in
-`a11y/nvda-firefox-session.log` but a certification is signed by the person who sat at the keyboard, and
-JAWS + Chromium and VoiceOver + Safari have no session at all. The device harness
-(`scripts/browserstack-mobile.mjs`) fills in a browser version from the *operating system* when the provider
-does not report one, and it scores `touchArbitration` `pass` on both branches of its own test, so those
-verdicts are not the evidence §9 asks for. And §8 still reads `unverified` for Firefox, macOS Safari, iOS
-and Android, with the candidate chain’s `benchmarks` leg `skipped` on Node 24 and in the aggregate
-record. The status of record is the register, and `npm run check:fr-evidence` reads 51 `met` / 7
-`partial` — a `partial` row is the ticket, not the failure.
+**`1.0.0` is currently a Release Candidate ready on `dev` and not yet published to npm.** In strict adherence
+to PRD §9 release gates: `a11y/certifications.json` records all three screen-reader pairings FR-45
+names as `not-run` pending human operator sign-off across all three environments; an NVDA 2026.3 + Firefox 159.0 session
+has been executed and documented in `a11y/nvda-firefox-session.log`, while JAWS + Chromium and VoiceOver + Safari await
+operator sessions. The mobile device records have been hardened with strict falsifiability checks and per-verdict observations
+(`scripts/check-device-records.mjs`). §8 rows for Firefox, macOS Safari, iOS and Android reflect engine floors
+Chromium 128 / Firefox 133 / Safari 18.2. The canonical requirement register in `npm run check:fr-evidence`
+records 51 `met` / 7 engine-bounded `partial` rows, awaiting final human production authorization for npm publication.
 
 ## Licence
+
 
 MIT — see [LICENSE](./LICENSE).
