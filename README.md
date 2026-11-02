@@ -652,7 +652,7 @@ release close: every figure below is the one `npm run size` measured and wrote t
 | A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.35–2.39 kB | separate entry, not over core |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
-69.75 kB for `index.js` and 38.17 kB for `headless.js`, each with `styles.css`. `edit.js` and `merge.js`
+69.76 kB for `index.js` and 38.17 kB for `headless.js`, each with `styles.css`. `edit.js` and `merge.js`
 are the two shipped files that import the writer, so a host that never names either path never loads it. What the `core` figure does not show is that adding an entry point
 moves it: a new tsup entry reshuffles the shared chunks every path is built from, which is why the *Over
 core* column, not the base row, is the number that describes what a feature costs you.

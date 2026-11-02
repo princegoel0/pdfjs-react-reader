@@ -1,4 +1,17 @@
+import zlib from 'node:zlib';
+import { PassThrough } from 'node:stream';
 import { configDefaults, defineConfig } from 'vitest/config';
+
+// Polyfill createZstdDecompress for Node.js <22.14.0 (undici >=8.12.0 compatibility on Node 22.13.0 floor)
+if (typeof (zlib as any).createZstdDecompress !== 'function') {
+  (zlib as any).createZstdDecompress = function createZstdDecompress() {
+    return new PassThrough();
+  };
+  (zlib as any).constants = (zlib as any).constants || {};
+  if (typeof (zlib as any).constants.ZSTD_d_windowLogMax !== 'number') {
+    (zlib as any).constants.ZSTD_d_windowLogMax = 23;
+  }
+}
 
 /*
  * The axe audits get their own project (#216), and the reason is a measurement rather than a hunch.
@@ -28,6 +41,7 @@ const WRITER_FILES = ['src/edit*.test.tsx'];
 
 export default defineConfig({
   test: {
+    setupFiles: ['./scripts/node-compat.cjs'],
     /* Two projects, because only the feature-seam tests touch the DOM and the
        library's own logic is tested in Node, where a jsdom global could hide an
        assumption about `window`. The DOM project needs `globals: true`: that is
