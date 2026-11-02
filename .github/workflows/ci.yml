@@ -46,9 +46,6 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - name: Configure Node compatibility
-        run: echo "NODE_OPTIONS=--require=${{ github.workspace }}/scripts/node-compat.cjs" >> $GITHUB_ENV
-
       - name: Install
         run: npm ci
 
@@ -56,6 +53,8 @@ jobs:
         run: npm run typecheck
 
       - name: Unit tests
+        env:
+          NODE_OPTIONS: "--require=${{ github.workspace }}/scripts/node-compat.cjs"
         run: npm test
 
       # FR-45, and FR-58's accessibility half. The same audits run inside `npm test` above, so a violation fails
@@ -63,6 +62,8 @@ jobs:
       # a suite — and because `a11y:record` is what *produces* `a11y/latest.json`, the committed evidence §9 asks
       # for, from a runner rather than from one developer's console.
       - name: Accessibility audit and record (axe-core, WCAG 2.0/2.1/2.2 A+AA)
+        env:
+          NODE_OPTIONS: "--require=${{ github.workspace }}/scripts/node-compat.cjs"
         run: npm run a11y:record
 
       - name: Build
