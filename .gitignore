@@ -10,3 +10,4 @@ playground/dist/
 # before its result is relied on.
 .spike/
 npmToken.md
+.agency/

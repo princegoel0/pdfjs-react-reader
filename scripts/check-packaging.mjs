@@ -113,6 +113,7 @@ const PUBLIC_CLASSES = [
   ['headless', (subpath) => subpath === './headless'],
   ['edit', (subpath) => subpath === './edit'],
   ['merge', (subpath) => subpath === './merge'],
+  ['labels catalog', (subpath) => subpath === './labels'],
   ['feature tier', (subpath) => subpath.startsWith('./features/')],
   ['locale catalog', (subpath) => subpath.startsWith('./locales/')],
   ['stylesheet', (subpath) => subpath.endsWith('.css')],

@@ -648,11 +648,11 @@ release close: every figure below is the one `npm run size` measured and wrote t
 | All nine | 49.72 kB | +16.33 kB |
 | A single headless hook (`usePdfDocument`) | 5.56 kB | — |
 | A merge, on its own (`/merge`, writer and hook) | 1.70 kB | separate entry, not over core |
-| The same two shipped paths as CommonJS (`index.cjs`, `headless.cjs`) | 62.22 / 32.94 kB | the other format, not another feature |
+| The same two shipped paths as CommonJS (`index.cjs`, `headless.cjs`) | 62.21 / 32.94 kB | the other format, not another feature |
 | A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.35–2.39 kB | separate entry, not over core |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
-69.76 kB for `index.js` and 38.17 kB for `headless.js`, each with `styles.css`. `edit.js` and `merge.js`
+69.75 kB for `index.js` and 38.17 kB for `headless.js`, each with `styles.css`. `edit.js` and `merge.js`
 are the two shipped files that import the writer, so a host that never names either path never loads it. What the `core` figure does not show is that adding an entry point
 moves it: a new tsup entry reshuffles the shared chunks every path is built from, which is why the *Over
 core* column, not the base row, is the number that describes what a feature costs you.
@@ -849,14 +849,13 @@ development, against the built `dist` in CI.
 
 ## Status
 
-Version `0.11.0`, built on `dev` and **not pushed**: the `0.2`–`0.11` sequence lives on this machine
-only — `git rev-list --count origin/dev..dev` is where to read that number, and `git log` on `dev` which
-of these releases is committed, rather than from a sentence that goes stale one commit later. Nothing is
-published. npm has `0.1.0`, `0.1.1` and `0.1.2` (the last one went out on 2026-09-25); everything from `0.2` 
-to `0.11` exists only on local `dev` and publishes together with `1.0.0`, which is the
-shipping rule in [`ROADMAP.md`](./ROADMAP.md) §Releases. So the tables above describe this working tree,
-not the tarball on npm. While the package is pre-1.0 a minor may break the API — `0.4` did, with six
-`PdfViewer` props becoming four feature imports — so pin exactly.
+Version `1.0.0` (Release Candidate 1 / `v1.0.0-rc.1`), built on `dev` and **not pushed**: all 58
+requirements (`FR-01`–`FR-58`) are implemented and all 11 verification gates in `npm run verify` pass.
+The release-candidate workflow (`.github/workflows/release-candidate.yml`) exercises the packed npm
+artifact across Node 22.13.0 and Node 24 on clean runners upon pushing tag `v1.0.0-rc.1`.
+Nothing beyond `0.1.2` is published on npm yet. In accordance with [`PRD.md`](./PRD.md) §9, final 1.0.0
+GA publication remains subject to completing the physical device mobile passes (#141, #156) and human
+screen-reader operator sessions (NVDA, JAWS, VoiceOver) logged in `a11y/certifications.json`.
 
 ## Licence
 

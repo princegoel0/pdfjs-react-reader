@@ -1142,12 +1142,12 @@ never be called `supported` or `certified` on the strength of a look.
 
 | Environment | In contract | Evidence state | Minimum | Evidence required |
 | :--- | :--- | :--- | :--- | :--- |
-| Chrome / Chromium | Yes | implemented | 125 | Twenty-Three automated browser checks run in Chromium today; a pinned floor job that fails on regression is what moves this row to `supported` |
-| Edge | Yes | unverified | 125-equivalent Chromium engine | Edge-specific job per release on a reproducible binary; no job exists yet |
-| Firefox | Yes | unverified | 124 provisional package floor | A pinned Firefox 124 runner through the full suite against the React and `pdfjs-dist` matrices |
-| Safari (macOS) | Yes | unverified | 18 | A reproducible Safari 18 / WebKit runner; the engine floor requires `light-dark()` and the nesting selector, so a stale WebKit fails the engine rather than the page |
-| iOS Safari | Yes | unverified | 18 | Simulator or emulation **plus** a real-device pass per release; the two are different evidence |
-| Android Chrome | Yes | unverified | 125 | Chromium engine floor plus a real-device pass per release |
+| Chrome / Chromium | Yes | implemented | 128 | Twenty-Three automated browser checks run in Chromium today; a pinned floor job that fails on regression is what moves this row to `supported` |
+| Edge | Yes | unverified | 128-equivalent Chromium engine | Edge-specific job per release on a reproducible binary; no job exists yet |
+| Firefox | Yes | unverified | 133 | A pinned Firefox 124 runner through the full suite against the React and `pdfjs-dist` matrices |
+| Safari (macOS) | Yes | unverified | 18.2 | A reproducible Safari 18 / WebKit runner; the engine floor requires `light-dark()` and the nesting selector, so a stale WebKit fails the engine rather than the page |
+| iOS Safari | Yes | unverified | 18.2 | Simulator or emulation **plus** a real-device pass per release; the two are different evidence |
+| Android Chrome | Yes | unverified | 128 | Chromium engine floor plus a real-device pass per release |
 | React / `react-dom` | Yes | implemented | `>=18.0.0 <20.0.0` | Both majors verified locally with matching DOM majors; the matrix still needs its minimum-patch row per major |
 | `pdfjs-dist` | Yes | implemented | `6.2.108` | Floor verified against `dist`; the latest-supported-6.x job and the consumer-tarball job remain to be run |
 | Node (ESM and build toolchain) | Yes | implemented | 22.13.0 | Build, test, SSR-import and consumer jobs on the supported floor; development runs a newer minor, which is not the same claim |

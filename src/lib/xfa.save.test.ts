@@ -31,13 +31,14 @@ const fixture = (name: string): Uint8Array =>
   new Uint8Array(readFileSync(join(process.cwd(), 'playground', 'fixtures', name)));
 
 const load = (bytes: Uint8Array) =>
-  getDocument({ data: bytes, enableXfa: true, isEvalSupported: false }).promise;
+  getDocument({ data: bytes, enableXfa: true }).promise;
 
-const flags = async (doc: { getMetadata: () => Promise<{ info: Record<string, unknown> }> }) => {
+const flags = async (doc: { getMetadata: () => Promise<{ info: object }> }) => {
   const { info } = await doc.getMetadata();
+  const record = info as Record<string, unknown>;
   return {
-    xfa: info.IsXFAPresent === true,
-    acroform: info.IsAcroFormPresent === true,
+    xfa: record.IsXFAPresent === true,
+    acroform: record.IsAcroFormPresent === true,
   };
 };
 

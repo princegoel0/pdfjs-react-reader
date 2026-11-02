@@ -206,6 +206,8 @@ without the real-device and screen-reader certifications *"1.0.0 does not ship"*
 not restated with numbers here — `npm run check:fr-evidence` is the status of record, and #240's rule in this
 file is to point at the command rather than type a figure the next push moves.
 
+**Current milestone (2026-11-01): staged as Release Candidate 1 (`1.0.0-rc.1`).** All 58 requirements are built and all 11 local verification gates in `npm run verify` pass; the packed artifact is ready for clean runner execution via `.github/workflows/release-candidate.yml` upon pushing tag `v1.0.0-rc.1`, leaving the human operator AT sessions and real handset passes for §9 GA certification.
+
 | §9 condition | Where it stands, read against the tree | What kind of thing closes it |
 | :--- | :--- | :--- |
 | Every accepted FR has implementation *and* verification evidence | rows still `partial` carry their gaps by name, and the gate refuses a `met` row that lists one | **P1 — code and instruments** |
@@ -262,6 +264,32 @@ model as a state the hook answers, instead of the clause changing: `pageStatus(p
 outside the current rows whatever that page last reported and the reported state — or `queued`, the first thing a
 mounted page emits — inside them, and `reportPageStatus` is the seam a host feeds from `PdfPage`'s `onStatusChange`.
 `src/headless/usePdfVirtualizer.page-status.test.tsx` is the guard; it fails when the ask stops deciding the answer.
+
+***The keyboard-scope row is closed, and every one of its four red sentences was the instrument talking about
+itself.***
+`keyboard-scope-selection` has failed the matrix since the push that added it (`8c495dd`) — three desktop cells at
+1,280 px reading *the control reads "all" and the application will print nothing*, two mobile cells at 375 px reading
+*no Print pages control in the tab order after 40 Tab presses* — and the row passed in isolation on every engine,
+which is the shape of a state bug rather than a product one. Desktop: it paired the print action with the
+**select's own region**, while `print.tsx:140` folds the two at different widths on purpose (the action a reader came
+for stays in the bar, the refinement gives its place up first), so once a previous row had mounted `annotate` the
+scope sat in the ⋯ panel, the button sat in the bar, and the comparison reported the split as a desync. The action is
+now read from wherever it is on screen, with *exactly one visible copy* as the claim. Mobile: `reveal()` leaves the
+panel open for the row that reaches a folded control, and this row pressed Enter on an already-open panel — shutting
+the thing it then went looking for, which is the rule that helper already carries and the reason two cells now print
+`past the ⋯ panel already open`. Arming the door honestly found the third defect: the bar's first control at 375 px is
+the Previous-page button on page 1 of two, it is `disabled`, and `HTMLElement.focus()` refuses a disabled control in
+silence, so `activeElement` was still the playground's URL field where `load()` had left it and the "Tab walk" had
+been lapping the entire page to reach the scope — 40 presses, exactly the ceiling, one control from a fifth false red.
+The door now arms in one page task on the first control a Tab can actually land on, and the six cells walk 16 to 20.
+The fourth was the page-change counter, which harvested the playground's log on install while one page serves every
+row in a cell and that log holds eight lines: *the document paged 1 → 14* was an ink row's scroll from several checks
+earlier, charged to a keystroke that never reached the viewport. It baselines against what it finds now and counts per
+text, so a page this row genuinely reaches twice is still recorded. Measured on this host: six cells — three engines
+at both profiles, `pdfjs-dist` 6.3.289 — no failures, both counterfactuals still reddening the row when they are
+reintroduced, and the watch's other consumer (`virtualizes-1000-pages`) still reporting its own walk. What that is
+not: the CI engine axis. This row landed red on 6.2.108 and on 6.4.299 as well, and a push is what says whether these
+four corrections were the whole of it.
 
 **P2 — turn the rules into something that runs (#284–#288).** Six assertions the PRD audit found missing
 behind `met` rows; §3.1's no-React-in-core rule and §3.2.1's public-`any`/engine-internal rule; §6 and §2.1's

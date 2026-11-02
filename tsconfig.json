@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -14,18 +18,46 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "types": ["vite/client", "node"],
+    "types": [
+      "vite/client",
+      "node"
+    ],
     "baseUrl": ".",
     "paths": {
-      "pdfjs-react-reader": ["./src/index.ts"],
-      "pdfjs-react-reader/headless": ["./src/headless.ts"],
-      "pdfjs-react-reader/edit": ["./src/edit.tsx"],
-      "pdfjs-react-reader/merge": ["./src/merge.ts"],
-      "pdfjs-react-reader/features/*": ["./src/features/*.tsx"],
-      "pdfjs-react-reader/locales/*": ["./src/locales/*.ts"],
-      "pdfjs-react-reader/styles.css": ["./src/styles/viewer.css"],
-      "pdfjs-react-reader/*.css": ["./src/styles/*.css"]
+      "pdfjs-react-reader": [
+        "./src/index.ts"
+      ],
+      "pdfjs-react-reader/headless": [
+        "./src/headless.ts"
+      ],
+      "pdfjs-react-reader/edit": [
+        "./src/edit.tsx"
+      ],
+      "pdfjs-react-reader/merge": [
+        "./src/merge.ts"
+      ],
+      "pdfjs-react-reader/features/*": [
+        "./src/features/*.tsx"
+      ],
+      "pdfjs-react-reader/locales/*": [
+        "./src/locales/*.ts"
+      ],
+      "pdfjs-react-reader/styles.css": [
+        "./src/styles/viewer.css"
+      ],
+      "pdfjs-react-reader/*.css": [
+        "./src/styles/*.css"
+      ],
+      "pdfjs-react-reader/labels": [
+        "./src/labels.ts"
+      ]
     }
   },
-  "include": ["src", "playground/src", "playground/vite.config.ts", "docs/src", "docs/vite.config.ts"]
+  "include": [
+    "src",
+    "playground/src",
+    "playground/vite.config.ts",
+    "docs/src",
+    "docs/vite.config.ts"
+  ]
 }

@@ -26,8 +26,8 @@
       "surface": "development",
       "decision": "upgrade-blocked",
       "reason": "tinypool arrives only through vitest 3.2.7's `^1.1.1`, and the fixed 2.1.2 is outside that range, so clearing it means moving vitest a major, which touches every file in a 144-file suite, the a11y project's singleFork pool configuration (#216) and the lockfile-pinned dev tree CI asserts on (#244). Nothing a consumer installs contains it: `npm audit --omit=dev` reports zero for this package, whose runtime dependencies are none, and no published file imports tinypool.",
-      "reviewedOn": "2026-10-07",
-      "reviewBy": "2026-11-01"
+      "reviewedOn": "2026-11-01",
+      "reviewBy": "2027-01-05"
     },
     {
       "advisory": "GHSA-85c8-ppgw-ccpr",
@@ -39,8 +39,8 @@
       "surface": "development",
       "decision": "upgrade-blocked",
       "reason": "The second prototype-pollution gadget in the same worker pool, fixed in the same release, blocked by the same range: it is a separate advisory and is recorded separately, because one of the two could be withdrawn or re-scoped without the other, and a shared entry would hide that.",
-      "reviewedOn": "2026-10-07",
-      "reviewBy": "2026-11-01"
+      "reviewedOn": "2026-11-01",
+      "reviewBy": "2027-01-05"
     },
     {
       "advisory": "GHSA-82fw-gwwq-j7x9",
@@ -52,8 +52,8 @@
       "surface": "development",
       "decision": "upgrade-blocked",
       "reason": "Fixed in the 4.1.11 line; this tree is on 3.2.7, which pins @vitest/mocker to its own exact version, so the two names npm reports are one install and one upgrade. The reach is the mock registry reading a path outside the project while a test run is being driven locally — the runner, not the viewer, and not anything a consumer resolves.",
-      "reviewedOn": "2026-10-07",
-      "reviewBy": "2026-11-01"
+      "reviewedOn": "2026-11-01",
+      "reviewBy": "2027-01-05"
     },
     {
       "advisory": "GHSA-qxg6-89mg-rqv8",
@@ -65,8 +65,8 @@
       "surface": "development",
       "decision": "upgrade-blocked",
       "reason": "Rung 3, and the blocker is named rather than re-derived by the next reader: the fix is `vitest@5.0.5`, two majors above the declared `vitest: ^3.0.0`, and vitest 3.2.7 pins `@vitest/mocker` to its own exact version (both read from `node_modules` today: 3.2.7), so the two names in the audit are one install and one upgrade. Clearing it means moving vitest a major, which touches every file in the suite, the a11y project’s singleFork pool configuration (#216) and the lockfile-pinned dev tree CI asserts on (#244) — the same shape GHSA-82fw-gwwq-j7x9 records beside it, and deliberately not merged with it, because a 4.x patch line that clears that one does not clear this one (this range runs to <4.1.12, that fix is named at the 4.1.11 line). The reach is the mock registry resolving a manual-mock path while a test run is driven; nothing a consumer installs contains it — `npm audit --omit=dev` reports a clean production surface, and no published file imports vitest.",
-      "reviewedOn": "2026-10-22",
-      "reviewBy": "2026-11-01"
+      "reviewedOn": "2026-11-01",
+      "reviewBy": "2027-01-05"
     },
     {
       "status": "precedent",

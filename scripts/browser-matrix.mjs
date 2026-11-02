@@ -137,7 +137,7 @@ const PROFILES = {
  * so the comparison is a row of its own — a run on an engine below a floor is a red row, and a run whose
  * engine cannot be identified is `na`, which is §8's "unverified, not passed".
  */
-const FLOORS = { chromium: 125, firefox: 124, webkit: 18 };
+const FLOORS = { chromium: 128, firefox: 133, webkit: 18 };
 
 /**
  * Compare the version an engine reports for itself against §8's floor for it.
@@ -290,27 +290,40 @@ const LAST_LOG = (prefix) => {
  * applied. The playground's log is a bounded stack of eight strings, so the events that left the top of it are
  * gone by the time a check looks; the count has to be collected while the walk is happening.
  *
- * It records page numbers it has not seen, deduplicated by text on purpose: React keys the log rows by
- * position, so prepending one line re-keys all eight and an observer that counted added nodes would report
- * eight events for one callback. A number that repeats is therefore counted once — true of any walk that
- * never revisits a page, which is what a jump and a scroll-out are — and `largest step` between consecutive
- * recorded pages is what separates a teleport from a one-row-at-a-time walk.
+ * It counts what arrived *after it was armed*, against a baseline of the lines already in the log. One page is
+ * shared by every row in a cell, and the log is a stack of eight, so a watch that harvested on install recorded
+ * the previous row's scroll as this row's defect — which is how `keyboard-scope-selection` came up red at "the
+ * document paged 1 → 14" on an ink row that had parked the reader on page 14 several checks earlier, with the
+ * print scope's own keystrokes nowhere near it. The baseline is per-text counts rather than a set of texts, so a
+ * page number this row genuinely reaches twice is still recorded, while the row before's number is not.
+ *
+ * Per-text counts also fix what the old dedupe by text was standing in for: React keys the log rows by position,
+ * so prepending one line re-keys all eight and an observer counting added nodes would report eight events for one
+ * callback. The multiset gains exactly one entry per callback, whatever shifted. The one reading this cannot
+ * make is a new line that evicts an *identical* one, which keeps the count flat — it needs eight page changes in
+ * one row's walk, and a walk that long reports its own span anyway.
  */
 const START_PAGE_CHANGE_WATCH = () => {
   const list = document.querySelector('.app-log');
   if (!list) return false;
+  const texts = () => [...list.querySelectorAll('li')].map((li) => (li.textContent ?? '').trim());
+  const tally = () => {
+    const counts = new Map();
+    for (const text of texts()) counts.set(text, (counts.get(text) ?? 0) + 1);
+    return counts;
+  };
+  const before = tally();
   const pages = [];
-  const seen = new Set();
   const harvest = () => {
-    for (const li of list.querySelectorAll('li')) {
-      const match = /^onPageChange (\d+)/.exec((li.textContent ?? '').trim());
-      if (match && !seen.has(match[1])) {
-        seen.add(match[1]);
+    for (const [text, count] of tally()) {
+      const match = /^onPageChange (\d+)/.exec(text);
+      if (!match) continue;
+      for (let extra = count - (before.get(text) ?? 0); extra > 0; extra -= 1) {
+        before.set(text, (before.get(text) ?? 0) + 1);
         pages.push(Number(match[1]));
       }
     }
   };
-  harvest();
   new MutationObserver(harvest).observe(list, { childList: true, subtree: true, characterData: true });
   window.__pjsrPageChanges = pages;
   return true;
@@ -3975,9 +3988,17 @@ const CHECKS = [
      * instrument.
      *
      * What this row asserts, in the order a reader meets it:
-     *  - **the control is reachable without a pointer.** Tab only, from the bar's first control, through the
-     *    ⋯ button opened with Enter when the bar has folded the control away. The stop count is printed,
-     *    because "reachable" is a claim about the tab order and not about the selector.
+     *  - **the control is reachable without a pointer.** Tab only, from the first control in the bar a Tab can
+     *    actually land on — not the measuring sizer's hidden copy, not a `tabindex="-1"`, not the disabled
+     *    Previous-page button that made this walk start in the playground's URL field instead, because
+     *    `HTMLElement.focus()` refuses a disabled control and says nothing while doing it. Through the ⋯ button,
+     *    which this row *opens* and never toggles, because a row that reached a folded control before
+     *    it leaves the panel open and Enter on an open panel shuts the one the walk is reaching into. When the
+     *    bar has nothing folded, no Enter is pressed at all. The stop count is printed, because "reachable" is a
+     *    claim about the tab order and not about the selector, and so is the press at which focus left the
+     *    viewer, because leaving and lapping are different stories. The press bound is a fuse against a hang,
+     *    nothing more — the honest walk is 16 to 17 stops, and the 40 this row used to allow was one accidental
+     *    lap of the whole page away from being a false red.
      *  - **each arrow key changes the selection and nothing else.** The value a key should produce is computed
      *    from the option list, clamped at both ends rather than wrapping — which is what the engine does, and
      *    the walk spends two keys proving it — and the read settles on that value with the same marked node
@@ -3985,11 +4006,19 @@ const CHECKS = [
      *  - **the application's state followed the control**, read as the page range off the print button's own
      *    title and compared with the scope the select shows: `all` is 1–numPages, `current` is one page, and
      *    `range` is the two fields the choice revealed. The desync the retired note described was these two
-     *    disagreeing, so they are compared rather than each asserted alone.
+     *    disagreeing, so they are compared rather than each asserted alone. The button is read from wherever it
+     *    is *on screen*, not from the select's own region: the fold evicts the scope into the panel while the
+     *    action stays in the bar, by design and at a different width (`print.tsx:140`), and demanding one region
+     *    made a correct split read as "the application will print nothing". Exactly one visible action is the
+     *    claim, because `Toolbar` renders an item either inline or in the panel and never both.
      *  - **the viewer did not page behind the reader**: no `onPageChange` and no scroll movement across the
-     *    whole walk, which is the half of that note that would have been a real defect.
+     *    whole walk, which is the half of that note that would have been a real defect. The page-change counter
+     *    baselines against the log it finds on install — one page serves every row in a cell and the playground
+     *    log holds eight lines, so an un-armed harvest recorded the *previous* row's scroll as this row's defect.
      *  - **the fields `range` reveals are on screen beside the select**, which is #243's claim reached by
-     *    keyboard: a field no Tab reaches is a range nobody can type.
+     *    keyboard: a field no Tab reaches is a range nobody can type. This one stays region-paired on purpose:
+     *    the fields are part of the same control as the select, so a copy of the select in the panel with its
+     *    fields elsewhere is the fold disagreeing with itself.
      */
     name: 'keyboard-scope-selection',
     run: async ({ page, load, profile, watchPageChanges, pageChanges }) => {
@@ -4033,9 +4062,17 @@ const CHECKS = [
           };
           const copies = [...document.querySelectorAll('[aria-label="Print pages"]')];
           const at = where(target);
-          const print = [...document.querySelectorAll('[aria-label="Print document"]')].find(
-            (el) => where(el) === at,
-          );
+          const printCopies = [...document.querySelectorAll('[aria-label="Print document"]')];
+          /*
+           * The action the reader can actually invoke: a copy that is on screen and is not the measuring sizer.
+           * Pairing this with the select's own region was the instrument's mistake, not the product's — the bar
+           * folds the scope into the ⋯ panel and keeps the print button inline *on purpose* (`print.tsx:140`:
+           * the action stays, the refinement gives its place up first), so requiring one region made a correct
+           * split read as "the application will print nothing". Both are bound to the same Runner state, which
+           * is why agreeing copies — not adjacent ones — is the claim worth asserting.
+           */
+          const action = printCopies.filter((el) => visible(el) && where(el) !== 'sizer');
+          const print = action[0] ?? null;
           const viewport = document.querySelector('.pjsr-viewport');
           const range = /(\d+)[^\d]+(\d+)\s*$/.exec(print?.getAttribute('title') ?? '');
           return {
@@ -4049,6 +4086,12 @@ const CHECKS = [
             // Every copy, because a controlled select rendered twice that disagrees is its own finding.
             copies: copies.map((el) => `${where(el)}:${el.value}`).join(' ') || 'none',
             agree: copies.length > 0 && copies.every((el) => el.value === copies[0].value) ? copies[0].value : null,
+            // Where the action lives relative to the control, and whether anyone can see it — the reading a
+            // failure has to name, because "no button in the select's region" and "no button on screen" are
+            // different findings with different owners.
+            printCopies:
+              printCopies.map((el) => `${where(el)}:${visible(el) ? 'seen' : 'blind'}`).join(' ') || 'none',
+            actionCount: action.length,
             title: print?.getAttribute('title') ?? null,
             titleRange: range ? [Number(range[1]), Number(range[2])] : null,
             fields: [...document.querySelectorAll('.pjsr-print-scope-input')]
@@ -4060,50 +4103,179 @@ const CHECKS = [
         });
 
       // ---- the door: Tab only ---------------------------------------------------------------------
-      const first = page.locator(`${BAR} button:visible, ${BAR} select:visible, ${BAR} input:visible`).first();
-      if ((await first.count()) === 0) {
-        fail(`the ${profile.viewport.width}px bar holds no focusable control to tab from, so the keyboard door to the print scope cannot be asked about`);
+      /*
+       * The door is armed inside one page task: find the bar's first real control, focus it, and read
+       * `activeElement` in the same breath. The two-call shape this replaces — `locator.focus()`, then a second
+       * round trip to ask where focus went — raced the toolbar's own fold. In two mobile cells `activeElement`
+       * was still the playground's URL field, the box `load()` had just pressed Enter in, so the walk never
+       * started in the bar at all and reached the scope only by lapping the whole page: 40 presses, the old
+       * ceiling to the press, and a "reachable by Tab" claim that had been proven by accident. React cannot
+       * interleave inside one synchronous block, so what this reads is what the focus did.
+       */
+      const arm = () =>
+        page.evaluate(() => {
+          const name = (n) => `${n.tagName.toLowerCase()}[${n.getAttribute('aria-label') ?? ''}]`;
+          const el = [
+            ...document.querySelectorAll('.pjsr-toolbar button, .pjsr-toolbar select, .pjsr-toolbar input'),
+          ].find((n) => {
+            const box = n.getBoundingClientRect();
+            return (
+              !n.closest('.pjsr-toolbar-sizer') &&
+              /*
+               * A *tab* walk starts on a control a Tab can land on. The bar's first control on a 375px mobile
+               * cell was the Previous-page button at page 1 of two — visible, enabled-looking, and `disabled`,
+               * which `HTMLElement.focus()` refuses in silence: `activeElement` stayed wherever `load()` had left
+               * it, in the playground's URL field, and the row's 40 presses were one lap of the whole page
+               * rather than a walk down the bar. Playwright's `:visible` says nothing about either half of that,
+               * and a reader never stops on a disabled control either.
+               */
+              !n.disabled &&
+              n.tabIndex >= 0 &&
+              box.width > 0 &&
+              box.height > 0 &&
+              getComputedStyle(n).visibility !== 'hidden'
+            );
+          });
+          if (!el) return { found: false };
+          el.focus();
+          const active = document.activeElement;
+          return {
+            found: true,
+            held: active === el,
+            asked: name(el),
+            active: active ? name(active) : 'nothing',
+            inViewer: Boolean(active?.closest('.pjsr-viewer')),
+          };
+        });
+      let held = { found: false };
+      for (let attempt = 0; attempt < 5 && !(held.found && held.held); attempt += 1) {
+        held = await arm();
+        if (!(held.found && held.held)) await page.waitForTimeout(60);
       }
-      await first.focus();
+      if (!held.found) {
+        fail(`the ${profile.viewport.width}px bar holds no visible control to tab from, so the keyboard door to the print scope cannot be asked about`);
+      }
+      const asked = held.asked;
       const trail = [];
-      let opened = false;
+      let openedBy = null;
       let stops = 0;
       let reached = false;
-      for (let i = 0; i < 40 && !reached; i += 1) {
+      let leftAt = null;
+      /*
+       * The walk is bounded by a fuse, not by a theory about the tab order. It used to stop after 40 presses,
+       * which a bar holding more controls than that walked past — and the alternative, ending the walk when
+       * focus leaves `.pjsr-viewer`, is not the lap it looked like: a mobile cell whose page field had lost its
+       * focus read `focus left the viewer on press 1` because Tab from `body` restarts the document at the
+       * playground's header, not because the application had run out of controls. So the exit is *reported*, and
+       * the walk keeps going to 120 presses — long enough to lap the whole page, and the token trail says
+       * whether the scope was ever mounted anywhere.
+       */
+      for (let i = 0; i < 120 && !reached; i += 1) {
         await page.keyboard.press('Tab');
         stops += 1;
-        const at = await page.evaluate(() => {
+        const stop = await page.evaluate(() => {
           const el = document.activeElement;
           const label = el?.getAttribute?.('aria-label') ?? null;
           if (label === 'Print pages' && !el.closest('.pjsr-toolbar-sizer')) {
             window.__pjsrScopeTarget = el;
-            return 'target';
+            return { token: 'target', inside: true };
           }
-          return label ? `${el.tagName.toLowerCase()}[${label}]` : (el?.tagName?.toLowerCase() ?? 'nothing');
+          return {
+            token: label
+              ? `${el.tagName.toLowerCase()}[${label}]`
+              : (el?.tagName?.toLowerCase() ?? 'nothing'),
+            inside: Boolean(el?.closest?.('.pjsr-viewer')),
+          };
         });
-        trail.push(at);
-        if (at === 'target') {
+        trail.push(stop.token);
+        if (stop.token === 'target') {
           reached = true;
           break;
         }
+        if (!stop.inside && leftAt === null) leftAt = stops;
         /*
          * A menu button is opened with Enter the way it is with a pointer, and the panel's controls sit next in
          * DOM order — so the walk continues into it rather than treating the fold as the end of the tab order.
+         *
+         * Open it, never toggle it — the rule `reveal()` already carries. A row that reached a folded control
+         * before this one leaves the panel open, and Enter on an open panel closes it: the walk then read `the
+         * overflow is closed`, one copy of the scope left (the `visibility: hidden` measuring sizer, which is in
+         * the DOM and out of the tab order), and 30 more presses spent inside the document's own form widgets.
+         * That is how this row came up red in a full cell and green alone.
          */
-        if (at.endsWith('[More controls]') && !opened) {
-          await page.keyboard.press('Enter');
-          opened = true;
+        if (stop.token.endsWith('[More controls]') && !openedBy) {
+          if ((await page.locator('.pjsr-overflow-menu').count()) === 0) {
+            await page.keyboard.press('Enter');
+            trail.push('(Enter)');
+            openedBy = 'opened with Enter';
+          } else {
+            trail.push('(already open)');
+            openedBy = 'already open';
+          }
           await page.waitForSelector('.pjsr-overflow-menu', { timeout: 5_000 }).catch(() => {});
-          trail.push('(Enter)');
         }
       }
       if (!reached) {
+        // Two different findings wear the same symptom, and only these three readings tell them apart: a control
+        // the fold never rendered, a panel that did not open, and a tab order that leaves the toolbar before the
+        // panel's rows. They come first because the printed line is capped (`errText`), and the walk shape is the
+        // part that can survive being cut.
+        const runs = [];
+        for (const step of trail) {
+          const last = runs[runs.length - 1];
+          if (last && last[0] === step) last[1] += 1;
+          else runs.push([step, 1]);
+        }
+        const shape = runs
+          .slice(-10)
+          .map(([s, n]) => (n > 1 ? `${s} ×${n}` : s))
+          .join(' → ');
+        const where = await page.evaluate(() => {
+          const shown = (el) => {
+            const box = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
+            return box.width > 0 && box.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+          };
+          // No `:visible` here — that pseudo-class belongs to Playwright's locator engine, and inside
+          // `document.querySelectorAll` Firefox throws over it, which is a worse report than the row failing.
+          const regions = (sel) =>
+            [...document.querySelectorAll(sel)]
+              .map((el) => {
+                const at = el.closest('.pjsr-toolbar-sizer')
+                  ? 'sizer'
+                  : el.closest('.pjsr-overflow-menu')
+                    ? 'panel'
+                    : el.closest('.pjsr-toolbar')
+                      ? 'bar'
+                      : 'outside';
+                return `${at}:${shown(el) ? 'seen' : 'blind'}`;
+              })
+              .join(' ') || 'none';
+          return {
+            scope: regions('[aria-label="Print pages"]'),
+            menu: document.querySelector('.pjsr-overflow')
+              ? document.querySelector('.pjsr-overflow-menu')
+                ? 'open'
+                : 'closed'
+              : 'absent',
+            chrome: [...document.querySelectorAll('.pjsr-toolbar button')].filter(shown).length,
+          };
+        });
         fail(
-          `no Print pages control in the tab order after ${stops} Tab presses on ${engine} at ` +
-            `${profile.viewport.width}px — the walk read ${trail.slice(-8).join(' → ')}`,
+          `no Print pages control in the tab order on ${engine} at ${profile.viewport.width}px after ` +
+            `${stops} presses — ${
+              leftAt === null
+                ? 'focus never left the viewer'
+                : `focus left the viewer on press ${leftAt}, so the walk ran on into the page shell`
+            } — copies ${where.scope}, overflow ${where.menu}, ${where.chrome} bar button(s) seen; ` +
+            `last ${Math.min(10, runs.length)} of ${runs.length} distinct stops: ${shape}`,
         );
       }
-      const door = `${opened ? `the ⋯ panel opened with Enter, ${stops}` : `${stops}`} tab stops from the bar's first control`;
+      const door = `${stops} tab stops from the bar's first control (${asked})${
+        held.held ? '' : `, which did not hold the focus it was given — active read ${held.active}`
+      }${openedBy ? `, past the ⋯ panel ${openedBy}` : ''}${
+        leftAt === null ? '' : `, after focus left the viewer on press ${leftAt} and came back`
+      }`;
 
       // ---- the walk -------------------------------------------------------------------------------
       const nums = await documentPages();
@@ -4138,6 +4310,18 @@ const CHECKS = [
           );
         }
         // The state half: what the button says it will print, against what the scope the reader chose means.
+        //
+        // Exactly one, because `Toolbar` renders an item either inline or in the panel and never both — the two
+        // sets come from one plan. Zero means the action this scope drives is not on screen; more than one means
+        // the fold started duplicating it. Only the zero half has a counterfactual below, since the other needs
+        // a product that no longer separates the two.
+        if (settled.actionCount !== 1) {
+          fail(
+            `the scope reads "${next}" and ${settled.actionCount} Print document controls are on screen ` +
+              `(copies ${settled.printCopies}) — the row compares a keyboard-chosen scope against the one job ` +
+              'it has to drive, and neither no action nor two of them is that job',
+          );
+        }
         const want =
           next === 'all'
             ? [1, nums.numPages]
@@ -4152,7 +4336,8 @@ const CHECKS = [
           fail(
             `the control reads "${next}" and the application will print ${settled.titleRange?.join('–') ?? 'nothing'} ` +
               `(${next === 'range' ? `fields ${settled.fields.join(',')}` : `expected ${want.join('–')}`}) — ` +
-              'a scope the reader chose by keyboard that the job does not follow',
+              `a scope the reader chose by keyboard that the job does not follow [select in the ${settled.at}, ` +
+              `Print document copies ${settled.printCopies}]`,
           );
         }
         if (next === 'current' && !nums.currentPage && settled.titleRange?.[0] !== settled.titleRange?.[1]) {
@@ -4182,7 +4367,7 @@ const CHECKS = [
       }
       const end = await read();
       return (
-        `${door} to the select in the ${end.at}; ${steps.join(', ')}; copies ${end.copies}; ` +
+        `${door}; the select sits in the ${end.at}; ${steps.join(', ')}; copies ${end.copies}; ` +
         `the job reads "${end.title}"; scroll held at ${end.scrollTop}px and no onPageChange fired`
       );
     },
@@ -5024,6 +5209,19 @@ console.log(
   `\n${cells.length} engine×profile cells on pdfjs-dist ${engineVersion}: ${tally('ok')} ok, ${tally('skip')} skipped, ${tally('na')} not runnable, ${tally('fail')} failed` +
     `; engine floors vs §8: ${floors('ok')} at or above, ${floors('fail')} below, ${floors('na')} unreadable.`,
 );
+
+// A filtered run is not a cell, and the difference is not cosmetic: every row inherits the page the rows before
+// it left behind — the fold's shape, which features are mounted, whether the overflow panel is open — so a filter
+// skips precisely the rows that create the state a bug needs. `keyboard-scope-selection` passed a solo run on
+// every engine and profile it was tried on and failed five of the six full cells, for exactly that reason, and a
+// summary that reads the same either way is how that kept happening.
+if (ONLY_CHECKS.length) {
+  console.log(
+    `\nNOT A CELL: --checks ran ${ONLY_CHECKS.length} of ${CHECKS.length} rows. The rows this filter skipped are the ones\n` +
+      'that leave state on the shared page, so a row that is green here can still be red in a full cell — run the\n' +
+      'whole matrix before believing a verdict about the tab order, the fold, or anything a previous row touches.',
+  );
+}
 
 // An engine that never started leaves its §8 row unbacked, and a summary that only counts failures would
 // let that read as "one row of the table has a problem" rather than "this row has no evidence yet".

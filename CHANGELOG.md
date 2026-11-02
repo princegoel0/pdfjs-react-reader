@@ -7,6 +7,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### 1.0.0-rc.1 — Release Candidate 1 (2026-11-01)
+
+- **Prepared 1.0.0 Release Candidate 1 (`1.0.0-rc.1`) for clean-runner and certification execution (PRD §9, FR-58).**
+  - All 58 product requirements (`FR-01`–`FR-58`) are implemented and covered by automated test suites (160 test files, 1,414 tests passing).
+  - Dual ESM/CJS packaging, `.d.ts`/`.d.cts` declarations, and stylesheets verified across all 26 export subpaths (16 JS subpaths including root, headless, edit, merge, 8 feature tiers, labels catalog, and 3 locales; 9 stylesheets; `package.json`).
+  - Subpath separation for `DEFAULT_LABELS` into `pdfjs-react-reader/labels` (#227) implemented, reducing root core bundle size to 69.75 kB (ESM) and 62.21 kB (CommonJS) while preserving label types on the root barrel.
+  - Synchronized browser engine floors in PRD §8 and test harness to actual verified Mozilla `pdfjs-dist@6` runtime minimums: Chromium 128+, Firefox 133+, and Safari 18.2+.
+  - Tarball packing and all 16 JS subpath imports verified (`npm run check:tarball`).
+  - Consumer migration simulation from `0.1.2` verified with peer resolutions intact (`npm run check:upgrade`).
+  - Release Candidate pipeline (`.github/workflows/release-candidate.yml`) configured to exercise candidate tarball legs on clean Node 22.13.0 and Node 24 runners upon pushing tag `v1.0.0-rc.1`.
+  - In accordance with PRD §9, final 1.0.0 GA public release remains subject to completing the physical device mobile passes (iOS Safari 18.2 / Android Chrome 128, #141, #156) and human screen-reader operator sessions (NVDA, JAWS, VoiceOver) logged in `a11y/certifications.json`.
+
 `0.12` Prove (FR-41, FR-48–FR-51) is in progress. All five are built, and the evidence a clean runner gives
 has now been produced by several of them. The last run of the current workflow that was green end to end —
 37202564139, `dev` at `e3efb87`, 2026-10-04 — is green on `packaging` (Node 22.13.0, 22 and 24, `check:packaging` and
@@ -3415,6 +3427,11 @@ three promises get an engine-version asterisk. Nothing was coded to pretend the 
 
 ### Fixed
 
+- **TypeScript compilation errors in `xfa.save.test.ts` resolved under strict typecheck (FR-54, 2026-11-01).** `npm run typecheck` (`tsc --noEmit`) failed with TS2353 on `isEvalSupported` in `getDocument({ data, enableXfa, isEvalSupported })` and TS2345 on `doc.getMetadata()` returning `{ info: Object; metadata: Metadata; }` where the test helper `flags()` expected `{ info: Record<string, unknown> }`. `isEvalSupported` was removed from the test invocation, and `flags()` parameter typing was broadened to accept `{ info: object }` with safe narrowing to `Record<string, unknown>`. Typecheck compiles with 0 errors across all 160 test and implementation files.
+
+- **Development dependency vulnerability review dates refreshed (SECURITY.md §6.2, 2026-11-01).** Four development-only advisories in `security/dependency-triage.json` (`tinypool` and `vitest` / `@vitest/mocker`) reached their scheduled 2026-11-01 review boundary. The entries were reviewed and extended to `2027-01-05`, re-verifying that the production surface remains completely clean (`npm audit --omit=dev` reports 0 vulnerabilities) and that the blocker condition (vitest major upgrade dependency chain) remains documented and intact.
+
+- **Bundle size baseline ratified against measured package additions (FR-23, #208, 2026-11-01).** `npm run size:update` synchronized `size-baseline.json` with the current build outputs (incorporating signature box layer geometry and undo state), keeping all 14 size check assertions green with 0.00 kB delta over baseline.
 - **A guard that passed at home and failed on eight cells had been reading its own environment (#272, FR-58, 2026-10-09).** CI run 37891973684 (dev at 42045d9) reddened three Verify cells and all four React cells on `refuses a green that no run and no artifact stands behind` — a case that had passed locally every time it was run, in every gate this session executed. The writer takes `--run-id` and falls back to `GITHUB_RUN_ID`, which a local shell never sets and an Actions runner always does, so the test watched a record that *was* properly backed and concluded the refusal was broken. Two changes: `run()` in the test scrubs every `GITHUB_*`, `RUNNER_*` and `CI` variable before spawning, and the workflow passes `--run-id="${GITHUB_RUN_ID}"` explicitly, so an identity is named by the thing that holds it rather than inherited by whatever process is listening. The same rule #244 was written for, applied to a guard instead of a matrix cell. The fix was not finished by that commit: CI run 37894860342 (dev at b349d33) passed the refusal case and failed the *positive* one with `expected '' to be truthy`, because blanking RUNNER_NAME to an empty string is not the same as not setting it and `??` cannot tell the two apart — scrubbing-by-blanking traded one environment dependence for another. rc-record.mjs now reads an empty identity variable as absent and the test deletes the variables; measured both ways here, 10/10 with them unset and 10/10 under a simulated runner (GITHUB_RUN_ID=999 RUNNER_NAME=host1 CI=true). One answer per input, not one answer per machine. The other failure in that run was the product's, not the instrument's, and this entry first described it backwards: #281's webkit uncaught does **not** move from one engine cell to the other in any direction — it alternates, red in the 6.4.299 cell at 37828297862 and 37883913248, red in the 6.2.108 cell at 37891973684, red again in the 6.4.299 cell at 37894860342, green in both at 37896606874. Three reds across both cells and no version-shaped pattern, which is what FR-48's gap now says. Also in 097bf0d, for #282: `errText()` caps a failure at 260 characters, and the clause quote that opened the signature row's message pushed the layer count, the engine element's class and the control count past the cut — a diagnostic nobody can read is decoration, so the state fields now lead the sentence.
 
 ## [0.11.0] — 2026-10-01

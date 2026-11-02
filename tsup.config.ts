@@ -23,6 +23,7 @@ export default defineConfig({
     'features/structure': 'src/features/structure.tsx',
     // One entry per shipped catalog. Not re-exported from the index on purpose: a
     // language is 134 strings, and importing the viewer should not hand it to you.
+    labels: 'src/labels.ts',
     'locales/de': 'src/locales/de.ts',
     'locales/es': 'src/locales/es.ts',
     'locales/fr': 'src/locales/fr.ts',

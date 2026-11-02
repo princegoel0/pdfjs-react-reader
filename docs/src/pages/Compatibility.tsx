@@ -497,11 +497,11 @@ export function Compatibility() {
 
       <h2>Versions</h2>
       <p>
-        The package is <code>0.11.0</code> — and that number names an <strong>internal milestone, not a
-        release</strong>. Only <code>0.1.0</code>, <code>0.1.1</code> and <code>0.1.2</code> were ever
+        The package is <code>1.0.0</code> — currently staged as <strong>Release Candidate 1
+        (<code>v1.0.0-rc.1</code>)</strong>. Only <code>0.1.0</code>, <code>0.1.1</code> and <code>0.1.2</code> were ever
         published; <code>0.2</code>–<code>0.12</code> name the order the work was built in, and nothing in
         them has been installable. The next public release is <code>1.0.0</code>, which publishes that whole
-        body of work together once §9&apos;s gate passes — so while the surface is pre-1.0, pin exactly, and
+        body of work together once §9&apos;s gate passes (including real-device and screen-reader certification) — so while the surface is pre-1.0, pin exactly, and
         treat the <code>0.x</code> numbers in the tables below as history rather than as rungs to climb.
         The full release entry, the development log and the versioning policy live in{' '}
         <code>CHANGELOG.md</code> at the repository root, which GitHub renders on the project home page.
