@@ -34,6 +34,8 @@ export default defineConfig({
       /* The writer tier, in both layouts, so a docs example can show the optional
          peer the same way the playground does. */
       { find: /^pdfjs-react-reader\/edit$/, replacement: target(`edit.${fromDist ? 'js' : 'tsx'}`) },
+      { find: /^pdfjs-react-reader\/merge$/, replacement: target(`merge.${fromDist ? 'js' : 'ts'}`) },
+      { find: /^pdfjs-react-reader\/labels$/, replacement: target(`labels.${fromDist ? 'js' : 'ts'}`) },
       { find: /^pdfjs-react-reader$/, replacement: target(fromDist ? 'index.js' : 'index.ts') },
     ],
   },

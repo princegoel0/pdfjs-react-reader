@@ -4,7 +4,7 @@ name: Deploy docs
 # pull request only gets checked by ci.yml and never reaches readers.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   # Republish without a code change, e.g. after flipping a Pages setting.
   workflow_dispatch:
 

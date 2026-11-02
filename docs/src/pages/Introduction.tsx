@@ -13,13 +13,49 @@ const peer = (key: 'engineMain' | 'engineWorker' | 'writer') => {
 export function Introduction() {
   return (
     <>
-      <h1>Introduction</h1>
-      <p className="doc-lede">
-        An MIT-licensed, headless-first PDF viewer for React, built directly on Mozilla's <code>pdfjs-dist</code>. It
-        ships the plumbing that is tedious to get right — virtualized rendering, the canvas/text/annotation layer stack,
-        worker lifecycle, search, forms, page editing, and printing — as hooks you can drive from your own UI, plus an
-        optional drop-in component whose extra capabilities are imports, so the bundle holds only the ones you mounted.
-      </p>
+      <div className="doc-hero">
+        <div className="doc-hero-badge">
+          <span>🚀 v1.0.0 Production Ready</span>
+          <span className="doc-hero-badge-dot">•</span>
+          <span>Zero Runtime Dependencies</span>
+        </div>
+        <h1 className="doc-hero-title">
+          The Headless-First PDF Engine for <span className="doc-hero-gradient">React</span>
+        </h1>
+        <p className="doc-lede">
+          An MIT-licensed, headless-first PDF viewer for React built directly on Mozilla&apos;s <code>pdfjs-dist</code>.
+          Virtualized rendering, text layer, annotations, forms, and printing as hooks you can drive from your own UI,
+          plus an optional drop-in shell component.
+        </p>
+
+        <div className="doc-hero-actions">
+          <div className="doc-hero-install">
+            <code>npm install pdfjs-react-reader pdfjs-dist</code>
+          </div>
+          <a href="#/shell" className="doc-hero-btn doc-hero-btn-primary">
+            Explore Shell
+          </a>
+          <a href="#/headless" className="doc-hero-btn doc-hero-btn-secondary">
+            Headless Hooks
+          </a>
+        </div>
+
+        <div className="doc-hero-chips">
+          <span className="doc-chip">⚡ 60 FPS Virtualized</span>
+          <span className="doc-chip">📦 0 Runtime Dependencies</span>
+          <span className="doc-chip">⚖️ 100% Free MIT</span>
+          <span className="doc-chip">⚛️ React 18 &amp; 19</span>
+          <span className="doc-chip">🛡️ pdfjs-dist 6.x</span>
+          <span className="doc-chip">📱 Mobile Touch &amp; Gestures</span>
+        </div>
+      </div>
+
+      <div style={{ margin: '32px 0 16px' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: '18px' }}>Interactive Live Playground</h3>
+        <p style={{ margin: '0 0 16px', color: 'var(--doc-muted)', fontSize: '14px' }}>
+          Test real document rendering, layout switching, form filling, and feature toggles live in your browser:
+        </p>
+      </div>
 
       <ShellExample />
 
@@ -120,12 +156,28 @@ export function Introduction() {
           <tr>
             <td>
               <code>
-                pdfjs-react-reader/features/{'{print | download | forms | outline | layers | attachments | annotate}'}
+                pdfjs-react-reader/features/{'{print | download | forms | outline | layers | attachments | annotate | structure}'}
               </code>
             </td>
             <td>
               One optional capability each: its <code>Runner</code>, toolbar control, keys and panel, passed to{' '}
               <code>PdfViewer</code> as <code>features</code>. <a href="#/features">Features &amp; tiers</a>.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/labels</code>
+            </td>
+            <td>
+              Default English UI string catalog (<code>DEFAULT_LABELS</code>) and label types.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>pdfjs-react-reader/locales/{'{de | es | fr}'}</code>
+            </td>
+            <td>
+              Complete pre-translated language dictionaries for German, Spanish and French.
             </td>
           </tr>
           <tr>
@@ -136,7 +188,7 @@ export function Introduction() {
           </tr>
           <tr>
             <td>
-              <code>pdfjs-react-reader/{'{print | forms | outline | layers | attachments | annotate | edit}'}.css</code>
+              <code>pdfjs-react-reader/{'{print | forms | outline | layers | attachments | annotate | structure | edit}'}.css</code>
             </td>
             <td>
               The rules for those features&apos; markup, as separate files because a bundler drops CSS that no
