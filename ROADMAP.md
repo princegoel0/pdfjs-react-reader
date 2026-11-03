@@ -96,7 +96,7 @@ certified on this machine at all.
 | `FR-44` | High Contrast & Forced Colours | **met** | 5/5 | 0 | — |
 | `FR-45` | WCAG 2.2 AA Conformance | **partial** | 5/5 | 3 | the pass itself has still not been run, and the record now says so in a form a person can sign a… |
 | `FR-46` | SSR-Safe Module Graph | **met** | 5/5 | 0 | — |
-| `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the one-finger clause is now measured rather than reasoned about, in one engine: `scripts/browse… |
+| `FR-47` | Touch & Gesture Handling (v1.0) | **partial** | 5/5 | 1 | the one-finger clause is now measured rather than reasoned about, in one engine: Chromium runs C… |
 | `FR-48` | Browser & Engine Verification Matrices | **partial** | 5/5 | 6 | the browser job runs on the runner on every push to dev, and its readings are recorded here run … |
 | `FR-49` | Benchmark Fixture Suite | **partial** | 5/5 | 4 | profile D's committed harness is a throttled Chromium with a phone-class user agent; §6 also ask… |
 | `FR-50` | Published API Maturity | **met** | 5/5 | 0 | — |

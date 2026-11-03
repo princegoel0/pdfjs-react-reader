@@ -189,9 +189,10 @@ export function audit(register, prdRows, matrixAnchors, roadmapText) {
       problems.push(`${id} carries a "clause" key — the requirement text lives in PRD.md, never copied here`);
     }
 
-    const lists = ['implementation', 'automated', 'acceptance', 'documentation', 'regressionGuard'];
+    const lists = ['implementation', 'automated', 'acceptance', 'documentation', 'regressionGuard', 'packaging'];
     for (const kind of lists) {
       const entries = row[kind];
+      if (kind === 'packaging' && entries === undefined) continue;
       if (!Array.isArray(entries)) {
         problems.push(`${id}.${kind} is ${JSON.stringify(entries)}, expected an array (empty is allowed)`);
         continue;
@@ -230,6 +231,11 @@ export function audit(register, prdRows, matrixAnchors, roadmapText) {
         problems.push(`${id}'s acceptanceWaiver is too short to be a reason: "${row.acceptanceWaiver}"`);
       }
       if (gaps && gaps.length) problems.push(`${id} is met but lists gaps: ${gaps.join('; ')}`);
+      // Per PRD §5.7 clause 6, requirements concerning exports, packaging, dependencies or types must carry packaging evidence
+      const PACKAGING_REQUIRED = new Set(['FR-21', 'FR-41', 'FR-50', 'FR-51']);
+      if (PACKAGING_REQUIRED.has(id) && !(row.packaging ?? []).length) {
+        problems.push(`${id} is met and concerns packaging/exports (PRD §5.7), but packaging evidence is empty`);
+      }
       // A guard that does not say what it guards is deleted as dead code in the next tidy-up, which is how a
       // verified requirement silently becomes unverified. One of the cited files must name the id.
       const namesId = [...(row.automated ?? []), ...(row.regressionGuard ?? [])].some((citation) => {
