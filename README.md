@@ -850,12 +850,16 @@ development, against the built `dist` in CI.
 ## Status
 
 Version `1.0.0`, built and verified on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, and
-all 12 legs of `npm run verify` pass — typecheck, 164 test files (1,448 tests), the build, the size ratchet, packaging,
+all 12 legs of `npm run verify` pass — typecheck, 164 test files (1,451 tests), the build, the size ratchet, packaging,
 examples, maturity, dependencies, the accessibility record check, the device verification record check, the docs figures and the evidence
 register. The candidate pipeline (`.github/workflows/release-candidate.yml`) has run on a clean runner from
 the packed artifact on Node 22.13.0 and Node 24 (`release/last-candidate.json`), and physical mobile device passes on
 iPhone 16 (iOS 18.5, Safari 18.5) and Google Pixel 9 Pro XL (Android 15, Chrome 152.0.0.0) are recorded in `device/`
-and guarded by `npm run check:device`.
+and guarded by `npm run check:device`. `verify` alone is not what guards the publish: `prepublishOnly` runs
+`npm run release:validate` after it, which refuses unless the CI run for the exact SHA is green in **both** browser
+matrix cells, a candidate record bound to this version, commit and artifact digest is green on every leg, the tag
+exists and the registry does not already carry the number — and `npm run publish:preflight` / `publish:readback`
+bracket the write itself, so "published" means the registry's own tarball hashes to the bytes the candidate tested.
 
 **`1.0.0` is currently a Release Candidate ready on `dev` and not yet published to npm.** In strict adherence
 to PRD §9 release gates and dated amendment (2026-11-03): `a11y/certifications.json` records all three screen-reader

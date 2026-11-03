@@ -252,6 +252,8 @@
     "check:device": "node scripts/check-device-records.mjs",
     "rc:record": "node scripts/rc-record.mjs",
     "release:validate": "node scripts/release-validate.mjs",
+    "publish:preflight": "node scripts/publish-preflight.mjs",
+    "publish:readback": "node scripts/publish-preflight.mjs --readback",
     "verify": "npm run typecheck && npm run test && npm run build && npm run size && npm run check:packaging && npm run check:examples && npm run check:maturity && npm run check:deps && node scripts/a11y-certify.mjs --check && npm run check:device && npm run check:docs && npm run check:fr-evidence",
     "prepublishOnly": "npm run verify && npm run release:validate",
     "a11y:certify": "node scripts/a11y-certify.mjs"

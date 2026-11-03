@@ -17,18 +17,41 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   registry already carries; and refuses an untagged HEAD, so the tag precedes the publish. `scripts/rc-record.mjs`
   now derives `passes` from its own leg list rather than leaving a reader to re-derive it, which is what makes
   the committed `v1.0.0-rc.1` record — `benchmarks=skipped` on its Node 24 cell — read as not-green instead of
-  as a footnote. `src/lib/release-gate.test.ts` (16 cases) breaks each refusal on purpose, spawns the real CLI so
+  as a footnote. `src/lib/release-gate.test.ts` (19 cases) breaks each refusal on purpose, spawns the real CLI so
   a gate that silently declines to run cannot pass, and ties the required job counts to ci.yml's own matrices.
   Against today's real state the gate refuses three times over: untagged HEAD, `6.2.108` red, no `v1.0.0`
   candidate. `verify`'s counts and README's stated totals were two releases stale (161/1,426 against a tree of
-  164/1,448) and are corrected here; the test *total* is still the one figure `check:docs` deliberately does not
-  derive, which is why it drifted.
+  164/1,448 at that commit) and are corrected there; the test *total* is still the one figure `check:docs`
+  deliberately does not derive, which is why it drifted.
+
+- **The registry write now has a preflight and a read-back (`FR-58`).** §9 and the release runbook both ask
+  for the two steps that surround an irreversible write, and neither existed: `npm publish` was attempted cold and
+  never confirmed from the consumer's side. `scripts/publish-preflight.mjs` is one tool with both halves.
+  `npm run publish:preflight` writes nothing and refuses five things it can check without asking permission — an
+  unauthenticated host (the message names the *token type*, because #207 measured that a Publish-type token
+  authenticates and is then refused `EOTP` by `npm deprecate`), a dirty tree, an untagged HEAD, a `pack --dry-run`
+  that cannot build, and a version the registry already carries, since a burned number cannot be reused. It prints
+  the username `npm whoami` returns and nothing else; no credential ever enters this file, and the npm commands it
+  can run are a literal allowlist it throws on. `npm run publish:readback` then reads the published package back
+  as a consumer does — `dist-tags.latest`, the version's own registry entry, and the sha256 of the tarball the
+  registry actually serves — and compares that hash with the digest the green candidate record bound, so
+  "published" means the bytes a user will install were the bytes the candidate tested. A lagging replica reads as
+  *re-run*, never as a licence to publish again, and an unpublished version reads as "not there yet" rather than as
+  four complaints including a hash of nothing. Measured against the real registry and the real tree on 2026-11-03:
+  preflight exits 1 with the three reasons it should (not authenticated on this console, seven files dirty, HEAD
+  untagged), and read-back exits 1 naming `dist-tags.latest is 0.1.2, not 1.0.0`, the version's absence and the
+  tarball it could not fetch. Two instrumentation lessons went into the file rather than being worked around by
+  hand: `npm` is `npm.cmd` here, so a plain `execFileSync` reported "not authenticated" and "pack failed" on a
+  machine where both were fine; and the candidate digest is only worth comparing once there is a downloaded tarball
+  to compare against. Three more cases in `src/lib/release-gate.test.ts` falsify each refusal, and the wiring case
+  now names both new scripts by their exact command strings, so a typo in `package.json` cannot leave either half
+  unrunnable.
 
 
 
 ## [1.0.0] - 2026-11-03
 
-- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,448 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
+- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,451 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
   - **Mobile Device Verification Scope & Hardening:** Real hardware test sessions executed and recorded via BrowserStack Local on iPhone 16 (iOS 18.5 Safari 18.5) and Google Pixel 9 Pro XL (Android 15 Chrome 152.0.0.0). Hardened harness with `scripts/check-device-records.mjs` and `src/lib/device-verification.test.ts` to strictly refuse fallback to OS versions, enforce failable touch arbitration verdicts, and record per-verdict empirical observations (`device/ios-safari-18.json`, `device/android-chrome-128.json`). Full interactive mobile user tasks remain unverified in PRD §8 and are scheduled for 1.x.
   - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
   - **Screen Reader Verification Status & PRD §9 Amendment:** In accordance with PRD §9 dated amendment (2026-11-03), canonical `a11y/certifications.json` maintains `not-run` for all three assistive-technology pairings (NVDA, JAWS, VoiceOver) with their respective environment and operator blockers documented, designated as open release gates for 1.x. Release 1.0.0 is guarded and validated by automated axe-core WCAG 2.2 AA audits (`npm run a11y`), structure tree integration (FR-43), and forced colors conformance (FR-44).

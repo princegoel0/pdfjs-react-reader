@@ -29,6 +29,7 @@ import {
   requiredLegsFrom,
   tagProblems,
 } from '../../scripts/release-validate.mjs';
+import { expectedDigest, preflightProblems, readbackProblems } from '../../scripts/publish-preflight.mjs';
 
 const repo = process.cwd();
 const SHA = '0123456789abcdef0123456789abcdef01234567';
@@ -236,6 +237,72 @@ describe('FR-58: the registry and the tag are consulted, not assumed', () => {
     const pkg = JSON.parse(readFileSync(`${repo}/package.json`, 'utf8'));
     expect(pkg.scripts.prepublishOnly).toContain('npm run release:validate');
     expect(pkg.scripts['release:validate']).toBe('node scripts/release-validate.mjs');
+    expect(pkg.scripts['publish:preflight']).toBe('node scripts/publish-preflight.mjs');
+    expect(pkg.scripts['publish:readback']).toBe('node scripts/publish-preflight.mjs --readback');
     expect(pkg.scripts.verify).toMatch(/check:fr-evidence$/);
+  });
+});
+
+describe('FR-58: the registry write is prefaced and followed, not just attempted', () => {
+  const clean = {
+    version: VERSION,
+    name: NAME,
+    whoami: 'princegoel072',
+    packument: { versions: {} },
+    described: `v${VERSION}`,
+    dirty: '',
+    dryRunOk: true,
+  };
+
+  it('refuses an unauthenticated host, a dirty tree, an untagged HEAD or a taken version', () => {
+    expect(preflightProblems({ ...clean, whoami: '' }).join(' ')).toMatch(/npm is not authenticated/);
+    // #207's lesson is that a name is not proof the write will be accepted — a Publish-type token is refused
+    // `EOTP` by `npm deprecate`, so the message has to point at the token type rather than its presence.
+    expect(preflightProblems({ ...clean, whoami: '' }).join(' ')).toMatch(/token type/);
+    expect(preflightProblems({ ...clean, dirty: ' M src/lib/x.ts\n M package.json' }).join(' ')).toMatch(/working tree is dirty \(2 file\(s\)\)/);
+    expect(preflightProblems({ ...clean, described: '' }).join(' ')).toMatch(/HEAD is \(untagged\)/);
+    expect(preflightProblems({ ...clean, packument: { versions: { [VERSION]: {} } } }).join(' ')).toMatch(/burned permanently/);
+    expect(preflightProblems({ ...clean, dryRunOk: false }).join(' ')).toMatch(/cannot be built/);
+    expect(preflightProblems(clean)).toEqual([]);
+  });
+
+  it('names a green candidate digest only when one green record binds one digest', () => {
+    const legs = requiredLegsFrom(readFileSync(`${repo}/scripts/rc-record.mjs`, 'utf8')).map((l) => leg(l));
+    const green = { tag: `v${VERSION}`, commit: SHA, legs, artifact: { file: 'a.tgz', sha256: 'b'.repeat(64) } };
+    expect(expectedDigest([green])).toBe('b'.repeat(64));
+    // rc.1's three records describe one tarball: the merged file and the Node 24 cell skipped `benchmarks`, so
+    // only the Node 22.13.0 cell is green — and its digest is what a published tarball must be compared against.
+    const records = ['release/last-candidate.json', 'release/last-candidate-node22.13.0.json', 'release/last-candidate-node24.json'].map(
+      (file) => ({ file, ...JSON.parse(readFileSync(`${repo}/${file}`, 'utf8')) }),
+    );
+    const node22 = records.find((r) => r.file.endsWith('node22.13.0.json'));
+    expect(expectedDigest(records), `expected one digest, got ${expectedDigest(records)}`).toBe(node22?.artifact?.sha256);
+    const merged = records.find((r) => r.file === 'release/last-candidate.json');
+    expect(deriveCandidatePasses(merged?.legs ?? []), 'the merged record must stay not-green while a leg was skipped').toMatchObject({
+      passes: false,
+    });
+    expect(expectedDigest([{ legs: [leg('verify-chain', 'failure')], artifact: { sha256: 'c'.repeat(64) } }])).toBeNull();
+  });
+
+  it('treats a lagging registry as a re-run, never as a licence to publish again', () => {
+    const ok = {
+      version: VERSION,
+      name: NAME,
+      packument: { versions: { [VERSION]: {} }, 'dist-tags': { latest: VERSION } },
+      downloaded: true,
+      latestTag: VERSION,
+      digest: 'b'.repeat(64),
+      bound: 'b'.repeat(64),
+    };
+    expect(readbackProblems(ok)).toEqual([]);
+    expect(readbackProblems({ ...ok, latestTag: '0.1.2' }).join(' ')).toMatch(/re-run before you re-publish/);
+    expect(readbackProblems({ ...ok, packument: { versions: {}, 'dist-tags': { latest: VERSION } } }).join(' ')).toMatch(/absence is not proof/);
+    expect(readbackProblems({ ...ok, digest: 'd'.repeat(64) }).join(' ')).toMatch(/is not the digest the green candidate record bound/);
+    expect(readbackProblems({ ...ok, bound: null }).join(' ')).toMatch(/nothing to be compared against/);
+    expect(readbackProblems({ ...ok, downloaded: false, digest: '' }).join(' ')).toMatch(/read-back did not happen/);
+    // An unpublished version must read as "not there yet", not as four complaints including a hash of nothing.
+    const unpublished = { ...ok, packument: { versions: {}, 'dist-tags': { latest: '0.1.2' } }, latestTag: '0.1.2', downloaded: false, digest: '' };
+    expect(readbackProblems(unpublished).join(' ')).toMatch(/re-run before you re-publish/);
+    expect(readbackProblems(unpublished).join(' '), readbackProblems(unpublished).join(' ')).not.toMatch(/sha256/);
   });
 });
