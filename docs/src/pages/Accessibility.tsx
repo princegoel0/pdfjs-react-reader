@@ -23,10 +23,10 @@ export function Accessibility() {
       <p>
         FR-45 requires NVDA with Firefox, JAWS with Chromium, and VoiceOver with Safari.{' '}
         <code>a11y/certifications.json</code> holds one row per pairing. Today all three read{' '}
-        <code>not-run</code>, and each row names the thing that is missing — the reader is not installed on the
-        machine that builds this package, and VoiceOver needs macOS with Safari rather than WebKit under a
-        driver. That is a reading of this project&rsquo;s environment, recorded so a host can see what has and has
-        not been tested.
+        <code>not-run</code>, and each row names the thing that is missing — NVDA and Firefox are both installed
+        on the machine that builds this package, so that row waits on an operator and a transcribed session; JAWS is
+        licensed software and is not installed, and VoiceOver needs macOS with Safari rather than WebKit under a
+        driver. That is a reading of this project&rsquo;s environment, recorded so a host can see what has and has not been tested.
       </p>
 
       <h2>Running a pass</h2>

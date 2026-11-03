@@ -107,7 +107,7 @@ certified on this machine at all.
 | `FR-55` | Worker & Source Security Contract | **met** | 5/5 | 0 | — |
 | `FR-56` | Feature Lifecycle Contract | **met** | 5/5 | 0 | — |
 | `FR-57` | Runtime Resource Budget Contract | **met** | 5/5 | 0 | — |
-| `FR-58` | Release Evidence & Consumer Verification | **partial** | 5/5 | 3 | the chain now exists and is guarded, and it has still never run. `npm run check:upgrade` install… |
+| `FR-58` | Release Evidence & Consumer Verification | **partial** | 5/5 | 3 | the chain now exists, is guarded, and has run clean on a runner: tag `v1.0.0-rc.1` at commit `1f… |
 
 <!-- FR-EVIDENCE:STATUS:END -->
 
@@ -370,7 +370,7 @@ reads `partial`.
 | **An independent PDF reader** — `qpdf --check`, MuPDF, Poppler's `pdfinfo` | the save, flatten, page-edit and signature round trips, which are today re-opened by pdf.js: the same engine family that wrote them | absent; the only tool on the PATH is `pdftotext`, shipped inside Git for Windows, which reads text and nothing else | free |
 | **A second engine version locally** | the 6.2.108 / 6.4.299 spread is runner evidence; a local run measures the one installed engine and must not be read as the axis | satisfied by CI; nothing to install | — |
 
-**Tier 3 — only a person brings these.** NVDA with a standalone Firefox for the NVDA + Firefox pairing; JAWS for
+**Tier 3 — only a person brings these.** The NVDA + Firefox pairing needs an operator, not an install — both are on this host — while JAWS for
 JAWS + Chromium, whose licence cost makes the honest options buy or amend §9; VoiceOver on Apple hardware. None
 of it is automatable through any service, and `a11y/certifications.json` already refuses a `pass` row without a
 named operator, a real environment and a date — which is the correct shape: the record states plainly that no
@@ -2814,14 +2814,14 @@ because neither was resolved by writing the feature someone had asked for:
   withdrawn from root and `/headless`, `annotateFeature`'s ink is the only pen, and FR-18 keeps its id with
   the permanent reason — which is what §9's second bullet and §2.5's withdrawal rule require rather than a
   deletion.
-* **`#141`** — the real-device matrix. **What changed is the environment, not the evidence.** BrowserStack
+* **`#141`** — the real-device matrix. **The environment changed, and then the evidence came.** BrowserStack
   Local is installed on this machine, its account authenticates against the platform API, and the plan
   carries iOS 18 hardware (iPhone 16 among the devices offered at that OS) and Android 15 hardware
   (Galaxy S25, Pixel 9), with **one parallel session**, so device passes run serially and the harness must be
   built that way. The catalog offers no Safari 18.0 — 18.4 and later are what it lists — so a device pass
-  cannot certify §8's pinned floor, and #280's ruling is not affected by it. Still missing: the owner's go on
-  spending the minutes, and a named operator for the screen-reader half. See
-  *Real devices: claim or strike* for what that path now looks like.
+  cannot certify §8's pinned 18.2 floor either, and #280's ruling is not affected by it. The sessions have now run,
+  on 2026-11-02, and are committed in `device/` under `npm run check:device` — mount, rasterisation, hardware touch
+  points and `touch-action` arbitration, and not the six user tasks. What is still missing is an operator and a transcribed session for the screen-reader half. See *Real devices: claim or strike* for what that path looks like.
 * **`#143`** — the accessibility audit, moved here from the `0.8` row that promised it. **Closed on both
   halves, on different dates.** The named item — `PdfPage` passing `structTreeLayer: null` in two places, so
   the tagged-PDF structure §6's Accessibility NFR asks screen readers to be given was declined in code — went
@@ -2915,8 +2915,8 @@ it is described under *The claim path*.
 
 | # | The claim | Where it is written | What would retire it |
 | :--- | :--- | :--- | :--- |
-| 1 | iOS Safari 18 is in the `1.0.0` contract, evidence `unverified`, and §8 requires "Simulator or emulation **plus** a real-device pass per release" | `PRD.md:1125` | A named device, OS build, date and operator against a committed artifact |
-| 2 | Android Chrome 125, same shape: "Chromium engine floor plus a real-device pass per release" | `PRD.md:1126` | as above |
+| 1 | iOS Safari is in the `1.0.0` contract with evidence `unverified`, and §8 requires "Simulator or emulation **plus** a real-device pass per release" | `PRD.md:1149` | A named device, OS build, date and operator against a committed artifact — done for the mount half on 2026-11-02 (`device/ios-safari-18.json`, iPhone 16, iOS 18.5, Safari 18.5, operator named); the six tasks are outstanding |
+| 2 | Android Chrome 128, same shape: "Chromium engine floor plus a real-device pass per release" | `PRD.md:1150` | as above — done for the mount half on 2026-11-02 (`device/android-chrome-128.json`, Pixel 9 Pro XL, Android 15, Chrome 152.0.0.0), tasks outstanding |
 | 3 | The rule that emulation and a device are *different evidence*, which is what makes rows 1–2 unmet rather than met-by-substitute | `PRD.md:1158` | nothing — this is the policy the other rows cite |
 | 4 | A mobile browser that reports a desktop-class user agent (iPad Safari) still gets the **probed** canvas ceiling, not a UA-derived one | `PRD.md:896` | one page load on that hardware, printing the probe's answer and the ceiling it chose |
 | 5 | FR-45's VoiceOver + Safari pairing is a required release pass, alongside NVDA + Firefox and JAWS + Chromium | `PRD.md:632`, gate bullets at `PRD.md:1181` and `:1195` | an operator pass with the pairing named, dated, and recorded against the release candidate |
