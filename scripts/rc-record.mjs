@@ -15,6 +15,10 @@
  *   - any attempt to record the candidate as *certified*: signing §9 is the owner's act, and a script that could
  *     write that word would eventually do it by accident.
  *
+ * What it derives rather than declares: `passes` comes from the legs, so a record with a `skipped` leg says so in a
+ * field the publish gate reads — `scripts/release-validate.mjs` refuses `passes: false`, and the record itself stays
+ * a truthful account of the run instead of being withheld.
+ *
  * Usage (from the release-candidate workflow):
  *   node scripts/rc-record.mjs --tag=<ref> --out=release/last-candidate.json \
  *     --leg=esm-cjs-resolution:success --leg=upgrade-path:success …
@@ -22,6 +26,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { deriveCandidatePasses } from './release-validate.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -111,6 +116,7 @@ const memoryGb = Number(
   (readOr('/proc/meminfo').match(/MemTotal:\s+(\d+)/)?.[1] ?? 0) / 1024 / 1024,
 );
 
+const legList = REQUIRED_LEGS.map((leg) => ({ leg, conclusion: legs.get(leg) ?? 'absent' }));
 const record = {
   schema: 'pjsr/release-candidate@1',
   generatedAt: new Date().toISOString(),
@@ -132,7 +138,11 @@ const record = {
     react: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).peerDependencies.react,
     'pdfjs-dist': JSON.parse(readFileSync(join(repo, 'node_modules', 'pdfjs-dist', 'package.json'), 'utf8')).version,
   },
-  legs: REQUIRED_LEGS.map((leg) => ({ leg, conclusion: legs.get(leg) ?? 'absent' })),
+  legs: legList,
+  // Derived, not declared. A `skipped` leg is recorded truthfully here and refused by the gate that reads it, so
+  // a record can no longer be quoted as a green candidate while a leg never ran — measured on 2026-11-03, where
+  // the committed rc.1 record carries `benchmarks: skipped` on its Node 24 cell.
+  ...deriveCandidatePasses(legList),
   // The one word this script cannot write. §9's gate is signed by the owner; a record that could say `certified`
   // would, one day, be mistaken for the signature.
   certification: 'not certified — §9 is a human gate; see PRD.md §9 and ROADMAP.md W9',
@@ -147,7 +157,7 @@ if (problems.length) {
 const out = flag('out', 'release/last-candidate.json');
 mkdirSync(dirname(join(repo, out)), { recursive: true });
 writeFileSync(join(repo, out), `${JSON.stringify(record, null, 2)}\n`);
-const failed = record.legs.filter((l) => l.conclusion !== 'success').map((l) => `${l.leg}=${l.conclusion}`);
+const failed = record.notPassed;
 console.log(
   `wrote ${out}: ${record.legs.length} legs against ${record.artifact.file} (${record.artifact.sha256.slice(0, 12)}…) ` +
     `on ${record.environment.runner} · node ${record.environment.node} — ${failed.length ? `${failed.length} not green: ${failed.join(', ')}` : 'all green'}`,

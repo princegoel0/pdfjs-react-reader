@@ -7,11 +7,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **The publish gate is no longer `verify` alone (`FR-58`, #319).** `prepublishOnly` ran `npm run verify`, and
+  `verify` never runs the browser matrix — measured 2026-11-03, where `verify` exited 0 on a tree whose
+  `Browser matrix (… pdfjs-dist 6.2.108)` cell was red on `no-uncaught-errors`. Added
+  `npm run release:validate` (`scripts/release-validate.mjs`), which `prepublishOnly` now runs after `verify`:
+  it reads the CI run for the exact SHA being published and requires every `Verify`/`Packaging`/`Consumer build`
+  job and **both** `Browser matrix` cells `success`; requires a `release/last-candidate*.json` whose tag, commit
+  and artifact digest match, with **every leg green — a `skipped` leg is not a pass**; refuses a version the
+  registry already carries; and refuses an untagged HEAD, so the tag precedes the publish. `scripts/rc-record.mjs`
+  now derives `passes` from its own leg list rather than leaving a reader to re-derive it, which is what makes
+  the committed `v1.0.0-rc.1` record — `benchmarks=skipped` on its Node 24 cell — read as not-green instead of
+  as a footnote. `src/lib/release-gate.test.ts` (16 cases) breaks each refusal on purpose, spawns the real CLI so
+  a gate that silently declines to run cannot pass, and ties the required job counts to ci.yml's own matrices.
+  Against today's real state the gate refuses three times over: untagged HEAD, `6.2.108` red, no `v1.0.0`
+  candidate. `verify`'s counts and README's stated totals were two releases stale (161/1,426 against a tree of
+  164/1,448) and are corrected here; the test *total* is still the one figure `check:docs` deliberately does not
+  derive, which is why it drifted.
+
 
 
 ## [1.0.0] - 2026-11-03
 
-- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 161 test files (1,426 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
+- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,448 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
   - **Mobile Device Verification Scope & Hardening:** Real hardware test sessions executed and recorded via BrowserStack Local on iPhone 16 (iOS 18.5 Safari 18.5) and Google Pixel 9 Pro XL (Android 15 Chrome 152.0.0.0). Hardened harness with `scripts/check-device-records.mjs` and `src/lib/device-verification.test.ts` to strictly refuse fallback to OS versions, enforce failable touch arbitration verdicts, and record per-verdict empirical observations (`device/ios-safari-18.json`, `device/android-chrome-128.json`). Full interactive mobile user tasks remain unverified in PRD §8 and are scheduled for 1.x.
   - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
   - **Screen Reader Verification Status & PRD §9 Amendment:** In accordance with PRD §9 dated amendment (2026-11-03), canonical `a11y/certifications.json` maintains `not-run` for all three assistive-technology pairings (NVDA, JAWS, VoiceOver) with their respective environment and operator blockers documented, designated as open release gates for 1.x. Release 1.0.0 is guarded and validated by automated axe-core WCAG 2.2 AA audits (`npm run a11y`), structure tree integration (FR-43), and forced colors conformance (FR-44).

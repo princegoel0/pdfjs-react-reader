@@ -1747,7 +1747,8 @@
         "scripts/a11y-browser-record.mjs",
         "src/lib/a11y-browser-record.test.ts",
         "src/lib/release-candidate.test.ts",
-        "scripts/upgrade-check.mjs"
+        "scripts/upgrade-check.mjs",
+        "src/lib/release-gate.test.ts"
       ],
       "acceptance": [
         ".github/workflows/release-candidate.yml"
@@ -1759,7 +1760,9 @@
         "src/lib/a11y-record.test.ts",
         "src/lib/benchmark-record.test.ts",
         "src/lib/a11y-browser-record.test.ts",
-        "src/lib/release-candidate.test.ts"
+        "src/lib/release-candidate.test.ts",
+        "scripts/release-validate.mjs",
+        "src/lib/release-gate.test.ts"
       ],
       "gaps": [
         "the chain now exists, is guarded, and has run clean on a runner: tag `v1.0.0-rc.1` at commit `1f3e3ab`, run 41455503338, committed as `release/last-candidate.json` plus one record per Node cell. `npm run check:upgrade` installs the registry’s current release into a throwaway consumer, applies the packed candidate over it the way a host would, and then reads back the lockfile, the peer resolutions and every published name a 0.1.2 host could reach — a name that vanishes is a failure unless `api-maturity.json`’s `removed` ledger already announced it, which is the shape §5.5 promises and the shape FR-18’s fifteen withdrawn ink names satisfy. `scripts/rc-record.mjs` writes the candidate record, refusing a leg that is absent, a leg no job produces, a `success` with no run id or artifact digest behind it, and any attempt to write the word `certified` (§9 is signed by a person). `.github/workflows/release-candidate.yml` runs the seven legs on Node 22.13.0 and 24 against the artifact — `verify`, FR-41’s tarball proof, §5.6’s examples, the upgrade, the browser matrix at `dist/`, the axe audit, the two bench passes — and uploads what it recorded. What that run does not settle is stated by its own records rather than by this gap: the `benchmarks` leg returned `success` on the Node 22.13.0 cell and `skipped` on the 24.22.1 cell, so the merged record carries the skip, and `ci.yml` only grew `tags: [‘v*’]` so a tag also runs the React and engine axes this job does not. Both cells installed the same artifact (`pdfjs-react-reader-1.0.0.tgz`, sha256 a7df1a2b…) and resolved `pdfjs-dist@6.3.289` — the middle of the peer range, so the engine ends remain the `consumer` job’s evidence and not this one’s — the same tag produced a `failure` and a `cancelled` run before the `success`, which is why every record names its run id, and each carries `certification: not certified — §9 is a human gate`, which is exactly the shape #272 built its refusal to leave. The guard proves the writers refuse to lie; the run proves the chain passes.",
@@ -1771,7 +1774,8 @@
         "scripts/upgrade-check.mjs",
         "scripts/rc-record.mjs",
         ".github/workflows/release-candidate.yml",
-        "playground/vite.config.ts"
+        "playground/vite.config.ts",
+        "scripts/release-validate.mjs"
       ]
     }
   }
