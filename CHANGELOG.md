@@ -47,6 +47,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   now names both new scripts by their exact command strings, so a typo in `package.json` cannot leave either half
   unrunnable.
 
+- **`Deploy docs` no longer asks for a publication the environment has refused.** `docs.yml` triggered on `dev` as
+  well as `main`, but the Pages environment publishes from `main` only, so every dev push ended with a red run
+  saying `Branch "dev" is not allowed to deploy to github-pages due to environment protection rules` (measured on
+  run 41591091310, 2026-11-03: `Build site` green, `deploy` refused in 2 s). A failure that means nothing about the
+  code is how a real one gets ignored, and it was the reason the working branch's tip looked red beside #319.
+  Nothing is lost: `ci.yml`'s `Build docs` job runs on every non-`main` ref, so a dev push still builds and checks
+  the site — it just no longer pretends to publish it.
+
 - **#319's webkit throw now has an instrument, and four readings that rule things out (`FR-48`).** The engine's
   uncaught `null is not an object (evaluating '_DrawingEditor.#currentDraw.isCancellable')` has fired in two of the
   four recorded CI readings of one cell — always stamped with the row that happened to press next, which is the

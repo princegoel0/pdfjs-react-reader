@@ -78,7 +78,7 @@ export function candidateProblems(records, { version, sha }) {
   const wanted = `v${version}`;
   const matching = records.filter((r) => r.tag === wanted);
   if (matching.length === 0) {
-    return [`no candidate record carries tag ${wanted} (found: ${[...new Set(records.map((r) => r.tag || 'none'))].join(', ')} — tag before publishing, per §9]`];
+    return [`no candidate record carries tag ${wanted} (found: ${[...new Set(records.map((r) => r.tag || 'none'))].join(', ')} — tag before publishing, per §9)`];
   }
   const problems = [];
   const bound = matching.filter((r) => r.commit === sha);

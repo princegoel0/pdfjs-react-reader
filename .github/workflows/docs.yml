@@ -2,9 +2,17 @@ name: Deploy docs
 
 # The published site mirrors `main`, the release branch, so a `dev` push or a
 # pull request only gets checked by ci.yml and never reaches readers.
+#
+# `dev` is therefore not a trigger here. It used to be, and every dev push answered with a red
+# `Deploy docs` run: the Pages environment refuses a branch it is not configured to publish from
+# ("Branch \"dev\" is not allowed to deploy to github-pages due to environment protection rules",
+# run 41591091310 measured 2026-11-03), so the workflow asked for a publication the environment had
+# already refused, and the tip of the working branch carried a failure that meant nothing about the
+# code. Nothing is lost by removing it — ci.yml's `Build docs` job runs on every non-`main` ref, so
+# a dev push still builds and checks the site; it just no longer pretends to publish it.
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   # Republish without a code change, e.g. after flipping a Pages setting.
   workflow_dispatch:
 
