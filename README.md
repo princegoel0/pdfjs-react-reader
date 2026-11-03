@@ -98,7 +98,7 @@ Core, in every import of the shell:
 - **Localisable** — every string in the shell lives in one typed catalog, 137 labels since `0.12` withdrew the ink controls and the pen gained its disclosure; override
   the subset you need and the rest keeps its English default, or take a complete language from
   `pdfjs-react-reader/locales/de`, `/fr` or `/es` — 2.35–2.39 kB gzipped each, and a separate entry so
-  importing the viewer never hands you a language you did not ask for. The default English catalog is available at `pdfjs-react-reader/labels` (`DEFAULT_LABELS`, #227), keeping the core bundle light for consumers supplying their own dictionaries.
+  importing the viewer never hands you a language you did not ask for. The default English catalog is available at `pdfjs-react-reader/labels` (`DEFAULT_LABELS`, #227) as well as re-exported from the root `pdfjs-react-reader` for backward compatibility with 0.1.2.
 - **Composable** — the shell's state is `useViewerController`, published through `ViewerProvider`, and
   the four parts (`ViewerRoot`, `ViewerToolbar`, `ViewerSidebar`, `ViewerPages`) read it. Write your own
   arrangement without forking anything, and hand the toolbar `{ hide, priorities, order, add }` to
@@ -648,7 +648,7 @@ release close: every figure below is the one `npm run size` measured and wrote t
 | All nine | 49.94 kB | +16.35 kB |
 | A single headless hook (`usePdfDocument`) | 5.78 kB | — |
 | A merge, on its own (`/merge`, writer and hook) | 1.70 kB | separate entry, not over core |
-| The same two shipped paths as CommonJS (`index.cjs`, `headless.cjs`) | 62.49 / 33.22 kB | the other format, not another feature |
+| The same two shipped paths as CommonJS (`index.cjs`, `headless.cjs`) | 62.5 / 33.22 kB | the other format, not another feature |
 | A shipped locale catalog (`locales/de`, `/fr` or `/es`) | 2.35–2.39 kB | separate entry, not over core |
 
 Summing the shipped files of a whole entry — what a bundler that cannot tree-shake pays — gives
@@ -858,10 +858,10 @@ iPhone 16 (iOS 18.5, Safari 18.5) and Google Pixel 9 Pro XL (Android 15, Chrome 
 and guarded by `npm run check:device`.
 
 **`1.0.0` is currently a Release Candidate ready on `dev` and not yet published to npm.** In strict adherence
-to PRD §9 release gates: `a11y/certifications.json` records all three screen-reader pairings FR-45
-names as `not-run` pending human operator sign-off across all three environments; an NVDA 2026.3 + Firefox 159.0 session
+to PRD §9 release gates and dated amendment (2026-11-03): `a11y/certifications.json` records JAWS and VoiceOver as `not-run`
+with measured host blockers, designated as open gates for 1.x. An NVDA 2026.3 + Firefox 159.0 human operator session
 has been executed and documented in `a11y/nvda-firefox-session.log`, while JAWS + Chromium and VoiceOver + Safari await
-operator sessions. The mobile device records have been hardened with strict falsifiability checks and per-verdict observations
+operator sessions. The mobile device records in `device/` verify shell mounting, canvas rasterisation, and touch arbitration, while full interactive tasks remain unverified per PRD §8 (scheduled for 1.x).
 (`scripts/check-device-records.mjs`). §8 rows for Firefox, macOS Safari, iOS and Android reflect engine floors
 Chromium 128 / Firefox 133 / Safari 18.2. The canonical requirement register in `npm run check:fr-evidence`
 records 51 `met` / 7 engine-bounded `partial` rows, awaiting final human production authorization for npm publication.

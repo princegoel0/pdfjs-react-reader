@@ -204,6 +204,7 @@ export {
 } from './lib/print';
 export { downloadBytes, pdfFileName } from './lib/download';
 export {
+  DEFAULT_LABELS,
   formatLabel,
   type PdfViewerLabels,
   type PdfViewerLabelsOverride,

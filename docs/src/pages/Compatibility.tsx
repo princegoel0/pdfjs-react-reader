@@ -525,8 +525,8 @@ export function Compatibility() {
         <code>PJSR_TARGET=dist</code> runs the same browser rows against the build rather than the sources, and the
         harness <em>refuses to run</em> when it is asked for the artifact and the page is served <code>src</code>.
         Both are steps in <code>.github/workflows/release-candidate.yml</code>, which is what PRD §9 means by a
-        candidate tested on a clean runner from the packed artifact — and, said plainly, that chain has not run yet,
-        so it is built rather than certified.
+        candidate tested on a clean runner from the packed artifact — successfully executed in CI run 41455503338
+        on Node 22.13.0 and Node 24 (recorded in <code>release/last-candidate.json</code>).
       </p>
       <table className="doc-table">
         <thead>
@@ -647,7 +647,7 @@ export function Compatibility() {
             </td>
             <td>
               If you are on <code>0.1.2</code> — the only version a host could have installed — the work to reach
-              1.0 is the seven steps above taken <em>together</em>, because <code>0.2</code>–<code>0.12</code> were
+              1.0 is the steps above taken <em>together</em> (including <code>DEFAULT_LABELS</code> modularized to <code>pdfjs-react-reader/labels</code> while preserved on root, and ink APIs superseded by <code>annotateFeature</code>), because <code>0.2</code>–<code>0.12</code> were
               never published. Pin the version, and treat a minor bump as a real upgrade from there on.
             </td>
           </tr>

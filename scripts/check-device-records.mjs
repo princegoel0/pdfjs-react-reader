@@ -202,3 +202,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   console.log('\nAll device records verified.');
   process.exit(0);
 }
+

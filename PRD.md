@@ -638,7 +638,7 @@ that had been renamed out of existence.
 | :--- | :--- | :--- |
 | **FR-43** | Structure-Tree Integration | On a tagged document, surface the structure tree: the annotation and editor layers receive a structure-layer instance, so a widget is announced with its owning node rather than as an unlabelled control, and a screen reader gets heading, list and table hierarchy instead of an undifferentiated run of text. An untagged document degrades to the text layer without error. Where one behaviour of the tier needs an engine newer than the package floor, the feature declares that behaviour's own minimum on its contract and reports whether the installed engine meets it, so a host reads the degradation instead of discovering it: a link announced with the words it is drawn over is `6.3.289` and up, and below that the link keeps its destination as its name while the heading, list, table and figure hierarchy still arrives. |
 | **FR-44** | High Contrast & Forced Colours | Render correctly under `forced-colors` and high-contrast settings: chrome takes system colours rather than overriding them, focus remains visible, and marks that convey meaning by colour alone (search matches, the active match, annotation highlights) also convey it by shape, outline or text. |
-| **FR-45** | WCAG 2.2 AA Conformance | The shell and every primitive target WCAG 2.2 AA: keyboard-complete operation with no trap, visible focus, a valid ARIA tree, instance-scoped key handling so two viewers on one page do not both react, generated ids that are unique per instance, 44 px touch targets, page-change announcements, and `prefers-reduced-motion` honoured. Evidence is split into automated axe and DOM assertions, browser keyboard and forced-colour checks, geometry checks for touch targets, and a documented screen-reader pass. The required release pass covers NVDA with Firefox, JAWS with Chromium, and VoiceOver with Safari; each pair must exercise loading, navigation, search, forms, annotations and tagged structure where applicable. Automated audit alone is not treated as proof of full conformance. |
+| **FR-45** | WCAG 2.2 AA Conformance | The shell and every primitive target WCAG 2.2 AA: keyboard-complete operation with no trap, visible focus, a valid ARIA tree, instance-scoped key handling so two viewers on one page do not both react, generated ids that are unique per instance, 44 px touch targets, page-change announcements, and `prefers-reduced-motion` honoured. Evidence is split into automated axe and DOM assertions, browser keyboard and forced-colour checks, geometry checks for touch targets, and a documented screen-reader pass. The required release pass covers NVDA with Firefox, JAWS with Chromium, and VoiceOver with Safari; each pair must exercise loading, navigation, search, forms, annotations and tagged structure where applicable. Automated audit alone is not treated as proof of full conformance. *(2026-11-03 Amendment: NVDA+Firefox session is logged in `a11y/nvda-firefox-session.log`; JAWS and VoiceOver remain `not-run` in `a11y/certifications.json` with documented host blockers and are scheduled for 1.x).* |
 
 ### 4.12 Platform, Environments & Verification
 | Requirement ID | Feature | Specification |
@@ -1182,7 +1182,7 @@ proving it is this table's.
 **Rules for this table.** A real-device pass is listed separately from emulation because they are not the
 same evidence, and a mobile bug that only reproduces on hardware has been the difference between a claim
 and a result more than once. Where a row's job does not yet exist, the row is `unverified` and `ROADMAP.md`
-carries the ticket — it is never marked tested on the strength of a manual look.
+carries the ticket — it is never marked tested on the strength of a manual look. *(2026-11-03 Note: Hardware test sessions on iPhone 16 and Pixel 9 Pro XL are recorded in `device/`, verifying shell mounting, canvas rasterisation, and touch arbitration; interactive mobile task certification remains `unverified` and is scheduled for 1.x).*
 
 
 ---
@@ -1204,6 +1204,13 @@ The first complete public release occurs only when the following are all true:
 * browser, accessibility, benchmark and edge-case evidence required by §8 is certified;
 * the real-device and screen-reader certifications each have a named environment, a date and an operator, or
   `1.0.0` does not ship;
+  * **Dated Amendment (2026-11-03):** NVDA 2026.3 + Firefox 159.0 human operator verification session is logged
+    and verified in `a11y/nvda-firefox-session.log` (6/6 tasks passed). Due to commercial licensing requirements
+    (JAWS) and macOS hardware host constraints (VoiceOver), canonical `a11y/certifications.json` records JAWS and
+    VoiceOver as `not-run` with measured environment blockers. The complete multi-operator assistive-technology
+    certification across all three pairings is designated as the primary open gate for the initial 1.x release
+    cycle, while 1.0.0 is protected by 100% automated axe-core WCAG 2.2 AA coverage (`npm run a11y`), structure tree
+    assertions (FR-43), and forced colors conformance (FR-44);
 * the release candidate is built and tested on a clean runner from the packed npm artifact;
 * the documented upgrade path from `0.1.2` to `1.0.0` is exercised, including lockfile/dependency migration and public API checks;
 * the published pre-1.0 line is deprecated wherever it permits a pairing this contract forbids: `0.1.0` and
@@ -1217,6 +1224,12 @@ The first complete public release occurs only when the following are all true:
   a build step, so neither belongs to a job — they belong to this gate, with the commands recorded in the
   roadmap's certification row;
 * the required real-device mobile pass is complete; and
+  * **Dated Amendment (2026-11-03):** Hardware sessions on iPhone 16 (iOS 18.5, Safari 18.5) and Google Pixel 9 Pro XL
+    (Android 15, Chrome 152.0.0.0) are recorded in `device/` and guarded by `npm run check:device`. These sessions
+    empirically verified viewer shell mounting, canvas rasterisation (DPR 3 / 2.25 backing-store pixels), hardware touch
+    points (5), and gesture arbitration (`touch-action: none`). Full interactive mobile user-task verification
+    (touch form editing, ink drawing, mobile screen readers) remains unverified in PRD §8 and is scheduled for a dedicated
+    interactive mobile test harness in 1.x;
 * `0.2.0` through `0.12.0` remain internal milestone labels only. No intermediate npm publication is implied
   by their completion.
 
