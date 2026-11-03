@@ -249,21 +249,43 @@ const WORD = [
 // The document side: one rule per figure, `groups` long.
 // ---------------------------------------------------------------------------
 
+/**
+ * §8's minimum column, read from inside §8 only, and refused rather than defaulted.
+ *
+ * The first version scanned every `| ` row in the document and fell back to hard-coded numbers when a lookup
+ * missed — so renaming `| Firefox |` left the gate green while deriving nothing, which is a guard that survives
+ * the disappearance of the thing it guards. Measured on 2026-11-03 by editing the heading and re-running it.
+ */
 function readPrdBrowserFloors(prdText = read('PRD.md')) {
+  const lines = prdText.split('\n');
+  const start = lines.findIndex((line) => /^## 8\./.test(line));
+  const rest = start < 0 ? -1 : lines.findIndex((line, i) => i > start && /^## \d+\./.test(line));
+  const section = rest < 0 ? lines.slice(start) : lines.slice(start, rest);
+  if (start < 0) throw new Error('PRD.md: no `## 8.` section to read the browser floors from');
+
   const found = new Map();
-  for (const line of prdText.split('\n')) {
+  for (const line of section) {
     if (!line.startsWith('| ')) continue;
     const cells = line.split('|').map((c) => c.trim());
     if (cells.length < 6) continue;
     found.set(cells[1], cells[4]);
   }
+
+  const version = (label, whole) => {
+    const cell = found.get(label);
+    if (!cell) throw new Error(`PRD.md §8 has no row labelled \`${label}\` — the floors cannot be derived`);
+    const match = whole ? /^(\d+)$/.exec(cell) || /^(\d+)/.exec(cell) : /^(\d+(?:\.\d+)*)$/.exec(cell);
+    if (!match) throw new Error(`PRD.md §8's \`${label}\` minimum is "${cell}", which is not a version`);
+    return whole ? Number(match[1]) : match[1];
+  };
+
   return {
-    chrome: Number(/^(\d+)/.exec(found.get('Chrome / Chromium') ?? '128')?.[1]),
-    edge: Number(/^(\d+)/.exec(found.get('Edge') ?? '128')?.[1]),
-    firefox: Number(/^(\d+)/.exec(found.get('Firefox') ?? '133')?.[1]),
-    safari: /^(\d+(?:\.\d+)*)/.exec(found.get('Safari (macOS)') ?? '18.2')?.[1],
-    ios: /^(\d+(?:\.\d+)*)/.exec(found.get('iOS Safari') ?? '18.2')?.[1],
-    android: Number(/^(\d+)/.exec(found.get('Android Chrome') ?? '128')?.[1]),
+    chrome: version('Chrome / Chromium', true),
+    edge: version('Edge', true),
+    firefox: version('Firefox', true),
+    safari: version('Safari (macOS)'),
+    ios: version('iOS Safari'),
+    android: version('Android Chrome', true),
   };
 }
 

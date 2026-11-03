@@ -28,19 +28,46 @@ describe('FR-48 / §3.1: Module separation and downward-only imports', () => {
     for (const file of sourceFiles) {
       const code = readFileSync(join(libDir, file), 'utf8');
       const sf = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true);
+      const isReact = (node: ts.Node | undefined): node is ts.StringLiteral =>
+        node !== undefined && ts.isStringLiteral(node) && (node.text === 'react' || node.text === 'react-dom');
 
-      for (const stmt of sf.statements) {
-        if (ts.isImportDeclaration(stmt)) {
-          const specifier = (stmt.moduleSpecifier as ts.StringLiteral).text;
-          if (specifier === 'react' || specifier === 'react-dom') {
-            const isTypeOnly = stmt.importClause?.isTypeOnly === true;
-            expect(
-              isTypeOnly,
-              `src/lib/${file} contains a runtime import from "${specifier}". PRD §3.1 forbids runtime React in core engine glue.`,
-            ).toBe(true);
-          }
+      /** True when every binding the clause names is marked `type`, so the compiler erases the whole edge. */
+      const allTypeOnly = (clause: ts.ExportDeclaration['exportClause']): boolean =>
+        clause !== undefined &&
+        ts.isNamedExports(clause) &&
+        clause.elements.length > 0 &&
+        clause.elements.every((element) => element.isTypeOnly);
+
+      const runtime: string[] = [];
+      const visit = (node: ts.Node): void => {
+        const name = (spec: ts.Node) => (spec as ts.StringLiteral).text;
+        if (ts.isImportDeclaration(node) && isReact(node.moduleSpecifier)) {
+          const named = node.importClause?.namedBindings;
+          const erased =
+            node.importClause?.isTypeOnly === true ||
+            (named !== undefined && ts.isNamedImports(named) && named.elements.length > 0 && named.elements.every((e) => e.isTypeOnly));
+          if (!erased) runtime.push(`import … from '${name(node.moduleSpecifier)}'`);
+        } else if (ts.isExportDeclaration(node) && isReact(node.moduleSpecifier)) {
+          // Re-exports were the hole: `export { useState } from 'react'` carries the same runtime edge as an
+          // import, and walking ImportDeclaration alone passed such a file. Measured on 2026-11-03.
+          if (!node.isTypeOnly && !allTypeOnly(node.exportClause)) runtime.push(`export … from '${name(node.moduleSpecifier)}'`);
+        } else if (
+          ts.isCallExpression(node) &&
+          node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+          isReact(node.arguments[0])
+        ) {
+          runtime.push(`await import('${name(node.arguments[0]!)}')`);
+        } else if (ts.isExternalModuleReference(node) && isReact(node.expression)) {
+          runtime.push(`require('${name(node.expression)}')`);
         }
-      }
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
+
+      expect(
+        runtime,
+        `src/lib/${file} binds React at runtime via ${runtime.join(', ')}. PRD §3.1 keeps core engine glue free of React.`,
+      ).toEqual([]);
     }
   });
 

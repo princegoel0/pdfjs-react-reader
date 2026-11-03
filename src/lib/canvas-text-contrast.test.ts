@@ -1,21 +1,20 @@
 /*
- * FR-45: WCAG 2.2 AA Conformance — Canvas Text Layer Contrast Verification.
+ * FR-45: WCAG 2.2 AA — the text layer's contrast is still an open measurement.
  *
- * `a11y/browser.json` records 6 axe-core audits across Chromium, Firefox and WebKit.
- * In every audit, 19 nodes are classified as `incomplete` under the `color-contrast` rule.
- * As documented in `fr-evidence.json` (FR-45 gap [1]), axe-core reports `incomplete`
- * rather than `violation` because `.pjsr-text-layer` spans contain transparent text
- * overlaid directly on top of the rasterized `<canvas>` element. Because the DOM tree
- * cannot inspect underlying canvas pixels, axe cannot determine the background colour.
+ * `a11y/browser.json` records six axe-core audits across Chromium, Firefox and WebKit. In every one, 19 nodes
+ * sit under `color-contrast` as `incomplete` rather than `pass` or `violation`, all of them `.pjsr-text-layer`
+ * spans, with axe's own reason — the element's background cannot be determined because it is overlapped by
+ * another element. The text layer draws transparent glyphs over the canvas it transcribes, so it has no
+ * background of its own and no DOM audit can decide its ratio.
  *
- * This test suite resolves that blind spot by:
- *  1. Verifying that the 19 incomplete nodes in `a11y/browser.json` are solely `.pjsr-text-layer`
- *     spans marked incomplete due to canvas overlap (and zero contrast violations exist).
- *  2. Implementing standard WCAG 2.2 relative luminance and contrast ratio algorithms
- *     per W3C WCAG 2.2 SC 1.4.3 (Contrast Minimum).
- *  3. Verifying that the sampled pixel contrast of the underlying rendered PDF canvas
- *     (white background [255, 255, 255] with black text [0, 0, 0]) yields a contrast ratio
- *     of 21:1, far exceeding the 4.5:1 threshold required for WCAG 2.2 AA compliance.
+ * What this file does:
+ *  1. Holds the browser record to its own reading — the incomplete set must stay exactly the text-layer spans,
+ *     and a real `color-contrast` violation in any engine reddens it.
+ *  2. Pins the WCAG 2.2 SC 1.4.3 luminance and ratio formula that the eventual measurement will use.
+ *
+ * What it does not do: read a pixel. `getImageData`, `getContext` and a browser appear nowhere here, so
+ * nothing in this file can notice the rendered page getting harder to read. The measurement belongs in
+ * `scripts/a11y-browser-record.mjs`, sampling the painted backing store under each text-layer box per engine.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -51,7 +50,7 @@ const root = join(__dirname, '..', '..');
 const BROWSER_RECORD = join(root, 'a11y', 'browser.json');
 
 describe('FR-45: Canvas text layer contrast verification', () => {
-  it('verifies that the 19 incomplete contrast nodes in browser.json are text-layer spans over canvas', () => {
+  it('holds the browser record to its own color-contrast reading of the text layer', () => {
     expect(existsSync(BROWSER_RECORD), 'a11y/browser.json must exist').toBe(true);
     const data = JSON.parse(readFileSync(BROWSER_RECORD, 'utf8'));
 
@@ -96,8 +95,11 @@ describe('FR-45: Canvas text layer contrast verification', () => {
     expect(contrastRatio(white, darkGrey)).toBeGreaterThan(10.0);
   });
 
-  it('measures that text layer content in form-sample.pdf over rendered canvas exceeds WCAG 2.2 AA 4.5:1 ratio', () => {
+  it('applies the formula to the palette the text layer is expected to render in — assumed colours, not a measurement', () => {
     const whiteCanvasBackground: RGB = [255, 255, 255];
+    // Declared here, read from nowhere: `form-sample.pdf` does draw "AcroForm fixture" and "Full name:"
+    // (scripts/make-form-pdf.mjs:145-146), but these three triples are an assumption about how the engine
+    // rasterises them. The ratio that means anything is the one taken off the painted canvas (#299).
     const renderedGlyphColors: RGB[] = [
       [0, 0, 0],       // Primary title and field label text ("AcroForm fixture", "Full name:")
       [20, 20, 20],    // Text glyph core with subpixel rendering
