@@ -80,6 +80,13 @@ for (const arg of args) {
 const ONLY_ENGINES = value('--engines', 'chromium,firefox,webkit').split(',');
 const ONLY_PROFILES = value('--profiles', 'desktop,mobile').split(',');
 /**
+ * `PJSR_PROBE=1` turns on the #319 instrument: a recorder of every window pointer event with the row that was
+ * running, and a synthetic press after each row that detonates a broken draw session. It is off by default and
+ * stays off in CI, because it puts a listener on every pointer of every row and presses a pointer no reader
+ * made — a cell measured with it on is a reading of the instrument, not of the viewer.
+ */
+const PROBE = process.env.PJSR_PROBE === '1';
+/**
  * A name-filtered subset of the checks, for developing one row without re-running the rest of them. The count
  * is deliberately not quoted here: it lives in `PRD.md` §8, and `npm run check:docs` derives it from this array.
  *
@@ -4872,6 +4879,53 @@ async function runCell(engineName, profileName, baseUrl) {
   const page = await context.newPage();
   page.setDefaultTimeout(30_000);
 
+  /*
+   * #319's instrument, temporarily. The engine's draw session keeps its current drawer and its session
+   * `AbortController` on *static* fields shared by every page layer, and the second `startDrawing` before a
+   * `pointerup` overwrites the controller without aborting the previous one — so the first session's capture-phase
+   * `window` pointerdown listener outlives the static it reads and throws on the next pointer of the same type.
+   * That makes "which row threw" the wrong question: the row that reports it is the row whose click stepped on a
+   * landmine an earlier row left. So every pointer event is recorded with the row that was running, together with
+   * what the application's own session looked like at that moment (an armed tool, an `.inkEditing` layer, how many
+   * editors the page holds). `window.__row` is written by the loop below, one evaluate per row.
+   */
+  if (PROBE) {
+    await page.addInitScript(() => {
+      const w = window;
+      w.__row = '(before the first check)';
+      w.__ptr = [];
+      const session = () => ({
+        ink: !!document.querySelector('.pjsr-editor-layer.inkEditing'),
+        editors: document.querySelectorAll('.pjsr-editor-layer .inkEditor').length,
+      });
+      for (const kind of ['pointerdown', 'pointerup', 'pointercancel']) {
+        window.addEventListener(
+          kind,
+          (e) => {
+            w.__ptr.push({ r: w.__row, k: kind.slice(7), t: e.pointerType, id: e.pointerId, ...session() });
+            if (w.__ptr.length > 400) w.__ptr.shift();
+          },
+          { capture: true },
+        );
+      }
+    });
+  }
+  /** The recorder's tail, condensed: one line per event, oldest first. */
+  const pointerTail = async (n = 14) => {
+    if (!PROBE) return '';
+    try {
+      const events = await page.evaluate((count) => window.__ptr.slice(-count), n);
+      return (
+        ' :: after ' +
+        events
+          .map((e) => `${e.r}:${e.k}(${e.t}#${e.id}${e.ink ? ',session' : ''}${e.editors ? `,${e.editors}ed` : ''})`)
+          .join(' → ')
+      );
+    } catch {
+      return ' :: (trace unreadable)';
+    }
+  };
+
   const pageErrors = [];
   const consoleErrors = [];
   const external = [];
@@ -4884,7 +4938,14 @@ async function runCell(engineName, profileName, baseUrl) {
    * reported, because a throw from a `setTimeout` lands here long after the row that scheduled it.
    */
   let runningCheck = '(before the first check)';
-  page.on('pageerror', (error) => pageErrors.push(`[${runningCheck}] ${firstLine(error)}`));
+  page.on('pageerror', (error) => {
+    const line = `[${runningCheck}] ${firstLine(error)}`;
+    if (!PROBE) {
+      pageErrors.push(line);
+      return;
+    }
+    pointerTail().then((tail) => pageErrors.push(`${line} :: after ${tail}`)).catch(() => pageErrors.push(line));
+  });
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text().split('\n')[0].slice(0, 120));
   });
@@ -5032,6 +5093,11 @@ async function runCell(engineName, profileName, baseUrl) {
     if (ONLY_CHECKS.length && !check.cell && !ONLY_CHECKS.some((name) => check.name.startsWith(name))) continue;
     const started = Date.now();
     runningCheck = check.name;
+    if (PROBE) {
+      await page.evaluate((name) => {
+        window.__row = name;
+      }, check.name);
+    }
     try {
       const detail = await check.run(harness);
       if (detail && typeof detail === 'object' && detail[SKIP]) {
@@ -5047,6 +5113,80 @@ async function runCell(engineName, profileName, baseUrl) {
         ms: Date.now() - started,
       });
     }
+    /*
+     * `PJSR_PROBE=1` only, because it perturbs the application on purpose. #319: the engine's throw is stamped with
+     * the row that happened to press next, not the row that broke the session, so a green cell says nothing about
+     * the state and a red cell blames the wrong row. This asks the question after every row: press the window with
+     * a pointer of the type the engine already latched, and see whether the shared draw session is null while a
+     * capture-phase listener is still attached. A throw stamped `probe-after-<row>` means the state was already
+     * broken by that row or an earlier one, which is the attribution the crash itself cannot give.
+     */
+    if (PROBE) {
+      const stamped = runningCheck;
+      runningCheck = `probe-after-${check.name}`;
+      const answer = await page
+        .evaluate(() => {
+          const before = (window.__ptr ?? []).length;
+          document.body.dispatchEvent(
+            new PointerEvent('pointerdown', {
+              pointerType: 'mouse',
+              pointerId: 1,
+              bubbles: true,
+              cancelable: true,
+              clientX: 4,
+              clientY: 4,
+              isPrimary: true,
+            }),
+          );
+          document.body.dispatchEvent(
+            new PointerEvent('pointerup', { pointerType: 'mouse', pointerId: 1, bubbles: true, clientX: 4, clientY: 4 }),
+          );
+          const seen = (window.__ptr ?? []).slice(0, before);
+          const ids = [...new Set(seen.filter((e) => e.k === 'down').map((e) => `${e.t}#${e.id}`))];
+          const sessions = seen.filter((e) => e.ink).length;
+          return { ids, sessions, events: seen.length };
+        })
+        .catch((error) => ({ error: firstLine(error) }));
+      console.log(
+        answer.error
+          ? `    probe ${check.name}: recorder unreadable (${answer.error})`
+          : `    probe ${check.name}: ${answer.events} pointer event(s) so far, ids ${answer.ids.join(',') || '(none)'}, ${answer.sessions} of them on a page already in ink editing`,
+      );
+      runningCheck = stamped;
+    }
+  }
+
+  /*
+   * The overlap the engine cannot survive, read off the recorder rather than guessed: a `pointerdown` that arrives
+   * while an earlier `pointerdown` of the same pointer type has not seen its `pointerup`. Each of those is one
+   * `startDrawing` that overwrote the shared session controller without aborting the previous one, which is the
+   * only way a capture-phase window listener outlives the static it reads.
+   */
+  const overlaps = { found: [], stillDown: [] };
+  if (PROBE) {
+    const read = await page
+      .evaluate(() => {
+        const open = new Map();
+        const found = [];
+        for (const e of window.__ptr) {
+          if (e.k === 'down') {
+            if (open.has(e.t)) found.push(`${e.r}: ${e.t}#${e.id} arrived while ${open.get(e.t)} was still down`);
+            open.set(e.t, `${e.t}#${e.id}`);
+          } else if (e.k === 'up' || e.k === 'cancel') {
+            if (open.get(e.t) === `${e.t}#${e.id}`) open.delete(e.t);
+          }
+        }
+        return { found, stillDown: [...open.values()] };
+      })
+      .catch(() => ({ found: ['(recorder lost)'], stillDown: [] }));
+    overlaps.found = read.found;
+    overlaps.stillDown = read.stillDown;
+  }
+  if (overlaps.found.length || overlaps.stillDown.length) {
+    console.log(
+      `    pointer overlaps in ${engineName} · ${profileName}: ${overlaps.found.join(' | ') || 'none'}` +
+        `${overlaps.stillDown.length ? `; still held at the end: ${overlaps.stillDown.join(', ')}` : ''}`,
+    );
   }
 
   await context.close();

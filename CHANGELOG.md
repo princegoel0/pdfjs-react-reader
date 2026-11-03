@@ -47,6 +47,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   now names both new scripts by their exact command strings, so a typo in `package.json` cannot leave either half
   unrunnable.
 
+- **#319's webkit throw now has an instrument, and four readings that rule things out (`FR-48`).** The engine's
+  uncaught `null is not an object (evaluating '_DrawingEditor.#currentDraw.isCancellable')` has fired in two of the
+  four recorded CI readings of one cell — always stamped with the row that happened to press next, which is the
+  wrong attribution, because the throw needs a capture-phase `window` listener that outlived the static it reads, so
+  the row that *arms* it and the row that *detonates* it are never the same row. `PJSR_PROBE=1` on
+  `npm run test:browsers` now records every window pointer event with the row that was running, prints any row that
+  leaves a press held, stamps each uncaught error with the events that preceded it, and presses a synthetic pointer
+  after every row — a broken session detonates on that press, so the row where the state first becomes readable is
+  named rather than inferred. Four readings on this host (pdfjs-dist 6.3.289, Playwright 1.63.0): a green
+  webkit · desktop cell sees `mouse#1` on every single pointer event, so the pointer id the engine latches never
+  diverges and the "`pointerup` cannot match it, so no session ends" branch is not what this cell takes; no row
+  leaves a press held; the per-row press never throws, so a passing cell carries no orphan. The deliberate
+  reproduction did not reproduce, and says why: with the session listeners counted by wrapping
+  `window.addEventListener` (without that count, "the overlap did not throw" and "the overlap never happened" read
+  identically — two earlier versions of the probe were in the second case, their aim a point the text layer covers),
+  a press on the editor layer registers the session listener and a release aborts it, while a **second** trusted
+  press held on top of the first registers nothing new in webkit or chromium. So the overwrite that the source
+  reading points at (`#currentDrawingAC` assigned without aborting the previous controller) was never performed
+  here, and the mechanism stays **read from the engine, not reproduced by it** — the row stays open, and the next
+  red run can finally name the row that armed it. The instrument is off by default and off in CI, because it puts a
+  listener on every pointer of every row and presses a pointer no reader made.
+
 
 
 ## [1.0.0] - 2026-11-03
