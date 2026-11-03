@@ -20,12 +20,14 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deriveCandidatePasses, tagProblems } from './release-validate.mjs';
+import { deriveCandidatePasses, realDeps, releaseOrderProblems } from './release-validate.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REGISTRY = 'https://registry.npmjs.org';
 const args = process.argv.slice(2);
 const flag = (name, fallback = '') => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
+/** The same git readers the gate uses, so the two can never disagree about where a tag points. */
+const gitState = realDeps();
 
 /** The candidate digest a published tarball must match, read from the records rather than retyped. */
 export function expectedDigest(records) {
@@ -40,11 +42,22 @@ export function expectedDigest(records) {
  * here means the credential is absent or is the wrong type, and #207 measured that a Publish-token is refused
  * `EOTP` for `npm deprecate`, so a name is not proof the write will be accepted.
  */
-export function preflightProblems({ version, name, whoami, packument, described, dirty, dryRunOk }) {
+export function preflightProblems({
+  name,
+  version,
+  whoami,
+  packument,
+  tagName,
+  taggedSha,
+  headSha,
+  changed,
+  dirty,
+  dryRunOk,
+}) {
   const problems = [];
   if (!whoami) problems.push('npm is not authenticated — `npm whoami` returned nothing (check the token type, not just its presence)');
   if (dirty) problems.push(`the working tree is dirty (${dirty.split('\n').length} file(s)) — publish the committed state, not a laptop's accident`);
-  problems.push(...tagProblems(described, version));
+  problems.push(...releaseOrderProblems({ tagName, taggedSha, headSha, changed }));
   if (!dryRunOk) problems.push('`npm pack --dry-run` failed — the artifact that would be published cannot be built');
   if (packument && Object.keys(packument.versions ?? {}).includes(version)) {
     problems.push(`${name}@${version} is already on the registry — version numbers are burned permanently`);
@@ -132,12 +145,19 @@ export async function run(mode) {
   const { name, version } = pkg;
   try {
     if (mode === 'preflight') {
+      const tagName = `v${version}`;
+      const taggedSha = gitState.tagCommit(tagName);
+      const headSha = gitState.headSha();
+      const changed = taggedSha ? gitState.changedBetween(taggedSha, headSha) : [];
       const problems = preflightProblems({
         version,
         name,
         whoami: npmRun('whoami') ?? '',
         packument: await packumentOf(name),
-        described: git(['describe', '--tags', '--exact-match', 'HEAD']),
+        tagName,
+        taggedSha,
+        headSha,
+        changed,
         dirty: git(['status', '--porcelain']),
         dryRunOk: npm('pack --dry-run'),
       });

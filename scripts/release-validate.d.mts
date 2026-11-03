@@ -49,11 +49,24 @@ export function candidateProblems(records: CandidateRecord[], options: { version
 
 export function registryProblems(packument: Packument | null, name: string, version: string): string[];
 
-export function tagProblems(described: string, version: string): string[];
+export interface ReleaseOrder {
+  tagName: string;
+  taggedSha: string;
+  headSha: string;
+  /** `null` when git could not name the range at all, which is a refusal rather than an empty diff. */
+  changed: string[] | null;
+}
+
+/** What the tag and the tree have to say to each other before a publish may go ahead. */
+export function releaseOrderProblems(order: ReleaseOrder): string[];
+
+/** The only paths a commit after the tag may touch. */
+export const RELEASE_EVIDENCE: RegExp;
 
 export interface ReleaseValidateDeps {
   headSha(): string;
-  tagOfHead(): string;
+  tagCommit(tagName: string): string;
+  changedBetween(from: string, to: string): string[] | null;
   jobs(sha: string): Promise<CiJob[]>;
   packument(name: string): Promise<Packument | null>;
   records(): CandidateRecord[];

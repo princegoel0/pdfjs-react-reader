@@ -8,7 +8,10 @@ export interface PreflightState {
   name: string;
   whoami: string;
   packument: { versions?: Record<string, unknown> } | null;
-  described: string;
+  tagName: string;
+  taggedSha: string;
+  headSha: string;
+  changed: string[] | null;
   dirty: string;
   dryRunOk: boolean;
 }

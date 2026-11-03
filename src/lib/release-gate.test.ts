@@ -26,13 +26,17 @@ import {
   deriveCandidatePasses,
   main,
   registryProblems,
+  releaseOrderProblems,
   requiredLegsFrom,
-  tagProblems,
 } from '../../scripts/release-validate.mjs';
 import { expectedDigest, preflightProblems, readbackProblems } from '../../scripts/publish-preflight.mjs';
 
 const repo = process.cwd();
 const SHA = '0123456789abcdef0123456789abcdef01234567';
+/** The commit the release candidate runs on, and the one the tag names. */
+const TAGGED = 'ffffffffffffffffffffffffffffffffffffffff';
+/** The commit that carries the record the candidate produced, so it is necessarily later than `TAGGED`. */
+const RELEASE_COMMIT = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 const VERSION: string = JSON.parse(readFileSync(`${repo}/package.json`, 'utf8')).version;
 const NAME: string = JSON.parse(readFileSync(`${repo}/package.json`, 'utf8')).name;
 
@@ -66,7 +70,8 @@ const greenRecord = (over = {}) => ({
 /** The whole gate satisfied, one knob per case. */
 const deps = (over: Record<string, unknown> = {}) => ({
   headSha: () => SHA,
-  tagOfHead: () => `v${VERSION}`,
+  tagCommit: () => SHA,
+  changedBetween: () => [],
   jobs: async () => greenRun(),
   packument: async () => null,
   records: () => [greenRecord({ file: 'release/last-candidate.json' })],
@@ -177,10 +182,15 @@ describe('FR-58: the registry and the tag are consulted, not assumed', () => {
     expect(registryProblems(null, NAME, VERSION)).toEqual([]);
   });
 
-  it('refuses an untagged HEAD, which is the publish-before-tag order this pipeline exists to stop', () => {
-    expect(tagProblems('', VERSION)).toEqual([expect.stringContaining('HEAD is (untagged)')]);
-    expect(tagProblems('v1.0.0-rc.1', VERSION)).toEqual([expect.stringContaining(`not v${VERSION}`)]);
-    expect(tagProblems(`v${VERSION}`, VERSION)).toEqual([]);
+  it('refuses when the version has no tag at all, which is the publish-before-tag order this gate exists to stop', () => {
+    expect(releaseOrderProblems({ tagName: `v${VERSION}`, taggedSha: '', headSha: SHA, changed: [] })).toEqual([
+      expect.stringContaining(`no tag v${VERSION}`),
+    ]);
+    // The tag exists and names another commit; HEAD is neither it nor a descendant, so nothing can say the
+    // published tree is the tested tree. `changed: null` is what `git diff` reports when the range is invalid.
+    expect(
+      releaseOrderProblems({ tagName: `v${VERSION}`, taggedSha: TAGGED, headSha: SHA, changed: null }),
+    ).toEqual([expect.stringContaining('not the tagged commit')]);
   });
 
   it('surfaces a registry or CI error as a refusal rather than an absence of evidence', async () => {
@@ -243,27 +253,93 @@ describe('FR-58: the registry and the tag are consulted, not assumed', () => {
   });
 });
 
+describe('FR-58: the release order the gate must be able to satisfy', () => {
+  /*
+   * The trap this case was written to catch, found by walking the publish order rather than by testing one rule
+   * at a time. A candidate record can only be produced by a run, so it is committed *after* the commit that run
+   * tested; and the tag has to name the tested commit, because that is the state whose artifact digest the record
+   * carries. So the published tree is the tagged commit **plus** the record file. A gate that requires
+   * `record.commit === HEAD` *and* an exactly-tagged HEAD asks for a commit that contains a record naming a
+   * different commit while also being that other commit — nothing can satisfy both arms, and the suite missed it
+   * because each rule was falsified in isolation.
+   */
+  it('accepts the tagged candidate with only the record and the changelog committed on top', async () => {
+    const code = await main(
+      deps({
+        headSha: () => RELEASE_COMMIT,
+        tagCommit: () => TAGGED,
+        changedBetween: () => ['CHANGELOG.md', 'release/last-candidate.json', 'release/last-candidate-node24.json'],
+        records: () => [greenRecord({ file: 'release/last-candidate.json', commit: TAGGED })],
+        jobs: async () => greenRun(),
+      }),
+    );
+    expect(code).toBe(0);
+  });
+
+  it('refuses when something that reaches the tarball changed between the tag and HEAD', async () => {
+    const code = await main(
+      deps({
+        headSha: () => RELEASE_COMMIT,
+        tagCommit: () => TAGGED,
+        changedBetween: () => ['src/components/PdfViewer.tsx', 'CHANGELOG.md'],
+        records: () => [greenRecord({ file: 'release/last-candidate.json', commit: TAGGED })],
+      }),
+    );
+    expect(code).toBe(1);
+  });
+
+  it('refuses a tag that does not resolve, and a HEAD that is not the tagged commit or its descendant', async () => {
+    expect(
+      releaseOrderProblems({ tagName: `v${VERSION}`, taggedSha: '', headSha: RELEASE_COMMIT, changed: null }),
+    ).toEqual([expect.stringContaining(`no tag v${VERSION}`)]);
+    expect(
+      releaseOrderProblems({ tagName: `v${VERSION}`, taggedSha: TAGGED, headSha: RELEASE_COMMIT, changed: null }),
+    ).toEqual([expect.stringContaining('not the tagged commit')]);
+    expect(releaseOrderProblems({ tagName: `v${VERSION}`, taggedSha: TAGGED, headSha: TAGGED, changed: [] })).toEqual(
+      [],
+    );
+  });
+
+  it('binds the candidate record to the tagged commit, not to the commit that carries the file', () => {
+    const record = greenRecord({ file: 'release/last-candidate.json', commit: TAGGED });
+    expect(candidateProblems([record], { version: VERSION, sha: TAGGED })).toEqual([]);
+    expect(candidateProblems([record], { version: VERSION, sha: RELEASE_COMMIT })).toEqual([
+      expect.stringContaining('the tagged commit'),
+    ]);
+  });
+});
+
 describe('FR-58: the registry write is prefaced and followed, not just attempted', () => {
   const clean = {
     version: VERSION,
     name: NAME,
     whoami: 'princegoel072',
     packument: { versions: {} },
-    described: `v${VERSION}`,
+    tagName: `v${VERSION}`,
+    taggedSha: SHA,
+    headSha: SHA,
+    changed: [],
     dirty: '',
     dryRunOk: true,
   };
 
-  it('refuses an unauthenticated host, a dirty tree, an untagged HEAD or a taken version', () => {
+  it('refuses an unauthenticated host, a dirty tree, a missing tag or a taken version', () => {
     expect(preflightProblems({ ...clean, whoami: '' }).join(' ')).toMatch(/npm is not authenticated/);
     // #207's lesson is that a name is not proof the write will be accepted — a Publish-type token is refused
     // `EOTP` by `npm deprecate`, so the message has to point at the token type rather than its presence.
     expect(preflightProblems({ ...clean, whoami: '' }).join(' ')).toMatch(/token type/);
     expect(preflightProblems({ ...clean, dirty: ' M src/lib/x.ts\n M package.json' }).join(' ')).toMatch(/working tree is dirty \(2 file\(s\)\)/);
-    expect(preflightProblems({ ...clean, described: '' }).join(' ')).toMatch(/HEAD is \(untagged\)/);
+    expect(preflightProblems({ ...clean, taggedSha: '' }).join(' ')).toMatch(new RegExp(`no tag v${VERSION.replace('.', '\\.')}`));
     expect(preflightProblems({ ...clean, packument: { versions: { [VERSION]: {} } } }).join(' ')).toMatch(/burned permanently/);
     expect(preflightProblems({ ...clean, dryRunOk: false }).join(' ')).toMatch(/cannot be built/);
     expect(preflightProblems(clean)).toEqual([]);
+  });
+
+  it('accepts the release commit that carries the record, because the tag cannot name a file it does not contain', () => {
+    expect(preflightProblems({ ...clean, headSha: RELEASE_COMMIT, changed: ['CHANGELOG.md', 'release/last-candidate.json'] })).toEqual([]);
+    expect(preflightProblems({ ...clean, headSha: RELEASE_COMMIT, changed: ['src/index.ts'] }).join(' ')).toMatch(
+      /beyond the release evidence/,
+    );
   });
 
   it('names a green candidate digest only when one green record binds one digest', () => {

@@ -7,11 +7,16 @@
  * tree whose `Browser matrix (… 6.2.108)` cell was red on `no-uncaught-errors`. A gate that cannot see the thing
  * it is supposed to refuse is not a gate, so this file reads four sources the publish cannot fake:
  *
- *   1. the CI run for the exact SHA being published — every required job `success`, and the matrix cells present;
- *   2. `release/last-candidate*.json` — a record for this version and commit whose legs are **all** `success`;
- *      a `skipped` leg is not a pass (the committed rc.1 record has `benchmarks: skipped` on its Node 24 cell);
+ *   1. the CI run for the commit the tag names — every required job `success`, and the matrix cells present;
+ *   2. `release/last-candidate*.json` — a record for this version and that commit whose legs are **all**
+ *      `success`; a `skipped` leg is not a pass (the committed rc.1 record has `benchmarks: skipped` on its
+ *      Node 24 cell);
  *   3. the registry — the version must not already be taken, because a burned number cannot be reused;
- *   4. the tag — HEAD must *be* `v<version>`, so the published bytes have a name that can be cited later.
+ *   4. the tag — `v<version>` must resolve, HEAD must be that commit or a descendant of it, and between the two
+ *      only `CHANGELOG.md` and `release/last-candidate*.json` may differ, because the candidate ran on the tagged
+ *      commit and the record it produced can only be committed afterwards. Requiring HEAD to be exactly the tagged
+ *      commit *and* the record to name HEAD asks for a commit that carries a record naming a different commit
+ *      while being it; nothing satisfies both, and the gate would have refused every publish forever.
  *
  * Every reader throws rather than defaulting. A check that assumes success when its source is missing is how
  * `check:docs`' floor rule stayed green after §8's row was renamed (#322, same day).
@@ -83,7 +88,10 @@ export function candidateProblems(records, { version, sha }) {
   const problems = [];
   const bound = matching.filter((r) => r.commit === sha);
   if (bound.length === 0) {
-    problems.push(`candidate records for ${wanted} are for commit ${matching.map((r) => String(r.commit).slice(0, 7)).join(', ')} — not the ${sha.slice(0, 7)} being published`);
+    problems.push(
+      `candidate records for ${wanted} are for commit ${matching.map((r) => String(r.commit).slice(0, 7)).join(', ')} ` +
+        `— not the tagged commit ${sha.slice(0, 7)} whose artifact the published bytes must be`,
+    );
   }
   for (const record of bound) {
     const legs = record.legs ?? [];
@@ -106,26 +114,75 @@ export function registryProblems(packument, name, version) {
   return problems;
 }
 
-export function tagProblems(described, version) {
-  const wanted = `v${version}`;
-  return described === wanted ? [] : [`HEAD is ${described || '(untagged)'}, not ${wanted} — publish the tagged state, and nothing after it`];
+/**
+ * The one order the release can actually happen in — found by walking it, not by testing the rules one at a time.
+ *
+ * A candidate record is produced by a run, so it can only be committed *after* the commit that run tested; and
+ * the tag has to name the tested commit, because that is the state whose artifact digest the record carries. The
+ * published tree is therefore the tagged commit plus the record. Requiring HEAD to be exactly the tagged commit
+ * *and* the record to name HEAD asks for a commit that contains a record naming a different commit while also
+ * being that other commit — nothing satisfies both, and the suite missed it while each rule passed alone.
+ *
+ * So: the tag must resolve, HEAD must be that commit or a descendant of it, and what may differ between the two
+ * is the release evidence and nothing else. `changed === null` means git could not name the range at all, which is
+ * a refusal, not an empty diff.
+ */
+export function releaseOrderProblems({ tagName, taggedSha, headSha, changed }) {
+  if (!taggedSha) {
+    return [`no tag ${tagName} resolves in this repository — tag the tested candidate first (§9: tag, then publish, never the reverse)`];
+  }
+  if (changed === null) {
+    return [
+      `HEAD (${headSha.slice(0, 7)}) is not the tagged commit (${taggedSha.slice(0, 7)}) or a descendant of it, ` +
+        'so nothing can say the tree being published is the tree that was tested',
+    ];
+  }
+  const beyond = changed.filter((path) => !RELEASE_EVIDENCE.test(path));
+  if (beyond.length) {
+    return [
+      `${tagName} (${taggedSha.slice(0, 7)})..HEAD changes ${beyond.length} file(s) beyond the release evidence ` +
+        `(${beyond.slice(0, 4).join(', ')}${beyond.length > 4 ? ', …' : ''}) — the candidate ran on the tagged commit, ` +
+        'so either re-run it or tag the commit this tree is',
+    ];
+  }
+  return [];
 }
+
+/** The only paths a commit after the tag may touch: the record the candidate produced, and the release notes. */
+export const RELEASE_EVIDENCE = /^(CHANGELOG\.md|release\/last-candidate[^/]*\.json)$/;
 
 /** Everything the real command consults, in one object, so the tests can hand in fakes instead of a network. */
 export function realDeps() {
   return {
     headSha: () => execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(),
-    tagOfHead: () => {
+    /** Where the tag actually points. An absent tag is `''`, which the release-order rule refuses. */
+    tagCommit: (tagName) => {
       try {
-        return execFileSync('git', ['describe', '--tags', '--exact-match', 'HEAD'], {
+        return execFileSync('git', ['rev-parse', '--verify', '--quiet', `${tagName}^{commit}`], {
           cwd: repo,
           encoding: 'utf8',
-          // An untagged HEAD is a finding this script reports in its own words; git's `fatal:` line on stderr
-          // would only make the refusal look like a crash.
           stdio: ['ignore', 'pipe', 'ignore'],
         }).trim();
       } catch {
         return '';
+      }
+    },
+    /**
+     * What changed between the tagged commit and HEAD. `git diff --name-only A..B` fails when B is not a
+     * descendant of A, and that failure *is* the finding, so it returns null rather than an empty list — an
+     * unreadable range must never be read as "nothing changed".
+     */
+    changedBetween: (from, to) => {
+      try {
+        return execFileSync('git', ['diff', '--name-only', `${from}..${to}`], {
+          cwd: repo,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        })
+          .split('\n')
+          .filter(Boolean);
+      } catch {
+        return null;
       }
     },
     jobs: async (sha) => {
@@ -165,24 +222,31 @@ export async function main(deps, argv = []) {
     return 1;
   }
 
-  let described = '';
+  const tagName = `v${pkg.version}`;
+  let taggedSha = '';
+  let changed = null;
   try {
-    described = deps.tagOfHead();
+    taggedSha = deps.tagCommit(tagName);
+    changed = taggedSha ? deps.changedBetween(taggedSha, sha) : [];
   } catch (error) {
-    problems.push(`git describe failed: ${String(error).slice(0, 120)}`);
+    problems.push(`git could not answer where ${tagName} points: ${String(error.message ?? error).slice(0, 120)}`);
   }
-  problems.push(...tagProblems(described, pkg.version));
+  problems.push(...releaseOrderProblems({ tagName, taggedSha, headSha: sha, changed }));
+
+  // Everything below is read from the commit that was actually built and tested — the tagged one, not the commit
+  // that carries the record of that run.
+  const tested = taggedSha || sha;
 
   try {
-    const jobs = await deps.jobs(sha);
-    problems.push(...ciProblems(jobs, sha));
-    notes.push(`CI on ${sha.slice(0, 7)}: ${jobs.filter((j) => j.conclusion === 'success').length}/${jobs.length} jobs success`);
+    const jobs = await deps.jobs(tested);
+    problems.push(...ciProblems(jobs, tested));
+    notes.push(`CI on ${tested.slice(0, 7)} (${tested === sha ? 'HEAD' : tagName}): ${jobs.filter((j) => j.conclusion === 'success').length}/${jobs.length} jobs success`);
   } catch (error) {
-    problems.push(`could not read the CI run for ${sha.slice(0, 7)}: ${String(error.message ?? error).slice(0, 160)}`);
+    problems.push(`could not read the CI run for ${tested.slice(0, 7)}: ${String(error.message ?? error).slice(0, 160)}`);
   }
 
   try {
-    problems.push(...candidateProblems(deps.records(), { version: pkg.version, sha }));
+    problems.push(...candidateProblems(deps.records(), { version: pkg.version, sha: tested }));
   } catch (error) {
     problems.push(`could not read release/last-candidate*.json: ${String(error.message ?? error).slice(0, 160)}`);
   }
@@ -200,9 +264,10 @@ export async function main(deps, argv = []) {
     console.error('Refusing means the publish did not happen; nothing was written anywhere.');
     return 1;
   }
+  const where = tested === sha ? `tagged at ${sha.slice(0, 7)} (HEAD)` : `tagged at ${tested.slice(0, 7)}, with HEAD adding only the release evidence`;
   console.log(
-    `release:validate green — ${pkg.name}@${pkg.version} is tagged as ${described}, every required job passed on ${sha.slice(0, 7)}, ` +
-      'the candidate record is all-green with a digest, and the registry does not carry this version.',
+    `release:validate green — ${pkg.name}@${pkg.version} is ${where}; every required job passed on the tested ` +
+      'commit, the candidate record is all-green with a digest, and the registry does not carry this version.',
   );
   console.log('This validates the state. It does not sign §9, and it does not publish: both stay a person’s act.');
   return 0;
