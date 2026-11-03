@@ -380,6 +380,10 @@ jobs:
         engine: ['6.2.108', '6.4.299']
     env:
       PDFJS_ENGINE: ${{ matrix.engine }}
+      # Diagnostic only, on this branch: #319 fires on runners and never on this host, so the pointer trace has to
+      # be taken where it happens. The recorder stays off unless PJSR_PROBE=1 and it perturbs the rows, so this
+      # line must not reach `dev` or `main`.
+      PJSR_PROBE: '1'
     steps:
       - uses: actions/checkout@v4
 
