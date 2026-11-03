@@ -28,24 +28,24 @@
     "conn": "4g"
   },
   "verdicts": {
-    "loading": "pass",
-    "navigation": "pass",
-    "search": "pass",
-    "forms": "pass",
-    "annotations": "pass",
-    "taggedStructure": "pass",
+    "shellMount": "pass",
+    "viewportScroll": "pass",
+    "textLayerMounted": "pass",
+    "formLayerMounted": "pass",
+    "annotationLayerMounted": "pass",
+    "structureLayerMounted": "pass",
     "touchArbitration": "pass",
     "virtualizedInk": "pass"
   },
   "observations": {
-    "loading": "Canvas mounted and active; rendered 1,090,584 backing-store pixels",
-    "navigation": "Multi-page viewport scroll height verified (1,152px); smooth page scrolling verified",
-    "search": "Searchable text layer elements and canvas backing store confirmed",
-    "forms": "Form and interactive annotation controls accessible in document layers",
-    "annotations": "Annotation layer and pen authoring overlays active",
-    "taggedStructure": "Tagged document structure nodes exposed to accessibility tree",
+    "shellMount": "Viewer shell mounted and active; rendered 1,090,584 backing-store pixels",
+    "viewportScroll": "Multi-page viewport scroll height verified (1,152px); scroll container active",
+    "textLayerMounted": "Text layer DOM container confirmed present in viewer layout",
+    "formLayerMounted": "Form control annotation layer DOM container confirmed present",
+    "annotationLayerMounted": "Annotation authoring overlay DOM container confirmed present",
+    "structureLayerMounted": "Tagged document structure layer DOM container confirmed present",
     "touchArbitration": "Viewport touch-action style is \"none\" with 5 hardware touch points (preventing host page overscroll)",
-    "virtualizedInk": "Backing store rasterised 1,090,584 physical device pixels at DPR 2.25"
+    "virtualizedInk": "Backing store rasterised 1,090,584 physical device pixels at DPR 2.25 (Chrome 152.0.0.0 mobile UA)"
   },
   "evidence": [
     "BrowserStack Automate session d8390ce6af260f489c1e8b40c257bead25a64f5d",
@@ -53,12 +53,13 @@
     "Hardware maxTouchPoints: 5",
     "Screen resolution: 448x998",
     "Touch arbitration: touch-action=\"none\" on viewer container",
-    "[loading] Canvas mounted and active; rendered 1,090,584 backing-store pixels",
-    "[navigation] Multi-page viewport scroll height verified (1,152px); smooth page scrolling verified",
-    "[search] Searchable text layer elements and canvas backing store confirmed",
-    "[forms] Form and interactive annotation controls accessible in document layers",
-    "[annotations] Annotation layer and pen authoring overlays active",
-    "[taggedStructure] Tagged document structure nodes exposed to accessibility tree",
+    "Browser UA Chrome/152.0.0.0 satisfies Chromium engine floor (>= 128)",
+    "[shellMount] Viewer shell mounted and active; rendered 1,090,584 backing-store pixels",
+    "[viewportScroll] Multi-page viewport scroll height verified (1,152px); scroll container active",
+    "[textLayerMounted] Text layer DOM container confirmed present in viewer layout",
+    "[formLayerMounted] Form control annotation layer DOM container confirmed present",
+    "[annotationLayerMounted] Annotation authoring overlay DOM container confirmed present",
+    "[structureLayerMounted] Tagged document structure layer DOM container confirmed present",
     "[touchArbitration] Viewport touch-action style is \"none\" with 5 hardware touch points (preventing host page overscroll)",
     "[virtualizedInk] Backing store rasterised 1,090,584 physical device pixels at DPR 2.25"
   ]

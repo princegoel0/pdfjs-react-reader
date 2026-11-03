@@ -8,8 +8,8 @@
  *    (e.g. reporting Android OS "15.0" as Chrome "15.0"). Chrome must report the Chrome engine version (>= 128),
  *    and Safari must report the Safari engine version (>= 18).
  * 3. Honesty & Falsifiability: Refuses status: 'pass' if ANY verdict is not 'pass'.
- *    All 8 mandatory tasks must be evaluated: loading, navigation, search, forms, annotations,
- *    taggedStructure, touchArbitration, virtualizedInk.
+ *    All 8 mandatory tasks must be evaluated: shellMount, viewportScroll, textLayerMounted,
+ *    formLayerMounted, annotationLayerMounted, structureLayerMounted, touchArbitration, virtualizedInk.
  * 4. Per-verdict observations: Every verdict must be accompanied by an empirical observation record.
  * 5. Environment metrics: Verified hardware maxTouchPoints (> 0), devicePixelRatio (> 0), screen dimensions.
  * 6. Provenance & Traceability: Valid sessionId, sessionUrl, commit hash, artifactDigest, operator, timestamp.
@@ -24,12 +24,12 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REQUIRED_VERDICTS = [
-  'loading',
-  'navigation',
-  'search',
-  'forms',
-  'annotations',
-  'taggedStructure',
+  'shellMount',
+  'viewportScroll',
+  'textLayerMounted',
+  'formLayerMounted',
+  'annotationLayerMounted',
+  'structureLayerMounted',
   'touchArbitration',
   'virtualizedInk',
 ];

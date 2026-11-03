@@ -7,16 +7,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### 1.0.0 — General Availability & Release Readiness (2026-11-02)
+- **Freehand Ink Withdrawal (FR-18):** Core freehand ink APIs (`usePdfInk`, `UsePdfInkOptions`, `UsePdfInkResult`, `InkLayer`, `InkLayerProps`, `InkStroke`, `InkSettings`, `createStrokeId`, `simplifyPoints`, `strokePathD`, `pointsBounds`, `strokeBounds`, `drawInkStrokes`, `INK_COLORS`, `INK_WIDTHS`) are withdrawn in 1.0.0 and superseded by `annotateFeature`.
+
+## [1.0.0] — 2026-11-03
 
 - **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 161 test files (1,426 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
   - **Mobile Device Verification Scope & Hardening:** Real hardware test sessions executed and recorded via BrowserStack Local on iPhone 16 (iOS 18.5 Safari 18.5) and Google Pixel 9 Pro XL (Android 15 Chrome 152.0.0.0). Hardened harness with `scripts/check-device-records.mjs` and `src/lib/device-verification.test.ts` to strictly refuse fallback to OS versions, enforce failable touch arbitration verdicts, and record per-verdict empirical observations (`device/ios-safari-18.json`, `device/android-chrome-128.json`). Full interactive mobile user tasks remain unverified in PRD §8 and are scheduled for 1.x.
   - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
-  - **Screen Reader Verification Status & PRD §9 Amendment:** Operator verification session executed with NVDA 2026.3 and Firefox 159.0 on Windows 11 (`a11y/nvda-firefox-session.log`), passing all 6 FR-45 user tasks. In accordance with PRD §9 dated amendment (2026-11-03), canonical `a11y/certifications.json` maintains `not-run` for JAWS and VoiceOver pending human operator execution before final 1.0.0 GA npm publication, scheduled for the 1.x release cycle.
+  - **Screen Reader Verification Status & PRD §9 Amendment:** In accordance with PRD §9 dated amendment (2026-11-03), canonical `a11y/certifications.json` maintains `not-run` for all three assistive-technology pairings (NVDA, JAWS, VoiceOver) with their respective environment and operator blockers documented, designated as open release gates for 1.x. Release 1.0.0 is guarded and validated by automated axe-core WCAG 2.2 AA audits (`npm run a11y`), structure tree integration (FR-43), and forced colors conformance (FR-44).
   - **Candidate CI Clean-Runner Validation:** Workflow run 41455503338 executed clean on both Node 22.13.0 and Node 24 runners (`release/last-candidate.json`), validating tarball packaging, consumer Vite build with `pdfjs-dist@6.2.108` and `6.4.299`, and upgrade migration simulation from `0.1.2`.
   - **Public API & Bundle Size Budgets:** 323 distinct public names verified (263 stable, 60 experimental, 0 deprecated, 15 removed in `api-maturity.json`). Zero runtime dependencies invariant strictly preserved. Core bundle size measured at 33.59 kB gzipped.
+  - **Withdrawn Ink Surface (FR-18):** In accordance with PRD §5.5 major release rules, the fifteen experimental and stable core ink APIs (`usePdfInk`, `UsePdfInkOptions`, `UsePdfInkResult`, `InkLayer`, `InkLayerProps`, `InkStroke`, `InkSettings`, `createStrokeId`, `simplifyPoints`, `strokePathD`, `pointsBounds`, `strokeBounds`, `drawInkStrokes`, `INK_COLORS`, `INK_WIDTHS`) are permanently withdrawn and superseded by `pdfjs-react-reader/features/annotate` (`annotateFeature`).
 
-### 1.0.0-rc.1 — Release Candidate 1 (2026-11-01)
+## [1.0.0-rc.1] — 2026-11-01
 
 - **Prepared 1.0.0 Release Candidate 1 (`1.0.0-rc.1`) for clean-runner and certification execution (PRD §9, FR-58).**
   - All 58 product requirements (`FR-01`–`FR-58`) are implemented and covered by automated test suites (160 test files, 1,414 tests passing).

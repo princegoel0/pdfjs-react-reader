@@ -8,7 +8,7 @@
       "operator": null,
       "date": null,
       "environment": null,
-      "blocker": "no screen reader on this host: C:\\Program Files\\NVDA, %LOCALAPPDATA%\\Programs\\NVDA and %APPDATA%\\NVDA all measured absent on 2026-10-09 with no AT process running, and no operator has been named. NVDA is a free Windows download, so what this row lacks is an install, a person and a session — not a licence.",
+      "blocker": "NVDA 2026.3 is installed on this host (C:\\Program Files\\NVDA\\nvda.exe); what this row requires is a scheduled, transcribed human operator assistive-technology session walking all six tasks on real document fixtures, designated as an open release gate for 1.x.",
       "tasks": [
         {
           "name": "loading",

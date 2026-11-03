@@ -213,28 +213,28 @@ async function runSession(target) {
     if (!rendered) throw new Error('Canvas failed to render ink within 35s');
     console.log(`Canvas rendered: ${inkPixels} device pixels.`);
 
-    // 4. Walk the six tasks required by FR-45 & §8
-    console.log('Executing FR-45 six-task verification checklist...');
+    // 4. Verify viewer component and layer DOM mounts on device
+    console.log('Verifying viewer component and layer DOM mounts on device...');
     const tasksRes = await w3c('POST', `/session/${sessionId}/execute/sync`, {
       script: `
         const root = document.querySelector('.pjsr-viewer, .pjsr-viewport, .app-main');
         const hasText = Boolean(document.querySelector('.pjsr-text-layer'));
         const hasAnnotations = Boolean(document.querySelector('.pjsr-annotation-layer'));
-        const hasStructure = Boolean(document.querySelector('.pjsr-structure-layer') || root);
+        const hasStructure = Boolean(document.querySelector('.pjsr-structure-layer'));
         const hasCanvas = Boolean(document.querySelector('canvas'));
         return {
-          loading: hasCanvas,
-          navigation: hasCanvas && document.body.scrollHeight > 0,
-          search: hasText || hasCanvas,
-          forms: hasAnnotations || hasCanvas,
-          annotations: hasAnnotations || hasCanvas,
-          taggedStructure: Boolean(hasStructure)
+          shellMount: hasCanvas,
+          viewportScroll: hasCanvas && document.body.scrollHeight > 0,
+          textLayerMounted: hasText,
+          formLayerMounted: hasAnnotations,
+          annotationLayerMounted: hasAnnotations,
+          structureLayerMounted: Boolean(hasStructure)
         };
       `,
       args: [],
     });
     const tasks = tasksRes.value;
-    console.log('FR-45 checklist tasks result:', tasks);
+    console.log('Viewer component mount check result:', tasks);
 
     // 5. Verify touch-action gesture arbitration
     const gestureRes = await w3c('POST', `/session/${sessionId}/execute/sync`, {
@@ -248,12 +248,6 @@ async function runSession(target) {
       args: [],
     });
     console.log('Touch gesture arbitration check:', gestureRes.value);
-
-    // Mark session as passed in BrowserStack Automate dashboard
-    await w3c('POST', `/session/${sessionId}/execute/sync`, {
-      script: `browserstack_executor: {"action": "setSessionStatus", "arguments": {"status": "passed", "reason": "All real-device verification tasks passed with full evidence."}}`,
-      args: [],
-    });
 
     // 6. Query BrowserStack REST API for session metadata
     console.log('Retrieving session details from BrowserStack API...');
@@ -281,37 +275,43 @@ async function runSession(target) {
 
     const touchArbitrationPass = gestureRes.value.touchAction !== 'auto' && (gestureRes.value.maxTouch ?? 0) > 0;
     const verdicts = {
-      loading: tasks.loading ? 'pass' : 'fail',
-      navigation: tasks.navigation ? 'pass' : 'fail',
-      search: tasks.search ? 'pass' : 'fail',
-      forms: tasks.forms ? 'pass' : 'fail',
-      annotations: tasks.annotations ? 'pass' : 'fail',
-      taggedStructure: tasks.taggedStructure ? 'pass' : 'fail',
+      shellMount: tasks.shellMount ? 'pass' : 'fail',
+      viewportScroll: tasks.viewportScroll ? 'pass' : 'fail',
+      textLayerMounted: tasks.textLayerMounted ? 'pass' : 'fail',
+      formLayerMounted: tasks.formLayerMounted ? 'pass' : 'fail',
+      annotationLayerMounted: tasks.annotationLayerMounted ? 'pass' : 'fail',
+      structureLayerMounted: tasks.structureLayerMounted ? 'pass' : 'fail',
       touchArbitration: touchArbitrationPass ? 'pass' : 'fail',
       virtualizedInk: inkPixels > 0 ? 'pass' : 'fail',
     };
     const allVerdictsPass = Object.values(verdicts).every((v) => v === 'pass');
     const status = allVerdictsPass ? 'pass' : 'fail';
 
+    // Mark session status in BrowserStack Automate dashboard after computing verdicts
+    await w3c('POST', `/session/${sessionId}/execute/sync`, {
+      script: `browserstack_executor: {"action": "setSessionStatus", "arguments": {"status": "${allVerdictsPass ? 'passed' : 'failed'}", "reason": "${allVerdictsPass ? 'All real-device verification tasks passed.' : 'One or more verification tasks failed.'}"}}`,
+      args: [],
+    });
+
     const observations = {
-      loading: tasks.loading
-        ? `Canvas mounted and active; rendered ${inkPixels.toLocaleString()} backing-store pixels`
-        : 'Canvas failed to render ink',
-      navigation: tasks.navigation
-        ? `Multi-page viewport scroll height verified (${tasks.scrollHeight || 'present'}px); page navigation verified`
-        : 'Navigation failed',
-      search: tasks.search
-        ? 'Searchable text layer elements and canvas backing store confirmed'
-        : 'Text layer absent',
-      forms: tasks.forms
-        ? 'Form and interactive annotation controls accessible in document layers'
-        : 'Form layer absent',
-      annotations: tasks.annotations
-        ? 'Annotation layer and tool overlays active'
-        : 'Annotation layer absent',
-      taggedStructure: tasks.taggedStructure
-        ? 'Tagged document structure nodes exposed to accessibility tree'
-        : 'Structure layer absent',
+      shellMount: tasks.shellMount
+        ? `Viewer shell mounted and active; rendered ${inkPixels.toLocaleString()} backing-store pixels`
+        : 'Viewer shell failed to mount or render canvas',
+      viewportScroll: tasks.viewportScroll
+        ? `Multi-page viewport scroll height verified (${tasks.scrollHeight || 'present'}px); scroll container active`
+        : 'Viewport scroll height is zero',
+      textLayerMounted: tasks.textLayerMounted
+        ? 'Text layer DOM container confirmed present in viewer layout'
+        : 'Text layer DOM container absent',
+      formLayerMounted: tasks.formLayerMounted
+        ? 'Form control annotation layer DOM container confirmed present'
+        : 'Form layer DOM container absent',
+      annotationLayerMounted: tasks.annotationLayerMounted
+        ? 'Annotation authoring overlay DOM container confirmed present'
+        : 'Annotation layer DOM container absent',
+      structureLayerMounted: tasks.structureLayerMounted
+        ? 'Tagged document structure layer DOM container confirmed present'
+        : 'Structure layer DOM container absent',
       touchArbitration: touchArbitrationPass
         ? `Viewport touch-action style is "${gestureRes.value.touchAction}" with ${gestureRes.value.maxTouch} hardware touch points (not default "auto")`
         : `Touch arbitration failed (touchAction="${gestureRes.value.touchAction}", maxTouch=${gestureRes.value.maxTouch})`,

@@ -858,12 +858,12 @@ iPhone 16 (iOS 18.5, Safari 18.5) and Google Pixel 9 Pro XL (Android 15, Chrome 
 and guarded by `npm run check:device`.
 
 **`1.0.0` is currently a Release Candidate ready on `dev` and not yet published to npm.** In strict adherence
-to PRD §9 release gates and dated amendment (2026-11-03): `a11y/certifications.json` records JAWS and VoiceOver as `not-run`
-with measured host blockers, designated as open gates for 1.x. An NVDA 2026.3 + Firefox 159.0 human operator session
-has been executed and documented in `a11y/nvda-firefox-session.log`, while JAWS + Chromium and VoiceOver + Safari await
-operator sessions. The mobile device records in `device/` verify shell mounting, canvas rasterisation, and touch arbitration, while full interactive tasks remain unverified per PRD §8 (scheduled for 1.x).
-(`scripts/check-device-records.mjs`). §8 rows for Firefox, macOS Safari, iOS and Android reflect engine floors
-Chromium 128 / Firefox 133 / Safari 18.2. The canonical requirement register in `npm run check:fr-evidence`
+to PRD §9 release gates and dated amendment (2026-11-03): `a11y/certifications.json` records all three screen-reader
+pairings (NVDA+Firefox, JAWS+Chromium, VoiceOver+Safari) as `not-run` with measured host and licensing blockers,
+designated as open release gates for 1.x. Release 1.0.0 is guarded by automated axe-core WCAG 2.2 AA audits (`npm run a11y`),
+structure tree assertions (FR-43), and forced colors conformance (FR-44). The physical mobile device records in `device/`
+verify shell mounting, canvas rasterisation, and touch arbitration, while full interactive tasks remain unverified per PRD §8 (scheduled for 1.x).
+§8 rows for Firefox, macOS Safari, iOS and Android reflect engine floors Chromium 128 / Firefox 133 / Safari 18.2. The canonical requirement register in `npm run check:fr-evidence`
 records 51 `met` / 7 engine-bounded `partial` rows, awaiting final human production authorization for npm publication.
 
 ## Licence

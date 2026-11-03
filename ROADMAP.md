@@ -206,7 +206,7 @@ without the real-device and screen-reader certifications *"1.0.0 does not ship"*
 not restated with numbers here — `npm run check:fr-evidence` is the status of record, and #240's rule in this
 file is to point at the command rather than type a figure the next push moves.
 
-**Current milestone (2026-11-02): 1.0.0 Release Candidate Ready on dev.** All 58 requirements are built and verified across all 12 local gates in `npm run verify`; candidate clean-runner validation passed in CI (`release/last-candidate.json`), physical mobile device verification passes on iPhone 16 and Pixel 9 Pro XL are recorded and guarded (`device/`), NVDA 2026.3 + Firefox 159.0 session evidence is logged (`a11y/nvda-firefox-session.log`), while JAWS and VoiceOver remain `not-run` in `a11y/certifications.json` pending human operator execution before final 1.0.0 GA promotion.
+**Current milestone (2026-11-03): 1.0.0 Release Candidate Ready on dev.** All 58 requirements are built and verified across all 12 local gates in `npm run verify`; candidate clean-runner validation passed in CI (`release/last-candidate.json`), physical mobile device verification passes on iPhone 16 and Pixel 9 Pro XL are recorded and guarded (`device/`), while all three screen-reader pairings remain `not-run` in `a11y/certifications.json` with documented blockers, designated as open gates for 1.x per PRD §9 dated amendment.
 
 | §9 condition | Where it stands, read against the tree | What kind of thing closes it |
 | :--- | :--- | :--- |
@@ -217,7 +217,7 @@ file is to point at the command rather than type a figure the next push moves.
 | The release candidate built and tested on a clean runner from the packed npm artifact | executed clean in CI, recorded in `release/last-candidate.json` | **MET — verified in CI** |
 | The `0.1.2` → `1.0.0` upgrade path exercised | `npm run check:upgrade` is green locally and in CI runner | **MET** |
 | The required real-device mobile pass is complete | real iPhone 16 (iOS 18.5) and Pixel 9 Pro XL (Android 15) sessions verified in `device/`; interactive user tasks unverified per PRD §8 (scheduled for 1.x) | **MET (hardware mounts & touch arbitration verified; full interactive tasks unverified)** |
-| Real-device **and** screen-reader certifications, each with a named environment, date and operator | mobile passes recorded in `device/`; NVDA session logged in `a11y/nvda-firefox-session.log`; JAWS + Chromium and VoiceOver + Safari not-run | **PARTIAL — PRD §9 dated amendment designates JAWS/VoiceOver operator sessions for 1.x** |
+| Real-device **and** screen-reader certifications, each with a named environment, date and operator | mobile passes recorded in `device/`; NVDA, JAWS, and VoiceOver not-run in `a11y/certifications.json` | **PARTIAL — PRD §9 dated amendment designates AT operator sessions for 1.x** |
 | Bundle budgets, feature isolation and CSS boundaries pass without disabling required functionality | green; #227 DEFAULT_LABELS separated to `pdfjs-react-reader/labels` while preserved on root for 0.1.2 compatibility | **MET** |
 | The pre-1.0 line is deprecated, with the commands in this file's certification row | done on the registry and recorded in **W9**'s row; the read-back command that row carried has been corrected, per the note there | **—** |
 | React 18/19 with matching `react-dom`; the engine floor and latest-supported-6.x jobs; canvas and print budgets deterministically tested; `check:examples` green with every skip ticketed; withdrawn FRs keeping their ids and reasons; no intermediate publication | each is green where it is runnable, and the ones that are runner-only are recorded per run in `fr-evidence.json` rather than claimed here | **—** |
@@ -2786,7 +2786,7 @@ and the release-candidate chain. Those wait on the `dev → main` merge, not on 
 paragraph assumed had not started.
 
 **One breaking change is already decided, and deliberately not taken yet (#227, owner's call 2026-10-05).**
-`DEFAULT_LABELS` — `src/lib/labels.ts:211`, re-exported from the root entry at `src/index.ts:206` — stops being
+`DEFAULT_LABELS` — `src/lib/labels.ts:217`, re-exported from the root entry at `src/index.ts:207` — stops being
 published from `pdfjs-react-reader` and moves to its own subpath, `pdfjs-react-reader/labels`. **Why:** #223
 measured the cost of the current shape at **844–869 B gz** of tier-owned English default strings carried by a
 consumer who imports nothing but `PdfViewer`, and proved that the only way to release them is for the root barrel

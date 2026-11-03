@@ -17,91 +17,91 @@
     "usePdfInk": {
       "tag": "experimental",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "UsePdfInkOptions": {
       "tag": "experimental",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "UsePdfInkResult": {
       "tag": "experimental",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "InkLayer": {
       "tag": "experimental",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "InkLayerProps": {
       "tag": "experimental",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "InkStroke": {
       "tag": "experimental",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "InkSettings": {
       "tag": "experimental",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "createStrokeId": {
       "tag": "stable",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "simplifyPoints": {
       "tag": "stable",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "strokePathD": {
       "tag": "stable",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "pointsBounds": {
       "tag": "stable",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "strokeBounds": {
       "tag": "stable",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "drawInkStrokes": {
       "tag": "experimental",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "INK_COLORS": {
       "tag": "stable",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     },
     "INK_WIDTHS": {
       "tag": "stable",
       "removedIn": "1.0.0",
-      "announcedIn": "Unreleased",
+      "announcedIn": "1.0.0",
       "supersededBy": "annotateFeature"
     }
   },

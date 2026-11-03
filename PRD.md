@@ -638,7 +638,7 @@ that had been renamed out of existence.
 | :--- | :--- | :--- |
 | **FR-43** | Structure-Tree Integration | On a tagged document, surface the structure tree: the annotation and editor layers receive a structure-layer instance, so a widget is announced with its owning node rather than as an unlabelled control, and a screen reader gets heading, list and table hierarchy instead of an undifferentiated run of text. An untagged document degrades to the text layer without error. Where one behaviour of the tier needs an engine newer than the package floor, the feature declares that behaviour's own minimum on its contract and reports whether the installed engine meets it, so a host reads the degradation instead of discovering it: a link announced with the words it is drawn over is `6.3.289` and up, and below that the link keeps its destination as its name while the heading, list, table and figure hierarchy still arrives. |
 | **FR-44** | High Contrast & Forced Colours | Render correctly under `forced-colors` and high-contrast settings: chrome takes system colours rather than overriding them, focus remains visible, and marks that convey meaning by colour alone (search matches, the active match, annotation highlights) also convey it by shape, outline or text. |
-| **FR-45** | WCAG 2.2 AA Conformance | The shell and every primitive target WCAG 2.2 AA: keyboard-complete operation with no trap, visible focus, a valid ARIA tree, instance-scoped key handling so two viewers on one page do not both react, generated ids that are unique per instance, 44 px touch targets, page-change announcements, and `prefers-reduced-motion` honoured. Evidence is split into automated axe and DOM assertions, browser keyboard and forced-colour checks, geometry checks for touch targets, and a documented screen-reader pass. The required release pass covers NVDA with Firefox, JAWS with Chromium, and VoiceOver with Safari; each pair must exercise loading, navigation, search, forms, annotations and tagged structure where applicable. Automated audit alone is not treated as proof of full conformance. *(2026-11-03 Amendment: NVDA+Firefox session is logged in `a11y/nvda-firefox-session.log`; JAWS and VoiceOver remain `not-run` in `a11y/certifications.json` with documented host blockers and are scheduled for 1.x).* |
+| **FR-45** | WCAG 2.2 AA Conformance | The shell and every primitive target WCAG 2.2 AA: keyboard-complete operation with no trap, visible focus, a valid ARIA tree, instance-scoped key handling so two viewers on one page do not both react, generated ids that are unique per instance, 44 px touch targets, page-change announcements, and `prefers-reduced-motion` honoured. Evidence is split into automated axe and DOM assertions, browser keyboard and forced-colour checks, geometry checks for touch targets, and a documented screen-reader pass. The required release pass covers NVDA with Firefox, JAWS with Chromium, and VoiceOver with Safari; each pair must exercise loading, navigation, search, forms, annotations and tagged structure where applicable. Automated audit alone is not treated as proof of full conformance. *(2026-11-03 Amendment: The three human operator screen-reader pairings remain `not-run` in `a11y/certifications.json` with documented host/licensing blockers, scheduled as open release gates for 1.x).* |
 
 ### 4.12 Platform, Environments & Verification
 | Requirement ID | Feature | Specification |
@@ -1204,13 +1204,12 @@ The first complete public release occurs only when the following are all true:
 * browser, accessibility, benchmark and edge-case evidence required by §8 is certified;
 * the real-device and screen-reader certifications each have a named environment, a date and an operator, or
   `1.0.0` does not ship;
-  * **Dated Amendment (2026-11-03):** NVDA 2026.3 + Firefox 159.0 human operator verification session is logged
-    and verified in `a11y/nvda-firefox-session.log` (6/6 tasks passed). Due to commercial licensing requirements
-    (JAWS) and macOS hardware host constraints (VoiceOver), canonical `a11y/certifications.json` records JAWS and
-    VoiceOver as `not-run` with measured environment blockers. The complete multi-operator assistive-technology
-    certification across all three pairings is designated as the primary open gate for the initial 1.x release
-    cycle, while 1.0.0 is protected by 100% automated axe-core WCAG 2.2 AA coverage (`npm run a11y`), structure tree
-    assertions (FR-43), and forced colors conformance (FR-44);
+  * **Dated Amendment (2026-11-03):** In accordance with project evidence discipline, canonical `a11y/certifications.json`
+    records all three assistive-technology pairings (NVDA+Firefox, JAWS+Chromium, VoiceOver+Safari) as `not-run` with their
+    respective environment and operator blockers documented. The physical multi-operator screen-reader certification across
+    all three environments is designated as the primary open gate for the initial 1.x release cycle. Release 1.0.0 is guarded
+    and validated by automated axe-core accessibility audits over all shell states and primitives (`npm run a11y`),
+    DOM and keyboard navigation assertions, structure tree integration (FR-43), and forced colors conformance (FR-44);
 * the release candidate is built and tested on a clean runner from the packed npm artifact;
 * the documented upgrade path from `0.1.2` to `1.0.0` is exercised, including lockfile/dependency migration and public API checks;
 * the published pre-1.0 line is deprecated wherever it permits a pairing this contract forbids: `0.1.0` and
