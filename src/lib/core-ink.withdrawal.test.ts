@@ -232,7 +232,7 @@ describe('FR-18: the removal is recorded, not merely done', () => {
   }
 
   it('lists every withdrawn name in the changelog that announces it', () => {
-    const unreleased = section('Unreleased');
+    const unreleased = section('1.0.0') ?? section('Unreleased');
     // The control: the ledger's own claims are read from a section that exists and says something.
     expect(unreleased).not.toBeNull();
     expect(unreleased ?? '').toContain('freehand');

@@ -7,6 +7,8 @@
   "osVersion": "15.0",
   "browser": "Chrome on Android",
   "browserVersion": "152.0.0.0",
+  "contractFloor": 128,
+  "notes": "Records session on Google Pixel 9 Pro XL running Chrome 152.0.0.0, satisfying PRD §8's Android Chrome engine floor of >= 128.",
   "sessionId": "d8390ce6af260f489c1e8b40c257bead25a64f5d",
   "sessionUrl": "https://automate.browserstack.com/builds/8e6782484a2a3fe41fb85b10cdf365fce90d190d/sessions/d8390ce6af260f489c1e8b40c257bead25a64f5d?auth_token=a7b7f8c8b1a94748f47da575172cfd656e9e0be821a3c09507605a9c039b44c7",
   "tunnelId": "rc1-tunnel",

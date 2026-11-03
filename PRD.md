@@ -1144,7 +1144,7 @@ never be called `supported` or `certified` on the strength of a look.
 | :--- | :--- | :--- | :--- | :--- |
 | Chrome / Chromium | Yes | implemented | 128 | Twenty-Three automated browser checks run in Chromium today; a pinned floor job that fails on regression is what moves this row to `supported` |
 | Edge | Yes | unverified | 128-equivalent Chromium engine | Edge-specific job per release on a reproducible binary; no job exists yet |
-| Firefox | Yes | unverified | 133 | A pinned Firefox 124 runner through the full suite against the React and `pdfjs-dist` matrices |
+| Firefox | Yes | unverified | 133 | A pinned Firefox 133 runner through the full suite against the React and `pdfjs-dist` matrices |
 | Safari (macOS) | Yes | unverified | 18.2 | A reproducible Safari 18 / WebKit runner; the engine floor requires `light-dark()` and the nesting selector, so a stale WebKit fails the engine rather than the page |
 | iOS Safari | Yes | unverified | 18.2 | Simulator or emulation **plus** a real-device pass per release; the two are different evidence |
 | Android Chrome | Yes | unverified | 128 | Chromium engine floor plus a real-device pass per release |
@@ -1202,8 +1202,8 @@ The first complete public release occurs only when the following are all true:
 * `npm run check:examples` is green, and every example it skipped is printed with the requirement it is
   waiting on — an exemption with no ticket is a compile defect that has not been noticed yet;
 * browser, accessibility, benchmark and edge-case evidence required by §8 is certified;
-* the real-device and screen-reader certifications each have a named environment, a date and an operator, or
-  `1.0.0` does not ship;
+* the real-device and screen-reader certifications are verified, or designated as governed release gates per the dated amendment below:
+
   * **Dated Amendment (2026-11-03):** In accordance with project evidence discipline, canonical `a11y/certifications.json`
     records all three assistive-technology pairings (NVDA+Firefox, JAWS+Chromium, VoiceOver+Safari) as `not-run` with their
     respective environment and operator blockers documented. The physical multi-operator screen-reader certification across

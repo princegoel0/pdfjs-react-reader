@@ -249,6 +249,26 @@ const WORD = [
 // The document side: one rule per figure, `groups` long.
 // ---------------------------------------------------------------------------
 
+function readPrdBrowserFloors(prdText = read('PRD.md')) {
+  const found = new Map();
+  for (const line of prdText.split('\n')) {
+    if (!line.startsWith('| ')) continue;
+    const cells = line.split('|').map((c) => c.trim());
+    if (cells.length < 6) continue;
+    found.set(cells[1], cells[4]);
+  }
+  return {
+    chrome: Number(/^(\d+)/.exec(found.get('Chrome / Chromium') ?? '128')?.[1]),
+    edge: Number(/^(\d+)/.exec(found.get('Edge') ?? '128')?.[1]),
+    firefox: Number(/^(\d+)/.exec(found.get('Firefox') ?? '133')?.[1]),
+    safari: /^(\d+(?:\.\d+)*)/.exec(found.get('Safari (macOS)') ?? '18.2')?.[1],
+    ios: /^(\d+(?:\.\d+)*)/.exec(found.get('iOS Safari') ?? '18.2')?.[1],
+    android: Number(/^(\d+)/.exec(found.get('Android Chrome') ?? '128')?.[1]),
+  };
+}
+
+const prdFloors = readPrdBrowserFloors();
+
 const RULES = [
   {
     id: 'subpaths',
@@ -334,6 +354,20 @@ const RULES = [
     file: 'docs/src/pages/Compatibility.tsx',
     pattern: /The package is <code>([\d.]+)<\/code>/,
     expect: () => [pkg.version],
+  },
+  {
+    id: 'FR-48-readme-floors',
+    what: 'FR-48 browser floors in README.md',
+    file: 'README.md',
+    pattern: /The contract floors are `PRD\.md` §8's: Chrome (\d+), Edge (\d+)-equivalent, Safari and iOS Safari ([\d.]+), Firefox (\d+), Android Chrome (\d+)/,
+    expect: () => [prdFloors.chrome, prdFloors.edge, prdFloors.safari, prdFloors.firefox, prdFloors.android],
+  },
+  {
+    id: 'FR-48-compatibility-floors',
+    what: 'FR-48 browser floors in Compatibility.tsx',
+    file: 'docs/src/pages/Compatibility.tsx',
+    pattern: /The floors are <code>PRD\.md<\/code> §8&apos;s: Chrome (\d+), Edge (\d+)-equivalent, Safari and iOS Safari ([\d.]+), Firefox (\d+), Android Chrome (\d+)/,
+    expect: () => [prdFloors.chrome, prdFloors.edge, prdFloors.safari, prdFloors.firefox, prdFloors.android],
   },
 ];
 

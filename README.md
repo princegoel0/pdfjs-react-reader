@@ -748,8 +748,8 @@ writes files, and what is not allowed is work done without being asked for, twic
 
 ## Browser support
 
-The contract floors are `PRD.md` §8's: Chrome and Edge 125, Safari and iOS Safari 18, Firefox 124
-(provisional), Node 22.13.0, `pdfjs-dist` 6.2.108. Those are the *minimums the promise carries*; what has
+The contract floors are `PRD.md` §8's: Chrome 128, Edge 128-equivalent, Safari and iOS Safari 18.2, Firefox 133, Android Chrome 128,
+Node 22.13.0, `pdfjs-dist` 6.2.108. Those are the *minimums the promise carries*; what has
 actually proved each of them is a different column of the same table, and it is mostly `unverified`.
 
 What is measured where: `npm run test:browsers` (FR-48) drives thirteen claims — a canvas that paints,
@@ -760,9 +760,9 @@ Chromium, Firefox and WebKit at 1280×900 and 375×812 dpr 2. **All three engine
 2026-10-04 pass is **67 ok, 5 skipped, 0 failed** over six cells — Chromium 153 with 23 ok and 1 skip, Firefox
 155 and WebKit 26 with 22 ok and 2 skips each — and every skip belongs to the emulation rather than the
 viewer, which dispatches no wheel events on the small profile and, on Firefox and WebKit, exposes no `Touch`
-constructor to synthesise a pinch from. What that is *not* is floor evidence. §8 claims Chrome 125, Firefox
-124 and Safari 18, and its own execution policy says a current browser passing the suite does not certify an
-older floor; no Edge check has ever run anywhere, and no real device has been touched. The CI `browser` job
+constructor to synthesise a pinch from. What that is *not* is floor evidence. §8 claims Chrome 128, Firefox
+133 and Safari 18.2, and its own execution policy says a current browser passing the suite does not certify an
+older floor; no Edge check has ever run anywhere, no pinned run exists yet at 128 / 133 / 18.2, and no real device has been touched. The CI `browser` job
 has now run — green on 2026-10-04 with the same 67 ok / 5 skipped over six cells — but it installs
 Playwright's current builds, so it is the same evidence as a local run and not the pinned-floor job §8's
 execution policy names.
@@ -779,15 +779,15 @@ and `Can't find variable: Iterator` because `pdf.mjs` evaluates `Iterator.protot
 engine's own calls, counted across all five published `pdfjs-dist` 6.x releases (`6.0.227`, `6.1.200`, `6.2.108`,
 `6.3.289`, `6.4.299`): every one calls `URL.parse` eight times in `pdf.mjs` and three in the worker, and
 `Promise.try` four times in each, while the module-scope `Iterator.prototype` check arrives with `6.2.108` — the
-floor this package advertises. So §8's browser numbers are the promise the engine it names cannot keep, and raising
-them (or lowering the engine floor, which the §6.2 advisory forbids) is a contract decision rather than a code
-change. §8's stated reason for its own Safari row is not the cause either: its evidence column says the floor needs
+floor this package advertises. §8 raised its minimums accordingly to Chromium 128, Firefox 133 and Safari 18.2; no pinned run
+exists yet at 128 / 133 / 18.2, so those floors remain unverified.
+§8's stated reason for its own Safari row is not the cause either: its evidence column says the floor needs
 `light-dark()` and the nesting selector, and the probe measured both of those — plus `:has()` and
-`AbortSignal.any` — present in WebKit 18.0. Until the decision is taken, the floor rows stay `unverified` and the
+`AbortSignal.any` — present in WebKit 18.0. The floor rows stay `unverified` and the
 instrument stays out of CI, where it would be
 red by design. The CSS ships `@media`
 fallbacks beside every `@container` rule and avoids `:has()`. Both of those are written against a target that
-no longer exists: `@container` and `:has()` are older than the §8 floor of Safari 18, so the fallbacks are
+no longer exists: `@container` and `:has()` are older than the §8 floor of Safari 18.2, so the fallbacks are
 margin rather than requirement, nothing exercises them, and no test would fail if someone deleted them. If
 Safari is critical to you, test that first.
 
