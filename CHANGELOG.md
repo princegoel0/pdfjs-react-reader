@@ -7,6 +7,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-03
+
+- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,451 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
+  - **Mobile Device Verification Scope & Hardening:** Real hardware test sessions executed and recorded via BrowserStack Local on iPhone 16 (iOS 18.5 Safari 18.5) and Google Pixel 9 Pro XL (Android 15 Chrome 152.0.0.0). Hardened harness with `scripts/check-device-records.mjs` and `src/lib/device-verification.test.ts` to strictly refuse fallback to OS versions, enforce failable touch arbitration verdicts, and record per-verdict empirical observations (`device/ios-safari-18.json`, `device/android-chrome-128.json`). Full interactive mobile user tasks remain unverified in PRD §8 and are scheduled for 1.x.
+  - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
+  - **Screen Reader Verification Status & PRD §9 Amendment:** In accordance with PRD §9 dated amendment (2026-11-03), canonical `a11y/certifications.json` maintains `not-run` for all three assistive-technology pairings (NVDA, JAWS, VoiceOver) with their respective environment and operator blockers documented, designated as open release gates for 1.x. Release 1.0.0 is guarded and validated by automated axe-core WCAG 2.2 AA audits (`npm run a11y`), structure tree integration (FR-43), and forced colors conformance (FR-44).
+  - **Candidate CI Clean-Runner Validation:** Workflow run 41455503338 executed clean on both Node 22.13.0 and Node 24 runners (`release/last-candidate.json`), validating tarball packaging, consumer Vite build with `pdfjs-dist@6.2.108` and `6.4.299`, and upgrade migration simulation from `0.1.2`.
+  - **Public API & Bundle Size Budgets:** 323 distinct public names verified (263 stable, 60 experimental, 0 deprecated, 15 removed in `api-maturity.json`). Zero runtime dependencies invariant strictly preserved. Core bundle size measured at 33.59 kB gzipped.
+  - **Withdrawn Ink Surface (FR-18):** In accordance with PRD §5.5 major release rules, the fifteen experimental and stable core freehand ink APIs (`usePdfInk`, `UsePdfInkOptions`, `UsePdfInkResult`, `InkLayer`, `InkLayerProps`, `InkStroke`, `InkSettings`, `createStrokeId`, `simplifyPoints`, `strokePathD`, `pointsBounds`, `strokeBounds`, `drawInkStrokes`, `INK_COLORS`, `INK_WIDTHS`) are permanently withdrawn and superseded by `pdfjs-react-reader/features/annotate` (`annotateFeature`).
+
 - **The publish gate is no longer `verify` alone (`FR-58`, #319).** `prepublishOnly` ran `npm run verify`, and
   `verify` never runs the browser matrix — measured 2026-11-03, where `verify` exited 0 on a tree whose
   `Browser matrix (… pdfjs-dist 6.2.108)` cell was red on `no-uncaught-errors`. Added
@@ -19,10 +29,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the committed `v1.0.0-rc.1` record — `benchmarks=skipped` on its Node 24 cell — read as not-green instead of
   as a footnote. `src/lib/release-gate.test.ts` (19 cases) breaks each refusal on purpose, spawns the real CLI so
   a gate that silently declines to run cannot pass, and ties the required job counts to ci.yml's own matrices.
-  Against today's real state the gate refuses three times over: untagged HEAD, `6.2.108` red, no `v1.0.0`
-  candidate. `verify`'s counts and README's stated totals were two releases stale (161/1,426 against a tree of
-  164/1,448 at that commit) and are corrected there; the test *total* is still the one figure `check:docs`
-  deliberately does not derive, which is why it drifted.
+  Against the tree it was written on (2026-11-03, before the tag existed) the gate refused three times over:
+  untagged HEAD, `6.2.108` red in CI, no `v1.0.0` candidate. `verify`'s counts and README's stated totals were two
+  releases stale (161/1,426 against a tree of 164/1,448 at that commit) and are corrected there; the test *total*
+  is still the one figure `check:docs` deliberately does not derive, which is why it drifted.
 
 - **The registry write now has a preflight and a read-back (`FR-58`).** §9 and the release runbook both ask
   for the two steps that surround an irreversible write, and neither existed: `npm publish` was attempted cold and
@@ -76,18 +86,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   here, and the mechanism stays **read from the engine, not reproduced by it** — the row stays open, and the next
   red run can finally name the row that armed it. The instrument is off by default and off in CI, because it puts a
   listener on every pointer of every row and presses a pointer no reader made.
-
-
-
-## [1.0.0] - 2026-11-03
-
-- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,451 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
-  - **Mobile Device Verification Scope & Hardening:** Real hardware test sessions executed and recorded via BrowserStack Local on iPhone 16 (iOS 18.5 Safari 18.5) and Google Pixel 9 Pro XL (Android 15 Chrome 152.0.0.0). Hardened harness with `scripts/check-device-records.mjs` and `src/lib/device-verification.test.ts` to strictly refuse fallback to OS versions, enforce failable touch arbitration verdicts, and record per-verdict empirical observations (`device/ios-safari-18.json`, `device/android-chrome-128.json`). Full interactive mobile user tasks remain unverified in PRD §8 and are scheduled for 1.x.
-  - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
-  - **Screen Reader Verification Status & PRD §9 Amendment:** In accordance with PRD §9 dated amendment (2026-11-03), canonical `a11y/certifications.json` maintains `not-run` for all three assistive-technology pairings (NVDA, JAWS, VoiceOver) with their respective environment and operator blockers documented, designated as open release gates for 1.x. Release 1.0.0 is guarded and validated by automated axe-core WCAG 2.2 AA audits (`npm run a11y`), structure tree integration (FR-43), and forced colors conformance (FR-44).
-  - **Candidate CI Clean-Runner Validation:** Workflow run 41455503338 executed clean on both Node 22.13.0 and Node 24 runners (`release/last-candidate.json`), validating tarball packaging, consumer Vite build with `pdfjs-dist@6.2.108` and `6.4.299`, and upgrade migration simulation from `0.1.2`.
-  - **Public API & Bundle Size Budgets:** 323 distinct public names verified (263 stable, 60 experimental, 0 deprecated, 15 removed in `api-maturity.json`). Zero runtime dependencies invariant strictly preserved. Core bundle size measured at 33.59 kB gzipped.
-  - **Withdrawn Ink Surface (FR-18):** In accordance with PRD §5.5 major release rules, the fifteen experimental and stable core freehand ink APIs (`usePdfInk`, `UsePdfInkOptions`, `UsePdfInkResult`, `InkLayer`, `InkLayerProps`, `InkStroke`, `InkSettings`, `createStrokeId`, `simplifyPoints`, `strokePathD`, `pointsBounds`, `strokeBounds`, `drawInkStrokes`, `INK_COLORS`, `INK_WIDTHS`) are permanently withdrawn and superseded by `pdfjs-react-reader/features/annotate` (`annotateFeature`).
 
 ## [1.0.0-rc.1] - 2026-11-01
 
