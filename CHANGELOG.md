@@ -7,6 +7,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **The matrix now isolates its rows, and that named the row #319 was waiting for (`FR-48`).** Every row is followed
+  by a read of what the bar still holds lit (`aria-pressed="true"`) and which `*Editing` class the mounted editor
+  layers carry, and anything armed is clicked off before the next row starts (`TOOL_STATE`/`disarmTools` in
+  `scripts/browser-matrix.mjs`). One row out of 23 leaves state, in all three desktop cells: `forced-colours`
+  (FR-44's row) arms Highlight and never takes it off, so the harness now prints
+  `forced-colours left a tool armed → Highlight from the bar`. The engine keeps its draw session in *statics* shared
+  by every page, and its session listeners sit on `window`, so a tool left armed is a live listener handed to
+  whoever presses next — which is why #319's uncaught throw has always been stamped with a print row that had
+  already finished its own assertions. Measured 2026-11-06 on this host at the installed pdfjs-dist 6.3.289: six
+  cells, 104 ok / 7 skipped / 0 not runnable / 0 failed, `STILL holds` printing nowhere. The first version of the
+  reset did the damage it was meant to undo and said so (`STILL holds Highlight + Highlight`), because the bar's
+  tool buttons *toggle* and a hidden sizer copy duplicates the label; it now re-reads the pressed state before every
+  click. CI run 41645701300 (`main` at `e27bd32`) is the reading this is aimed at — webkit · desktop at the 6.2.108
+  floor, 2 uncaught `null is not an object (evaluating 'this._freeHighlight.isEmpty')` plus
+  `print-carries-an-authored-mark` failing because a pen-armed drag produced no ink editor at all — and the floor
+  build's own source says what that means: `#endHighlight` reads the static as its first statement (6.2.108
+  `pdf.mjs:22978`) and is what nulls it (22989), so it ran with a session already closed. Read from the source, not
+  reproduced; the open half is whether the floor cell still crashes when no row hands a live tool to the next, which
+  only a runner with 6.2.108 installed can say.
+
 ## [1.0.0] - 2026-11-03
 
 - **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,456 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).

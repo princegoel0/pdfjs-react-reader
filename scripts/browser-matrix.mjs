@@ -4839,6 +4839,88 @@ async function waitFor(fn, timeout) {
 const firstLine = (error) => String(error?.message ?? error).split('\n')[0].slice(0, 120);
 
 /**
+ * What the application holds at a row boundary: which tool the bar says is pressed, and which engine editing
+ * class is on a page's editor layer.
+ *
+ * `#319`'s family of crashes needs a draw or highlight session that outlives the row that opened it — the engine
+ * keeps that state on fields shared by every page and un-registers its window listeners only when the session's
+ * own controller is aborted. So a row must not be allowed to leave one open, and the only honest way to know
+ * whether it did is to read the two things the application itself publishes. The editing class is the engine's:
+ * `AnnotationEditorLayer` toggles ```${editorType._type}Editing``` (`pdf.mjs:26856`), which is where `inkEditing`
+ * comes from — no code in this repository adds it.
+ */
+const TOOL_STATE = () => ({
+  pressed: [
+    ...new Set(
+      [...document.querySelectorAll('.pjsr-toolbar [aria-pressed="true"]')]
+        .map((n) => n.getAttribute('aria-label'))
+        .filter(Boolean),
+    ),
+  ],
+  editing: [
+    ...new Set(
+      [...document.querySelectorAll('.pjsr-editor-layer')]
+        .flatMap((n) => n.className.match(/[a-zA-Z]+Editing/g) ?? [])
+        .filter((c) => c !== 'nonEditing'),
+    ),
+  ],
+});
+
+/**
+ * Put the tool back the way a reader does — press the control that is lit. Returns what it had to do, so the
+ * report can say which row left what open rather than quietly tidying up after it.
+ *
+ * Two traps this version had to be written around. The bar keeps a hidden measuring copy of every control
+ * (`#243`'s family), so the same label arrives twice from `querySelectorAll` and a naive loop clicks it twice —
+ * and these buttons *toggle*, so the second click arms the tool again: the first cut of this reset did exactly
+ * that to Highlight, and the row boundary read `still armed` because of the instrument, not the application. And
+ * the folded case matters as much as the visible one: at 375px the annotate group lives behind the ⋯ panel, and a
+ * reset that opened the panel and left it there would leak a state of its own into the next row.
+ */
+async function disarmTools(page) {
+  const before = await page.evaluate(TOOL_STATE);
+  if (!before.pressed.length) return { disarmed: [], stillArmed: [], panelUsed: false };
+  const done = [];
+  for (const label of before.pressed) {
+    // Re-read before every click: a previous click may have already changed what the bar holds, and these
+    // controls toggle, so pressing a cold control would arm it rather than disarm it.
+    if (!(await page.evaluate(TOOL_STATE)).pressed.includes(label)) continue;
+    const visible = page.locator(`${BAR} [aria-label="${label}"]:visible`);
+    if ((await visible.count()) > 0) {
+      await visible.first().click();
+      done.push(`${label} from the bar`);
+      continue;
+    }
+    const trigger = page.locator(`${BAR} [aria-label="More controls"]:visible`);
+    if ((await trigger.count()) === 0) {
+      done.push(`${label} NOT reachable (no bar copy, no ⋯ trigger)`);
+      continue;
+    }
+    const wasOpen = (await page.locator('.pjsr-overflow-menu').count()) > 0;
+    if (!wasOpen) await trigger.click();
+    const folded = page.locator(`.pjsr-overflow-menu [aria-label="${label}"]:visible`);
+    if ((await folded.count()) > 0) {
+      await folded.first().click();
+      done.push(`${label} from the ⋯ panel${wasOpen ? '' : ' (panel opened and closed for it)'}`);
+    } else {
+      done.push(`${label} pressed but absent from the panel`);
+    }
+    if (!wasOpen) await trigger.click().catch(() => undefined);
+  }
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.pjsr-toolbar [aria-pressed="true"]')].length === 0,
+    undefined,
+    { timeout: 5_000 },
+  ).catch(() => undefined);
+  const after = await page.evaluate(TOOL_STATE);
+  return {
+    disarmed: done,
+    stillArmed: [...after.pressed, ...after.editing.map((c) => `layer still ${c}`)],
+    panelUsed: done.some((d) => d.includes('panel')),
+  };
+}
+
+/**
  * Playwright puts the locator it was waiting for on a later line than the timeout, and a report that names
  * only the first line says "timed out" without saying what never appeared.
  */
@@ -5112,6 +5194,24 @@ async function runCell(engineName, profileName, baseUrl) {
         detail: `${error instanceof Failure ? '' : `${error.name}: `}${errText(error)}`,
         ms: Date.now() - started,
       });
+    }
+    /*
+     * Row isolation, and it is measured rather than assumed: read what the bar and the engine layer still hold,
+     * and put an armed tool back before the next row starts. #319's crashes are read off fields the engine keeps
+     * *shared* across every page, and a listener for one of those fields survives the row that opened it — so a
+     * row that ends with Highlight or Ink lit hands a live session to whoever presses next, which is why the throw
+     * arrives in a print row that has finished its own assertions and passed them. The names are printed, not
+     * swallowed: a row that needs this is a row worth naming.
+     */
+    const leftArmed = await disarmTools(page).catch((error) => ({
+      disarmed: [],
+      stillArmed: [`(the reset itself failed: ${firstLine(error)})`],
+    }));
+    if (leftArmed.disarmed.length) {
+      console.log(`    ${check.name} left a tool armed → ${leftArmed.disarmed.join(', ')}`);
+    }
+    if (leftArmed.stillArmed.length) {
+      console.log(`    ${check.name} STILL holds ${leftArmed.stillArmed.join(' + ')} after the reset`);
     }
     /*
      * `PJSR_PROBE=1` only, because it perturbs the application on purpose. #319: the engine's throw is stamped with
