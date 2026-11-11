@@ -31,13 +31,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   read out of the log: `forced-colours` is row 17, `print-sheets-hide-the-application` row 18 and
   `layers-switch-paints-a-page` row 19 — and those two are exactly the rows that carried the `_freeHighlight.isEmpty`
   throws in 41645701300. The armed Highlight session was being handed to the next row, whose pointer events then
-  ended a session the engine's shared static had already closed. So #319 and #281 close as row contamination with
-  the instrument named. One distinction stays in the verdict: the `_freeHighlight` pair is matched to its cause by
-  row order, while the earlier `#currentDraw` throw is gone in the same run but its route is *inferred by elimination
-  and not separately read* — no row was ever caught leaving the pen armed. The engine's unguarded dereference remains
-  a real pdf.js defect that no row of the isolated matrix now reaches, and the limit is #248's: one run against ten
-  earlier red readings is a sample of one, so what retires the worry is the mechanism being gone, not the tally
-  being green.
+  ended a session the engine's shared static had already closed. So the `_freeHighlight` face of #319 closes as row
+  contamination with the instrument named, matched to its cause by row order. **The `#currentDraw` face does not, and
+  the claim that the isolated matrix no longer reaches it is withdrawn.** CI run 43064328114 attempt 1 (`dev` at
+  `7d43405`, 2026-11-11) read webkit · desktop at the 6.2.108 floor as 103 ok / 7 skipped / 1 failed, the one failure
+  being `no-uncaught-errors` reporting `1 uncaught: [print-carries-an-authored-mark] null is not an object (evaluating
+  '_DrawingEditor.#currentDraw.isCancellable')` with every row itself ok — and the isolation instrument ran clean in
+  that same attempt, `forced-colours left a tool armed → Highlight from the bar` printing in all three desktop cells
+  and `STILL holds` nowhere. Attempt 2 of the same job on the same SHA read 104 ok / 7 skipped / 0 failed with 0
+  uncaught in all six cells, so #281's `#currentDraw` face reopens instead of staying closed. The limit is the
+  instrument's own: `disarmTools` reads `aria-pressed` and the layers' `*Editing` classes, which is DOM state, and an
+  orphaned `window` listener is not DOM state — a clean reset cannot see one. The engine's unguarded dereference is
+  still a real pdf.js defect: `startDraw` overwrites the single static `#currentDrawingAC` at 6.2.108 `pdf.mjs:23664`
+  without aborting the previous controller, `_cleanup(true)` nulls `#currentDraw` at 23751, and the `pointerdown`
+  capture listener reads it unguarded at 23686 — as 6.4.299 `pdf.mjs:22495` does too, which is why this has never had
+  an engine axis. No fix is claimed and the route through our own actions is not measured; what would settle it is an
+  instrument that counts the engine's session listeners per row instead of reading the bar.
 
 - **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,463 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
   - **Mobile Device Verification Scope & Hardening:** Real hardware test sessions executed and recorded via BrowserStack Local on iPhone 16 (iOS 18.5 Safari 18.5) and Google Pixel 9 Pro XL (Android 15 Chrome 152.0.0.0). Hardened harness with `scripts/check-device-records.mjs` and `src/lib/device-verification.test.ts` to strictly refuse fallback to OS versions, enforce failable touch arbitration verdicts, and record per-verdict empirical observations (`device/ios-safari-18.json`, `device/android-chrome-128.json`). Full interactive mobile user tasks remain unverified in PRD §8 and are scheduled for 1.x.
