@@ -28,6 +28,11 @@ jobs:
     name: Candidate ${{ github.ref_name }} (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Job-level, not `echo … >> $GITHUB_ENV`: the runner refused that with "Can't store NODE_OPTIONS output
+    # parameter using '$GITHUB_ENV' command" in both cells of run 43072537971, so the polyfill never loaded for
+    # any leg without its own `env:`. It is the same variable ci.yml sets per step, which the runner accepts.
+    env:
+      NODE_OPTIONS: "--require=${{ github.workspace }}/scripts/node-compat.cjs"
     strategy:
       fail-fast: false
       matrix:
@@ -43,9 +48,6 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - name: Configure Node compatibility
-        run: echo "NODE_OPTIONS=--require=${{ github.workspace }}/scripts/node-compat.cjs" >> $GITHUB_ENV
-
       - name: Install
         run: npm ci
 
@@ -53,8 +55,6 @@ jobs:
       # count written beside it goes stale the first time the suite grows, and nothing gates this comment.
       - name: Verify chain
         id: verify
-        env:
-          NODE_OPTIONS: "--require=${{ github.workspace }}/scripts/node-compat.cjs"
         run: npm run verify
 
       - name: Pack the artifact
@@ -124,8 +124,13 @@ jobs:
       # `benchmarks: skipped` and stays not-green on its own — `release:validate` reads the two records together,
       # requiring one to certify every leg and naming which class declined which (#324; the first version of that
       # gate demanded every record be green, which no run of this matrix could ever satisfy).
+      #
+      # `always()` survives a red leg above, but it does not install a browser: `Install browsers` has no
+      # `always()`, so when `verify` failed the bench ran anyway and died on a missing headless shell
+      # (run 43072537971) — a second red that named Playwright instead of the leg that actually broke. The
+      # dependency is named here so the record says `skipped` for the reason it was skipped.
       - name: Run the benchmarks twice and keep both records
-        if: always() && matrix.node == '22.13.0'
+        if: always() && matrix.node == '22.13.0' && steps.engines.outcome == 'success'
         id: bench
         run: |
           set -euo pipefail

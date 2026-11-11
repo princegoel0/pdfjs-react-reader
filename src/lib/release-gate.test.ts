@@ -376,7 +376,11 @@ describe('FR-58: the registry and the tag are consulted, not assumed', () => {
     expect(pkg.scripts['release:validate']).toBe('node scripts/release-validate.mjs');
     expect(pkg.scripts['publish:preflight']).toBe('node scripts/publish-preflight.mjs');
     expect(pkg.scripts['publish:readback']).toBe('node scripts/publish-preflight.mjs --readback');
-    expect(pkg.scripts.verify).toMatch(/check:fr-evidence$/);
+    expect(pkg.scripts.verify).toMatch(/check:fr-evidence/);
+    // The byte budget goes last, for the reason ci.yml gives its own size step: `verify` is an `&&` chain, so a
+    // budget decision ahead of the contract legs leaves them unreachable on a runner — which is how FR-52's gap
+    // stayed open. Measured again on the candidate: one red leg skipped `Pack` and every artifact leg after it.
+    expect(pkg.scripts.verify).toMatch(/&& npm run size$/);
   });
 });
 

@@ -141,6 +141,42 @@ describe('FR-58: the release-candidate record', () => {
       expect(block, `step ${id} can be skipped by an earlier red`).toMatch(/^\s+if: always\(\)/m);
     }
     expect(workflow).toMatch(/if-no-files-found: error/);
+    // `always()` is not a dependency. The bench needs the browsers `engines` installs, and that step has no
+    // `always()` of its own — so a red verify left the bench running with no executable and produced a second red
+    // naming Playwright instead of the leg that broke (run 43072537971).
+    const bench = blocks.find((b) => /^ {8}id: bench$/m.test(b));
+    expect(bench, 'the bench must name the step that installs its browsers').toMatch(
+      /steps\.engines\.outcome == 'success'/,
+    );
+  });
+
+  it('loads the Node polyfill the way the runner accepts, not through GITHUB_ENV', () => {
+    // Both cells of run 43072537971 printed "Can't store NODE_OPTIONS output parameter using '$GITHUB_ENV'
+    // command" and still exited 0, so the job carried on with the polyfill absent from every leg that had no
+    // `env:` of its own. A step that fails to set a variable must not read as one that set it.
+    // The write, not the word: the comment above the job-level `env:` quotes the refusal, so a guard on the
+    // bare name would fail on the prose that explains it.
+    expect(workflow, 'NODE_OPTIONS must not be set by appending to GITHUB_ENV').not.toMatch(
+      /NODE_OPTIONS=[^\n]*GITHUB_ENV/,
+    );
+    // Six spaces is the job-level `env:` child; a step-level one sits at ten. Job level covers every leg.
+    expect(workflow).toMatch(/^ {6}NODE_OPTIONS: "--require=\$\{\{ github\.workspace \}\}\/scripts\/node-compat\.cjs"$/m);
+    expect(existsSync(join('scripts', 'node-compat.cjs'))).toBe(true);
+  });
+
+  it('leaves the docs figure record alone during a check pass', () => {
+    // `verify` ran `size` before `check:docs` while ci.yml runs them the other way round, so writing the record on
+    // every run made one commit green in CI and red in the candidate: the runner measured `shell` at 70.07 kB and
+    // refused README's 70.06 (runs 43072537955 and 43072537971). The record is committed and refreshed by
+    // `size:update`; the ratchet still measures every run, and the budget now goes last so it cannot blind a
+    // contract leg.
+    const size = readFileSync(join('scripts', 'check-size.mjs'), 'utf8');
+    expect([...size.matchAll(/writeFileSync\(figuresPath/g)], 'the figures record must have one writer').toHaveLength(1);
+    const updateBlock = /if \(update\) \{([\s\S]*?)\n\}/.exec(size)?.[1] ?? '';
+    expect(updateBlock, 'the figures record is written outside `--update`, so a check pass rewrites a committed file')
+      .toContain('writeFileSync(figuresPath');
+    expect(manifest.scripts['size:update']).toContain('--update');
+    expect(manifest.scripts.verify).toMatch(/&& npm run size$/);
   });
 
   it('runs the artifact chain through commands that exist, not prose', () => {
