@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   REQUIRED_JOBS,
+  candidateNotes,
   candidateProblems,
   ciProblems,
   deriveCandidatePasses,
@@ -111,6 +112,111 @@ describe('FR-58: a candidate record passes only when every leg ran', () => {
       expect.stringContaining('no candidate record carries tag'),
     ]);
     expect(candidateProblems([], { version: VERSION, sha: SHA })).toEqual([expect.stringContaining('no release/last-candidate')]);
+  });
+});
+
+/**
+ * FR-58: the gate must be satisfiable by the workflow that feeds it.
+ *
+ * The first version required *every* bound record to be all-green, and `release-candidate.yml` runs the benchmark
+ * leg on one runner class only — the one with an accepted entry in `benchmarks/baseline.json`. So the other
+ * class's record was `benchmarks: skipped` by design and no release could ever have passed. Measured 2026-11-11
+ * against the two records the workflow writes. Nothing here relaxes "a skipped leg is not a pass": a skip is
+ * lawful only on a record that is not the certifying one, and only when a green record on the same commit ran
+ * that leg. The classes and the gated leg are read out of the workflow rather than typed, so a change to either
+ * moves these cases instead of leaving them asserting a shape the runner no longer produces.
+ */
+describe('FR-58: a candidate the workflow can produce is one the gate can pass', () => {
+  const names = requiredLegsFrom(readFileSync(`${repo}/scripts/rc-record.mjs`, 'utf8'));
+  const yml = readFileSync(`${repo}/.github/workflows/release-candidate.yml`, 'utf8');
+  /** A reader of the runner's own shape throws rather than defaults, so a moved step is a failure, not a `''`. */
+  const capture = (text: string, pattern: RegExp, what: string): string => {
+    const found = pattern.exec(text)?.[1];
+    if (!found) throw new Error(`release-candidate.yml no longer writes ${what} where these cases read it`);
+    return found;
+  };
+  const classes = capture(yml, /node: \[([^\]]+)\]/, 'the node matrix')
+    .split(',')
+    .map((entry) => capture(entry.trim(), /^'([^']+)'$/, `a quoted node version (${entry.trim()})`));
+  const benchClass = capture(
+    yml,
+    /- name: Run the benchmarks[\s\S]*?if:[^\n]*matrix\.node == '([^']+)'/,
+    'the class the benchmark leg is gated to',
+  );
+  const otherClass = capture(classes.filter((c) => c !== benchClass).join(','), /^([^,]+)$/, 'exactly one other class');
+  const fileFor = (node: string) => `release/last-candidate-node${node}.json`;
+  const record = (file: string, over: Record<string, string> = {}) => ({
+    file,
+    tag: `v${VERSION}`,
+    commit: SHA,
+    artifact: { file: `${NAME}-${VERSION}.tgz`, sha256: 'a'.repeat(64) },
+    legs: names.map((n) => leg(n, over[n] ?? 'success')),
+  });
+  /** Exactly what the workflow writes: the gated class green, every other class skipping the gated leg. */
+  const asWritten = () =>
+    classes.map((node) => record(fileFor(node), node === benchClass ? {} : { benchmarks: 'skipped' }));
+
+  it('reads the workflow rather than assuming its shape', () => {
+    expect(classes.length, 'the candidate matrix must have more than one class for this trap to exist').toBeGreaterThan(1);
+    expect(classes, 'the benchmark leg must be gated to a class named in the matrix').toContain(benchClass);
+    expect(otherClass).not.toBe(benchClass);
+    expect(names, 'the gated leg must be one rc-record requires').toContain('benchmarks');
+  });
+
+  it('passes the records the workflow writes, and names the class that did not measure', () => {
+    const records = asWritten();
+    expect(candidateProblems(records, { version: VERSION, sha: SHA })).toEqual([]);
+    const skipped = records.filter((r) => r.legs.some((l) => l.conclusion === 'skipped'));
+    expect(candidateNotes(records, { version: VERSION, sha: SHA })).toEqual(
+      skipped.map((r) => `${r.file}: benchmarks not run on this class — certified by ${fileFor(benchClass)}`),
+    );
+  });
+
+  it('still refuses every way a skip could be laundered into a pass', () => {
+    const onlySkipped = [record(fileFor(otherClass), { benchmarks: 'skipped' })];
+    expect(candidateProblems(onlySkipped, { version: VERSION, sha: SHA }).join(' ')).toMatch(
+      /no candidate record .* certifies every leg/,
+    );
+    expect(candidateProblems(onlySkipped, { version: VERSION, sha: SHA }).join(' ')).toMatch(
+      /no green record on this commit certifies it/,
+    );
+    const allSkipped = classes.map((c) => record(fileFor(c), { benchmarks: 'skipped' }));
+    expect(candidateProblems(allSkipped, { version: VERSION, sha: SHA }).join(' ')).toMatch(/certifies every leg/);
+    // A leg no class ran is not a leg that passed, even when every other leg is green somewhere.
+    const nobodyRanIt = classes.map((c) => record(fileFor(c), { 'upgrade-path': 'skipped' }));
+    expect(candidateProblems(nobodyRanIt, { version: VERSION, sha: SHA }).join(' ')).toMatch(
+      /upgrade-path skipped, and no green record/,
+    );
+  });
+
+  it('refuses a leg that ran and broke on any class, not only on the certifying one', () => {
+    for (const conclusion of ['failure', 'cancelled']) {
+      const records = [record(fileFor(benchClass)), record(fileFor(otherClass), { 'verify-chain': conclusion })];
+      expect(candidateProblems(records, { version: VERSION, sha: SHA }).join(' ')).toMatch(
+        new RegExp(`verify-chain=${conclusion}.*tested on this runner class and broke there`),
+      );
+    }
+    const absent = [record(fileFor(benchClass)), record(fileFor(otherClass), { benchmarks: 'absent' })];
+    expect(candidateProblems(absent, { version: VERSION, sha: SHA }).join(' ')).toMatch(
+      /an absent leg reads exactly like one that passed/,
+    );
+  });
+
+  it('refuses two green records that bind different artifacts', () => {
+    const records = classes.map((c, i) => {
+      const one = record(fileFor(c));
+      return i === 1 ? { ...one, artifact: { ...one.artifact, sha256: 'c'.repeat(64) } } : one;
+    });
+    expect(candidateProblems(records, { version: VERSION, sha: SHA })).toEqual([
+      expect.stringContaining('bind 2 different artifact digests'),
+    ]);
+  });
+
+  it('keeps the record’s own verdict strict, so a skipped leg never reads as a pass in the file', () => {
+    expect(deriveCandidatePasses(record(fileFor(otherClass), { benchmarks: 'skipped' }).legs)).toEqual({
+      passes: false,
+      notPassed: ['benchmarks=skipped'],
+    });
   });
 });
 

@@ -117,6 +117,13 @@ jobs:
       # no entry prints `n/a` per leg rather than passing — §6's rule that an unverified row is not a pass, applied
       # to a machine. Two passes because the tolerance needs a distribution to compare against, and it is the
       # machine's own readings it may not be compared with another's.
+      #
+      # Gated rather than run everywhere, because `benchmark.mjs` exits `broke.length || regressed.length ? 1 : 0`
+      # and an `n/a` line is neither: on a class with no baseline entry the step would go green having measured
+      # nothing, which is the laundering this workflow exists to prevent. So this class's record says
+      # `benchmarks: skipped` and stays not-green on its own — `release:validate` reads the two records together,
+      # requiring one to certify every leg and naming which class declined which (#324; the first version of that
+      # gate demanded every record be green, which no run of this matrix could ever satisfy).
       - name: Run the benchmarks twice and keep both records
         if: always() && matrix.node == '22.13.0'
         id: bench

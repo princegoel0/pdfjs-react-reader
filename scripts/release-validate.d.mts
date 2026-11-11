@@ -47,6 +47,9 @@ export function ciProblems(jobs: CiJob[], sha: string): string[];
 
 export function candidateProblems(records: CandidateRecord[], options: { version: string; sha: string }): string[];
 
+/** Which class declined which leg, and which record on the same commit ran it instead. */
+export function candidateNotes(records: CandidateRecord[], options: { version: string; sha: string }): string[];
+
 export function registryProblems(packument: Packument | null, name: string, version: string): string[];
 
 export interface ReleaseOrder {

@@ -5,7 +5,7 @@ All notable changes to `pdfjs-react-reader` are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-11-11
 
 - **The matrix now isolates its rows, and that named the row #319 was waiting for (`FR-48`).** Every row is followed
   by a read of what the bar still holds lit (`aria-pressed="true"`) and which `*Editing` class the mounted editor
@@ -23,13 +23,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   floor, 2 uncaught `null is not an object (evaluating 'this._freeHighlight.isEmpty')` plus
   `print-carries-an-authored-mark` failing because a pen-armed drag produced no ink editor at all — and the floor
   build's own source says what that means: `#endHighlight` reads the static as its first statement (6.2.108
-  `pdf.mjs:22978`) and is what nulls it (22989), so it ran with a session already closed. Read from the source, not
-  reproduced; the open half is whether the floor cell still crashes when no row hands a live tool to the next, which
-  only a runner with 6.2.108 installed can say.
+  `pdf.mjs:22978`) and is what nulls it (22989), so it ran with a session already closed. **The runner has now
+  answered the open half, and it answered green:** CI run 42194303046 (`dev` at `d611de5`, 2026-11-06) finished with
+  all sixteen jobs successful, both matrix cells at 104 ok / 7 skipped / 0 not runnable / 0 failed on 6.2.108 and on
+  6.4.299, `no-uncaught-errors` reading 0 uncaught in all six cells of both jobs, and neither `_freeHighlight` nor
+  `#currentDraw` anywhere in either log. What makes this more than the next green in an alternation is the row order
+  read out of the log: `forced-colours` is row 17, `print-sheets-hide-the-application` row 18 and
+  `layers-switch-paints-a-page` row 19 — and those two are exactly the rows that carried the `_freeHighlight.isEmpty`
+  throws in 41645701300. The armed Highlight session was being handed to the next row, whose pointer events then
+  ended a session the engine's shared static had already closed. So #319 and #281 close as row contamination with
+  the instrument named. One distinction stays in the verdict: the `_freeHighlight` pair is matched to its cause by
+  row order, while the earlier `#currentDraw` throw is gone in the same run but its route is *inferred by elimination
+  and not separately read* — no row was ever caught leaving the pen armed. The engine's unguarded dereference remains
+  a real pdf.js defect that no row of the isolated matrix now reaches, and the limit is #248's: one run against ten
+  earlier red readings is a sample of one, so what retires the worry is the mechanism being gone, not the tally
+  being green.
 
-## [1.0.0] - 2026-11-03
-
-- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,456 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
+- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,462 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
   - **Mobile Device Verification Scope & Hardening:** Real hardware test sessions executed and recorded via BrowserStack Local on iPhone 16 (iOS 18.5 Safari 18.5) and Google Pixel 9 Pro XL (Android 15 Chrome 152.0.0.0). Hardened harness with `scripts/check-device-records.mjs` and `src/lib/device-verification.test.ts` to strictly refuse fallback to OS versions, enforce failable touch arbitration verdicts, and record per-verdict empirical observations (`device/ios-safari-18.json`, `device/android-chrome-128.json`). Full interactive mobile user tasks remain unverified in PRD §8 and are scheduled for 1.x.
   - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
   - **Screen Reader Verification Status & PRD §9 Amendment:** In accordance with PRD §9 dated amendment (2026-11-03), canonical `a11y/certifications.json` maintains `not-run` for all three assistive-technology pairings (NVDA, JAWS, VoiceOver) with their respective environment and operator blockers documented, designated as open release gates for 1.x. Release 1.0.0 is guarded and validated by automated axe-core WCAG 2.2 AA audits (`npm run a11y`), structure tree integration (FR-43), and forced colors conformance (FR-44).
@@ -132,6 +142,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   row that armed it, and a red cell left as it is names only the row that pressed last. Two cells of the one run
   both red, on two different engine builds, also weakens what is left of the engine-axis reading and points at
   something about the run itself — which is what the trace is for.
+
+- **The publish gate refused the only candidate its own workflow can produce (`FR-58`, #324).** The second
+  impossible-order trap in this gate, found the same way as the first — by walking what the runner actually writes
+  rather than testing one rule at a time. `candidateProblems` required **every** record bound to the tagged commit to
+  be all-green, but `release-candidate.yml` runs the benchmark leg on one node class only (`22.13.0`, the one with an
+  accepted `benchmarks/baseline.json` entry for a Linux runner), so the Node 24 record is `benchmarks: skipped` by
+  design. Measured 2026-11-11 by feeding the gate the two records that workflow writes: refused, every time, forever.
+  The rule is now the one FR-58's clause asks for — *a* clean runner, not every runner. One bound record must certify
+  every leg with a digest; **no** bound record may carry a `failure`, a `cancelled` or an `absent` leg, because a leg
+  that ran and broke on a class is not a class the release may ignore; a `skipped` leg is lawful only on a record that
+  is not the certifying one and only when a green record on the same commit ran that leg; and the certifying records
+  must bind one digest, or they are not one candidate. `candidateNotes` prints which class declined which leg and
+  which record certified it instead, so the skip is named rather than silently absorbed. The tempting shorter fix was
+  rejected on a measurement: un-gating the benchmark step would make it *pass* on a class with no baseline entry,
+  because `benchmark.mjs` exits `broke.length || regressed.length ? 1 : 0` and an `n/a` line is neither — a green
+  having measured nothing. `deriveCandidatePasses` is unchanged, so a record with a skip still reads `passes: false`
+  in the file itself. Six cases in `src/lib/release-gate.test.ts` (30 in the file) read the node matrix and the gated
+  class out of the workflow rather than typing them, pass exactly what it writes, and refuse each way a skip could be
+  laundered: only the skipped record committed, both classes skipping, a leg no class ran, a leg that broke on the
+  non-certifying class, an absent leg, and two green records binding different artifacts.
 
 ## [1.0.0-rc.1] - 2026-11-01
 

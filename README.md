@@ -850,7 +850,7 @@ development, against the built `dist` in CI.
 ## Status
 
 Version `1.0.0`, built and verified on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, and
-all 12 legs of `npm run verify` pass — typecheck, 164 test files (1,456 tests), the build, the size ratchet, packaging,
+all 12 legs of `npm run verify` pass — typecheck, 164 test files (1,462 tests), the build, the size ratchet, packaging,
 examples, maturity, dependencies, the accessibility record check, the device verification record check, the docs figures and the evidence
 register. The candidate pipeline (`.github/workflows/release-candidate.yml`) has run on a clean runner from
 the packed artifact on Node 22.13.0 and Node 24 (`release/last-candidate.json`), and physical mobile device passes on

@@ -8,9 +8,18 @@
  * it is supposed to refuse is not a gate, so this file reads four sources the publish cannot fake:
  *
  *   1. the CI run for the commit the tag names — every required job `success`, and the matrix cells present;
- *   2. `release/last-candidate*.json` — a record for this version and that commit whose legs are **all**
- *      `success`; a `skipped` leg is not a pass (the committed rc.1 record has `benchmarks: skipped` on its
- *      Node 24 cell);
+ *   2. `release/last-candidate*.json` — records for this version and that commit, of which **at least one must
+ *      have every leg `success`** and carry an artifact digest. A `skipped` leg is never a pass: it is allowed
+ *      only on a record that is not the certifying one, only when a green record on the same commit certifies
+ *      that same leg, and it is printed with the file that does. A leg that `failure`d or was `cancelled` on any
+ *      bound record is a refusal, because the artifact was tested on that runner class and broke there.
+ *      This is the shape §9 asks for ("built and tested on a clean runner", singular) and the shape
+ *      `publish-preflight.mjs`'s `expectedDigest` already assumed when it took the green record's digest out of
+ *      rc.1's three. Requiring *every* bound record to be all-green asked for something the workflow cannot
+ *      produce: `release-candidate.yml` runs the benchmark leg only on Node 22.13.0, the one CI class with an
+ *      accepted entry in `benchmarks/baseline.json`, so the Node 24 record is `benchmarks: skipped` by design and
+ *      no release could ever have passed. Measured 2026-11-11 with this file's own functions against the two
+ *      records the workflow writes;
  *   3. the registry — the version must not already be taken, because a burned number cannot be reused;
  *   4. the tag — `v<version>` must resolve, HEAD must be that commit or a descendant of it, and between the two
  *      only `CHANGELOG.md` and `release/last-candidate*.json` may differ, because the candidate ran on the tagged
@@ -76,6 +85,12 @@ export function ciProblems(jobs, sha) {
   return problems;
 }
 
+/**
+ * FR-58: is this release certified by a candidate run on the tagged commit?
+ *
+ * One bound record must certify every leg. The others are evidence about their own runner class, and they are
+ * refused for anything that means the artifact broke there — not for a leg that class was never able to run.
+ */
 export function candidateProblems(records, { version, sha }) {
   if (records.length === 0) {
     return ['no release/last-candidate*.json in the tree — §9 wants a run, not a memory of one'];
@@ -85,24 +100,84 @@ export function candidateProblems(records, { version, sha }) {
   if (matching.length === 0) {
     return [`no candidate record carries tag ${wanted} (found: ${[...new Set(records.map((r) => r.tag || 'none'))].join(', ')} — tag before publishing, per §9)`];
   }
-  const problems = [];
   const bound = matching.filter((r) => r.commit === sha);
   if (bound.length === 0) {
-    problems.push(
+    return [
       `candidate records for ${wanted} are for commit ${matching.map((r) => String(r.commit).slice(0, 7)).join(', ')} ` +
         `— not the tagged commit ${sha.slice(0, 7)} whose artifact the published bytes must be`,
-    );
+    ];
   }
+
+  const problems = [];
+  const certifying = [];
   for (const record of bound) {
     const legs = record.legs ?? [];
-    if (legs.some((leg) => leg.conclusion === 'absent')) {
+    const absent = legs.filter((leg) => leg.conclusion === 'absent');
+    const broke = legs.filter((leg) => leg.conclusion === 'failure' || leg.conclusion === 'cancelled');
+    if (absent.length) {
       problems.push(`${record.file}: a leg is absent, and an absent leg reads exactly like one that passed`);
     }
-    const { passes, notPassed } = deriveCandidatePasses(legs);
-    if (!passes) problems.push(`${record.file}: not green — ${notPassed.join(', ')} (a skipped leg is not a pass)`);
+    if (broke.length) {
+      problems.push(
+        `${record.file}: ${broke.map((leg) => `${leg.leg}=${leg.conclusion}`).join(', ')} — the artifact was tested ` +
+          'on this runner class and broke there, which is not a class the release may ignore',
+      );
+    }
     if (!record.artifact?.sha256) problems.push(`${record.file}: no artifact digest, so the green is bound to nothing`);
+    if (deriveCandidatePasses(legs).passes) certifying.push(record);
+  }
+
+  if (certifying.length === 0) {
+    problems.push(
+      `no candidate record for ${wanted} on ${sha.slice(0, 7)} certifies every leg — a skipped leg is not a pass, ` +
+        'and §9 wants a run that passed rather than a set of runs that each declined part of it',
+    );
+  }
+  const digests = [...new Set(certifying.map((r) => r.artifact.sha256))];
+  if (digests.length > 1) {
+    problems.push(`the green candidate records bind ${digests.length} different artifact digests — they are not one candidate`);
+  }
+  // A leg no class ran is not a leg that passed, so a skip is only lawful when a green record covers it.
+  for (const { record, skipped } of skippedLegs(bound)) {
+    const covered = certifying.some((c) =>
+      skipped.every((name) => (c.legs ?? []).some((leg) => leg.leg === name && leg.conclusion === 'success')),
+    );
+    if (!covered) {
+      problems.push(
+        `${record.file}: ${skipped.join(', ')} skipped, and no green record on this commit certifies it — ` +
+          'a leg no runner class ran is not a leg that passed',
+      );
+    }
   }
   return problems;
+}
+
+/** The legs each bound record declined to run, so the gate can name them and check someone else ran them. */
+function skippedLegs(bound) {
+  return bound
+    .map((record) => ({
+      record,
+      skipped: (record.legs ?? []).filter((leg) => leg.conclusion === 'skipped').map((leg) => leg.leg),
+    }))
+    .filter((entry) => entry.skipped.length > 0);
+}
+
+/**
+ * FR-58: what the green message must not let a reader assume. A class that skipped a leg is named here with the
+ * record that certifies it, so "the candidate is green" never reads as "every runner class measured everything".
+ */
+export function candidateNotes(records, { version, sha }) {
+  const bound = records.filter((r) => r.tag === `v${version}` && r.commit === sha);
+  const certifying = bound.filter((r) => deriveCandidatePasses(r.legs ?? []).passes);
+  return skippedLegs(bound).map(({ record, skipped }) => {
+    const by = certifying.filter((c) =>
+      skipped.every((name) => (c.legs ?? []).some((leg) => leg.leg === name && leg.conclusion === 'success')),
+    );
+    return (
+      `${record.file}: ${skipped.join(', ')} not run on this class` +
+      (by.length ? ` — certified by ${by.map((c) => c.file).join(', ')}` : ' — certified by no record')
+    );
+  });
 }
 
 export function registryProblems(packument, name, version) {
@@ -246,7 +321,9 @@ export async function main(deps, argv = []) {
   }
 
   try {
-    problems.push(...candidateProblems(deps.records(), { version: pkg.version, sha: tested }));
+    const records = deps.records();
+    problems.push(...candidateProblems(records, { version: pkg.version, sha: tested }));
+    notes.push(...candidateNotes(records, { version: pkg.version, sha: tested }));
   } catch (error) {
     problems.push(`could not read release/last-candidate*.json: ${String(error.message ?? error).slice(0, 160)}`);
   }
@@ -267,7 +344,7 @@ export async function main(deps, argv = []) {
   const where = tested === sha ? `tagged at ${sha.slice(0, 7)} (HEAD)` : `tagged at ${tested.slice(0, 7)}, with HEAD adding only the release evidence`;
   console.log(
     `release:validate green — ${pkg.name}@${pkg.version} is ${where}; every required job passed on the tested ` +
-      'commit, the candidate record is all-green with a digest, and the registry does not carry this version.',
+      'commit, a candidate record certifies every leg there with a digest, and the registry does not carry this version.',
   );
   console.log('This validates the state. It does not sign §9, and it does not publish: both stay a person’s act.');
   return 0;
