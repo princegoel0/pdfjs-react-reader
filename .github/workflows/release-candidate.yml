@@ -49,8 +49,8 @@ jobs:
       - name: Install
         run: npm ci
 
-      # The whole of `verify` on the checked-out tree: typecheck, 153 test files, build, size, packaging, examples,
-      # maturity, the §6.2 dependency scan, the docs gate and the register gate.
+      # The whole of `verify` on the checked-out tree. The leg list belongs to the command and is not copied here: a
+      # count written beside it goes stale the first time the suite grows, and nothing gates this comment.
       - name: Verify chain
         id: verify
         env:
