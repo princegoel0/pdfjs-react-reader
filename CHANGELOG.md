@@ -39,7 +39,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   earlier red readings is a sample of one, so what retires the worry is the mechanism being gone, not the tally
   being green.
 
-- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,462 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
+- **Release Candidate & PRD §9 Verification:** Verified and release-ready on `dev`: all 58 requirements (`FR-01`–`FR-58`) are implemented, all 12 verification legs in `npm run verify` pass across 164 test files (1,463 tests), and candidate pipeline passes on clean runners (`release/last-candidate.json`).
   - **Mobile Device Verification Scope & Hardening:** Real hardware test sessions executed and recorded via BrowserStack Local on iPhone 16 (iOS 18.5 Safari 18.5) and Google Pixel 9 Pro XL (Android 15 Chrome 152.0.0.0). Hardened harness with `scripts/check-device-records.mjs` and `src/lib/device-verification.test.ts` to strictly refuse fallback to OS versions, enforce failable touch arbitration verdicts, and record per-verdict empirical observations (`device/ios-safari-18.json`, `device/android-chrome-128.json`). Full interactive mobile user tasks remain unverified in PRD §8 and are scheduled for 1.x.
   - **Engine Compatibility Polyfills (`src/lib/compat.ts`):** Zero-dependency pure JavaScript runtime polyfills added for TC39 `Map.prototype.getOrInsertComputed`, `Map.prototype.getOrInsert`, and `Uint8Array.prototype.toHex`, resolving unhandled runtime exceptions in `pdfjs-dist@6` on iOS 18 Safari (#141, #156).
   - **Screen Reader Verification Status & PRD §9 Amendment:** In accordance with PRD §9 dated amendment (2026-11-03), canonical `a11y/certifications.json` maintains `not-run` for all three assistive-technology pairings (NVDA, JAWS, VoiceOver) with their respective environment and operator blockers documented, designated as open release gates for 1.x. Release 1.0.0 is guarded and validated by automated axe-core WCAG 2.2 AA audits (`npm run a11y`), structure tree integration (FR-43), and forced colors conformance (FR-44).
@@ -143,7 +143,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   both red, on two different engine builds, also weakens what is left of the engine-axis reading and points at
   something about the run itself — which is what the trace is for.
 
-- **The publish gate refused the only candidate its own workflow can produce (`FR-58`, #324).** The second
+- **The publish gate refused the only candidate its own workflow can produce (`FR-58`).** The second
   impossible-order trap in this gate, found the same way as the first — by walking what the runner actually writes
   rather than testing one rule at a time. `candidateProblems` required **every** record bound to the tagged commit to
   be all-green, but `release-candidate.yml` runs the benchmark leg on one node class only (`22.13.0`, the one with an
@@ -158,10 +158,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   rejected on a measurement: un-gating the benchmark step would make it *pass* on a class with no baseline entry,
   because `benchmark.mjs` exits `broke.length || regressed.length ? 1 : 0` and an `n/a` line is neither — a green
   having measured nothing. `deriveCandidatePasses` is unchanged, so a record with a skip still reads `passes: false`
-  in the file itself. Six cases in `src/lib/release-gate.test.ts` (30 in the file) read the node matrix and the gated
+  in the file itself. Six cases in `src/lib/release-gate.test.ts` (31 in the file) read the node matrix and the gated
   class out of the workflow rather than typing them, pass exactly what it writes, and refuse each way a skip could be
   laundered: only the skipped record committed, both classes skipping, a leg no class ran, a leg that broke on the
   non-certifying class, an absent leg, and two green records binding different artifacts.
+
+- **The candidate's digest named bytes nobody kept (`FR-58`).** `publish:readback` downloads the registry's tarball
+  and compares its sha256 against the candidate record's, which is the whole point of binding a digest — but
+  `release-candidate.yml` uploaded only the JSON record, so the artifact the digest described was destroyed with the
+  runner. The comparison was therefore unpassable by the only publish path this repo has, because a local `npm pack`
+  is not the runner's bytes: `core.autocrlf=true` here, and the tarball's text members are CRLF in this working tree
+  (`README.md` 876 CRLF / 0 LF, `package.json` 302 / 0, `LICENSE` 0 / 21) while git stores them as LF and a Linux
+  runner checks them out verbatim. Measured 2026-11-11 from `npm pack --dry-run`: `files: ["dist"]` plus npm's
+  auto-included `README.md`, `LICENSE` and `package.json`, 163 files. The two runner classes do agree with each other
+  — all three `v1.0.0-rc.1` records bind `a7df1a2b0583ea15…`, so packing is reproducible across Node 22.13.0 and
+  Node 24 on one commit; it is the checkout, not the packer, that differs. The workflow now uploads
+  `steps.pack.outputs.tarball` as `release-tarball-node22.13.0` and `release-tarball-node24`, gated on
+  `steps.pack.outcome == 'success'` with `if-no-files-found: error`, so the bytes to publish are retrievable and are
+  the bytes that were tested. One case in `src/lib/release-gate.test.ts` (31 in the file) ties the uploaded path to the
+  same pack step the `--sha256` comes from; its counterfactual — the step still uploading, but the record instead of
+  the tarball — fails naming that clause. The guard's first version hard-coded `\n` and so failed on this CRLF tree
+  while it would have passed on CI's LF checkout; it reads `\r?\n` now, because an instrument that only works on one
+  machine's line endings is the defect it was written to catch.
 
 ## [1.0.0-rc.1] - 2026-11-01
 

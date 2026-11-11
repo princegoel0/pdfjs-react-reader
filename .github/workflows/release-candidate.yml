@@ -162,3 +162,15 @@ jobs:
           name: release-candidate-node${{ matrix.node }}
           path: release/last-candidate-node${{ matrix.node }}.json
           if-no-files-found: error
+
+      # The record binds a sha256, and a digest nobody can retrieve is a promise rather than evidence. A local
+      # `npm pack` is not these bytes: this tree checks out with core.autocrlf=true on Windows, so README.md and
+      # package.json enter a laptop tarball as CRLF while the runner packs the LF blobs. `publish:readback` compares
+      # the registry's tarball against this digest, so the artifact published has to be the artifact tested here.
+      - name: Upload the packed artifact the record binds
+        if: always() && steps.pack.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-tarball-node${{ matrix.node }}
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error

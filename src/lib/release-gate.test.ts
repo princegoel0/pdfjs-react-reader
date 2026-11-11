@@ -163,6 +163,27 @@ describe('FR-58: a candidate the workflow can produce is one the gate can pass',
     expect(names, 'the gated leg must be one rc-record requires').toContain('benchmarks');
   });
 
+  /**
+   * A digest nobody can retrieve is a promise, not evidence. `publish:readback` compares the registry's tarball
+   * against the record's sha256, and a laptop's `npm pack` is not those bytes — this tree checks out CRLF on
+   * Windows while the runner packs the LF blobs — so the run must keep the artifact it digested.
+   */
+  it('keeps the bytes its digest names, so the artifact published can be the artifact tested', () => {
+    const upload = capture(
+      yml,
+      /- name: Upload the packed artifact the record binds\r?\n([\s\S]*?)(?=\r?\n {6}- name: |\s*$)/,
+      'the packed-artifact upload step',
+    );
+    expect(upload, 'the upload must wait for a pack that produced a file').toMatch(/steps\.pack\.outcome == 'success'/);
+    expect(upload, 'the uploaded file must be the one the record digests').toMatch(
+      /path: \$\{\{ steps\.pack\.outputs\.tarball \}\}/,
+    );
+    expect(upload, 'a missing tarball must fail the run rather than upload nothing').toMatch(/if-no-files-found: error/);
+    expect(yml, 'the digest must come from the same pack step as the uploaded file').toMatch(
+      /--sha256="\$\{\{ steps\.pack\.outputs\.sha256 \}\}"/,
+    );
+  });
+
   it('passes the records the workflow writes, and names the class that did not measure', () => {
     const records = asWritten();
     expect(candidateProblems(records, { version: VERSION, sha: SHA })).toEqual([]);
